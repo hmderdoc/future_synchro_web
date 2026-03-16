@@ -75,13 +75,13 @@
 			</div>
 			<div class="message" data-message-body></div>
 			<div class="clearfix">
-				<button class="btn btn-default icon" title="<? locale.write('label_delete'); ?>" aria-label="<? locale.write('label_delete'); ?>">
+				<button class="btn btn-default icon" data-button-delete title="<? locale.write('label_delete'); ?>" aria-label="<? locale.write('label_delete'); ?>">
 					<span class="glyphicon glyphicon-trash"></span>
 				</button>
 				<a class="btn btn-default icon" title="<? locale.write('label_direct_link'); ?>" aria-label="<? locale.write('label_direct_link'); ?>" href="#" data-direct-link>
 					<span class="glyphicon glyphicon-link"></span>
 				</a>
-				<button class="btn btn-default icon" title="<? locale.write('label_reply'); ?>" aria-label="<? locale.write('label_reply'); ?>">
+				<button class="btn btn-default icon" data-button-reply title="<? locale.write('label_reply'); ?>" aria-label="<? locale.write('label_reply'); ?>">
 					<span class="glyphicon glyphicon-comment"></span>
 				</button>
 				<button class="btn-uv btn btn-default icon" data-button-upvote>
@@ -139,7 +139,16 @@
 		// Should subscribe here for updates to the thread; need to add some functions to lib/forum.js, lib/events/forum.js, root/js/xjs-forum.js
 	</script>
 	
-	<!-- get n messages of thread and append to forum-list-container -->
+	
+    <!-- Template for a message reply input (thread view) -->
+    <div id="forum-message-reply-template" class="reply" hidden>
+        <strong><? locale.write('label_form_reply'); ?></strong>
+        <textarea rows="8" class="form-control reply" id="replytext-ID"></textarea>
+        <button id="quote-ID" class="btn" onclick="quotify('ID')"><? locale.write('button_quote_message'); ?></button>
+        <input id="reply-button-ID" class="btn btn-primary" type="submit" value="Submit" onclick="postReply('SUB', 'ID')" />
+    </div>
+
+<!-- get n messages of thread and append to forum-list-container -->
 
 <!-- Viewing a sub (list of threads) -->
 <? } else if (request.has_param('sub') && msg_area.sub[request.get_param('sub')] !== undefined) { ?>
@@ -341,11 +350,7 @@
     </div>
 
 	<div id="forum-list-container" class="list-group"></div>
-	<div id="forum-load-more-threads" class="text-center" hidden>
-		<button id="load-more-threads" class="btn btn-primary" aria-label="<? locale.write('button_load_more', 'main'); ?>" title="<? locale.write('button_load_more', 'main'); ?>" onclick="listThreads('<? write(sub.code); ?>', <? write(settings.page_size); ?>, true)">
-			<? locale.write('button_load_more', 'main'); ?>
-		</button>
-	</div>
+        <div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
 
     <script type="text/javascript">
 
@@ -357,7 +362,7 @@
             sub: '<? request.write_param("sub"); ?>',
 		});
 
-		listThreads('<? write(sub.code); ?>', <? write(settings.page_size); ?>);
+		initThreadInfiniteScroll('<? write(sub.code); ?>', <? write(settings.page_size); ?>);
 
     </script>
 
