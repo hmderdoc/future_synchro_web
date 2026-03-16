@@ -117,6 +117,7 @@
 <script src="./js/graphics-converter.js?_v=<? write(time()); ?>"></script>
 <script src="./js/avatars.js?_v=<? write(time()); ?>"></script>
 <script src="./js/common.js?_v=<? write(time()); ?>"></script>
+<script src="./js/chat.js?_v=<? write(time()); ?>"></script>
 
 
 <!-- Navbar (BS5) -->
@@ -185,6 +186,10 @@
                         <li><a class="dropdown-item" href="./?page=000-mail.xjs">
                             <? write(locale.strings.main.menu_item_mail); ?>
                             <span class="badge bg-danger" id="badge-unread-mail-inner"></span>
+                        </a></li>
+                        <li><a class="dropdown-item" href="./?page=004-chat.xjs">
+                            Chat
+                            <span class="badge bg-primary" id="badge-chat-unread" class="d-none"></span>
                         </a></li>
                         <li><a class="dropdown-item" id="button-logout" href="#"><? write(locale.strings.main.menu_item_logout); ?></a></li>
                     </ul>
@@ -296,5 +301,6 @@
 <script src="./js/mqtt.js?_v=<? write(time()); ?>"></script>
 <?xjs } ?>
 <script src="./js/spa.js?_v=<? write(time()); ?>"></script>
+<div id="chat-toasts"></div>
 </body>
 </html>

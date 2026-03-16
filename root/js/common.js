@@ -274,6 +274,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (actionBtn) actionBtn.hidden = true;
             if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
         });
+
+        registerEventListener('chat', function (e) {
+            try {
+                var data = JSON.parse(e.data);
+                window.dispatchEvent(new CustomEvent('chat:message', { detail: data }));
+            } catch (err) {
+                console.error('chat SSE parse error', err);
+            }
+        }, { channel: 'main' });
     }
 
     // Start SSE

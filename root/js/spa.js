@@ -86,7 +86,7 @@
     }
 
     function dispatch(name, detail) {
-        document.dispatchEvent(new CustomEvent(name, { detail: detail }));
+        window.dispatchEvent(new CustomEvent(name, { detail: detail }));
     }
 
     /* ---------- navigation ---------- */

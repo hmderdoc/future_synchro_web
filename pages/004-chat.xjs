@@ -1,0 +1,252 @@
+<!--Chat-->
+<style>.chat-container{display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:400px}</style>
+
+<div class="chat-container">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chat</h4>
+        <span id="chat-user-count" class="badge bg-secondary" role="button" style="cursor:pointer">0 users</span>
+    </div>
+
+    <div id="chat-users-panel" class="chat-users-panel d-none mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong><i class="bi bi-people me-1"></i>Online Users</strong>
+            <button id="chat-users-close" class="btn btn-sm btn-outline-secondary">&times;</button>
+        </div>
+        <div id="chat-users-list" class="chat-users-list"></div>
+    </div>
+    <div id="chat-messages" class="chat-messages flex-grow-1 mb-2">
+        <div class="text-center text-muted py-4">Loading chat history&hellip;</div>
+    </div>
+
+<?xjs
+    if (user.number > 0) {
+?>
+    <form id="chat-input" class="chat-input-area" autocomplete="off">
+        <div class="input-group">
+            <input type="text" id="chat-text" class="form-control"
+                   placeholder="Type a message&hellip;" maxlength="500" required>
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-send"></i> Send
+            </button>
+        </div>
+    </form>
+<?xjs } else { ?>
+    <div class="text-center text-muted py-2">
+        <a href="/?page=000-login.xjs">Log in</a> to send messages.
+    </div>
+<?xjs } ?>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var msgContainer = document.getElementById('chat-messages');
+    var chatInput    = document.getElementById('chat-input');
+    var chatText     = document.getElementById('chat-text');
+    var userCount    = document.getElementById('chat-user-count');
+
+    var usersPanel  = document.getElementById('chat-users-panel');
+    var usersList   = document.getElementById('chat-users-list');
+    var usersClose  = document.getElementById('chat-users-close');
+
+    /* Toggle users panel */
+    if (userCount) {
+        userCount.addEventListener('click', function () {
+            usersPanel.classList.toggle('d-none');
+            if (!usersPanel.classList.contains('d-none')) {
+                window.ChatService && window.ChatService.getUsers();
+            }
+        });
+    }
+    if (usersClose) {
+        usersClose.addEventListener('click', function () {
+            usersPanel.classList.add('d-none');
+        });
+    }
+
+    function renderUsers(users) {
+        if (!usersList) return;
+        if (!users || !users.length) {
+            usersList.innerHTML = '<div class="text-muted small">No users online</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            var nick = u.nick || 'Unknown';
+            var sys  = u.system || '';
+            var num  = u.userNumber || 0;
+            html += '<div class="chat-user-item">';
+            html += '<div class="chat-user-avatar" data-avatar="' + num + '"></div>';
+            html += '<div class="chat-user-info">';
+            html += '<div class="chat-user-nick">' + escapeHtml(nick) + '</div>';
+            if (sys) html += '<div class="chat-user-system">' + escapeHtml(sys) + '</div>';
+            html += '</div></div>';
+        }
+        usersList.innerHTML = html;
+        if (typeof Avatars !== 'undefined' && Avatars.draw) {
+            var avatarEls = usersList.querySelectorAll('div[data-avatar]');
+            var nums = [];
+            avatarEls.forEach(function (el) {
+                var n = el.getAttribute('data-avatar');
+                if (n && n !== '0') nums.push(n);
+            });
+            if (nums.length) Avatars.draw(nums);
+        }
+    }
+
+    /* ---- Helpers ---- */
+    function escapeHtml(str) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(str));
+        return d.innerHTML;
+    }
+
+    function linkify(text) {
+        return escapeHtml(text).replace(
+            /(https?:\/\/[^\s<]+)/gi,
+            '<a href="$1" target="_blank" rel="noopener">$1</a>'
+        );
+    }
+
+    function formatTime(ts) {
+        if (!ts) return '';
+        var d = new Date(ts);
+        var h = d.getHours(), m = d.getMinutes();
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    }
+
+    function getMyAlias() { return (window.sbbsConfig && window.sbbsConfig.userAlias) || ''; }
+
+    /* ---- Render ---- */
+    function renderMessages() {
+        var msgs = window.ChatService ? window.ChatService.getMessages() : [];
+        if (!msgs.length) {
+            msgContainer.innerHTML = '<div class="text-center text-muted py-4">No messages yet. Say hello!</div>';
+            return;
+        }
+
+        var html = '';
+        var prevSender = '', prevTime = 0;
+        var GROUP_WINDOW = 120000; /* 2 min */
+
+        for (var i = 0; i < msgs.length; i++) {
+            var m = msgs[i];
+            if (m.type !== 'message') continue;
+
+            var isSelf = getMyAlias() && m.sender === getMyAlias();
+            var isSystem = !m.sender;
+            var sameGroup = (m.sender === prevSender) &&
+                            (m.timestamp - prevTime < GROUP_WINDOW);
+
+            if (isSystem) {
+                html += '<div class="chat-system-msg">' + escapeHtml(m.text) + '</div>';
+                prevSender = '';
+                continue;
+            }
+
+            if (!sameGroup) {
+                if (prevSender) html += '</div></div>'; /* close prev group */
+
+                if (isSelf) {
+                    html += '<div class="chat-msg-group chat-msg-group-self">';
+                    html += '<div class="chat-msg-content">';
+                    html += '<div class="chat-sender text-end">' + escapeHtml(m.sender) +
+                            ' <small class="chat-timestamp">' + formatTime(m.timestamp) + '</small></div>';
+                } else {
+                    html += '<div class="chat-msg-group chat-msg-group-other">';
+                    var userNum = m.userNumber || 0;
+                    html += '<div class="chat-avatar" data-avatar="' + userNum + '"></div>';
+                    html += '<div class="chat-msg-content">';
+                    html += '<div class="chat-sender">' + escapeHtml(m.sender) +
+                            ' <small class="chat-timestamp">' + formatTime(m.timestamp) + '</small></div>';
+                }
+            }
+
+            var bubbleClass = isSelf ? 'chat-bubble chat-bubble-self' : 'chat-bubble chat-bubble-other';
+            html += '<div class="' + bubbleClass + '">' + linkify(m.text) + '</div>';
+
+            prevSender = m.sender;
+            prevTime = m.timestamp;
+        }
+
+        if (prevSender) html += '</div></div>'; /* close last group */
+
+        msgContainer.innerHTML = html;
+
+        /* Render avatars */
+        if (typeof Avatars !== 'undefined' && Avatars.draw) {
+            var avatarEls = msgContainer.querySelectorAll('div[data-avatar]');
+            var users = [];
+            avatarEls.forEach(function (el) {
+                var u = el.getAttribute('data-avatar');
+                if (u && u !== '0') users.push(u);
+            });
+            if (users.length) Avatars.draw(users);
+        }
+
+        scrollToBottom();
+    }
+
+    function appendMessage(msg) {
+        /* Quick append: just re-render for now (grouping logic is complex) */
+        renderMessages();
+    }
+
+    function scrollToBottom() {
+        requestAnimationFrame(function () {
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        });
+    }
+
+    /* ---- Events ---- */
+    function onNewMessage(e) {
+        appendMessage(e.detail);
+    }
+
+    function onHistoryLoaded() {
+        renderMessages();
+    }
+
+    function onUsersUpdated(e) {
+        var users = e.detail || [];
+        userCount.textContent = users.length + ' user' + (users.length !== 1 ? 's' : '');
+        renderUsers(users);
+    }
+
+    window.addEventListener('chat:newMessage', onNewMessage);
+    window.addEventListener('chat:historyLoaded', onHistoryLoaded);
+    window.addEventListener('chat:usersUpdated', onUsersUpdated);
+
+    if (chatInput) {
+        chatInput.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var text = chatText.value.trim();
+            if (!text) return;
+            chatText.value = '';
+            window.ChatService && window.ChatService.send(text);
+        });
+    }
+
+    /* Tell ChatService this page is active */
+    if (window.ChatService) {
+        window.ChatService.setChatPageActive(true);
+        window.ChatService.loadHistory();
+        window.ChatService.getUsers();
+    }
+
+    /* Cleanup on navigate away */
+    function cleanup() {
+        window.removeEventListener('chat:newMessage', onNewMessage);
+        window.removeEventListener('chat:historyLoaded', onHistoryLoaded);
+        window.removeEventListener('chat:usersUpdated', onUsersUpdated);
+        window.removeEventListener('spa:beforeNavigate', cleanup);
+        if (window.ChatService) window.ChatService.setChatPageActive(false);
+    }
+    window.addEventListener('spa:beforeNavigate', cleanup);
+
+})();
+</script>
