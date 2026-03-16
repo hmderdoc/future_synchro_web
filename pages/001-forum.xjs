@@ -2,7 +2,7 @@
 
 <?xjs
     var request = require({}, settings.web_lib + 'request.js', 'request');
-    var forum = require({}, settings.web_lib + 'forum.js', 'forum');
+    load(settings.web_lib + 'forum.js');
     locale.section = 'page_forum';
 
     /* Icon resolution for breadcrumbs */

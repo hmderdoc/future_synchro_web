@@ -828,3 +828,29 @@
         max-width: none;
     }
 }
+
+/* Forum message body styles */
+div.message {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+div.message blockquote {
+    border-left: 3px solid #555;
+    margin: 0.5em 0;
+    padding: 0.25em 0.75em;
+    color: #aaa;
+}
+div.message pre.ansi {
+    background-color: #000;
+    color: #aaa;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.1;
+    padding: 0.5em;
+    overflow-x: auto;
+    max-width: 100%;
+}
+[data-theme="cga"] div.message blockquote {
+    border-left-color: #00aa00;
+    color: #00aaaa;
+}
