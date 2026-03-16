@@ -1,0 +1,76 @@
+<h4>
+    <? write(locale.strings.sidebar_node_list.label_title); ?>
+</h4>
+
+<div id="sbbs-nodelist"></div>
+
+<script type="text/javascript">
+
+    var anl = <? write(settings.active_node_list); ?>;
+    var nch = '<? write(settings.active_node_list ? locale.strings.sidebar_node_list.label_connection_column : locale.strings.sidebar_node_list.label_node_column) ?>';
+    var nll = <? write(system.node_list.length); ?>;
+    var niu = 0;
+
+    function _sb_nodelist(evt) {
+        var data = JSON.parse(evt.data);
+        var nodelistEl = document.getElementById('sbbs-nodelist');
+        var parentEl = nodelistEl ? nodelistEl.parentElement : null;
+        if (parentEl) parentEl.style.display = 'none';
+        if (nodelistEl) nodelistEl.style.display = 'none';
+
+        var tableHtml =
+            '<table id="sbbs-nodelist-table" class="table table-sm table-striped">' +
+            '<thead><tr>' +
+            '<th>' + nch + '</th>' +
+            '<th><?xjs write(locale.strings.sidebar_node_list.label_status_column); ?></th>' +
+            '</tr></thead>' +
+            '<tbody></tbody>' +
+            '</table>';
+        if (nodelistEl) nodelistEl.innerHTML = tableHtml;
+
+        niu = 0;
+        var ns = 0;
+        var tbody = document.querySelector('#sbbs-nodelist-table tbody');
+
+        data.forEach(function (c) {
+            if (anl && (c.action === null || c.user === null)) return;
+            var tr = document.createElement('tr');
+            var th = document.createElement('th');
+            th.setAttribute('scope', 'row');
+            th.textContent = anl ? c.connection : (typeof c.node === 'number' ? c.node : c.connection);
+            var td = document.createElement('td');
+            td.id = 'nodelist-' + c.node;
+            td.innerHTML = c.user ? ('<strong>' + c.user + '</strong> ' + c.action) : (c.status || '');
+            tr.appendChild(th);
+            tr.appendChild(td);
+            if (tbody) tbody.appendChild(tr);
+
+            if (c.user && <? write(user.alias != settings.guest); ?>) {
+                td.title = '<? write(locale.strings.sidebar_node_list.label_send_telegram); ?>';
+                td.style.cursor = 'pointer';
+                td.addEventListener('click', (function (u) {
+                    return function () { sendTelegram(u); };
+                })(c.user));
+            }
+            if (typeof c.node === 'number' && c.user !== '') niu++;
+            ns++;
+        });
+
+        if (ns) {
+            if (parentEl) parentEl.style.display = '';
+            if (nodelistEl) nodelistEl.style.display = '';
+        }
+
+        // Update node counters in system stats sidebar
+        var sidebarEl = document.getElementById('sidebar');
+        if (sidebarEl) {
+            var inUseEls = sidebarEl.querySelectorAll('.sb-nodes-in-use');
+            var availEls = sidebarEl.querySelectorAll('.sb-nodes-available');
+            inUseEls.forEach(function (el) { el.textContent = niu; });
+            availEls.forEach(function (el) { el.textContent = nll - niu; });
+        }
+    }
+
+    registerEventListener('nodelist', _sb_nodelist);
+
+</script>

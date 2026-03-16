@@ -1,0 +1,108 @@
+<!--Home-->
+
+<?xjs
+    require('sbbsdefs.js', 'SYS_CLOSED');
+?>
+
+<!-- Welcome -->
+<div class="card mb-3">
+    <div class="card-body">
+        <h4 class="card-title"><? write(system.name); ?></h4>
+        <p class="card-text">Welcome to <? write(system.name); ?>.</p>
+<?xjs if (user.alias === settings.guest || user.number < 1) { ?>
+        <p class="text-muted">Log in to access the terminal, send messages, and join the forums.</p>
+<?xjs } ?>
+    </div>
+</div>
+
+<!-- System Info + Node List -->
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">System Information</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Sysop</td><td><? write(system.operator); ?></td></tr>
+                    <tr><td>Nodes</td><td><? write(system.nodes); ?></td></tr>
+                    <tr><td>Total Users</td><td><? write(system.stats.total_users); ?></td></tr>
+                    <tr><td>Total Calls</td><td><? write(system.stats.total_logons); ?></td></tr>
+                    <tr><td>Messages Posted</td><td><? write(system.stats.total_messages); ?></td></tr>
+                    <tr><td>Files Uploaded</td><td><? write(system.stats.total_files); ?></td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">Who's Online</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0" id="home-nodelist-table">
+                    <thead>
+                        <tr><th>User</th><th>Activity</th></tr>
+                    </thead>
+                    <tbody id="home-nodelist-body">
+                        <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function _home_nodelist(evt) {
+    var data = JSON.parse(evt.data);
+    var tbody = document.getElementById('home-nodelist-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    var count = 0;
+    var avatarUsers = [];
+    data.forEach(function (c) {
+        if (!c.user) return;
+        var tr = document.createElement('tr');
+        var tdUser = document.createElement('td');
+        if (c.useron) {
+            var avatar = document.createElement('div');
+            avatar.setAttribute('data-avatar', String(c.useron));
+            avatar.className = 'avatar-inline';
+            tdUser.appendChild(avatar);
+            if (avatarUsers.indexOf(c.useron) < 0) avatarUsers.push(c.useron);
+        }
+        tdUser.appendChild(document.createTextNode(' ' + c.user));
+        var tdActivity = document.createElement('td');
+        tdActivity.textContent = c.action || c.status || '';
+        tr.appendChild(tdUser);
+        tr.appendChild(tdActivity);
+        tbody.appendChild(tr);
+        count++;
+    });
+    if (count === 0) {
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        td.setAttribute('colspan', '2');
+        td.className = 'text-muted';
+        td.textContent = 'No users online';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+    }
+    if (avatarUsers.length && typeof Avatars !== 'undefined' && Avatars.draw) {
+        Avatars.draw(avatarUsers);
+    }
+}
+(function() {
+    function attach() {
+        if (window._sbbsEventSource) {
+            window._sbbsEventSource.addEventListener('nodelist', _home_nodelist);
+            return true;
+        }
+        return false;
+    }
+    if (!attach()) {
+        var timer = setInterval(function() {
+            if (attach()) clearInterval(timer);
+        }, 200);
+        setTimeout(function() { clearInterval(timer); }, 10000);
+    }
+})();
+</script>

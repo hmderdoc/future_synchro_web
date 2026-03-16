@@ -1,0 +1,108 @@
+<!--Games-->
+<?xjs
+
+load("ftelnethelper.js");
+load(settings.web_lib + 'ftelnet.js');
+
+if (typeof settings.xtrn_blacklist === 'string') {
+    settings.xtrn_blacklist = settings.xtrn_blacklist.toLowerCase().split(',');
+} else {
+    settings.xtrn_blacklist = [];
+}
+
+var gamePrograms = [];
+var gameSections = {};
+xtrn_area.sec_list.forEach(function (sec) {
+    if (!sec.can_access || sec.prog_list.length < 1) return;
+    if (settings.xtrn_blacklist.indexOf(sec.code.toLowerCase()) > -1) return;
+    sec.prog_list.forEach(function (prog) {
+        if (!prog.can_access || !prog.can_run) return;
+        if (settings.xtrn_blacklist.indexOf(prog.code.toLowerCase()) > -1) return;
+        gamePrograms.push({
+            code: prog.code,
+            name: prog.name,
+            section: sec.name,
+            sectionCode: sec.code
+        });
+        gameSections[sec.code] = sec.name;
+    });
+});
+
+var modsDir = system.mods_dir;
+if (modsDir && modsDir.slice(-1) !== '/' && modsDir.slice(-1) !== '\\') modsDir += '/';
+
+var usageRaw = {};
+var usageFile = modsDir + 'future_shell/data/external_usage.json';
+var uf = new File(usageFile);
+if (uf.exists && uf.open('r')) {
+    try { usageRaw = JSON.parse(uf.readAll().join('\n')); } catch (e) {}
+    uf.close();
+}
+
+var iconsDir = modsDir + 'future_shell/assets/';
+var gameIcons = {};
+try {
+    var binList = directory(iconsDir + '*.bin') || [];
+    for (var i = 0; i < binList.length; i++) {
+        var fullPath = binList[i];
+        var fname = fullPath.substr(fullPath.lastIndexOf('/') + 1).replace(/\.bin$/i, '');
+        var bf = new File(fullPath);
+        if (bf.open('rb')) {
+            gameIcons[fname.toUpperCase()] = base64_encode(bf.read());
+            bf.close();
+        }
+    }
+} catch (e) {}
+
+load('sbbsdefs.js');
+var validUsers = {};
+var _vu = new User(0);
+for (var _un = 1; _un <= system.lastuser; _un++) {
+    _vu.number = _un;
+    if (_vu.settings & USER_DELETED) continue;
+    if (!_vu.alias || _vu.alias === '') continue;
+    validUsers[_un] = _vu.alias;
+}
+_vu = undefined;
+
+?>
+
+<div id="games-page">
+
+    <div class="d-flex flex-wrap align-items-center mb-3 gap-2" id="games-controls">
+        <div class="btn-group btn-group-sm" role="group" id="games-sort">
+            <button class="btn btn-outline-success active" data-sort="time">Time</button>
+            <button class="btn btn-outline-success" data-sort="launches">Launches</button>
+            <button class="btn btn-outline-success" data-sort="recent">Recent</button>
+            <button class="btn btn-outline-success" data-sort="name">Name</button>
+            <button class="btn btn-outline-success" data-sort="unique">Players</button>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" id="games-month-nav">
+            <button class="btn btn-outline-info" id="games-month-prev" title="Previous month">&laquo;</button>
+            <button class="btn btn-outline-info disabled" id="games-month-label">All Time</button>
+            <button class="btn btn-outline-info" id="games-month-next" title="Next month">&raquo;</button>
+        </div>
+        <div class="position-relative d-inline-block">
+            <button class="btn btn-outline-warning btn-sm" id="games-user-filter">
+                <span class="glyphicon glyphicon-user"></span> All Users
+            </button>
+        </div>
+    </div>
+
+    <div id="games-stats" class="d-flex flex-wrap gap-3 mb-3 small text-muted"></div>
+
+    <div id="games-grid"></div>
+
+</div>
+
+<script>
+var _gamesData = {
+    programs: <?xjs write(JSON.stringify(gamePrograms)); ?>,
+    usage: <?xjs write(JSON.stringify(usageRaw)); ?>,
+    icons: <?xjs write(JSON.stringify(gameIcons)); ?>,
+    sections: <?xjs write(JSON.stringify(gameSections)); ?>,
+    validUsers: <?xjs write(JSON.stringify(validUsers)); ?>
+};
+</script>
+<script src="./js/graphics-converter.js"></script>
+<script src="./js/games.js?_v=<?xjs write(time()); ?>"></script>

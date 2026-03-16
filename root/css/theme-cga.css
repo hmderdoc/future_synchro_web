@@ -1,0 +1,317 @@
+/* ===== theme-cga.css — Pure CGA 16-color theme =====
+ *
+ * Strict CGA palette only. No gradients, no rgba, no glow, no blur.
+ * Toggle via [data-theme="cga"] on <html>.
+ *
+ * CGA palette:
+ *   0 #000000 Black          8 #555555 Dark Gray
+ *   1 #0000AA Blue           9 #5555FF Bright Blue
+ *   2 #00AA00 Green         10 #55FF55 Bright Green
+ *   3 #00AAAA Cyan          11 #55FFFF Bright Cyan
+ *   4 #AA0000 Red           12 #FF5555 Bright Red
+ *   5 #AA00AA Magenta       13 #FF55FF Bright Magenta
+ *   6 #AA5500 Brown         14 #FFFF55 Yellow
+ *   7 #AAAAAA Light Gray   15 #FFFFFF White
+ */
+
+[data-theme="cga"] {
+    --bs-body-bg: #000000;
+    --bs-body-color: #AAAAAA;
+    --bs-primary: #55FFFF;
+    --bs-secondary: #AA00AA;
+    --bs-success: #00AA00;
+    --bs-info: #5555FF;
+    --bs-warning: #AA5500;
+    --bs-danger: #AA0000;
+    --bs-light: #AAAAAA;
+    --bs-dark: #555555;
+    --fx-glow: none;
+    --fx-glow-magenta: none;
+    --fx-border: 1px solid #00AAAA;
+    --fx-soft-border: 1px solid #555555;
+    --fx-card-bg: #000000;
+}
+
+[data-theme="cga"] html,
+[data-theme="cga"] body {
+    background: #000000 !important;
+    background-image: none !important;
+}
+
+[data-theme="cga"] body {
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .crt-root::before,
+[data-theme="cga"] .crt-root::after {
+    display: none !important;
+}
+
+[data-theme="cga"] a,
+[data-theme="cga"] .link-primary {
+    color: #55FFFF;
+}
+
+[data-theme="cga"] a:hover,
+[data-theme="cga"] .link-primary:hover {
+    color: #FFFFFF;
+    text-shadow: none;
+}
+
+[data-theme="cga"] h1,
+[data-theme="cga"] h2,
+[data-theme="cga"] h3,
+[data-theme="cga"] h4,
+[data-theme="cga"] h5,
+[data-theme="cga"] h6 {
+    color: #FFFFFF;
+    text-shadow: none;
+}
+
+[data-theme="cga"] .navbar {
+    background: #0000AA !important;
+    border-bottom: 2px solid #55FFFF;
+    backdrop-filter: none;
+}
+
+[data-theme="cga"] .navbar-brand,
+[data-theme="cga"] .navbar-nav .nav-link {
+    color: #FFFFFF !important;
+}
+
+[data-theme="cga"] .navbar-brand:hover,
+[data-theme="cga"] .navbar-nav .nav-link:hover {
+    color: #FFFF55 !important;
+    text-shadow: none;
+}
+
+[data-theme="cga"] .navbar-nav .nav-link.active {
+    color: #55FFFF !important;
+}
+
+[data-theme="cga"] .card {
+    background: #000000;
+    border: 1px solid #00AAAA;
+    box-shadow: none;
+}
+
+[data-theme="cga"] .card .card-header {
+    color: #FFFF55;
+    background: #0000AA;
+    border-bottom: 1px solid #00AAAA;
+}
+
+[data-theme="cga"] .btn {
+    box-shadow: none;
+    text-shadow: none;
+}
+
+[data-theme="cga"] .btn-primary {
+    color: #000000;
+    background: #55FFFF;
+    border-color: #00AAAA;
+}
+
+[data-theme="cga"] .btn-primary:hover {
+    background: #FFFFFF;
+    border-color: #55FFFF;
+    filter: none;
+}
+
+[data-theme="cga"] .btn-secondary {
+    color: #000000;
+    background: #FF55FF;
+    border-color: #AA00AA;
+}
+
+[data-theme="cga"] .btn-secondary:hover {
+    background: #FFFFFF;
+    border-color: #FF55FF;
+}
+
+[data-theme="cga"] .btn-outline-primary {
+    color: #55FFFF;
+    border-color: #55FFFF;
+    background: transparent;
+}
+
+[data-theme="cga"] .btn-outline-primary:hover {
+    color: #000000;
+    background: #55FFFF;
+}
+
+[data-theme="cga"] .form-control,
+[data-theme="cga"] .form-select {
+    color: #FFFFFF;
+    background: #000000;
+    border: 1px solid #00AAAA;
+}
+
+[data-theme="cga"] .form-control:focus,
+[data-theme="cga"] .form-select:focus {
+    border-color: #55FFFF;
+    box-shadow: none;
+    outline: 2px solid #55FFFF;
+}
+
+[data-theme="cga"] .table {
+    --bs-table-color: #AAAAAA;
+    --bs-table-bg: transparent;
+    color: #AAAAAA;
+    border-color: #555555;
+}
+
+[data-theme="cga"] .table thead th {
+    color: #FFFF55;
+    background: #0000AA;
+    border-bottom: 2px solid #00AAAA;
+}
+
+[data-theme="cga"] .table-striped tbody tr:nth-of-type(odd) {
+    background-color: #000000;
+}
+
+[data-theme="cga"] .table-striped tbody tr:nth-of-type(even) {
+    background-color: #0000AA;
+}
+
+[data-theme="cga"] .table td,
+[data-theme="cga"] .table th,
+[data-theme="cga"] .table > :not(caption) > * > * {
+    border-color: #555555;
+    --bs-table-color: #AAAAAA;
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .badge.bg-primary {
+    background: #00AAAA !important;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .badge.bg-secondary {
+    background: #AA00AA !important;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .alert {
+    border-width: 2px;
+    background: #000000;
+}
+
+[data-theme="cga"] .alert-primary {
+    border-color: #55FFFF;
+    color: #55FFFF;
+    background: #000000;
+}
+
+[data-theme="cga"] .alert-danger {
+    border-color: #FF5555;
+    color: #FF5555;
+    background: #000000;
+}
+
+[data-theme="cga"] .alert-success {
+    border-color: #55FF55;
+    color: #55FF55;
+    background: #000000;
+}
+
+[data-theme="cga"] .alert-warning {
+    border-color: #FFFF55;
+    color: #FFFF55;
+    background: #000000;
+}
+
+[data-theme="cga"] pre.ansi,
+[data-theme="cga"] .terminal {
+    color: #AAAAAA;
+    background: #000000;
+    border: 1px solid #00AAAA;
+    box-shadow: none;
+}
+
+[data-theme="cga"] hr {
+    border-top: 1px solid #555555;
+}
+
+[data-theme="cga"] #sidebar {
+    opacity: 1;
+}
+
+[data-theme="cga"] #sidebar .list-group-item.sidebar {
+    background: #000000;
+    border-color: #555555;
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .dropdown-menu {
+    background: #000000;
+    border: 1px solid #00AAAA;
+}
+
+[data-theme="cga"] .dropdown-item {
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .dropdown-item:hover {
+    color: #FFFFFF;
+    background: #0000AA;
+}
+
+[data-theme="cga"] .modal-content {
+    background: #000000;
+    border: 2px solid #55FFFF;
+}
+
+[data-theme="cga"] .modal-header {
+    background: #0000AA;
+    border-bottom: 1px solid #00AAAA;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] ::-webkit-scrollbar {
+    width: 8px;
+    background: #000000;
+}
+
+[data-theme="cga"] ::-webkit-scrollbar-thumb {
+    background: #555555;
+}
+
+[data-theme="cga"] ::-webkit-scrollbar-thumb:hover {
+    background: #AAAAAA;
+}
+
+[data-theme="cga"] ::selection {
+    background: #0000AA;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .list-group-item {
+    background: #000000;
+    border-color: #555555;
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .terminal-panel {
+    border-bottom: 2px solid #00AAAA;
+}
+
+[data-theme="cga"] .text-muted {
+    color: #555555 !important;
+}
+
+[data-theme="cga"] strong,
+[data-theme="cga"] b {
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .border-cga {
+    border: 2px solid #55FFFF;
+    box-shadow: none;
+}
+
+[data-theme="cga"] .border-cga::before,
+[data-theme="cga"] .border-cga::after {
+    display: none;
+}

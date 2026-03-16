@@ -1,0 +1,300 @@
+<?xjs
+    var page = typeof http_request.query.page == 'undefined'
+        ? '000-home.xjs' : http_request.query.page[0];
+    if (page.search(/^http(s)*:\/\//) > -1) exit();
+
+    var settings = load('modopts.js', 'web') || { web_directory: web_root_dir + '/..' };
+    load(settings.web_directory + '/lib/init.js');
+    load(settings.web_lib + 'auth.js');
+    load(settings.web_lib + 'pages.js');
+    load(settings.web_lib + 'sidebar.js');
+
+    /* Redirect .link pages */
+    if (page.search(/\.link$/) > -1) {
+        var loc = getExternalLink(page);
+        http_reply.status = '301 Moved Permanently';
+        http_reply.header['Location'] = loc;
+        exit();
+    }
+
+    var pagePath = getPagePath(page);
+    if (pagePath == null) {
+        page = '000-home.xjs';
+        pagePath = getPagePath('000-home.xjs');
+    }
+    var page_ctrl = getCtrlLine(pagePath);
+
+    /* fTelnet config */
+    if (settings.ftelnet) {
+        load(settings.web_lib + 'ftelnet.js');
+        load('ftelnethelper.js');
+        var ftelnet_url = get_url();
+        var ftelnet_splash = get_splash();
+        var wsp = settings.wsp || GetWebSocketServicePort();
+        var wssp = settings.wssp || GetWebSocketServicePort(true);
+    }
+
+    /* MQTT config */
+    var broker_enabled = false;
+    var broker_password = '';
+    var broker_username = '';
+    var broker_addr = settings.mqtt_hostname || '';
+    var broker_ws_port = settings.mqtt_ws_port || 0;
+    var broker_wss_port = settings.mqtt_wss_port || 0;
+    var f = new File(system.ctrl_dir + 'main.ini');
+    if (f.open('r')) {
+        try {
+            broker_enabled = f.iniGetValue('MQTT', 'Enabled', false);
+            broker_password = f.iniGetValue('MQTT', 'Password', '');
+            broker_username = f.iniGetValue('MQTT', 'Username', '');
+        } finally { f.close(); }
+    }
+
+    /* Build page list for nav */
+    var nav_pages = getPageList();
+
+    /* Sidebar HTML (captured for initial load) */
+    function _sidebarOff() {
+        return settings.layout_sidebar_off || page_ctrl.options.no_sidebar;
+    }
+?>
+<?xjs
+    /* Nav menu helpers */
+    function navItem(e, path) {
+        if (e.type == 'list') {
+            navDropdown(e, path);
+        } else if (e.type == 'link') {
+?>
+    <li class="nav-item">
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>" target="_blank"><? write(e.title); ?></a>
+    </li>
+<?xjs
+        } else {
+?>
+    <li class="nav-item">
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>"><? write(e.title); ?></a>
+    </li>
+<?xjs
+        }
+    }
+
+    function navDropdown(obj, path) {
+?>
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <? write(obj.title.replace(/^.*\-/, '')); ?>
+        </a>
+        <ul class="dropdown-menu">
+<?xjs obj.list.forEach(function(e) { navItem(e, (path || '') + obj.title + '/'); }); ?>
+        </ul>
+    </li>
+<?xjs
+    }
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<? write(getCsrfToken()); ?>">
+    <title><? write(page_ctrl.title + ': ' + system.name); ?></title>
+    <link rel="icon" href="./images/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="./css/style.css" rel="stylesheet">
+    <? if (settings.darkmode_allow) { ?>
+    <link href="./css/checkbox.css" rel="stylesheet">
+    <? } ?>
+    <? if (file_exists(settings.web_root + 'css/custom.css')) { ?>
+    <link href="./css/custom.css" rel="stylesheet">
+    <? } ?>
+    <link href="./css/theme-cga.css" rel="stylesheet">
+    <link href="./css/spa.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Early scripts: needed before inline scripts in sidebar/content -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+<script src="./js/graphics-converter.js?_v=<? write(time()); ?>"></script>
+<script src="./js/avatars.js?_v=<? write(time()); ?>"></script>
+<script src="./js/common.js?_v=<? write(time()); ?>"></script>
+
+
+<!-- Navbar (BS5) -->
+<nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <div class="container<? if (settings.layout_full_width) write('-fluid'); ?>">
+        <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><? write(settings.brand || system.name); ?></a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarMain">
+            <ul class="navbar-nav me-auto">
+<?xjs nav_pages.forEach(function(e) { navItem(e, ''); }); ?>
+            </ul>
+            <ul class="navbar-nav ms-auto align-items-center">
+<?xjs if (settings.ftelnet) { ?>
+                <li class="nav-item">
+                    <button class="btn btn-outline-light btn-sm me-2" id="btn-terminal" type="button" title="Toggle Terminal">
+                        <span id="terminal-status" class="badge rounded-pill bg-secondary" style="width:8px;height:8px;display:inline-block;"></span>
+                        Terminal
+                    </button>
+                </li>
+<?xjs } ?>
+                <li class="nav-item me-2">
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="cgaSwitch">
+                        <label class="form-check-label text-light ms-1" for="cgaSwitch">CGA</label>
+                    </div>
+                </li>
+<?xjs if (settings.darkmode_allow) { ?>
+                <li class="nav-item me-2">
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="darkSwitch" <? write(settings.darkmode_on ? 'checked' : ''); ?>>
+                        <label class="form-check-label text-light ms-1" for="darkSwitch">Dark</label>
+                    </div>
+                </li>
+<?xjs } ?>
+<?xjs if (user.alias === settings.guest || user.number < 1) { ?>
+<?xjs   if (settings.user_registration) { ?>
+                <li class="nav-item">
+                    <a class="nav-link" href="./?page=000-register.xjs"><? write(locale.strings.main.menu_item_register); ?></a>
+                </li>
+<?xjs   } ?>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <? write(locale.strings.main.menu_item_login); ?>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:250px;">
+                        <form id="form-login">
+                            <div class="mb-2">
+                                <input id="input-username" type="text" class="form-control form-control-sm" placeholder="<? write(locale.strings.main.input_username); ?>">
+                            </div>
+                            <div class="mb-2">
+                                <input id="input-password" type="password" class="form-control form-control-sm" placeholder="<? write(locale.strings.main.input_password); ?>">
+                            </div>
+                            <button id="button-login" class="btn btn-primary btn-sm w-100" type="submit"><? write(locale.strings.main.button_login); ?></button>
+                        </form>
+                    </div>
+                </li>
+<?xjs } else { ?>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <? write(user.alias); ?>
+                        <span class="badge bg-danger" id="badge-unread-mail" style="display:none;"></span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="./?page=000-mail.xjs">
+                            <? write(locale.strings.main.menu_item_mail); ?>
+                            <span class="badge bg-danger" id="badge-unread-mail-inner"></span>
+                        </a></li>
+                        <li><a class="dropdown-item" id="button-logout" href="#"><? write(locale.strings.main.menu_item_logout); ?></a></li>
+                    </ul>
+                </li>
+<?xjs } ?>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Terminal Panel (persistent, hidden by default) -->
+<?xjs if (settings.ftelnet) { ?>
+<div id="terminal-panel" class="terminal-panel d-none">
+    <div class="container<? if (settings.layout_full_width) write('-fluid'); ?> py-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <small class="text-muted" id="terminal-info">Terminal</small>
+            <button class="btn btn-sm btn-outline-secondary" id="btn-terminal-close" type="button">&times;</button>
+        </div>
+        <div id="fTelnetContainer" class="fTelnetContainer"></div>
+        <div id="terminal-controls" class="mt-1 text-center d-none">
+            <button id="ftelnet-connect" class="btn btn-primary btn-sm">Connect</button>
+        </div>
+    </div>
+</div>
+<?xjs } ?>
+
+<!-- Modal (BS5) -->
+<div class="modal fade" id="popUpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="popUpModalTitle">Pop-Up Thingie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="popUpModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="popUpModalCloseButton" data-bs-dismiss="modal"><? write(locale.strings.main.button_close); ?></button>
+                <button type="button" class="btn btn-primary" id="popUpModalActionButton" hidden><? write(locale.strings.main.button_submit); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main content area -->
+<div class="container<? if (settings.layout_full_width) write('-fluid'); ?> spa-container">
+    <div class="row">
+<?xjs if (!_sidebarOff() && settings.layout_sidebar_left) { ?>
+        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
+<?xjs } ?>
+        <div class="col-md-<? write(_sidebarOff() ? '12' : '9'); ?>" id="content">
+            <? writePage(page); ?>
+        </div>
+<?xjs if (!_sidebarOff() && !settings.layout_sidebar_left) { ?>
+        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
+<?xjs } ?>
+    </div>
+    <hr>
+    <footer class="mb-3">
+        <p>&copy; <? write(system.name + ", " + strftime("%Y")); ?></p>
+    </footer>
+</div>
+
+<!-- Config passed to client JS -->
+<script>
+    window.sbbsConfig = {
+        systemName: '<? write(system.name.replace(/'/g, "\\'")); ?>',
+        guest: '<? write(settings.guest); ?>',
+        userAlias: '<? write(user.alias.replace(/'/g, "\\'")); ?>',
+        userNumber: <? write(user.number); ?>,
+        userPassword: '<? write((user.alias !== settings.guest && user.number > 0) ? user.security.password.replace(/'/g, "\\'" ) : ''); ?>',
+        isLoggedIn: <? write(user.alias !== settings.guest && user.number > 0); ?>,
+        csrfToken: '<? write(getCsrfToken()); ?>',
+        sidebarOff: <? write(_sidebarOff()); ?>,
+        sidebarLeft: <? write(settings.layout_sidebar_left ? true : false); ?>,
+        fullWidth: <? write(settings.layout_full_width ? true : false); ?>,
+        ftelnet: <? write(settings.ftelnet ? true : false); ?>,
+<?xjs if (settings.ftelnet) { ?>
+        ftelnetUrl: '<? write(ftelnet_url); ?>',
+        ftelnetSplash: '<? write(ftelnet_splash); ?>',
+        hostname: '<? write(http_request.vhost); ?>',
+        wsp: <? write(wsp); ?>,
+        wssp: <? write(wssp); ?>,
+        telnetPort: <? write(system.telnet_port || 23); ?>,
+        rloginPort: <? write(settings.rlogin_port || 1513); ?>,
+<?xjs } ?>
+        mqttEnabled: <? write(broker_enabled); ?>,
+<?xjs if (broker_enabled && broker_addr && broker_ws_port && broker_wss_port) { ?>
+        mqttQwkId: '<? write(system.qwk_id); ?>',
+        mqttAddr: '<? write(broker_addr); ?>',
+        mqttUser: '<? write(broker_username); ?>',
+        mqttPass: '<? write(broker_password); ?>',
+        mqttWsPort: <? write(broker_ws_port); ?>,
+        mqttWssPort: <? write(broker_wss_port); ?>,
+<?xjs } ?>
+        currentPage: '<? write(page); ?>',
+        avatarsEnabled: true,
+        darkmodeAllow: <? write(settings.darkmode_allow ? true : false); ?>,
+        darkmodeOn: <? write(settings.darkmode_on ? true : false); ?>
+    };
+</script>
+
+<!-- Scripts -->
+<?xjs if (settings.ftelnet) { ?>
+<script id="fTelnetScript" src="<? write(ftelnet_url); ?>"></script>
+<script src="./js/terminal.js?_v=<? write(time()); ?>"></script>
+<?xjs } ?>
+<?xjs if (broker_enabled && broker_addr && broker_ws_port && broker_wss_port) { ?>
+<script src="https://unpkg.com/mqtt@5.0.2/dist/mqtt.min.js"></script>
+<script src="./js/mqtt.js?_v=<? write(time()); ?>"></script>
+<?xjs } ?>
+<script src="./js/spa.js?_v=<? write(time()); ?>"></script>
+</body>
+</html>
