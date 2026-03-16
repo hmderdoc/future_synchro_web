@@ -418,7 +418,7 @@ async function listThread(e) {
         const urm = stats.querySelector('span[data-unread-messages]');
         if (urm !== null) { // If user is guest, this element will not exist
             urm.innerHTML = e.unread;
-            if (sub.scan_cfg&(1<<1) || sub.scan_cfg&5 || sub.scan_cfg&(1<<8)) {
+            if (sub && (sub.scan_cfg&(1<<1) || sub.scan_cfg&5 || sub.scan_cfg&(1<<8))) {
                 urm.classList.add('scanned');
             } else {
                 urm.classList.remove('scanned');

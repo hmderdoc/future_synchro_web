@@ -30,7 +30,6 @@
     }
 ?>
 
-<script type="text/javascript" src="./js/graphics-converter.js"></script>
 <script type="text/javascript" src="./js/xjs-forum.js"></script>
 <script type="text/javascript" src="./js/cache.js"></script>
 
@@ -48,8 +47,7 @@
 
     <? var thread = getMessageThreads(request.get_param('sub'), settings.max_messages).thread[request.get_param('thread')]; ?>
 	
-	<script type="text/javascript" src="./js/graphics-converter.js"></script>
-	<script type="text/javascript" src="./js/avatars.js"></script>
+
 	
 	<div hidden>
 		<li id="forum-message-template" class="list-group-item striped" data-message>

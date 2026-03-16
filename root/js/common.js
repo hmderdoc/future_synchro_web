@@ -50,6 +50,7 @@ async function v4_fetch_jsonl(url) {
         }, []);
     } catch (err) {
         console.error('Error on fetch_jsonl', url, err);
+        return [];
     }
 }
 

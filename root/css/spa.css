@@ -843,12 +843,13 @@ div.message blockquote {
 div.message pre.ansi {
     background-color: #000;
     color: #aaa;
-    font-family: 'Courier New', monospace;
     font-size: 14px;
     line-height: 1.1;
     padding: 0.5em;
     overflow-x: auto;
     max-width: 100%;
+    width: 80ch;
+    overflow: hidden;
 }
 [data-theme="cga"] div.message blockquote {
     border-left-color: #00aa00;
