@@ -86,8 +86,9 @@
     }
 
     // Re-render after SPA page transitions
-    document.addEventListener('spa:pageLoaded', function () {
-        renderAll();
+    window.addEventListener('spa:afterNavigate', function () {
+        // Small delay to let page scripts insert DOM before scanning
+        setTimeout(function () { renderAll(); }, 50);
     });
 
     // Public API

@@ -62,10 +62,10 @@
             </button>
             <ul id="forum-search-scope-menu" class="dropdown-menu dropdown-menu-right"></ul>
             <button id="forum-search-btn" class="btn btn-default" type="button" onclick="searchForum()">
-                <span class="bin-icon bin-icon-sm" data-icon="search"></span>
+                <span class="bin-icon" data-icon="search"></span>
             </button>
             <button id="forum-search-clear" class="btn btn-default" type="button" onclick="clearSearch()" hidden>
-                <span class="bin-icon bin-icon-sm" data-icon="stop"></span>
+                <span class="bin-icon" data-icon="stop"></span>
             </button>
         </span>
     </div>
@@ -140,11 +140,11 @@
                 <div class="pull-right" data-stats hidden>
                     <span data-unread-messages title="Unread messages" class="badge" hidden></span>
                     <span data-upvotes-badge title="Upvotes" class="badge upvote-bg" style="display:none;">
-                        <span class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
+                        <span class="bin-icon" data-icon="thumbs_up"></span>
                         <span data-upvotes></span>
                     </span>
                     <span data-downvotes-badge title="Downvotes" class="badge downvote-bg" style="display:none;">
-                        <span class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
+                        <span class="bin-icon" data-icon="thumbs_down"></span>
                         <span data-downvotes></span>
                     </span>
                 </div>
@@ -196,20 +196,20 @@
 			<div class="message" data-message-body></div>
 			<div class="clearfix">
 				<button class="btn btn-default icon" data-button-delete title="<? locale.write('label_delete'); ?>" aria-label="<? locale.write('label_delete'); ?>">
-					<span class="bin-icon bin-icon-sm" data-icon="trash"></span>
+					<span class="bin-icon" data-icon="trash"></span>
 				</button>
 				<a class="btn btn-default icon" title="<? locale.write('label_direct_link'); ?>" aria-label="<? locale.write('label_direct_link'); ?>" href="#" data-direct-link>
-					<span class="bin-icon bin-icon-sm" data-icon="link"></span>
+					<span class="bin-icon" data-icon="link"></span>
 				</a>
 				<button class="btn btn-default icon" data-button-reply title="<? locale.write('label_reply'); ?>" aria-label="<? locale.write('label_reply'); ?>">
-					<span class="bin-icon bin-icon-sm" data-icon="comment"></span>
+					<span class="bin-icon" data-icon="comment"></span>
 				</button>
 				<button class="btn-uv btn btn-default icon" data-button-upvote>
-					<span title="Upvotes" class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
+					<span title="Upvotes" class="bin-icon" data-icon="thumbs_up"></span>
 					<span title="Upvotes" data-upvote-count>0</span>
 				</button>
 				<button class="btn-dv btn btn-default icon" data-button-downvote>
-					<span title="Downvotes" class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
+					<span title="Downvotes" class="bin-icon" data-icon="thumbs_down"></span>
 					<span title="Downvotes" data-downvote-count>0</span>
 				</button>
 			</div>
@@ -219,7 +219,7 @@
     <ol class="breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
-                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
+                <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -301,11 +301,11 @@
 							<span data-unread-messages title="<? locale.write('badge_unread_messages'); ?>" class="badge" hidden></span>
 						<? } ?>
 						<span data-upvotes-badge title="<? locale.write('badge_upvotes'); ?>" class="badge upvote-bg" style="display:none;">
-							<span class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
+							<span class="bin-icon" data-icon="thumbs_up"></span>
 							<span data-upvotes></span>
 						</span>
 						<span data-downvotes-badge title="<? locale.write('badge_downvotes'); ?>" class="badge downvote-bg" style="display:none;">
-							<span class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
+							<span class="bin-icon" data-icon="thumbs_down"></span>
 							<span data-downvotes></span>
 						</span>
 					</div>
@@ -404,10 +404,10 @@
                     </button>
                     <div class="pull-right">
                         <button type="button" title="<? locale.write('button_poll_add_comment'); ?>" class="btn btn-success" onclick="addPollField('comment', 'newpoll-comment-group')">
-                            <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
+                            <span class="bin-icon" data-icon="pencil"></span>
                         </button> 
                         <button type="button" title="<? locale.write('button_poll_add_answer'); ?>" class="btn btn-success" onclick="addPollField('answer', 'newpoll-answer-group')">
-                            <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
+                            <span class="bin-icon" data-icon="pencil"></span>
                         </button> 
                     </div>
                 </div>
@@ -422,7 +422,7 @@
         </div>
         <div class="col-sm-1">
             <button type="button" class="btn btn-danger" onclick="$('#forum-new-poll-field-container-template').remove()">
-				<span class="bin-icon bin-icon-sm" data-icon="stop"></span>
+				<span class="bin-icon" data-icon="stop"></span>
 			</button>
 		</div>
     </div>
@@ -431,7 +431,7 @@
 	<ol class="breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
-                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
+                <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -452,21 +452,21 @@
     <? var sub = msg_area.sub[request.get_param('sub')]; ?>
 
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_message'); ?>" title="<? locale.write('button_post_message'); ?>" onclick="addNew('<? write(sub.code); ?>')">
-        <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
+        <span class="bin-icon" data-icon="pencil"></span>
     </button>
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_poll'); ?>" title="<? locale.write('button_post_poll'); ?>" onclick="addPoll('<? write(sub.code); ?>')">
-        <span class="bin-icon bin-icon-sm" data-icon="poll"></span>
+        <span class="bin-icon" data-icon="poll"></span>
     </button>
 
     <div class="pull-right">
         <button id="scan-cfg-new" class="btn btn-default icon" aria-label="<? locale.write('button_scan_new'); ?>" title="<? locale.write('button_scan_new'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 1)">
-            <span class="bin-icon bin-icon-sm" data-icon="checkmark"></span>
+            <span class="bin-icon" data-icon="checkmark"></span>
         </button>
         <button id="scan-cfg-youonly" class="btn btn-default icon" aria-label="<? locale.write('button_scan_you'); ?>" title="<? locale.write('button_scan_you'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 2)">
-            <span class="bin-icon bin-icon-sm" data-icon="users"></span>
+            <span class="bin-icon" data-icon="users"></span>
         </button>
         <button id="scan-cfg-off" class="btn btn-primary icon" aria-label="<? locale.write('button_scan_off'); ?>" title="<? locale.write('button_scan_off'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 0)">
-            <span class="bin-icon bin-icon-sm" data-icon="stop"></span>
+            <span class="bin-icon" data-icon="stop"></span>
         </button>
     </div>
 
@@ -552,7 +552,7 @@
     <ol class="breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
-                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
+                <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -604,7 +604,7 @@
     <ol class="breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
-                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
+                <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>

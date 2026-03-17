@@ -295,7 +295,7 @@ body.terminal-open {
     vertical-align: middle;
 }
 .bin-icon-img {
-    height: 20px;
+    height: 24px;
     width: auto;
     image-rendering: pixelated;
     display: block;
@@ -305,28 +305,50 @@ body.terminal-open {
 .bin-icon-lg .bin-icon-img { height: 32px; }
 .bin-icon-xl .bin-icon-img { height: 48px; }
 
-/* Navbar context — inline with text */
+/* Navbar context — fill to nav item height */
 .navbar .bin-icon {
-    margin-right: 0.35em;
+    margin-right: 0.15em;
 }
 .navbar .bin-icon-img {
-    height: 20px;
+    height: 32px;
 }
 
 /* Dropdown menu items */
 .dropdown-item .bin-icon {
-    margin-right: 0.4em;
+    margin-right: 0.3em;
 }
 .dropdown-item .bin-icon-img {
-    height: 18px;
+    height: 24px;
 }
 
-/* Forum sort bar context */
+/* Forum sort bar context — match text line height */
 #forum-sort-controls .bin-icon {
-    margin-right: 0.25em;
+    margin-right: 0.2em;
 }
 #forum-sort-controls .bin-icon-img {
-    height: 16px;
+    height: 24px;
+}
+
+/* Icon-only action buttons — fill the button */
+.btn.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+.btn.icon .bin-icon-img {
+    height: 28px;
+}
+
+/* Vote buttons with count — icon beside text */
+.btn-uv .bin-icon-img,
+.btn-dv .bin-icon-img {
+    height: 24px;
+}
+
+/* Breadcrumb context */
+.breadcrumb .bin-icon-img {
+    height: 20px;
 }
 
 /* ---- Forum icons ---- */
