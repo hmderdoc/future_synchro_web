@@ -165,29 +165,12 @@ function registerEventListener(scope, callback, params) {
     };
 }
 
-/* ---------- Dark mode ---------- */
-
-function darkmodeRequested() {
-    var ls = localStorage.getItem('darkSwitch');
-    if (ls === 'true') return true;
-    if (ls === 'false') return false;
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return true;
-    var sw = document.getElementById('darkSwitch');
-    return sw ? sw.checked : false;
-}
+/* ---------- Theme: CGA on, dark off (hardcoded) ---------- */
 
 function resetTheme() {
-    var sw = document.getElementById('darkSwitch');
-    if (!sw) return;
-    if (sw.checked) {
-        document.body.classList.add('dark');
-        document.documentElement.setAttribute('data-bs-theme', 'dark');
-        localStorage.setItem('darkSwitch', 'true');
-    } else {
-        document.body.classList.remove('dark');
-        document.documentElement.removeAttribute('data-bs-theme');
-        localStorage.setItem('darkSwitch', 'false');
-    }
+    document.body.classList.remove('dark');
+    document.documentElement.removeAttribute('data-bs-theme');
+    document.documentElement.setAttribute('data-theme', 'cga');
 }
 
 /* ---------- Avatar cache (client-side) ---------- */
@@ -205,30 +188,8 @@ window.sbbs = sbbs;
 /* ---------- Init ---------- */
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Dark mode
-    var darkSwitch = document.getElementById('darkSwitch');
-    if (darkSwitch) {
-        darkSwitch.checked = darkmodeRequested();
-        darkSwitch.addEventListener('change', resetTheme);
-        resetTheme();
-    }
-
-    // CGA theme toggle
-    var cgaSwitch = document.getElementById('cgaSwitch');
-    if (cgaSwitch) {
-        cgaSwitch.checked = localStorage.getItem('cgaTheme') === 'true';
-        function applyCgaTheme() {
-            if (cgaSwitch.checked) {
-                document.documentElement.setAttribute('data-theme', 'cga');
-                localStorage.setItem('cgaTheme', 'true');
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.setItem('cgaTheme', 'false');
-            }
-        }
-        cgaSwitch.addEventListener('change', applyCgaTheme);
-        applyCgaTheme();
-    }
+    // Apply hardcoded theme (CGA on, dark off)
+    resetTheme();
 
     // Login / Logout
     var logoutBtn = document.getElementById('button-logout');

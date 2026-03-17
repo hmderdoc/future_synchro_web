@@ -33,7 +33,127 @@
 <script type="text/javascript" src="./js/xjs-forum.js"></script>
 <script type="text/javascript" src="./js/cache.js"></script>
 
-<!-- To do: Search (forum, group, sub, or thread), Sortation and data-attributes -->
+<?xjs
+    var _searchScope = 'forum';
+    var _searchGroup = '';
+    var _searchSub = '';
+    var _searchQuery = request.has_param('q') ? request.get_param('q') : '';
+    var _searchSort = request.has_param('sort') ? request.get_param('sort') : '';
+    var _searchDir = request.has_param('dir') ? request.get_param('dir') : '';
+    if (request.has_param('sub') && msg_area.sub[request.get_param('sub')] !== undefined) {
+        if (!request.has_param('thread')) {
+            _searchScope = 'sub';
+            _searchSub = request.get_param('sub');
+            _searchGroup = String(msg_area.sub[request.get_param('sub')].grp_index);
+        }
+    } else if (request.has_param('group') && msg_area.grp_list[request.get_param('group')] !== undefined) {
+        _searchScope = 'group';
+        _searchGroup = request.get_param('group');
+    }
+?>
+
+<? if (!request.has_param('thread')) { ?>
+<div id="forum-search-bar" data-scope="<? write(_searchScope); ?>" data-group="<? write(_searchGroup); ?>" data-sub="<? write(_searchSub); ?>">
+    <div class="input-group" style="margin-bottom:0.75em;">
+        <input type="text" id="forum-search-input" class="form-control" placeholder="Search forums..." value="<? write(_searchQuery.replace(/"/g, '&quot;')); ?>" />
+        <span class="input-group-btn">
+            <button id="forum-search-scope-btn" class="btn btn-default dropdown-toggle" data-toggle="dropdown" type="button">
+                <span id="forum-search-scope-label"></span> <span class="caret"></span>
+            </button>
+            <ul id="forum-search-scope-menu" class="dropdown-menu dropdown-menu-right"></ul>
+            <button id="forum-search-btn" class="btn btn-default" type="button" onclick="searchForum()">
+                <span class="bin-icon bin-icon-sm" data-icon="search"></span>
+            </button>
+            <button id="forum-search-clear" class="btn btn-default" type="button" onclick="clearSearch()" hidden>
+                <span class="bin-icon bin-icon-sm" data-icon="stop"></span>
+            </button>
+        </span>
+    </div>
+</div>
+<script type="text/javascript">
+    (function() {
+        var bar = document.getElementById('forum-search-bar');
+        if (!bar) return;
+        var scope = bar.getAttribute('data-scope');
+        var group = bar.getAttribute('data-group');
+        var sub = bar.getAttribute('data-sub');
+        var label = document.getElementById('forum-search-scope-label');
+        var menu = document.getElementById('forum-search-scope-menu');
+
+        var scopes = [{ key: 'forum', label: 'All Forums' }];
+        if (group) scopes.push({ key: 'group', label: 'This Group' });
+        if (sub) scopes.push({ key: 'sub', label: 'This Sub' });
+
+        function setScope(s) {
+            bar.setAttribute('data-scope', s);
+            for (var i = 0; i < scopes.length; i++) {
+                if (scopes[i].key === s) { label.textContent = scopes[i].label; break; }
+            }
+        }
+        menu.innerHTML = '';
+        for (var i = 0; i < scopes.length; i++) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = '#';
+            a.textContent = scopes[i].label;
+            a.setAttribute('data-scope', scopes[i].key);
+            a.onclick = (function(s) { return function(e) { e.preventDefault(); setScope(s); }; })(scopes[i].key);
+            li.appendChild(a);
+            menu.appendChild(li);
+        }
+        setScope(scope);
+
+        var input = document.getElementById('forum-search-input');
+        if (input) {
+            input.addEventListener('keydown', function(e) {
+                e.stopImmediatePropagation();
+                if (e.keyCode === 13) searchForum();
+            });
+        }
+
+        if (input && input.value) {
+            document.getElementById('forum-search-clear').removeAttribute('hidden');
+        }
+    })();
+</script>
+
+<!-- Search result template (available at all view levels) -->
+<div hidden>
+    <a id="forum-search-result-template" href="#" class="list-group-item striped" data-thread>
+        <div class="row">
+            <div class="col-sm-9">
+                <strong data-thread-subject></strong>
+                <span data-search-sub-badge class="badge" style="margin-left:0.5em;background:#5bc0de;" hidden></span>
+                <p>
+                    From <strong data-thread-from></strong>
+                    on <span data-thread-date-start></span>
+                </p>
+                <div data-replies hidden>
+                    <strong data-message-count></strong>
+                    <span data-suffix-reply hidden> reply.</span>
+                    <span data-suffix-replies hidden> replies.</span>
+                    Latest reply by <strong data-last-from></strong>
+                    on <span data-last-time></span>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="pull-right" data-stats hidden>
+                    <span data-unread-messages title="Unread messages" class="badge" hidden></span>
+                    <span data-upvotes-badge title="Upvotes" class="badge upvote-bg" style="display:none;">
+                        <span class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
+                        <span data-upvotes></span>
+                    </span>
+                    <span data-downvotes-badge title="Downvotes" class="badge downvote-bg" style="display:none;">
+                        <span class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
+                        <span data-downvotes></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </a>
+</div>
+
+<? } ?>
 
 <div data-loading-template hidden>
 	<li class="list-group-item striped">
@@ -76,20 +196,20 @@
 			<div class="message" data-message-body></div>
 			<div class="clearfix">
 				<button class="btn btn-default icon" data-button-delete title="<? locale.write('label_delete'); ?>" aria-label="<? locale.write('label_delete'); ?>">
-					<span class="glyphicon glyphicon-trash"></span>
+					<span class="bin-icon bin-icon-sm" data-icon="trash"></span>
 				</button>
 				<a class="btn btn-default icon" title="<? locale.write('label_direct_link'); ?>" aria-label="<? locale.write('label_direct_link'); ?>" href="#" data-direct-link>
-					<span class="glyphicon glyphicon-link"></span>
+					<span class="bin-icon bin-icon-sm" data-icon="link"></span>
 				</a>
 				<button class="btn btn-default icon" data-button-reply title="<? locale.write('label_reply'); ?>" aria-label="<? locale.write('label_reply'); ?>">
-					<span class="glyphicon glyphicon-comment"></span>
+					<span class="bin-icon bin-icon-sm" data-icon="comment"></span>
 				</button>
 				<button class="btn-uv btn btn-default icon" data-button-upvote>
-					<span title="Upvotes" class="glyphicon glyphicon-arrow-up"></span>
+					<span title="Upvotes" class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
 					<span title="Upvotes" data-upvote-count>0</span>
 				</button>
 				<button class="btn-dv btn btn-default icon" data-button-downvote>
-					<span title="Downvotes" class="glyphicon glyphicon-arrow-down"></span>
+					<span title="Downvotes" class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
 					<span title="Downvotes" data-downvote-count>0</span>
 				</button>
 			</div>
@@ -98,7 +218,8 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>">
+            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -128,15 +249,14 @@
     </div>
 
 	<div id="forum-list-container" class="list-group"></div>
-	<div id="forum-load-more-messages" class="text-center" hidden>
-		<button id="load-more-messages" class="btn btn-primary" aria-label="<? locale.write('button_load_more', 'main'); ?>" title="<? locale.write('button_load_more', 'main'); ?>" onclick="listMessages('<? request.write_param('sub'); ?>', '<? request.write_param('thread'); ?>', <? write(settings.page_size); ?>, true)">
-			<? locale.write('button_load_more', 'main'); ?>
-		</button>
-	</div>
+	<div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
+	<div id="forum-message-sentinel" class="text-center p-3" hidden></div>
 
 	<script type="text/javascript">
-		listMessages('<? request.write_param('sub'); ?>', <? request.write_param('thread'); ?>, <? write(settings.page_size); ?>);
-		// Should subscribe here for updates to the thread; need to add some functions to lib/forum.js, lib/events/forum.js, root/js/xjs-forum.js
+		initMessageInfiniteScroll('<? request.write_param('sub'); ?>', <? request.write_param('thread'); ?>, <? write(settings.page_size); ?>).then(function () {
+			getVotesInThread('<? request.write_param('sub'); ?>', <? request.write_param('thread'); ?>);
+		});
+		threadNav();
 	</script>
 	
 	
@@ -181,11 +301,11 @@
 							<span data-unread-messages title="<? locale.write('badge_unread_messages'); ?>" class="badge" hidden></span>
 						<? } ?>
 						<span data-upvotes-badge title="<? locale.write('badge_upvotes'); ?>" class="badge upvote-bg" style="display:none;">
-							<span class="glyphicon glyphicon-arrow-up"></span>
+							<span class="bin-icon bin-icon-sm" data-icon="thumbs_up"></span>
 							<span data-upvotes></span>
 						</span>
 						<span data-downvotes-badge title="<? locale.write('badge_downvotes'); ?>" class="badge downvote-bg" style="display:none;">
-							<span class="glyphicon glyphicon-arrow-down"></span>
+							<span class="bin-icon bin-icon-sm" data-icon="thumbs_down"></span>
 							<span data-downvotes></span>
 						</span>
 					</div>
@@ -284,10 +404,10 @@
                     </button>
                     <div class="pull-right">
                         <button type="button" title="<? locale.write('button_poll_add_comment'); ?>" class="btn btn-success" onclick="addPollField('comment', 'newpoll-comment-group')">
-                            <span class="glyphicon glyphicon-pencil"></span>
+                            <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
                         </button> 
                         <button type="button" title="<? locale.write('button_poll_add_answer'); ?>" class="btn btn-success" onclick="addPollField('answer', 'newpoll-answer-group')">
-                            <span class="glyphicon glyphicon-plus"></span>
+                            <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
                         </button> 
                     </div>
                 </div>
@@ -302,7 +422,7 @@
         </div>
         <div class="col-sm-1">
             <button type="button" class="btn btn-danger" onclick="$('#forum-new-poll-field-container-template').remove()">
-				<span class="glyphicon glyphicon-remove"></span>
+				<span class="bin-icon bin-icon-sm" data-icon="stop"></span>
 			</button>
 		</div>
     </div>
@@ -310,7 +430,8 @@
 
 	<ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>">
+            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -331,22 +452,30 @@
     <? var sub = msg_area.sub[request.get_param('sub')]; ?>
 
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_message'); ?>" title="<? locale.write('button_post_message'); ?>" onclick="addNew('<? write(sub.code); ?>')">
-        <span class="glyphicon glyphicon-pencil"></span>
+        <span class="bin-icon bin-icon-sm" data-icon="pencil"></span>
     </button>
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_poll'); ?>" title="<? locale.write('button_post_poll'); ?>" onclick="addPoll('<? write(sub.code); ?>')">
-        <span class="glyphicon glyphicon-list-alt"></span>
+        <span class="bin-icon bin-icon-sm" data-icon="poll"></span>
     </button>
 
     <div class="pull-right">
         <button id="scan-cfg-new" class="btn btn-default icon" aria-label="<? locale.write('button_scan_new'); ?>" title="<? locale.write('button_scan_new'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 1)">
-            <span class="glyphicon glyphicon-ok-sign"></span>
+            <span class="bin-icon bin-icon-sm" data-icon="checkmark"></span>
         </button>
         <button id="scan-cfg-youonly" class="btn btn-default icon" aria-label="<? locale.write('button_scan_you'); ?>" title="<? locale.write('button_scan_you'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 2)">
-            <span class="glyphicon glyphicon-user"></span>
+            <span class="bin-icon bin-icon-sm" data-icon="users"></span>
         </button>
         <button id="scan-cfg-off" class="btn btn-primary icon" aria-label="<? locale.write('button_scan_off'); ?>" title="<? locale.write('button_scan_off'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 0)">
-            <span class="glyphicon glyphicon-ban-circle"></span>
+            <span class="bin-icon bin-icon-sm" data-icon="stop"></span>
         </button>
+    </div>
+
+    <div id="forum-sort-controls" class="btn-group" style="margin-bottom:0.75em;">
+        <button class="btn btn-default btn-sm active" data-sort="activity" onclick="setSort('activity')" title="Sort by most recent reply"><span class="bin-icon" data-icon="bar_chart"></span>Activity</button>
+        <button class="btn btn-default btn-sm" data-sort="started" onclick="setSort('started')" title="Sort by thread creation date"><span class="bin-icon" data-icon="calendar"></span>Started</button>
+        <button class="btn btn-default btn-sm" data-sort="subject" onclick="setSort('subject')" title="Sort alphabetically by subject"><span class="bin-icon" data-icon="doc_edit"></span>Subject</button>
+        <button class="btn btn-default btn-sm" data-sort="replies" onclick="setSort('replies')" title="Sort by number of replies"><span class="bin-icon" data-icon="chat_new"></span>Replies</button>
+        <button class="btn btn-default btn-sm" data-sort="sender" onclick="setSort('sender')" title="Sort alphabetically by author"><span class="bin-icon" data-icon="users"></span>Sender</button>
     </div>
 
 	<div id="forum-list-container" class="list-group"></div>
@@ -362,7 +491,35 @@
             sub: '<? request.write_param("sub"); ?>',
 		});
 
-		initThreadInfiniteScroll('<? write(sub.code); ?>', <? write(settings.page_size); ?>);
+		var _initSort = '<? write(_searchSort); ?>';
+		var _initDir = '<? write(_searchDir); ?>';
+		if (_initSort && _initSort !== 'activity') {
+		    _threadSortMode = _initSort;
+		}
+		if (_initDir) _threadSortDir = _initDir;
+		document.querySelectorAll('#forum-sort-controls button').forEach(function(btn) {
+		    var arrow = btn.querySelector('.sort-arrow');
+		    if (btn.getAttribute('data-sort') === _threadSortMode) {
+		        btn.classList.add('active');
+		        if (!arrow) {
+		            arrow = document.createElement('span');
+		            arrow.className = 'sort-arrow';
+		            arrow.style.marginLeft = '4px';
+		            btn.appendChild(arrow);
+		        }
+		        var def = _defaultDir(_threadSortMode);
+		        var isReversed = _threadSortDir && _threadSortDir !== def;
+		        arrow.textContent = (def === 'desc') ? (isReversed ? '\u25B2' : '\u25BC') : (isReversed ? '\u25BC' : '\u25B2');
+		    } else {
+		        btn.classList.remove('active');
+		        if (arrow) arrow.remove();
+		    }
+		});
+
+                initThreadInfiniteScroll('<? write(sub.code); ?>', <? write(settings.page_size); ?>);
+
+                var _initQuery = '<? write(_searchQuery.replace(/\\/g, "\\\\").replace(/\'/g, "\\\'")); ?>';
+                if (_initQuery) searchForum();
 
     </script>
 
@@ -378,6 +535,7 @@
 				</h4>
 				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge ignored" data-unread-unscanned></span>
 				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge scanned" data-unread-scanned></span>
+				<span title="Total messages" class="badge" data-total-msgs style="background:#555" hidden></span>
 				<p data-sub-description></p>
 				<span data-newest-message-container hidden>
 				<? locale.write('label_sub_newest_message'); ?>:
@@ -393,7 +551,8 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>">
+            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
@@ -406,6 +565,7 @@
     </ol>
 
 	<div id="forum-list-container" class="list-group"></div>
+	<div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
 
 	<script type="text/javascript">
 		(async () => {
@@ -443,13 +603,15 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>">
+            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+                <span class="bin-icon bin-icon-sm" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
     </ol>
 
 	<div id="forum-list-container" class="list-group"></div>
+	<div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
 
         <script type="text/javascript">
 			(async () => await listGroups())();

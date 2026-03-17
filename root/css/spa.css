@@ -287,6 +287,48 @@ body.terminal-open {
     }
 }
 
+/* ---- BIN icons (reusable ANSI art icon system) ---- */
+.bin-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+}
+.bin-icon-img {
+    height: 20px;
+    width: auto;
+    image-rendering: pixelated;
+    display: block;
+}
+/* Size variants */
+.bin-icon-sm .bin-icon-img { height: 16px; }
+.bin-icon-lg .bin-icon-img { height: 32px; }
+.bin-icon-xl .bin-icon-img { height: 48px; }
+
+/* Navbar context — inline with text */
+.navbar .bin-icon {
+    margin-right: 0.35em;
+}
+.navbar .bin-icon-img {
+    height: 20px;
+}
+
+/* Dropdown menu items */
+.dropdown-item .bin-icon {
+    margin-right: 0.4em;
+}
+.dropdown-item .bin-icon-img {
+    height: 18px;
+}
+
+/* Forum sort bar context */
+#forum-sort-controls .bin-icon {
+    margin-right: 0.25em;
+}
+#forum-sort-controls .bin-icon-img {
+    height: 16px;
+}
+
 /* ---- Forum icons ---- */
 .forum-item-with-icon {
     display: flex !important;

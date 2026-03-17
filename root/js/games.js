@@ -391,9 +391,14 @@
             launchBtn.className = 'btn btn-sm btn-outline-success ms-2 flex-shrink-0 game-launch-btn';
             launchBtn.textContent = 'Play';
             launchBtn.title = 'Launch ' + formatProgramName(prog.name);
-            launchBtn.addEventListener('click', function () {
-                launchGame(prog.code);
-            });
+            if (data.isGuest) {
+                launchBtn.disabled = true;
+                launchBtn.title = 'Log in to play';
+            } else {
+                launchBtn.addEventListener('click', function () {
+                    launchGame(prog.code);
+                });
+            }
             row.appendChild(launchBtn);
 
             grid.appendChild(row);

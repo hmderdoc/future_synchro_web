@@ -60,3 +60,4 @@
     var system_qwk_id = '<? write(system.qwk_id); ?>';
 </script>
 <script src="./js/webmonitor.js"></script>
+<script src="./js/webmonitor.js"></script>

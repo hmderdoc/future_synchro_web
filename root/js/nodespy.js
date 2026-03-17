@@ -1,11 +1,14 @@
 var spy_nodes = [];
 
 // Check if we're targeting a specific node
-const urlParams = new URLSearchParams(window.location.search);
-const targetNode = parseInt(urlParams.get('node'), 10);
+var urlParams = new URLSearchParams(window.location.search);
+var targetNode = parseInt(urlParams.get('node'), 10);
 
 // Create an fTelnet instance for each node
 function create_ftelnet_instances() {
+    var wrapper = document.getElementById('ClientsWrapper');
+    if (!wrapper) return;
+
     // Loop through the node range
     for (var node = 1; node <= system_nodes; node++) {
         if (!targetNode || (targetNode === node)) {
@@ -16,31 +19,33 @@ function create_ftelnet_instances() {
             }
             
             // Build a div containing the node status, keyboard checkbox, and fTelnet instance
-            $('#ClientsWrapper').append(`
-                <div id="Client${node}" class="${targetNode ? '' : 'col-xl-6'}">
-                <h4 style="text-align: center;">
-                    <a href="${nodeUrl}">Node ${node}</a> - 
-                    <span id="Status${node}">Status Unknown</span> &nbsp; &nbsp; 
-                    <span style="white-space: nowrap;">
-                    <input type="checkbox" class="keyboard-input" id="chkKeyboard${node}" value="${node}" /> 
-                    <label class="normal" for="chkKeyboard${node}">Enable Keyboard Input</label>
-                    </span>
-                </h4>
-                <div id="fTelnetContainer${node}" class="fTelnetContainer"></div>
-                </div>
-            `);
+            var div = document.createElement('div');
+            div.id = 'Client' + node;
+            div.className = targetNode ? '' : 'col-xl-6';
+            div.innerHTML =
+                '<h4 style="text-align: center;">' +
+                    '<a href="' + nodeUrl + '">Node ' + node + '</a> - ' +
+                    '<span id="Status' + node + '">Status Unknown</span> &nbsp; &nbsp; ' +
+                    '<span style="white-space: nowrap;">' +
+                    '<input type="checkbox" class="keyboard-input" id="chkKeyboard' + node + '" value="' + node + '" /> ' +
+                    '<label class="normal" for="chkKeyboard' + node + '">Enable Keyboard Input</label>' +
+                    '</span>' +
+                '</h4>' +
+                '<div id="fTelnetContainer' + node + '" class="fTelnetContainer"></div>';
+            wrapper.appendChild(div);
 
-            // Apply a clearfix after every other node div, to ensure the expected grid layout is followed even if some node divs are taller than others
-            // Addresses https://gitlab.synchro.net/main/sbbs/-/issues/683
+            // Apply a clearfix after every other node div
             if (node % 2 == 0) {
-                $('#ClientsWrapper').append('<div class="clearfix visible-xl-block"></div>');
+                var clearfix = document.createElement('div');
+                clearfix.className = 'clearfix visible-xl-block';
+                wrapper.appendChild(clearfix);
             }
 
             // And initialize a new fTelnet instance
             var Options = new fTelnetOptions();
             Options.AllowModernScrollback = false;
             Options.BareLFtoCRLF = false;
-            Options.BitsPerSecond = 57600;
+            Options.BitsPerSecond = 921600;
             Options.ConnectionType = 'telnet';
             Options.Emulation = 'ansi-bbs';
             Options.Enter = '\r';
@@ -62,17 +67,19 @@ function create_ftelnet_instances() {
 
 // Setup the keyboard handler
 function init_keyboard_handler() {
-    // Handle clicks on the keyboard checkboxes
-    $('.keyboard-input').click(function() {
-        var selectedNode = this.value;
-        
-        // Highlight the new selected div, and un-highlight+un-check the other divs and checkboxes
+    // Handle clicks on the keyboard checkboxes (delegated)
+    document.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('keyboard-input')) return;
+        var selectedNode = e.target.value;
+
         for (var node in spy_nodes) {
-            if ((node === selectedNode) && this.checked) {
-                $('#Client' + node).addClass('active');
+            var clientEl = document.getElementById('Client' + node);
+            var chk = document.getElementById('chkKeyboard' + node);
+            if ((node === selectedNode) && e.target.checked) {
+                if (clientEl) clientEl.classList.add('active');
             } else {
-                $('#Client' + node).removeClass('active');
-                $('.keyboard-input[value=' + node + ']').removeAttr('checked');
+                if (clientEl) clientEl.classList.remove('active');
+                if (chk) chk.checked = false;
             }
         }
     });
@@ -80,7 +87,8 @@ function init_keyboard_handler() {
     // Handle keydown event, which is where control keys and special keys are handled
     // Code is copy/pasted (with slight modifications) from fTelnet
     window.addEventListener('keydown', function (ke) {
-        var node = $('.keyboard-input:checked').attr('value');
+        var checked = document.querySelector('.keyboard-input:checked');
+        var node = checked ? checked.value : null;
         if (node) {
             var keyString = '';
         
@@ -139,7 +147,8 @@ function init_keyboard_handler() {
     // Handle keypress event, which is where standard keys are handled
     // Code is copy/pasted (with slight modifications) from fTelnet
     window.addEventListener('keypress', function (ke) {
-        var node = $('.keyboard-input:checked').attr('value');
+        var checked = document.querySelector('.keyboard-input:checked');
+        var node = checked ? checked.value : null;
         if (node) {
             if (ke.charCode >= 33) {
                 mqtt_publish('sbbs/' + system_qwk_id + '/node/' + node + '/input', String.fromCharCode(ke.charCode));
@@ -162,8 +171,9 @@ function mqtt_message(topic, message, packet) {
     
     switch (messageType) {
         case undefined:
-            // message contains the node's current activity (ie waiting for caller, or user is running an external, etc)
-            $('#Status' + node).html(message.toString());
+            // message contains the node's current activity
+            var statusEl = document.getElementById('Status' + node);
+            if (statusEl) statusEl.innerHTML = message.toString();
             break;
         
         case '/output':
@@ -184,19 +194,17 @@ function mqtt_message(topic, message, packet) {
             break;
         
         case '/terminal':
-            // message contains tab-separated terminal information, most importantly the column and row count as the first
-            // and second elements, so resize fTelnet and tell it to reload the best font based on the new size.
+            // message contains tab-separated terminal information
             var arr = message.toString().split('\t');
             spy_nodes[node].ftelnet._Crt.SetScreenSize(parseInt(arr[0], 10), parseInt(arr[1], 10));
-            spy_nodes[node].ftelnet._Crt.SetFont(spy_nodes[node].ftelnet._Crt.Font.Name); 
+            spy_nodes[node].ftelnet._Crt.SetFont(spy_nodes[node].ftelnet._Crt.Font.Name);
             spy_nodes[node].charset = arr[4];
-            // TODOX When arr[4] is 'CBM-ASCII' things get messy -- did I add support for PETSCII to fTelnet?
             break;
     }        
 }
 
 // Add an onload handler to setup the node spy
-window.addEventListener('load', (event) => {
+(function() {
     create_ftelnet_instances();
     init_keyboard_handler();
     
@@ -207,4 +215,4 @@ window.addEventListener('load', (event) => {
         topics.push('sbbs/' + system_qwk_id + '/node/' + node + '/terminal');
     }
     mqtt_connect(topics, mqtt_message, log_ftelnet);
-});
+})();

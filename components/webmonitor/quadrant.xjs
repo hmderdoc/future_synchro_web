@@ -44,13 +44,14 @@
     }
 ?>
 
-<ul class="nav nav-tabs">
+<ul class="nav nav-tabs" role="tablist">
     <?
-        // Loop through the panel list to build the list of tabs
+        // Loop through the panel list to build the list of tabs (BS5)
         for (var i = 0; i < panels.length; i++) {
-            var className = i == 0 ? 'active' : '';
-            var badge = panels[i] === 'clients' ? ' <span class="badge" id="' + panels[i] + 'CounterBadge">0</span>' : '';
-            write('<li class="' + className + '"><a href="#' + panels[i] + 'Tab" data-toggle="tab">' + get_panel_description(panels[i]) + badge + '</a></li>');
+            var activeClass = i == 0 ? ' active' : '';
+            var ariaSelected = i == 0 ? 'true' : 'false';
+            var badge = panels[i] === 'clients' ? ' <span class="badge bg-secondary" id="' + panels[i] + 'CounterBadge">0</span>' : '';
+            write('<li class="nav-item" role="presentation"><button class="nav-link' + activeClass + '" id="' + panels[i] + '-tab-btn" data-bs-toggle="tab" data-bs-target="#' + panels[i] + 'Tab" type="button" role="tab" aria-controls="' + panels[i] + 'Tab" aria-selected="' + ariaSelected + '">' + get_panel_description(panels[i]) + badge + '</button></li>');
         }
     ?>
 </ul>
@@ -59,9 +60,9 @@
         // Loop through the panel list to load the proper component panels
         for (var i = 0; i < panels.length; i++) {
             if (server_panels.includes(panels[i])) {
-                load(xjs_compile(settings.web_components + 'webmonitor/server-panel.xjs'), panels[i], get_panel_description(panels[i]), i == 0 ? 'active in' : '');
+                load(xjs_compile(settings.web_components + 'webmonitor/server-panel.xjs'), panels[i], get_panel_description(panels[i]), i == 0 ? 'active show' : '');
             } else {
-                load(xjs_compile(settings.web_components + 'webmonitor/' + panels[i] + '-panel.xjs'), i == 0 ? 'active in' : '');
+                load(xjs_compile(settings.web_components + 'webmonitor/' + panels[i] + '-panel.xjs'), i == 0 ? 'active show' : '');
             }
         }
     ?>

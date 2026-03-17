@@ -52,7 +52,7 @@
 		var wssp = <?xjs write(settings.wssp || GetWebSocketServicePort(true)); ?>;
 		var Options = new fTelnetOptions();
 		Options.BareLFtoCRLF = false;
-		Options.BitsPerSecond = 57600;
+		Options.BitsPerSecond = 921600;
 		Options.ConnectionType = 'rlogin';
 		Options.Emulation = 'ansi-bbs';
 		Options.Enter = '\r';

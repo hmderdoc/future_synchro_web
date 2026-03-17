@@ -298,7 +298,7 @@
 }
 
 [data-theme="cga"] .text-muted {
-    color: #555555 !important;
+    color: #AAAAAA !important;
 }
 
 [data-theme="cga"] strong,
@@ -314,4 +314,176 @@
 [data-theme="cga"] .border-cga::before,
 [data-theme="cga"] .border-cga::after {
     display: none;
+}
+
+/* ---------- BS3 legacy class overrides ---------- */
+
+[data-theme="cga"] .panel {
+    background: #000000;
+    border: 1px solid #00AAAA;
+    border-radius: 0;
+    box-shadow: none;
+    margin-bottom: 1em;
+}
+
+[data-theme="cga"] .panel-heading {
+    background: #0000AA;
+    color: #FFFF55;
+    border-bottom: 1px solid #00AAAA;
+    padding: 8px 15px;
+}
+
+[data-theme="cga"] .panel-heading h1,
+[data-theme="cga"] .panel-heading h2,
+[data-theme="cga"] .panel-heading h3,
+[data-theme="cga"] .panel-heading h4 {
+    color: #FFFF55;
+    margin: 0;
+}
+
+[data-theme="cga"] .panel-body {
+    background: #000000;
+    color: #AAAAAA;
+    padding: 15px;
+}
+
+[data-theme="cga"] .panel-body label {
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .panel-footer {
+    background: #0000AA;
+    color: #AAAAAA;
+    border-top: 1px solid #00AAAA;
+    padding: 8px 15px;
+}
+
+[data-theme="cga"] .well {
+    background: #000000;
+    border: 1px solid #555555;
+    color: #AAAAAA;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+[data-theme="cga"] .btn-default {
+    color: #FFFFFF;
+    background: #555555;
+    border-color: #AAAAAA;
+}
+
+[data-theme="cga"] .btn-default:hover,
+[data-theme="cga"] .btn-default:focus {
+    color: #000000;
+    background: #AAAAAA;
+    border-color: #FFFFFF;
+}
+
+[data-theme="cga"] .btn-default.active,
+[data-theme="cga"] .btn-default:active {
+    color: #000000;
+    background: #55FFFF;
+    border-color: #00AAAA;
+}
+
+/* Sort button group — active state */
+[data-theme="cga"] .btn-group .btn-default.active {
+    color: #000000;
+    background: #55FFFF;
+    border-color: #00AAAA;
+}
+
+[data-theme="cga"] .btn-default .glyphicon {
+    color: inherit;
+}
+
+/* Vote buttons */
+[data-theme="cga"] .btn-uv.btn-default {
+    color: #55FF55;
+    background: transparent;
+    border-color: #555555;
+}
+
+[data-theme="cga"] .btn-uv.btn-default:hover {
+    background: #00AA00;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .btn-dv.btn-default {
+    color: #FF5555;
+    background: transparent;
+    border-color: #555555;
+}
+
+[data-theme="cga"] .btn-dv.btn-default:hover {
+    background: #AA0000;
+    color: #FFFFFF;
+}
+
+/* ---------- Breadcrumb ---------- */
+
+[data-theme="cga"] .breadcrumb {
+    background: #0000AA;
+    border: 1px solid #555555;
+    border-radius: 0;
+}
+
+[data-theme="cga"] .breadcrumb a {
+    color: #55FFFF;
+}
+
+[data-theme="cga"] .breadcrumb a:hover {
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .breadcrumb > .active,
+[data-theme="cga"] .breadcrumb-item.active {
+    color: #AAAAAA;
+}
+
+/* ---------- Misc light-bg leaks ---------- */
+
+[data-theme="cga"] .bg-light {
+    background: #000000 !important;
+    color: #AAAAAA !important;
+}
+
+[data-theme="cga"] .bg-white {
+    background: #000000 !important;
+}
+
+[data-theme="cga"] .bg-body {
+    background: #000000 !important;
+}
+
+[data-theme="cga"] .label-default {
+    background: #555555;
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] .text-secondary {
+    color: #AAAAAA !important;
+}
+
+[data-theme="cga"] .text-dark {
+    color: #AAAAAA !important;
+}
+
+[data-theme="cga"] code {
+    color: #FF55FF;
+    background: #000000;
+}
+
+[data-theme="cga"] .alert-info {
+    border-color: #FFFF55;
+    color: #FFFF55;
+    background: #000000;
+}
+
+[data-theme="cga"] .control-label {
+    color: #FFFFFF;
+}
+
+[data-theme="cga"] p {
+    color: #AAAAAA;
 }

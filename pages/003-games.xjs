@@ -12,11 +12,13 @@ if (typeof settings.xtrn_blacklist === 'string') {
 
 var gamePrograms = [];
 var gameSections = {};
+var isGuest = (user.alias === settings.guest || user.number < 1);
 xtrn_area.sec_list.forEach(function (sec) {
-    if (!sec.can_access || sec.prog_list.length < 1) return;
+    if (sec.prog_list.length < 1) return;
+    if (!isGuest && !sec.can_access) return;
     if (settings.xtrn_blacklist.indexOf(sec.code.toLowerCase()) > -1) return;
     sec.prog_list.forEach(function (prog) {
-        if (!prog.can_access || !prog.can_run) return;
+        if (!isGuest && (!prog.can_access || !prog.can_run)) return;
         if (settings.xtrn_blacklist.indexOf(prog.code.toLowerCase()) > -1) return;
         gamePrograms.push({
             code: prog.code,
@@ -101,7 +103,9 @@ var _gamesData = {
     usage: <?xjs write(JSON.stringify(usageRaw)); ?>,
     icons: <?xjs write(JSON.stringify(gameIcons)); ?>,
     sections: <?xjs write(JSON.stringify(gameSections)); ?>,
-    validUsers: <?xjs write(JSON.stringify(validUsers)); ?>
+    validUsers: <?xjs write(JSON.stringify(validUsers)); ?>,
+    isGuest: <?xjs write(isGuest ? "true" : "false"); ?>,
+    isGuest: <?xjs write(isGuest ? "true" : "false"); ?>
 };
 </script>
 <script src="./js/graphics-converter.js"></script>

@@ -166,6 +166,7 @@
 	function writeRows(users) {
 		for (var u = 0; u < users.length; u++) {
 			writeln('<tr>');
+			writeln('<td><div data-avatar="' + users[u].alias + '" style="min-width:60px;min-height:36px;"></div></td>');
 			for (var c in columns) {
 				writeln(
 					'<td>' +
@@ -187,7 +188,8 @@
 <table class="table table-striped">
 	<thead>
 		<tr>
-			<?xjs writeColumns(); ?>
+			<th>Avatar</th>
+				<?xjs writeColumns(); ?>
 		</tr>
 	</thead>
 	<tbody>

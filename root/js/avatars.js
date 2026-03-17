@@ -65,8 +65,12 @@ const Avatars = new ( function () {
         }
         if (!u.length) return;
 
-        const a = await v4_get(`./api/system.ssjs?call=get-avatar&user=${u.join('&user=')}`);
-        a.forEach(e => {
+        // Batch into chunks of 20 to avoid URL length limits
+        for (let i = 0; i < u.length; i += 20) {
+            const batch = u.slice(i, i + 20);
+            const a = await v4_get(`./api/system.ssjs?call=get-avatar&user=${batch.join('&user=')}`);
+            if (!a) continue;
+            a.forEach(e => {
             if (e.data) {
                 gc.from_bin(atob(e.data), 10, 6, dataURL => {
                     const o = { ...e, dataURL };
@@ -78,7 +82,8 @@ const Avatars = new ( function () {
                 sbbs.avatars.set(o);
                 draw(o);
             }
-        });
+            });
+        }
 
     }
 

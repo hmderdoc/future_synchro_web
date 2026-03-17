@@ -278,10 +278,11 @@ function lastVisibleMessage() {
 
 async function listMessages(sub, thread, count, after) {
 
-    const dlmm = document.getElementById('forum-load-more-messages');
-    const blmm = document.getElementById('load-more-messages');
-    dlmm.setAttribute('hidden', true);
-    blmm.setAttribute('disabled', true);
+    if (_msgScrollLoading) return;
+    _msgScrollLoading = true;
+
+    var sentinel = document.getElementById('forum-message-sentinel');
+    if (sentinel) sentinel.setAttribute('hidden', true);
 
     let _data;
     const loadingMessage = new LoadingMessage();
@@ -305,10 +306,26 @@ async function listMessages(sub, thread, count, after) {
         _data = await v4_fetch_jsonl(`./api/forum.ssjs?call=get-thread&sub=${sub}&thread=${thread}&count=${count}&after=${data[data.length - 1].number}`);
         data = data.concat(_data);
     } else {
-        // TO DO: check for any newer messages than the newest we have on hand; prepend them
+        // Always fetch fresh on first load; cache is only for scroll-more
+        data = await v4_fetch_jsonl(`./api/forum.ssjs?call=get-thread&sub=${sub}&thread=${thread}&count=${count}`);
     }
-    localStorage.setItem(`${sub}-${thread}`, JSON.stringify(data));
+    if (data && data.length) localStorage.setItem(`${sub}-${thread}`, JSON.stringify(data));
     loadingMessage.stop();
+
+    if (!data || !data.length) {
+        // Thread expired or empty — clean up any stale cache and show notice
+        localStorage.removeItem(`${sub}-${thread}`);
+        var container = document.getElementById('forum-list-container');
+        if (container && !container.querySelector('.forum-expired-notice')) {
+            var notice = document.createElement('div');
+            notice.className = 'forum-expired-notice alert alert-info';
+            notice.textContent = 'This thread is no longer available.';
+            container.appendChild(notice);
+        }
+        _msgScrollLoading = false;
+        _msgScrollExhausted = true;
+        return;
+    }
 
     // TO DO: what about poll messages? If they may show up in (_data || data) then they need to be handled differently and a template created in forum.xjs
     const users = [];
@@ -349,17 +366,47 @@ async function listMessages(sub, thread, count, after) {
         if (upvoteBtn) upvoteBtn.onclick = function () { vote(sub, e.number, true); };
         var downvoteBtn = elem.querySelector('button[data-button-downvote]');
         if (downvoteBtn) downvoteBtn.onclick = function () { vote(sub, e.number, false); };
+        applyVoteState(e.number);
         elem.removeAttribute('hidden');
+        if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
         if (append) document.getElementById('forum-list-container').appendChild(elem);
         if (users.indexOf(akey) < 0) users.push(akey);
     });
 
-    dlmm.removeAttribute('hidden');
-    blmm.removeAttribute('disabled');
+    var loaded = (_data || data).length;
+    _msgScrollLoading = false;
+    if (loaded < count) {
+        _msgScrollExhausted = true;
+        if (sentinel) sentinel.setAttribute('hidden', true);
+    } else {
+        if (sentinel) sentinel.removeAttribute('hidden');
+    }
 
     if (Avatars) Avatars.draw(users);
 
 }
+
+
+var _msgScrollLoading = false;
+var _msgScrollExhausted = false;
+var _msgScrollObserver = null;
+
+async function initMessageInfiniteScroll(sub, thread, count) {
+    var sentinel = document.getElementById('forum-message-sentinel');
+    if (!sentinel) return;
+    if (_msgScrollObserver) _msgScrollObserver.disconnect();
+    _msgScrollExhausted = false;
+    _msgScrollLoading = false;
+    await listMessages(sub, thread, count);
+    if (_msgScrollExhausted) return;
+    _msgScrollObserver = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting && !_msgScrollLoading && !_msgScrollExhausted) {
+            listMessages(sub, thread, count, true);
+        }
+    }, { rootMargin: '200px' });
+    _msgScrollObserver.observe(sentinel);
+}
+
 
 
 // Thread list
@@ -432,7 +479,7 @@ function onThreadStats(data) {
 }
 
 function lastVisibleThread() {
-    const lastThreadElement = Array.from(document.querySelectorAll('li[data-thread]')).pop();
+    const lastThreadElement = Array.from(document.querySelectorAll('[data-thread]')).pop();
     if (!lastThreadElement) return null;
     const ret = parseInt(lastThreadElement.getAttribute('data-thread'), 10);
     if (isNaN(ret) || ret < 0) return null;
@@ -496,12 +543,22 @@ async function listThread(e) {
     }
 
     elem.removeAttribute('hidden');
+    if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
     if (append) document.getElementById('forum-list-container').appendChild(elem);
 }
 
 var _threadScrollLoading = false;
 var _threadScrollExhausted = false;
 var _threadScrollObserver = null;
+var _threadScrollCursor = null;
+var _threadPageSize = 20;
+
+function _sortParams() {
+    var p = '';
+    if (_threadSortMode && _threadSortMode !== 'activity') p += '&sort=' + _threadSortMode;
+    if (_threadSortDir) p += '&dir=' + _threadSortDir;
+    return p;
+}
 
 async function listThreads(sub, count, after) {
 
@@ -513,39 +570,53 @@ async function listThreads(sub, count, after) {
 
     const lm = new LoadingMessage();
     lm.start();
-    let response;
-    let data = await sbbs.forum.getThreads(v => v.sub === sub);
-    if (data === undefined || !data.length) {
-        if (after) {
-            const lastThread = lastVisibleThread();
-            if (lastThread === null) {
-                response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}`);
+    let loaded = 0;
+    try {
+        let response;
+        let data = ((_threadSortMode && _threadSortMode !== 'activity') || _threadSortDir) ? undefined : await sbbs.forum.getThreads(v => v.sub === sub);
+        if (data === undefined || !data.length) {
+            if (after) {
+                const lastThread = lastVisibleThread();
+                if (lastThread === null) {
+                    response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}` + _sortParams());
+                } else {
+                    response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}&after=${lastThread}&reload=true` + _sortParams());
+                }
             } else {
-                response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}&after=${lastThread}&reload=true`);
+                response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}` + _sortParams());
+            }
+        } else if (after) {
+            if (!_threadScrollCursor) {
+                // Cache loaded without API — fetch first page to get ordering cursor
+                var fresh = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}` + _sortParams());
+                if (fresh && fresh.threads && fresh.threads.length > 0) {
+                    _threadScrollCursor = fresh.threads[fresh.threads.length - 1].id;
+                }
+            }
+            if (_threadScrollCursor) {
+                response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}&after=${_threadScrollCursor}` + _sortParams());
+                if (response && response.threads) data = data.concat(response.threads);
             }
         } else {
-            response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}`);
+            // Always fetch fresh on first load; IndexedDB cache is only for scroll-more
+            response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}` + _sortParams());
         }
-    } else if (after) {
-        response = await v4_get(`./api/forum.ssjs?call=list-threads&sub=${sub}&count=${count}&after=${data[data.length - 1].id}`);
-        data = data.concat(response.threads);
-    } else {
-        // TO DO: check for NEWER threads than what we have on hand
+
+        if (response && response.threads) {
+            loaded = response.threads.length;
+            response.threads.forEach(e => {
+                sbbs.forum.setThread(e);
+                listThread(e);
+            });
+            if (loaded > 0) _threadScrollCursor = response.threads[loaded - 1].id;
+        } else if (data && data.length) {
+            loaded = data.length;
+            data.forEach(listThread);
+        }
+    } catch (err) {
+        console.error('listThreads error:', err);
     }
     lm.stop();
-
-    let loaded = 0;
-    if (response) {
-        loaded = response.threads.length;
-        response.threads.forEach(e => {
-            sbbs.forum.setThread(e);
-            listThread(e);
-        });
-    } else {
-        loaded = data.length;
-        data.forEach(listThread);
-    }
-
     _threadScrollLoading = false;
     if (loaded < count) {
         _threadScrollExhausted = true;
@@ -555,21 +626,265 @@ async function listThreads(sub, count, after) {
     }
 }
 
-function initThreadInfiniteScroll(sub, count) {
+async function initThreadInfiniteScroll(sub, count) {
+    _threadPageSize = count;
     const sentinel = document.getElementById('forum-thread-sentinel');
     if (!sentinel) return;
     if (_threadScrollObserver) _threadScrollObserver.disconnect();
     _threadScrollExhausted = false;
     _threadScrollLoading = false;
+    _threadScrollCursor = null;
+    await listThreads(sub, count);
+    if (_threadScrollExhausted) return;
     _threadScrollObserver = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting && !_threadScrollLoading && !_threadScrollExhausted) {
             listThreads(sub, count, true);
         }
     }, { rootMargin: '200px' });
     _threadScrollObserver.observe(sentinel);
-    listThreads(sub, count);
 }
 
+
+
+
+// Search & Sort
+
+var _searchActive = false;
+var _searchOffset = 0;
+var _searchTotal = 0;
+var _searchExhausted = false;
+var _searchLoading = false;
+var _threadSortMode = 'activity';
+var _threadSortDir = '';
+
+async function searchForum(loadMore) {
+    var input = document.getElementById('forum-search-input');
+    if (!input) return;
+    var query = input.value.trim();
+    if (!query) return;
+
+    if (_searchLoading) return;
+    _searchLoading = true;
+
+    var bar = document.getElementById('forum-search-bar');
+    var scope = bar ? bar.getAttribute('data-scope') : 'forum';
+    var group = bar ? bar.getAttribute('data-group') : '';
+    var sub = bar ? bar.getAttribute('data-sub') : '';
+    var sort = _threadSortMode || 'activity';
+
+    if (!loadMore) {
+        _searchOffset = 0;
+        _searchExhausted = false;
+        _searchActive = true;
+        var container = document.getElementById('forum-list-container');
+        if (container) container.innerHTML = '';
+        var clearBtn = document.getElementById('forum-search-clear');
+        if (clearBtn) clearBtn.removeAttribute('hidden');
+        // Disconnect thread scroll observer during search
+        if (_threadScrollObserver) _threadScrollObserver.disconnect();
+    }
+
+    var count = 20;
+    var url = './api/forum.ssjs?call=search-threads&query=' + encodeURIComponent(query) +
+              '&scope=' + scope + '&count=' + count + '&offset=' + _searchOffset +
+              '&sort=' + sort + (_threadSortDir ? '&dir=' + _threadSortDir : '');
+    if ((scope === 'group' || scope === 'sub') && group) url += '&group=' + group;
+    if (scope === 'sub' && sub) url += '&sub=' + sub;
+
+    var lm = new LoadingMessage();
+    lm.start();
+    try {
+        var data = await v4_get(url);
+        if (data && data.threads) {
+            _searchTotal = data.total;
+            data.threads.forEach(function(e) { listSearchResult(e); });
+            _searchOffset += data.threads.length;
+            if (_searchOffset >= _searchTotal || data.threads.length < count) {
+                _searchExhausted = true;
+            }
+        }
+    } catch (err) {
+        console.error('searchForum error:', err);
+    }
+    lm.stop();
+    _searchLoading = false;
+
+    var sentinel = document.getElementById('forum-thread-sentinel');
+    if (sentinel) {
+        if (_searchExhausted) {
+            sentinel.setAttribute('hidden', true);
+        } else {
+            sentinel.removeAttribute('hidden');
+        }
+    }
+
+    // Show result count
+    var countEl = document.getElementById('forum-search-count');
+    if (!countEl) {
+        countEl = document.createElement('small');
+        countEl.id = 'forum-search-count';
+        countEl.className = 'text-muted';
+        countEl.style.marginLeft = '0.5em';
+        var barDiv = document.getElementById('forum-search-bar');
+        if (barDiv) barDiv.appendChild(countEl);
+    }
+    countEl.textContent = _searchTotal + ' result' + (_searchTotal !== 1 ? 's' : '');
+
+    // Re-attach observer for search infinite scroll
+    if (!_searchExhausted && sentinel) {
+        if (_threadScrollObserver) _threadScrollObserver.disconnect();
+        _threadScrollObserver = new IntersectionObserver(function(entries) {
+            if (entries[0].isIntersecting && !_searchLoading && !_searchExhausted) {
+                searchForum(true);
+            }
+        }, { rootMargin: '200px' });
+        _threadScrollObserver.observe(sentinel);
+    }
+}
+
+function listSearchResult(e) {
+    var tmpl = document.getElementById('forum-search-result-template') || document.getElementById('forum-thread-link-template');
+    if (!tmpl) return;
+    var elem = tmpl.cloneNode(true);
+    elem.id = 'forum-search-result-' + e.sub + '-' + e.id;
+    elem.setAttribute('data-thread', e.id);
+
+    var page = new URLSearchParams(window.location.search).get('page') || '001-forum.xjs';
+    elem.setAttribute('href', './?page=' + page + '&sub=' + e.sub + '&thread=' + e.id);
+
+    elem.querySelector('strong[data-thread-subject]').innerHTML = e.subject;
+    elem.querySelector('strong[data-thread-from]').innerHTML = e.first.from;
+    elem.querySelector('span[data-thread-date-start]').innerHTML = formatMessageDate(e.first.when_written_time);
+
+    // Sub name badge for cross-sub results
+    var badgeEl = elem.querySelector('[data-search-sub-badge]');
+    if (badgeEl && e.sub_name) {
+        badgeEl.textContent = e.sub_name;
+        badgeEl.removeAttribute('hidden');
+    } else if (e.sub_name) {
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.cssText = 'margin-left:0.5em;background:#5bc0de;';
+        badge.textContent = e.sub_name;
+        var subjectEl = elem.querySelector('strong[data-thread-subject]');
+        if (subjectEl) subjectEl.parentNode.insertBefore(badge, subjectEl.nextSibling);
+    }
+
+    if (e.messages > 1) {
+        elem.querySelector('strong[data-message-count]').innerHTML = e.messages - 1;
+        if (e.messages == 2) {
+            elem.querySelector('span[data-suffix-reply]').removeAttribute('hidden');
+        } else {
+            elem.querySelector('span[data-suffix-replies]').removeAttribute('hidden');
+        }
+        elem.querySelector('strong[data-last-from]').innerHTML = e.last.from;
+        elem.querySelector('span[data-last-time]').innerHTML = formatMessageDate(e.last.when_written_time);
+        elem.querySelector('div[data-replies]').removeAttribute('hidden');
+    }
+
+    var stats = elem.querySelector('div[data-stats]');
+    if (e.unread) {
+        var urm = stats ? stats.querySelector('span[data-unread-messages]') : null;
+        if (urm) {
+            urm.innerHTML = e.unread;
+            urm.removeAttribute('hidden');
+            stats.removeAttribute('hidden');
+        }
+    }
+    if (e.votes && e.votes.total) {
+        if (stats && e.votes.up && e.votes.up.t) {
+            stats.querySelector('span[data-upvotes]').innerHTML = e.votes.up.p + '/' + e.votes.up.t;
+            stats.querySelector('span[data-upvotes-badge]').style.setProperty('display', '');
+        }
+        if (stats && e.votes.down && e.votes.down.t) {
+            stats.querySelector('span[data-downvotes]').innerHTML = e.votes.down.p + '/' + e.votes.down.t;
+            stats.querySelector('span[data-downvotes-badge]').style.setProperty('display', '');
+        }
+        if (stats) stats.removeAttribute('hidden');
+    }
+
+    elem.removeAttribute('hidden');
+    if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+    document.getElementById('forum-list-container').appendChild(elem);
+}
+
+function clearSearch() {
+    _searchActive = false;
+    _searchOffset = 0;
+    _searchTotal = 0;
+    _searchExhausted = false;
+    _searchLoading = false;
+
+    var input = document.getElementById('forum-search-input');
+    if (input) input.value = '';
+    var clearBtn = document.getElementById('forum-search-clear');
+    if (clearBtn) clearBtn.setAttribute('hidden', true);
+    var countEl = document.getElementById('forum-search-count');
+    if (countEl) countEl.remove();
+
+    // Remove q from URL and reload page content
+    var url = new URL(window.location);
+    url.searchParams.delete('q');
+    window.location.href = url.toString();
+}
+
+function _defaultDir(mode) {
+    return (mode === 'subject' || mode === 'sender') ? 'asc' : 'desc';
+}
+
+function setSort(mode) {
+    if (_threadSortMode === mode) {
+        // Toggle direction
+        var def = _defaultDir(mode);
+        var alt = def === 'desc' ? 'asc' : 'desc';
+        _threadSortDir = (_threadSortDir === alt) ? '' : alt;
+    } else {
+        _threadSortMode = mode;
+        _threadSortDir = '';
+    }
+
+    document.querySelectorAll('#forum-sort-controls button').forEach(function(btn) {
+        var arrow = btn.querySelector('.sort-arrow');
+        if (btn.getAttribute('data-sort') === _threadSortMode) {
+            btn.classList.add('active');
+            if (!arrow) {
+                arrow = document.createElement('span');
+                arrow.className = 'sort-arrow';
+                arrow.style.marginLeft = '4px';
+                btn.appendChild(arrow);
+            }
+            var def = _defaultDir(_threadSortMode);
+            var isReversed = _threadSortDir && _threadSortDir !== def;
+            arrow.textContent = (def === 'desc') ? (isReversed ? '\u25B2' : '\u25BC') : (isReversed ? '\u25BC' : '\u25B2');
+        } else {
+            btn.classList.remove('active');
+            if (arrow) arrow.remove();
+        }
+    });
+
+    // Update URL
+    var url = new URL(window.location);
+    if (_threadSortMode !== 'activity') url.searchParams.set('sort', _threadSortMode);
+    else url.searchParams.delete('sort');
+    if (_threadSortDir) url.searchParams.set('dir', _threadSortDir);
+    else url.searchParams.delete('dir');
+    history.replaceState(null, '', url);
+
+    if (_searchActive) {
+        searchForum();
+    } else {
+        // Re-load threads with new sort
+        var container = document.getElementById('forum-list-container');
+        if (container) container.innerHTML = '';
+        _threadScrollLoading = false;
+        _threadScrollExhausted = false;
+        _threadScrollCursor = null;
+        if (_threadScrollObserver) _threadScrollObserver.disconnect();
+        var bar = document.getElementById('forum-search-bar');
+        var sub = bar ? bar.getAttribute('data-sub') : '';
+        if (sub) initThreadInfiniteScroll(sub, _threadPageSize);
+    }
+}
 
 
 // Sub list
@@ -657,6 +972,10 @@ function onSubList(data) {
         elem.querySelector('p[data-sub-description]').innerHTML = e.description;
         if (e.newest) showNewestMessage(elem, e.newest);
         if (e.unread != null) showSubUnreadCount(elem, e.code, e.unread);
+        if (e.total_msgs != null) {
+            var tm = elem.querySelector('span[data-total-msgs]');
+            if (tm) { tm.innerHTML = e.total_msgs + ' msgs'; tm.hidden = false; }
+        }
         if (append) document.getElementById('forum-list-container').appendChild(elem);
     });
 }
@@ -741,6 +1060,183 @@ async function listGroups() {
     onGroupList(data);
     lm.stop();
 }
+
+
+// --- Vote state tracking for thread view ---
+var _threadVoteCache = null;
+
+function applyVoteState(msgNum) {
+    if (!_threadVoteCache || !_threadVoteCache[msgNum]) return;
+    var vd = _threadVoteCache[msgNum];
+    var elem = document.getElementById('forum-message-' + msgNum);
+    if (!elem) return;
+    var uvBtn = elem.querySelector('button[data-button-upvote]');
+    var dvBtn = elem.querySelector('button[data-button-downvote]');
+    var uvCount = elem.querySelector('span[data-upvote-count]');
+    var dvCount = elem.querySelector('span[data-downvote-count]');
+    if (uvCount && vd.u !== undefined) {
+        if (parseInt(uvCount.textContent) !== vd.u) {
+            uvCount.textContent = vd.u;
+            if (uvBtn) uvBtn.classList.add('indicator');
+        }
+    }
+    if (dvCount && vd.d !== undefined) {
+        if (parseInt(dvCount.textContent) !== vd.d) {
+            dvCount.textContent = vd.d;
+            if (dvBtn) dvBtn.classList.add('indicator');
+        }
+    }
+    switch (vd.v) {
+        case 1:
+            if (uvBtn) { uvBtn.classList.add('upvote-fg'); uvBtn.disabled = true; }
+            if (dvBtn) dvBtn.disabled = true;
+            break;
+        case 2:
+            if (dvBtn) { dvBtn.classList.add('downvote-fg'); dvBtn.disabled = true; }
+            if (uvBtn) uvBtn.disabled = true;
+            break;
+    }
+}
+
+async function getVotesInThread(sub, id) {
+    var data = await v4_get('./api/forum.ssjs?call=get-thread-votes&sub=' + sub + '&id=' + id);
+    if (!data || !data.m) return;
+    _threadVoteCache = data.m;
+    Object.keys(data.m).forEach(function (m) { applyVoteState(m); });
+}
+
+async function getVotesInThreads(sub) {
+    var data = await v4_get('./api/forum.ssjs?call=get-sub-votes&sub=' + sub);
+    if (!data) return;
+    Object.keys(data).forEach(function (t) {
+        var elem = document.getElementById('forum-thread-link-' + t);
+        if (!elem) return;
+        var uvSpan = elem.querySelector('span[data-upvotes]');
+        var dvSpan = elem.querySelector('span[data-downvotes]');
+        if (uvSpan) {
+            var uv = data[t].p.u + '/' + data[t].t.u;
+            if (uv !== uvSpan.textContent) uvSpan.textContent = uv;
+        }
+        if (dvSpan) {
+            var dv = data[t].p.d + '/' + data[t].t.d;
+            if (dv !== dvSpan.textContent) dvSpan.textContent = dv;
+        }
+    });
+}
+
+// --- Thread keyboard navigation ---
+function threadNav() {
+    var flc = document.getElementById('forum-list-container');
+    if (!flc) return;
+    function setCurrentFromHash() {
+        flc.querySelectorAll('.current').forEach(function (el) { el.classList.remove('current'); });
+        var target;
+        if (window.location.hash === '') {
+            target = flc.querySelector('.list-group-item[data-message]');
+        } else {
+            target = document.getElementById('forum-message-' + window.location.hash.substr(1));
+        }
+        if (target) {
+            target.classList.add('current');
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+    setCurrentFromHash();
+    document.addEventListener('keydown', function (evt) {
+        if (evt.target.tagName === 'TEXTAREA' || evt.target.tagName === 'INPUT') return;
+        var cur = flc.querySelector('.list-group-item.current');
+        if (!cur) return;
+        var items = Array.from(flc.querySelectorAll('.list-group-item[data-message]'));
+        var idx = items.indexOf(cur);
+        if (idx < 0) return;
+        switch (evt.keyCode) {
+            case 37:
+                if (idx > 0) {
+                    window.location.hash = items[idx - 1].getAttribute('data-message');
+                    evt.preventDefault();
+                }
+                break;
+            case 39:
+                if (idx < items.length - 1) {
+                    window.location.hash = items[idx + 1].getAttribute('data-message');
+                    evt.preventDefault();
+                }
+                break;
+        }
+    });
+    window.addEventListener('hashchange', setCurrentFromHash);
+}
+
+// --- Poll interaction ---
+async function getPollData(sub, id) {
+    var data = await v4_get('./api/forum.ssjs?call=get-poll-results&sub=' + sub + '&id=' + id);
+    if (!data) return;
+    if (data.tally) {
+        data.tally.forEach(function (e, i) {
+            if (e > 0) {
+                var el = document.getElementById('poll-count-' + id + '-' + i);
+                if (el) el.textContent = e;
+            }
+        });
+    }
+    if (data.answers > 0) {
+        document.querySelectorAll('input[name="poll-' + id + '"]').forEach(function (el) {
+            el.disabled = true;
+        });
+        var submitBtn = document.getElementById('submit-poll-' + id);
+        if (submitBtn) submitBtn.disabled = true;
+    }
+}
+
+function pollControl(id, count) {
+    document.querySelectorAll('input[name="poll-' + id + '"]').forEach(function (el) {
+        el.addEventListener('change', function () {
+            var checked = document.querySelectorAll('input[name="poll-' + id + '"]:checked').length;
+            document.querySelectorAll('input[name="poll-' + id + '"]:not(:checked)').forEach(function (inp) {
+                inp.disabled = checked >= count;
+            });
+        });
+    });
+}
+
+async function submitPollAnswers(sub, id) {
+    var checked = document.querySelectorAll('input[name="poll-' + id + '"]:checked');
+    if (checked.length < 1) return;
+    var answers = Array.from(checked).map(function (el) { return el.value; });
+    await v4_post('./api/forum.ssjs', {
+        call: 'submit-poll-answers',
+        sub: sub,
+        id: id,
+        answer: answers.join('&answer=')
+    });
+    document.querySelectorAll('input[name="poll-' + id + '"]').forEach(function (el) {
+        el.disabled = true;
+        if (el.checked) el.parentElement.parentElement.classList.add('upvote-bg');
+    });
+    var submitBtn = document.getElementById('submit-poll-' + id);
+    if (submitBtn) submitBtn.disabled = true;
+}
+
+// --- Block sender ---
+async function blockSender(id, from, from_net) {
+    var data = await v4_get('./api/forum.ssjs?call=block-sender&from=' + encodeURIComponent(from) + '&from_net=' + encodeURIComponent(from_net));
+    if (!data.err) {
+        var btn = document.getElementById('bsb-' + id);
+        if (btn) btn.disabled = true;
+    }
+}
+
+// --- Unread count fetchers (complement SSE push) ---
+async function getSubUnreadCounts(grp) {
+    var res = await v4_get('./api/forum.ssjs?call=get-sub-unread-counts&group=' + grp);
+    if (res) onSubUnreadCount(res);
+}
+
+async function getGroupUnreadCounts() {
+    var res = await v4_get('./api/forum.ssjs?call=get-group-unread-counts');
+    if (res) onGroupUnreadCount(res);
+}
+
 
 /* ---- Render breadcrumb icons on page load ---- */
 (function initBreadcrumbIcons() {

@@ -87,18 +87,12 @@
                 cc.style.overflow = 'hidden';
             }
 
-            // Clear fTelnet's inline dimensions so our CSS drives sizing
-            var cc = document.querySelector('.fTelnetClientContainer');
-            if (cc) {
-                cc.style.width = '';
-                cc.style.height = '';
-                cc.style.overflow = 'hidden';
-            }
-
             // Re-fit font to current container size (always safe)
             if (typeof client._Crt.SetFont === 'function') {
                 client._Crt.SetFont(client._Crt.Font ? client._Crt.Font.Name : 'CP437');
             }
+
+            scrollToBottom();
 
             // Only change screen dimensions if connected — avoids NAWS during handshake
             if (!isConnected) return;
@@ -115,6 +109,7 @@
                     client._Crt.SetFont(client._Crt.Font ? client._Crt.Font.Name : 'CP437');
                 }
             }
+            scrollToBottom();
         }, 250);
     }
 
@@ -229,6 +224,16 @@
     }
 
     /* ============================================================
+     *  Scroll container to bottom — fTelnet canvas includes scrollback
+     *  above the active area.  Chrome auto-scrolls; Safari does not.
+     * ============================================================ */
+
+    function scrollToBottom() {
+        var cc = document.querySelector('.fTelnetClientContainer');
+        if (cc) cc.scrollTop = cc.scrollHeight;
+    }
+
+    /* ============================================================
      *  Force font recalculation after layout settles
      * ============================================================ */
 
@@ -251,6 +256,7 @@
                 if (typeof client._Crt.SetFont === 'function') {
                     client._Crt.SetFont(client._Crt.Font ? client._Crt.Font.Name : 'CP437');
                 }
+                scrollToBottom();
             }, ms);
         });
     }
@@ -314,6 +320,10 @@
                 isConnected = true;
                 updateStatus();
                 if (origConnect) origConnect.apply(this, arguments);
+                // Safari needs explicit scroll to bottom of canvas
+                scrollToBottom();
+                setTimeout(scrollToBottom, 200);
+                setTimeout(scrollToBottom, 1000);
             };
         }
         if (client.OnConnectionClose) {

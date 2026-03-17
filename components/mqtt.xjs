@@ -66,42 +66,42 @@
 ?>
         <!-- TODOZ Translate -->
         <div class="container">
-            <div class="col-lg-6 col-lg-offset-3 col-md-7 col-md-offset-3 col-sm-9 col-sm-offset-2">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
+            <div class="col-lg-6 offset-lg-3 col-md-7 offset-md-3 col-sm-9 offset-sm-2">
+                <div class="card">
+                    <div class="card-header">
                         <h3>Missing MQTT settings</h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         <p>Please provide the hostname and WebSocket ports your MQTT server is listening on:</p>
 
-                        <form method="POST" class="form-horizontal">
+                        <form method="POST" class="">
                             <? if (mqtt_post_error) { ?>
                                 <div class="alert alert-danger"><? write(mqtt_post_error); ?></div>
                             <? } ?>
 
                             <div class="form-group">
-                                <label for="mqtt_hostname" class="col-sm-3 control-label">Hostname</label>
+                                <label for="mqtt_hostname" class="col-sm-3 form-label">Hostname</label>
                                 <div class="col-sm-9">
                                     <input type="text" id="mqtt_hostname" name="mqtt_hostname" class="form-control" value="<? write(broker_addr === undefined ? '' : broker_addr); ?>" />
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label for="mqtt_ws_port" class="col-sm-3 control-label">WS:// port</label>
+                                <label for="mqtt_ws_port" class="col-sm-3 form-label">WS:// port</label>
                                 <div class="col-sm-9">
                                     <input type="text" id="mqtt_ws_port" name="mqtt_ws_port" class="form-control" value="<? write(broker_ws_port === undefined ? '' : broker_ws_port); ?>" />
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label for="mqtt_wss_port" class="col-sm-3 control-label">WSS:// port</label>
+                                <label for="mqtt_wss_port" class="col-sm-3 form-label">WSS:// port</label>
                                 <div class="col-sm-9">
                                     <input type="text" id="mqtt_wss_port" name="mqtt_wss_port" class="form-control" value="<? write(broker_wss_port === undefined ? '' : broker_wss_port); ?>" />
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <div class="col-sm-offset-3 col-sm-9">
+                                <div class="offset-sm-3 col-sm-9">
                                     <button class="btn btn-primary">Submit</button>
                                 </div>
                             </div>
@@ -111,7 +111,7 @@
                             If you're not sure what to put here, take a look at the <a href="https://wiki.synchro.net/howto:mqtt#websockets" target="_blank">MQTT Wiki Entry</a>.
                         </div>
                     </div>
-                    <div class="panel-footer">
+                    <div class="card-footer">
                         <p>
                             Alternatively, you can edit <strong><? write(system.ctrl_dir + 'modopts.ini'); ?></strong> and add <strong>mqtt_hostname</strong>, 
                             <strong>mqtt_ws_port</strong> and <strong>mqtt_wss_port</strong> keys to the <strong>[web]</strong> section.

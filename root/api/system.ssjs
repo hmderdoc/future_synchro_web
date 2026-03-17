@@ -18,7 +18,8 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 				const u = e.split('@');
 				var ret;
 				if (u.length === 1) {
-					ret = avatar_lib.read_localuser(u[0]) || {};
+					var usernum = parseInt(u[0], 10) || system.matchuser(u[0]);
+					ret = avatar_lib.read_localuser(usernum) || {};
 				} else {
 					ret = avatar_lib.read_netuser(u[0], u[1]) || {};
 				}

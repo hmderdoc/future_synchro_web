@@ -66,13 +66,13 @@
         } else if (e.type == 'link') {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>" target="_blank"><? write(e.title); ?></a>
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>" target="_blank"><span class="bin-icon" data-icon="<? write(e.name); ?>"></span><? write(e.title); ?></a>
     </li>
 <?xjs
         } else {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>"><? write(e.title); ?></a>
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>"><span class="bin-icon" data-icon="<? write(e.name); ?>"></span><? write(e.title); ?></a>
     </li>
 <?xjs
         }
@@ -82,7 +82,7 @@
 ?>
     <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <? write(obj.title.replace(/^.*\-/, '')); ?>
+            <span class="bin-icon" data-icon="<? write(obj.name || ''); ?>"></span><? write(obj.title.replace(/^.*\-/, '')); ?>
         </a>
         <ul class="dropdown-menu">
 <?xjs obj.list.forEach(function(e) { navItem(e, (path || '') + obj.title + '/'); }); ?>
@@ -109,6 +109,35 @@
     <? } ?>
     <link href="./css/theme-cga.css" rel="stylesheet">
     <link href="./css/spa.css?_v=<? write(time()); ?>" rel="stylesheet">
+
+<!-- BIN icon data (server-side encoded) -->
+<?xjs
+    var _binIconDir = system.mods_dir;
+    if (_binIconDir && _binIconDir.slice(-1) !== '/' && _binIconDir.slice(-1) !== '\\') _binIconDir += '/';
+    _binIconDir += 'future_shell/assets/';
+    var _binIconMap = {
+        home: 'home2', forum: 'forum', files: 'folder126a',
+        games: 'games', chat: 'chat', terminal: 'monitor',
+        register: 'edit', mail: 'messages', logout: 'exit',
+        bar_chart: 'bar_chart', calendar: 'calendar',
+        doc_edit: 'doc_edit', chat_new: 'chat_new', users: 'users',
+        search: 'search', trash: 'trash_can', pencil: 'hand_pencil_icon',
+        thumbs_up: 'thumbs_up', thumbs_down: 'thumbs_down',
+        comment: 'chat_new', checkmark: 'checkmark', stop: 'stop',
+        link: 'WALLETLINK', poll: 'bar_chart', group: 'group'
+    };
+    var _binIconData = {};
+    for (var _bk in _binIconMap) {
+        var _bp = _binIconDir + _binIconMap[_bk] + '.bin';
+        try {
+            if (file_exists(_bp)) {
+                var _bf = new File(_bp);
+                if (_bf.open('rb')) { _binIconData[_bk] = base64_encode(_bf.read()); _bf.close(); }
+            }
+        } catch(e) {}
+    }
+?>
+<script>window.sbbsBinIcons = <? write(JSON.stringify(_binIconData)); ?>;</script>
 </head>
 <body>
 
@@ -118,6 +147,7 @@
 <script src="./js/avatars.js?_v=<? write(time()); ?>"></script>
 <script src="./js/common.js?_v=<? write(time()); ?>"></script>
 <script src="./js/chat.js?_v=<? write(time()); ?>"></script>
+<script src="./js/bin-icons.js?_v=<? write(time()); ?>"></script>
 
 
 <!-- Navbar (BS5) -->
@@ -136,14 +166,14 @@
                 <li class="nav-item">
                     <button class="btn btn-outline-light btn-sm me-2" id="btn-terminal" type="button" title="Toggle Terminal">
                         <span id="terminal-status" class="badge rounded-pill bg-secondary" style="width:8px;height:8px;display:inline-block;"></span>
-                        Terminal
+                        <span class="bin-icon" data-icon="terminal"></span>Terminal
                     </button>
                 </li>
 <?xjs } ?>
 <?xjs if (user.alias === settings.guest || user.number < 1) { ?>
 <?xjs   if (settings.user_registration) { ?>
                 <li class="nav-item">
-                    <a class="nav-link" href="./?page=000-register.xjs"><? write(locale.strings.main.menu_item_register); ?></a>
+                    <a class="nav-link" href="./?page=000-register.xjs"><span class="bin-icon" data-icon="register"></span><? write(locale.strings.main.menu_item_register); ?></a>
                 </li>
 <?xjs   } ?>
                 <li class="nav-item dropdown">
@@ -170,14 +200,14 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="./?page=000-mail.xjs">
-                            <? write(locale.strings.main.menu_item_mail); ?>
+                            <span class="bin-icon" data-icon="mail"></span><? write(locale.strings.main.menu_item_mail); ?>
                             <span class="badge bg-danger" id="badge-unread-mail-inner"></span>
                         </a></li>
                         <li><a class="dropdown-item" href="./?page=004-chat.xjs">
-                            Chat
+                            <span class="bin-icon" data-icon="chat"></span>Chat
                             <span class="badge bg-primary" id="badge-chat-unread" class="d-none"></span>
                         </a></li>
-                        <li><a class="dropdown-item" id="button-logout" href="#"><? write(locale.strings.main.menu_item_logout); ?></a></li>
+                        <li><a class="dropdown-item" id="button-logout" href="#"><span class="bin-icon" data-icon="logout"></span><? write(locale.strings.main.menu_item_logout); ?></a></li>
                     </ul>
                 </li>
 <?xjs } ?>

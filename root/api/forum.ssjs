@@ -182,7 +182,23 @@ if (request.has_param('call') && (http_request.method === 'GET' || http_request.
             case 'list-threads':
                 if (request.has_param('sub')) {
                     if (request.has_param('count')) var count = request.get_param('count');
-                    reply = listThreads(request.get_param('sub'), count || settings.page_size, request.get_param('after'));
+                    reply = listThreads(request.get_param('sub'), count || settings.page_size, request.get_param('after'), request.get_param('sort'), request.get_param('dir'));
+                }
+                break;
+
+            case 'search-threads':
+                if (request.has_param('query')) {
+                    if (request.has_param('count')) var count = request.get_param('count');
+                    reply = searchThreads(
+                        request.get_param('query'),
+                        request.get_param('scope') || 'forum',
+                        request.get_param('group'),
+                        request.get_param('sub'),
+                        request.get_param('sort'),
+                        count || settings.page_size,
+                        request.get_param('offset'),
+                        request.get_param('dir')
+                    );
                 }
                 break;
 
