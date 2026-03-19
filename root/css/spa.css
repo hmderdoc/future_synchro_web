@@ -306,6 +306,11 @@ body.terminal-open {
 .bin-icon-xl .bin-icon-img { height: 48px; }
 
 /* Navbar context — fill to nav item height */
+.navbar .nav-link {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+}
 .navbar .bin-icon {
     margin-right: 0.15em;
 }
@@ -335,6 +340,8 @@ body.terminal-open {
     align-items: center;
     justify-content: center;
     padding: 4px;
+    font-size: 1.15rem;
+    margin-right: 4px;
 }
 .btn.icon .bin-icon-img {
     height: 28px;
@@ -397,7 +404,7 @@ body.terminal-open {
 }
 /* CGA theme overrides */
 [data-theme="cga"] .forum-icon {
-    border-color: var(--cga-gray);
+    border-color: var(--cga-dark-gray);
 }
 /* Responsive */
 @media (max-width: 576px) {
@@ -444,8 +451,8 @@ body.terminal-open {
 /* Message groups */
 .chat-msg-group {
     display: flex;
-    gap: 8px;
-    max-width: 75%;
+    gap: 10px;
+    max-width: 85%;
     margin-bottom: 4px;
 }
 .chat-msg-group-other {
@@ -456,32 +463,26 @@ body.terminal-open {
     flex-direction: row-reverse;
 }
 
-.chat-msg-stack {
+.chat-msg-content {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    min-width: 0;
 }
 
-/* Avatar column */
-.chat-avatar-col {
-    flex-shrink: 0;
-    width: 40px;
-    align-self: flex-end;
-}
+/* Avatar */
 .chat-avatar {
-    width: 40px;
-    height: 40px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    width: 60px;
     border-radius: 4px;
     overflow: hidden;
     background: #111;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 .chat-avatar img {
     width: 100%;
-    height: 100%;
+    height: auto;
     image-rendering: pixelated;
     display: block;
 }
@@ -489,18 +490,18 @@ body.terminal-open {
     color: #aaa;
     font-size: 18px;
     font-weight: bold;
-    line-height: 40px;
+    line-height: 72px;
     text-align: center;
     display: block;
     width: 100%;
 }
 
 /* Sender name */
-.chat-sender-name {
-    font-size: 0.75rem;
-    font-weight: 600;
+.chat-sender {
+    font-size: 0.85rem;
+    font-weight: 700;
     color: var(--bs-secondary-color, #6c757d);
-    padding: 0 8px;
+    padding: 0 4px;
     margin-top: 4px;
 }
 
@@ -529,9 +530,10 @@ body.terminal-open {
 .chat-timestamp {
     font-size: 0.65rem;
     color: inherit;
-    opacity: 0.55;
+    opacity: 0.6;
     text-align: right;
     margin-top: 2px;
+    margin-left: 6px;
 }
 
 /* System messages (join/part) */
@@ -607,16 +609,15 @@ body.terminal-open {
 }
 
 .chat-toast-avatar {
-    width: 36px;
-    height: 36px;
+    width: 48px;
     border-radius: 4px;
     overflow: hidden;
     background: #111;
     flex-shrink: 0;
 }
 .chat-toast-avatar img {
-    width: 100%;
-    height: 100%;
+    width: 48px;
+    height: 58px;
     image-rendering: pixelated;
 }
 
@@ -634,9 +635,13 @@ body.terminal-open {
 .chat-toast-text {
     font-size: 0.8rem;
     color: var(--bs-secondary-color, #6c757d);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .chat-toast-close {
@@ -663,36 +668,56 @@ body.terminal-open {
 /* ---- CGA theme overrides ---- */
 [data-theme="cga"] .chat-messages,
 .cga .chat-messages {
-    background: #000;
-    border-color: var(--cga-gray);
+    background: var(--cga-black);
+    border-color: var(--cga-dark-gray);
 }
 [data-theme="cga"] .chat-bubble-other,
 .cga .chat-bubble-other {
-    background: #222;
-    color: var(--cga-lt-gray);
+    background: var(--cga-cyan);
+    color: var(--cga-white);
+    border: 1px solid var(--cga-bright-cyan);
 }
 [data-theme="cga"] .chat-bubble-self,
 .cga .chat-bubble-self {
     background: var(--cga-blue);
     color: var(--cga-white);
+    border: 1px solid var(--cga-bright-blue);
 }
 [data-theme="cga"] .chat-input-area,
 .cga .chat-input-area {
-    background: #000;
-    border-color: var(--cga-gray);
+    background: var(--cga-black);
+    border-color: var(--cga-dark-gray);
+}
+[data-theme="cga"] .chat-input-area input,
+.cga .chat-input-area input,
+[data-theme="cga"] .chat-input-area textarea,
+.cga .chat-input-area textarea {
+    background: var(--cga-black);
+    color: var(--cga-light-gray);
+    border-color: var(--cga-dark-gray);
 }
 [data-theme="cga"] .chat-system-msg,
 .cga .chat-system-msg {
-    color: var(--cga-gray);
+    color: var(--cga-bright-cyan);
 }
-[data-theme="cga"] .chat-sender-name,
-.cga .chat-sender-name {
-    color: var(--cga-lt-green);
+[data-theme="cga"] .chat-sender,
+.cga .chat-sender {
+    color: var(--cga-bright-magenta);
+    font-weight: 700;
+}
+[data-theme="cga"] .chat-timestamp,
+.cga .chat-timestamp {
+    color: var(--cga-dark-gray);
 }
 [data-theme="cga"] .chat-toast,
 .cga .chat-toast {
-    background: #111;
-    border-color: var(--cga-gray);
+    background: var(--cga-black);
+    color: var(--cga-bright-cyan);
+    border-color: var(--cga-dark-gray);
+}
+[data-theme="cga"] .chat-toast-text,
+.cga .chat-toast-text {
+    color: var(--cga-bright-magenta);
 }
 
 
@@ -730,8 +755,7 @@ body.terminal-open {
     background: var(--bs-tertiary-bg, rgba(0,0,0,.03));
 }
 .chat-user-avatar {
-    width: 28px;
-    height: 28px;
+    width: 40px;
     flex-shrink: 0;
     border-radius: 2px;
     overflow: hidden;
@@ -739,8 +763,8 @@ body.terminal-open {
 }
 .chat-user-avatar img,
 .chat-user-avatar canvas {
-    width: 100%;
-    height: 100%;
+    width: 40px;
+    height: 48px;
     display: block;
 }
 .chat-user-info {
@@ -765,12 +789,12 @@ body.terminal-open {
 [data-theme="cga"] .chat-users-panel,
 .cga .chat-users-panel {
     background: #000;
-    border-color: var(--cga-gray);
+    border-color: var(--cga-dark-gray);
 }
 [data-theme="cga"] .chat-users-panel-header,
 .cga .chat-users-panel-header {
-    border-color: var(--cga-gray);
-    color: var(--cga-lt-cyan);
+    border-color: var(--cga-dark-gray);
+    color: var(--cga-bright-cyan);
 }
 [data-theme="cga"] .chat-user-item:hover,
 .cga .chat-user-item:hover {
@@ -778,11 +802,11 @@ body.terminal-open {
 }
 [data-theme="cga"] .chat-user-nick,
 .cga .chat-user-nick {
-    color: var(--cga-lt-green);
+    color: var(--cga-bright-green);
 }
 [data-theme="cga"] .chat-user-system,
 .cga .chat-user-system {
-    color: var(--cga-gray);
+    color: var(--cga-dark-gray);
 }
 /* ---- Responsive ---- */
 @media (max-width: 576px) {
@@ -990,4 +1014,159 @@ div.message pre.ansi {
     33%  { opacity: 0.92; }
     66%  { opacity: 1; }
     100% { opacity: 1; }
+}
+
+/* ── Oneliners page ── */
+.ol-list {
+    max-height: 600px;
+    overflow-y: auto;
+    background: #111;
+    font-family: 'IBM VGA', 'Perfect DOS VGA 437', 'Fixedsys', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+.ol-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid #222;
+}
+.ol-row:last-child { border-bottom: none; }
+.ol-row:hover { background: #1a1a1a; }
+.ol-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    overflow: hidden;
+}
+.ol-avatar img {
+    width: 40px;
+    height: auto;
+    image-rendering: pixelated;
+}
+.ol-body { flex: 1; min-width: 0; }
+.ol-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+.ol-alias { color: #55ffff; font-size: 13px; }
+.ol-system { color: #555; font-size: 12px; }
+.ol-time { color: #555; font-size: 11px; margin-left: auto; white-space: nowrap; }
+.ol-text { color: #aaa; word-break: break-word; }
+
+/* Color toolbar */
+#ol-color-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+}
+.ol-color-btn {
+    display: inline-block;
+    width: 26px;
+    height: 22px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: monospace;
+    color: #fff;
+    text-align: center;
+    line-height: 20px;
+    padding: 0;
+}
+.ol-color-btn:hover { border-color: #aaa; transform: scale(1.15); }
+.ol-color-reset {
+    background: #333 !important;
+    color: #aaa !important;
+    font-size: 13px;
+}
+
+/* Preview box */
+.ol-preview-box {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-family: 'IBM VGA', 'Perfect DOS VGA 437', 'Fixedsys', 'Consolas', monospace;
+    font-size: 14px;
+    color: #aaa;
+}
+
+/* ============================================================
+ *  CRT power-off animation (inverse of power-on)
+ * ============================================================ */
+
+.crt-off-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10;
+    pointer-events: none;
+    background: transparent;
+}
+
+.crt-off-line {
+    position: absolute;
+    left: 5%; right: 5%;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-50%);
+    background: #fff;
+    box-shadow:
+        0 0 15px 5px rgba(200, 220, 255, 0.7),
+        0 0 40px 10px rgba(180, 200, 255, 0.3);
+    opacity: 0;
+}
+
+/* Phase 1: brief brightness flash, then fade to black */
+.crt-off-flash {
+    animation: crt-off-flash 80ms ease-out forwards;
+}
+
+/* Phase 2: black screen with bright horizontal line at center */
+.crt-off-line-show {
+    background: #000;
+}
+.crt-off-line-show .crt-off-line {
+    opacity: 1;
+    transition: opacity 30ms ease;
+}
+
+/* Phase 3: line shrinks horizontally and fades (phosphor decay) */
+.crt-off-line-fade {
+    background: #000;
+}
+.crt-off-line-fade .crt-off-line {
+    animation: crt-off-line-shrink 200ms ease-in forwards;
+}
+
+@keyframes crt-off-flash {
+    0%   { background: rgba(255, 255, 255, 0); }
+    35%  { background: rgba(255, 255, 255, 0.2); }
+    100% { background: #000; }
+}
+
+@keyframes crt-off-line-shrink {
+    0%   {
+        opacity: 1;
+        left: 5%; right: 5%;
+        box-shadow:
+            0 0 15px 5px rgba(200, 220, 255, 0.7),
+            0 0 40px 10px rgba(180, 200, 255, 0.3);
+    }
+    50%  {
+        opacity: 0.8;
+        left: 25%; right: 25%;
+        box-shadow:
+            0 0 10px 3px rgba(200, 220, 255, 0.5),
+            0 0 25px 6px rgba(180, 200, 255, 0.2);
+    }
+    100% {
+        opacity: 0;
+        left: 48%; right: 48%;
+        box-shadow:
+            0 0 4px 2px rgba(200, 220, 255, 0.1);
+    }
 }

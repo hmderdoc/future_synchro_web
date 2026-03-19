@@ -1,38 +1,486 @@
 <!--Chat-->
-<style>.chat-container{display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:400px}</style>
+<style>
+.chat-web-page {
+    --chat-bg: #050505;
+    --chat-panel: #111111;
+    --chat-panel-alt: #171717;
+    --chat-border: #2b2b2b;
+    --chat-muted: #9e9e9e;
+    --chat-fg: #efefef;
+    --chat-accent: #34c6d3;
+    --chat-self: #2d2ad8;
+    --chat-other: #2a2a2a;
+    --chat-system: #666666;
+    color: var(--chat-fg);
+}
+.chat-web-page .chat-web-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: calc(100vh - 180px);
+}
+.chat-web-page .chat-web-layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+}
+.chat-web-page .chat-web-sidebar,
+.chat-web-page .chat-web-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.chat-web-page .chat-web-sidebar {
+    border: 1px solid var(--chat-border);
+    border-radius: 1rem;
+    background: var(--chat-panel);
+    padding: 0.9rem;
+}
+.chat-web-page .chat-web-sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+.chat-web-page .chat-web-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.chat-web-page .chat-web-sidebar-heading,
+.chat-web-page .chat-web-title {
+    margin: 0;
+}
+.chat-web-page .chat-web-sidebar-heading {
+    color: #5555ff;
+}
+.chat-web-page .chat-web-sidebar-form,
+.chat-web-page .chat-web-form {
+    display: flex;
+    gap: 0.5rem;
+}
+.chat-web-page .chat-web-sidebar-input,
+.chat-web-page .chat-web-input {
+    flex: 1 1 auto;
+    border: 1px solid var(--chat-border);
+    background: #0b0b0b;
+    color: var(--chat-fg);
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.9rem;
+}
+.chat-web-page .chat-web-sidebar-button,
+.chat-web-page .chat-web-send,
+.chat-web-page .chat-web-status-button,
+.chat-web-page .chat-web-users-close {
+    border: 1px solid var(--chat-border);
+    background: var(--chat-panel-alt);
+    color: var(--chat-fg);
+    border-radius: 0.65rem;
+    padding: 0.55rem 0.8rem;
+}
+.chat-web-page .chat-web-send {
+    background: var(--chat-accent);
+    color: #041013;
+    font-weight: bold;
+}
+.chat-web-page .chat-web-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.chat-web-page .chat-web-nav-empty,
+.chat-web-page .chat-web-empty {
+    color: var(--chat-muted);
+}
+.chat-web-page .chat-web-nav-item {
+    border: 1px solid var(--chat-border);
+    background: #0d0d0d;
+    color: var(--chat-fg);
+    border-radius: 0.8rem;
+    padding: 0.7rem 0.8rem;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.chat-web-page .chat-web-nav-item.is-active {
+    border-color: var(--chat-accent);
+    background: #0c1619;
+}
+.chat-web-page .chat-web-nav-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+.chat-web-page .chat-web-nav-title {
+    font-weight: bold;
+    min-width: 0;
+}
+.chat-web-page .chat-web-nav-secondary,
+.chat-web-page .chat-web-nav-preview,
+.chat-web-page .chat-web-channel {
+    color: var(--chat-muted);
+    font-size: 0.9rem;
+}
+.chat-web-page .chat-web-nav-preview {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chat-web-page .chat-web-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: bold;
+    background: var(--chat-accent);
+    color: #041013;
+}
+.chat-web-page .chat-web-badge.is-unread {
+    background: #f1c12b;
+    color: #271d00;
+}
+.chat-web-page .chat-web-thread-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: center;
+}
+.chat-web-page .chat-web-thread-avatar {
+    width: 48px;
+    min-width: 48px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--chat-border);
+    border-radius: 0.5rem;
+    background: #0a0a0a;
+    overflow: hidden;
+}
+.chat-web-page .chat-web-thread-avatar img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+}
+.chat-web-page .chat-web-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    padding: 1rem;
+    z-index: 1050;
+}
+.chat-web-page .chat-web-modal.is-open {
+    display: flex;
+}
+.chat-web-page .chat-web-modal-card {
+    width: min(440px, 100%);
+    border: 1px solid var(--chat-border);
+    border-radius: 1rem;
+    background: var(--chat-panel);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+.chat-web-page .chat-web-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.chat-web-page .chat-web-modal-title {
+    margin: 0;
+    color: #5555ff;
+}
+.chat-web-page .chat-web-modal-text {
+    color: var(--chat-muted);
+    margin: 0;
+}
+.chat-web-page .chat-web-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+.chat-web-page .chat-web-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.chat-web-page .chat-web-count {
+    border: 1px solid var(--chat-border);
+    background: var(--chat-panel);
+    color: var(--chat-fg);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    cursor: pointer;
+}
+.chat-web-page .chat-web-status {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--chat-border);
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    background: #101010;
+}
+.chat-web-page .chat-web-status.is-visible {
+    display: flex;
+}
+.chat-web-page .chat-web-status.is-warning {
+    border-color: #8f6d1f;
+    background: #171207;
+}
+.chat-web-page .chat-web-status.is-error {
+    border-color: #9c3b3b;
+    background: #190909;
+}
+.chat-web-page .chat-web-users {
+    display: none;
+    border: 1px solid var(--chat-border);
+    background: var(--chat-panel);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+}
+.chat-web-page .chat-web-users.is-open {
+    display: block;
+}
+.chat-web-page .chat-web-users-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+.chat-web-page .chat-web-users-list {
+    display: grid;
+    gap: 0.5rem;
+}
+.chat-web-page .chat-web-user {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 0.6rem;
+    align-items: center;
+    border: 1px solid var(--chat-border);
+    background: #0d0d0d;
+    color: var(--chat-fg);
+    border-radius: 0.75rem;
+    padding: 0.55rem;
+    text-align: left;
+}
+.chat-web-page .chat-web-user-avatar,
+.chat-web-page .chat-web-avatar {
+    width: 50px;
+    min-width: 50px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--chat-border);
+    border-radius: 0.5rem;
+    background: #0a0a0a;
+    overflow: hidden;
+}
+.chat-web-page .chat-web-user-avatar img,
+.chat-web-page .chat-web-avatar img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+}
+.chat-web-page .chat-web-avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--chat-muted);
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+.chat-web-page .chat-web-actor,
+.chat-web-page .chat-web-sender-button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+    text-align: inherit;
+}
+.chat-web-page .chat-web-sender-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+.chat-web-page .chat-web-messages {
+    flex: 1 1 auto;
+    border: 1px solid var(--chat-border);
+    background: var(--chat-bg);
+    border-radius: 1rem;
+    padding: 1rem;
+    overflow-y: auto;
+    min-height: 440px;
+}
+.chat-web-page .chat-web-system {
+    text-align: center;
+    color: var(--chat-system);
+    margin: 0.5rem 0 1rem;
+}
+.chat-web-page .chat-web-group {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    max-width: 92%;
+}
+.chat-web-page .chat-web-group.is-self {
+    margin-left: auto;
+    flex-direction: row-reverse;
+}
+.chat-web-page .chat-web-content {
+    min-width: 0;
+}
+.chat-web-page .chat-web-header {
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+}
+.chat-web-page .chat-web-group.is-self .chat-web-header {
+    text-align: right;
+}
+.chat-web-page .chat-web-system-name,
+.chat-web-page .chat-web-time {
+    color: var(--chat-muted);
+}
+.chat-web-page .chat-web-time {
+    font-size: 0.85rem;
+}
+.chat-web-page .chat-web-bubble {
+    display: block;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.9rem;
+    margin-bottom: 0.35rem;
+    max-width: 100%;
+    word-break: break-word;
+    line-height: 1.5;
+}
+.chat-web-page .chat-web-group.is-self .chat-web-bubble {
+    background: var(--chat-self);
+    color: #ffffff;
+}
+.chat-web-page .chat-web-group:not(.is-self) .chat-web-bubble {
+    background: var(--chat-other);
+    color: var(--chat-fg);
+}
+.chat-web-page .chat-web-login {
+    color: var(--chat-muted);
+    text-align: center;
+}
+.chat-web-page .chat-web-login a {
+    color: var(--chat-accent);
+}
+@media (max-width: 980px) {
+    .chat-web-page .chat-web-layout {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 768px) {
+    .chat-web-page .chat-web-group {
+        max-width: 100%;
+    }
+    .chat-web-page .chat-web-messages {
+        min-height: 360px;
+        padding: 0.75rem;
+    }
+}
+</style>
 
-<div class="chat-container">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <h4 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chat</h4>
-        <span id="chat-user-count" class="badge bg-secondary" role="button" style="cursor:pointer">0 users</span>
-    </div>
+<div class="chat-web-page">
+    <div class="chat-web-shell">
+        <div class="chat-web-layout">
+            <aside class="chat-web-sidebar">
+                <div class="chat-web-sidebar-section">
+                    <div class="chat-web-sidebar-header">
+                        <h4 class="chat-web-sidebar-heading">Public Rooms</h4>
+                    </div>
+<?xjs if (user.number > 0) { ?>
+                    <button id="chat-room-open" class="chat-web-sidebar-button" type="button">Create Room</button>
+<?xjs } ?>
+                    <div id="chat-rooms" class="chat-web-nav-list"></div>
+                </div>
 
-    <div id="chat-users-panel" class="chat-users-panel d-none mb-2">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong><i class="bi bi-people me-1"></i>Online Users</strong>
-            <button id="chat-users-close" class="btn btn-sm btn-outline-secondary">&times;</button>
-        </div>
-        <div id="chat-users-list" class="chat-users-list"></div>
-    </div>
-    <div id="chat-messages" class="chat-messages flex-grow-1 mb-2">
-        <div class="text-center text-muted py-4">Loading chat history&hellip;</div>
-    </div>
+                <div class="chat-web-sidebar-section">
+                    <div class="chat-web-sidebar-header">
+                        <h4 class="chat-web-sidebar-heading">Private Chats</h4>
+                    </div>
+                    <div id="chat-private" class="chat-web-nav-list"></div>
+                </div>
+            </aside>
 
-<?xjs
-    if (user.number > 0) {
-?>
-    <form id="chat-input" class="chat-input-area" autocomplete="off">
-        <div class="input-group">
-            <input type="text" id="chat-text" class="form-control"
-                   placeholder="Type a message&hellip;" maxlength="500" required>
-            <button class="btn btn-primary" type="submit">
-                <i class="bi bi-send"></i> Send
-            </button>
-        </div>
-    </form>
+            <div class="chat-web-main">
+                <div class="chat-web-topbar">
+                    <div>
+                        <h3 class="chat-web-title"><i class="bi bi-chat-dots me-2"></i>Chat</h3>
+                        <div class="chat-web-channel">View: <span id="chat-view-label">#main</span></div>
+                    </div>
+                    <button id="chat-user-count" class="chat-web-count" type="button">0 users</button>
+                </div>
+
+                <div id="chat-status" class="chat-web-status" role="alert" aria-live="polite">
+                    <div id="chat-status-text"></div>
+                    <button id="chat-status-retry" class="chat-web-status-button" type="button">Retry now</button>
+                </div>
+
+                <div id="chat-users-panel" class="chat-web-users">
+                    <div class="chat-web-users-header">
+                        <strong>Online Users</strong>
+                        <button id="chat-users-close" class="chat-web-users-close" type="button">&times;</button>
+                    </div>
+                    <div id="chat-users-list" class="chat-web-users-list"></div>
+                </div>
+
+                <div id="chat-messages" class="chat-messages flex-grow-1 mb-2">
+                    <div class="chat-web-empty">Loading chat history...</div>
+                </div>
+
+<?xjs if (user.number > 0) { ?>
+                <form id="chat-input" class="chat-input-area chat-web-form" autocomplete="off">
+                    <input type="text" id="chat-text" class="chat-web-input" maxlength="500" placeholder="Type a message...">
+                    <button class="chat-web-send" type="submit">Send</button>
+                </form>
 <?xjs } else { ?>
-    <div class="text-center text-muted py-2">
-        <a href="/?page=000-login.xjs">Log in</a> to send messages.
+                <div class="chat-web-login">
+                    <a href="/?page=000-login.xjs">Log in</a> to send messages and open private chats.
+                </div>
+<?xjs } ?>
+            </div>
+        </div>
+    </div>
+
+<?xjs if (user.number > 0) { ?>
+    <div id="chat-room-modal" class="chat-web-modal" aria-hidden="true">
+        <div class="chat-web-modal-card">
+            <div class="chat-web-modal-header">
+                <h4 class="chat-web-modal-title">Create Room</h4>
+                <button id="chat-room-close" class="chat-web-users-close" type="button">&times;</button>
+            </div>
+            <p class="chat-web-modal-text">Pick a short public room name using letters, numbers, `_` or `-`.</p>
+            <form id="chat-room-form" class="chat-web-sidebar-form" autocomplete="off">
+                <input id="chat-room-input" class="chat-web-sidebar-input" type="text" maxlength="32" placeholder="new-room">
+                <button class="chat-web-sidebar-button" type="submit">Create</button>
+            </form>
+            <div class="chat-web-modal-actions">
+                <button id="chat-room-cancel" class="chat-web-sidebar-button" type="button">Cancel</button>
+            </div>
+        </div>
     </div>
 <?xjs } ?>
 </div>
@@ -41,212 +489,727 @@
 (function () {
     'use strict';
 
+    var chatService = window.ChatService || null;
+    var sbbsConfig = window.sbbsConfig || {};
+    var isLoggedIn = !!sbbsConfig.isLoggedIn;
+    var userAlias = String(sbbsConfig.userAlias || '');
+    var userSystemName = String(sbbsConfig.systemName || '');
+    var users = chatService && chatService.getUsersSnapshot ? chatService.getUsersSnapshot() : [];
+
+    var roomsList = document.getElementById('chat-rooms');
+    var privateList = document.getElementById('chat-private');
+    var roomOpen = document.getElementById('chat-room-open');
+    var roomForm = document.getElementById('chat-room-form');
+    var roomInput = document.getElementById('chat-room-input');
+    var roomModal = document.getElementById('chat-room-modal');
+    var roomClose = document.getElementById('chat-room-close');
+    var roomCancel = document.getElementById('chat-room-cancel');
+    var viewLabel = document.getElementById('chat-view-label');
+    var userCount = document.getElementById('chat-user-count');
+    var statusBox = document.getElementById('chat-status');
+    var statusText = document.getElementById('chat-status-text');
+    var statusRetry = document.getElementById('chat-status-retry');
+    var usersPanel = document.getElementById('chat-users-panel');
+    var usersList = document.getElementById('chat-users-list');
+    var usersClose = document.getElementById('chat-users-close');
     var msgContainer = document.getElementById('chat-messages');
-    var chatInput    = document.getElementById('chat-input');
-    var chatText     = document.getElementById('chat-text');
-    var userCount    = document.getElementById('chat-user-count');
+    var chatInput = document.getElementById('chat-input');
+    var chatText = document.getElementById('chat-text');
 
-    var usersPanel  = document.getElementById('chat-users-panel');
-    var usersList   = document.getElementById('chat-users-list');
-    var usersClose  = document.getElementById('chat-users-close');
-
-    /* Toggle users panel */
-    if (userCount) {
-        userCount.addEventListener('click', function () {
-            usersPanel.classList.toggle('d-none');
-            if (!usersPanel.classList.contains('d-none')) {
-                window.ChatService && window.ChatService.getUsers();
-            }
-        });
-    }
-    if (usersClose) {
-        usersClose.addEventListener('click', function () {
-            usersPanel.classList.add('d-none');
-        });
+    function trimText(value) {
+        return String(value || '').replace(/^\s+|\s+$/g, '');
     }
 
-    function renderUsers(users) {
-        if (!usersList) return;
-        if (!users || !users.length) {
-            usersList.innerHTML = '<div class="text-muted small">No users online</div>';
-            return;
-        }
-        var html = '';
-        for (var i = 0; i < users.length; i++) {
-            var u = users[i];
-            var nick = u.nick || 'Unknown';
-            var sys  = u.system || '';
-            var num  = u.userNumber || 0;
-            html += '<div class="chat-user-item">';
-            html += '<div class="chat-user-avatar" data-avatar="' + num + '"></div>';
-            html += '<div class="chat-user-info">';
-            html += '<div class="chat-user-nick">' + escapeHtml(nick) + '</div>';
-            if (sys) html += '<div class="chat-user-system">' + escapeHtml(sys) + '</div>';
-            html += '</div></div>';
-        }
-        usersList.innerHTML = html;
-        if (typeof Avatars !== 'undefined' && Avatars.draw) {
-            var avatarEls = usersList.querySelectorAll('div[data-avatar]');
-            var nums = [];
-            avatarEls.forEach(function (el) {
-                var n = el.getAttribute('data-avatar');
-                if (n && n !== '0') nums.push(n);
-            });
-            if (nums.length) Avatars.draw(nums);
-        }
+    function normalizeUpper(value) {
+        return trimText(value).toUpperCase();
     }
 
-    /* ---- Helpers ---- */
+    function sanitizeChannelName(raw) {
+        var channel = String(raw || 'main').replace(/[^a-zA-Z0-9_-]/g, '');
+        return channel.length ? channel : 'main';
+    }
+
+    function sanitizeAlias(raw) {
+        return trimText(String(raw || '')).replace(/[\x00-\x1f]/g, '').substr(0, 60);
+    }
+
+    function buildThreadKey(name, system) {
+        return normalizeUpper(name).replace(/[^A-Z0-9]/g, '') + '|' + normalizeUpper(system);
+    }
+
+    function parseRoute() {
+        var params;
+
+        try {
+            params = new URLSearchParams(window.location.search);
+        } catch (_error) {
+            return {
+                channel: 'main',
+                privateName: '',
+                privateSystem: ''
+            };
+        }
+
+        return {
+            channel: sanitizeChannelName(params.get('channel') || 'main'),
+            privateName: sanitizeAlias(params.get('private') || ''),
+            privateSystem: trimText(params.get('system') || '')
+        };
+    }
+
     function escapeHtml(str) {
-        var d = document.createElement('div');
-        d.appendChild(document.createTextNode(str));
-        return d.innerHTML;
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str || ''));
+        return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+        return escapeHtml(str || '').replace(/"/g, '&quot;');
     }
 
     function linkify(text) {
-        return escapeHtml(text).replace(
-            /(https?:\/\/[^\s<]+)/gi,
-            '<a href="$1" target="_blank" rel="noopener">$1</a>'
-        );
+        return escapeHtml(text || '').replace(/(https?:\/\/[^\s<]+)/gi, '<a href="$1" target="_blank" rel="noopener">$1</a>');
     }
 
     function formatTime(ts) {
         if (!ts) return '';
         var d = new Date(ts);
-        var h = d.getHours(), m = d.getMinutes();
+        var h = d.getHours();
+        var m = d.getMinutes();
         var ampm = h >= 12 ? 'PM' : 'AM';
         h = h % 12 || 12;
         return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
     }
 
-    function getMyAlias() { return (window.sbbsConfig && window.sbbsConfig.userAlias) || ''; }
+    function getRooms() {
+        return chatService && chatService.getRooms ? chatService.getRooms() : [];
+    }
 
-    /* ---- Render ---- */
-    function renderMessages() {
-        var msgs = window.ChatService ? window.ChatService.getMessages() : [];
-        if (!msgs.length) {
-            msgContainer.innerHTML = '<div class="text-center text-muted py-4">No messages yet. Say hello!</div>';
+    function getPrivateThreads() {
+        return chatService && chatService.getPrivateThreads ? chatService.getPrivateThreads() : [];
+    }
+
+    function getMessages() {
+        return chatService && chatService.getMessages ? chatService.getMessages() : [];
+    }
+
+    function getActiveView() {
+        return chatService && chatService.getActiveView ? chatService.getActiveView() : {
+            type: 'channel',
+            name: 'main',
+            system: '',
+            avatar: '',
+            currentChannel: 'main'
+        };
+    }
+
+    function updateQueryString(view) {
+        var next;
+
+        if (!window.history || !window.history.replaceState) {
             return;
         }
 
+        next = new URL(window.location.href);
+        if (view.type === 'private') {
+            next.searchParams.set('channel', view.currentChannel || 'main');
+            next.searchParams.set('private', view.name);
+            if (view.system) {
+                next.searchParams.set('system', view.system);
+            } else {
+                next.searchParams.delete('system');
+            }
+        } else {
+            next.searchParams.set('channel', view.name || 'main');
+            next.searchParams.delete('private');
+            next.searchParams.delete('system');
+        }
+
+        window.history.replaceState({}, '', next.toString());
+    }
+
+    function renderEmbeddedAvatars(root) {
+        if (chatService && chatService._renderEmbeddedAvatars) {
+            chatService._renderEmbeddedAvatars(root);
+        }
+    }
+
+    function renderLocalAvatars(root) {
+        var scope = root || document;
+        var avatarEls;
+        var ids = [];
+
+        if (typeof Avatars === 'undefined' || !Avatars.draw) {
+            return;
+        }
+
+        avatarEls = scope.querySelectorAll('div[data-avatar]');
+        avatarEls.forEach(function (el) {
+            var id = el.getAttribute('data-avatar');
+            if (id && id !== '0') {
+                ids.push(id);
+            }
+        });
+
+        if (ids.length) {
+            Avatars.draw(ids);
+        }
+    }
+
+    function renderAvatarFallbacks(root) {
+        var scope = root || document;
+        var placeholders = scope.querySelectorAll('.chat-web-avatar-placeholder[data-initial], .chat-avatar-placeholder[data-initial]');
+
+        placeholders.forEach(function (el) {
+            if (el.parentNode && el.parentNode.children.length > 1) {
+                el.remove();
+            }
+        });
+    }
+
+    function renderStatus(status) {
+        if (!statusBox || !statusText) {
+            return;
+        }
+
+        statusBox.classList.remove('is-visible', 'is-warning', 'is-error');
+        if (!status || !status.message) {
+            statusText.textContent = '';
+            if (statusRetry) statusRetry.style.display = 'none';
+            return;
+        }
+
+        statusText.textContent = status.message;
+        statusBox.classList.add('is-visible');
+        statusBox.classList.add(status.type === 'error' ? 'is-error' : 'is-warning');
+        if (statusRetry) {
+            statusRetry.style.display = status.showRetry ? '' : 'none';
+        }
+    }
+
+    function updateUserCountButton() {
+        var activeView = getActiveView();
+        var currentChannel = activeView.currentChannel || activeView.name || 'main';
+        var count = users.length;
+        var rooms = getRooms();
+
+        rooms.forEach(function (room) {
+            if (normalizeUpper(room.name) === normalizeUpper(currentChannel)) {
+                count = typeof room.userCount === 'number' ? room.userCount : count;
+            }
+        });
+
+        if (userCount) {
+            userCount.textContent = String(count) + ' user' + (count === 1 ? '' : 's');
+        }
+    }
+
+    function updateComposer() {
+        var activeView = getActiveView();
+        if (!chatText) return;
+
+        if (activeView.type === 'private') {
+            chatText.placeholder = 'Message @' + activeView.name + '...';
+            return;
+        }
+
+        chatText.placeholder = 'Message #' + (activeView.name || 'main') + '...';
+    }
+
+    function renderViewLabel(view) {
+        var activeView = view || getActiveView();
+
+        if (!viewLabel) return;
+        if (activeView.type === 'private') {
+            viewLabel.textContent = '@' + activeView.name;
+        } else {
+            viewLabel.textContent = '#' + (activeView.name || 'main');
+        }
+    }
+
+    function renderRooms() {
+        var rooms = getRooms().filter(function (room) {
+            return room.isActive || (room.userCount || 0) > 0 || (room.unreadCount || 0) > 0;
+        }).slice();
         var html = '';
-        var prevSender = '', prevTime = 0;
-        var GROUP_WINDOW = 120000; /* 2 min */
 
-        for (var i = 0; i < msgs.length; i++) {
-            var m = msgs[i];
-            if (m.type !== 'message') continue;
+        rooms.sort(function (a, b) {
+            if ((a.isActive ? 1 : 0) !== (b.isActive ? 1 : 0)) {
+                return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
+            }
+            if ((a.unreadCount || 0) !== (b.unreadCount || 0)) {
+                return (b.unreadCount || 0) - (a.unreadCount || 0);
+            }
+            return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+        });
 
-            var isSelf = getMyAlias() && m.sender === getMyAlias();
-            var isSystem = !m.sender;
-            var sameGroup = (m.sender === prevSender) &&
-                            (m.timestamp - prevTime < GROUP_WINDOW);
+        if (!rooms.length) {
+            roomsList.innerHTML = '<div class="chat-web-nav-empty">No public rooms yet.</div>';
+            updateUserCountButton();
+            return;
+        }
+
+        rooms.forEach(function (room) {
+            html += '<button type="button" class="chat-web-nav-item' + (room.isActive ? ' is-active' : '') + '" data-room="' + escapeAttr(room.name) + '">';
+            html += '<div class="chat-web-nav-top">';
+            html += '<span class="chat-web-nav-title">#' + escapeHtml(room.name) + '</span>';
+            if ((room.unreadCount || 0) > 0) {
+                html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(room.unreadCount)) + '</span>';
+            }
+            html += '</div>';
+            html += '<div class="chat-web-nav-secondary">' + escapeHtml(String(room.userCount || 0)) + ' user' + ((room.userCount || 0) === 1 ? '' : 's') + '</div>';
+            html += '</button>';
+        });
+
+        roomsList.innerHTML = html;
+        updateUserCountButton();
+    }
+
+    function renderPrivateThreads() {
+        var threads = getPrivateThreads().filter(function (thread) {
+            return thread.isActive || thread.isOnline;
+        }).slice();
+        var html = '';
+
+        threads.sort(function (a, b) {
+            if ((a.isActive ? 1 : 0) !== (b.isActive ? 1 : 0)) {
+                return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
+            }
+            if ((a.unreadCount || 0) !== (b.unreadCount || 0)) {
+                return (b.unreadCount || 0) - (a.unreadCount || 0);
+            }
+            return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+        });
+
+        if (!threads.length) {
+            privateList.innerHTML = '<div class="chat-web-nav-empty">No private chats online.</div>';
+            return;
+        }
+
+        threads.forEach(function (thread) {
+            var initial = thread.name ? thread.name.charAt(0).toUpperCase() : '?';
+
+            html += '<button type="button" class="chat-web-nav-item' + (thread.isActive ? ' is-active' : '') + '" data-private-nav="' + escapeAttr(thread.name) + '" data-private-system="' + escapeAttr(thread.system || '') + '" data-private-avatar="' + escapeAttr(thread.avatar || '') + '">';
+            html += '<div class="chat-web-thread-row">';
+            html += '<div class="chat-web-thread-avatar">';
+            if (thread.avatar) {
+                html += '<div data-avatar-bin="' + escapeAttr(thread.avatar) + '"></div>';
+            } else {
+                html += '<div class="chat-web-avatar-placeholder" data-initial="' + escapeAttr(initial) + '">' + escapeHtml(initial) + '</div>';
+            }
+            html += '</div>';
+            html += '<div>';
+            html += '<div class="chat-web-nav-top">';
+            html += '<span class="chat-web-nav-title">@' + escapeHtml(thread.name) + '</span>';
+            if ((thread.unreadCount || 0) > 0) {
+                html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(thread.unreadCount)) + '</span>';
+            }
+            html += '</div>';
+            if (thread.system) {
+                html += '<div class="chat-web-nav-secondary">' + escapeHtml(thread.system) + '</div>';
+            }
+            html += '</div>';
+            html += '</div>';
+            html += '</button>';
+        });
+
+        privateList.innerHTML = html;
+        renderEmbeddedAvatars(privateList);
+        renderAvatarFallbacks(privateList);
+    }
+
+    function renderUsers() {
+        var html = '';
+
+        if (!usersList) {
+            return;
+        }
+
+        if (!users.length) {
+            usersList.innerHTML = '<div class="chat-web-empty">No users online.</div>';
+            updateUserCountButton();
+            return;
+        }
+
+        users.forEach(function (entry) {
+            var initial = entry.nick ? entry.nick.charAt(0).toUpperCase() : '?';
+
+            html += '<button type="button" class="chat-web-user" data-private-user="' + escapeAttr(entry.nick || '') + '" data-private-system="' + escapeAttr(entry.system || '') + '" data-private-avatar="' + escapeAttr(entry.avatar || '') + '">';
+            html += '<div class="chat-web-user-avatar">';
+            if (entry.avatar) {
+                html += '<div data-avatar-bin="' + escapeAttr(entry.avatar) + '"></div>';
+            } else if (entry.userNumber && entry.userNumber > 0) {
+                html += '<div data-avatar="' + String(entry.userNumber) + '"></div>';
+            } else {
+                html += '<div class="chat-web-avatar-placeholder" data-initial="' + escapeAttr(initial) + '">' + escapeHtml(initial) + '</div>';
+            }
+            html += '</div>';
+            html += '<div>';
+            html += '<div><strong>' + escapeHtml(entry.nick || 'Unknown') + '</strong></div>';
+            if (entry.system) {
+                html += '<div class="chat-web-channel">' + escapeHtml(entry.system) + '</div>';
+            }
+            html += '</div></button>';
+        });
+
+        usersList.innerHTML = html;
+        renderEmbeddedAvatars(usersList);
+        renderLocalAvatars(usersList);
+        renderAvatarFallbacks(usersList);
+        updateUserCountButton();
+    }
+
+    function buildActorAttrs(message, isSelf) {
+        if (isSelf || !message.sender) {
+            return '';
+        }
+
+        return ' data-private-user="' + escapeAttr(message.sender) + '"' +
+            ' data-private-system="' + escapeAttr(message.system || '') + '"' +
+            ' data-private-avatar="' + escapeAttr(message.avatar || '') + '"';
+    }
+
+    function renderMessages() {
+        var msgs = getMessages();
+        var html = '';
+        var prevSender = '';
+        var prevTime = 0;
+        var groupWindow = 120000;
+
+        if (!msgs.length) {
+            msgContainer.innerHTML = '<div class="chat-web-empty">No messages yet. Say hello.</div>';
+            return;
+        }
+
+        msgs.forEach(function (message) {
+            var isSystem = !message.sender;
+            var isSelf = !!message.isSelf;
+            var sameGroup = message.sender === prevSender && Math.abs((message.timestamp || 0) - prevTime) < groupWindow;
+            var avatarInitial = message.sender ? message.sender.charAt(0).toUpperCase() : '?';
+            var actorAttrs = buildActorAttrs(message, isSelf);
+
+            if (!isSelf && userAlias) {
+                isSelf =
+                    normalizeUpper(message.sender) === normalizeUpper(userAlias) &&
+                    (!message.system || !userSystemName || normalizeUpper(message.system) === normalizeUpper(userSystemName));
+            }
 
             if (isSystem) {
-                html += '<div class="chat-system-msg">' + escapeHtml(m.text) + '</div>';
+                html += '<div class="chat-system-msg">' + escapeHtml(message.text || '') + '</div>';
                 prevSender = '';
-                continue;
+                prevTime = 0;
+                return;
             }
 
             if (!sameGroup) {
-                if (prevSender) html += '</div></div>'; /* close prev group */
-
-                if (isSelf) {
-                    html += '<div class="chat-msg-group chat-msg-group-self">';
-                    html += '<div class="chat-msg-content">';
-                    html += '<div class="chat-sender text-end">' + escapeHtml(m.sender) +
-                            ' <small class="chat-timestamp">' + formatTime(m.timestamp) + '</small></div>';
-                } else {
-                    html += '<div class="chat-msg-group chat-msg-group-other">';
-                    var userNum = m.userNumber || 0;
-                    html += '<div class="chat-avatar" data-avatar="' + userNum + '"></div>';
-                    html += '<div class="chat-msg-content">';
-                    html += '<div class="chat-sender">' + escapeHtml(m.sender) +
-                            ' <small class="chat-timestamp">' + formatTime(m.timestamp) + '</small></div>';
+                if (prevSender.length) {
+                    html += '</div></div>';
                 }
+
+                html += '<div class="chat-msg-group ' + (isSelf ? 'chat-msg-group-self' : 'chat-msg-group-other') + '">';
+                if (actorAttrs.length) {
+                    html += '<button type="button" class="chat-avatar chat-web-actor"' + actorAttrs + '>';
+                } else {
+                    html += '<div class="chat-avatar">';
+                }
+
+                if (message.avatar) {
+                    html += '<div data-avatar-bin="' + escapeAttr(message.avatar) + '"></div>';
+                } else if (message.userNumber && message.userNumber > 0) {
+                    html += '<div data-avatar="' + String(message.userNumber) + '"></div>';
+                } else {
+                    html += '<div class="chat-avatar-placeholder" data-initial="' + escapeAttr(avatarInitial) + '">' + escapeHtml(avatarInitial) + '</div>';
+                }
+
+                html += actorAttrs.length ? '</button>' : '</div>';
+                html += '<div class="chat-msg-content">';
+                html += '<div class="chat-header">';
+                if (actorAttrs.length) {
+                    html += '<button type="button" class="chat-sender chat-web-sender-button"' + actorAttrs + '>';
+                } else {
+                    html += '<div class="chat-sender">';
+                }
+                html += '<strong>' + escapeHtml(message.sender) + '</strong>';
+                if (message.system) {
+                    html += ' <span class="chat-web-channel">- ' + escapeHtml(message.system) + '</span>';
+                }
+                html += ' <small class="chat-timestamp">' + escapeHtml(formatTime(message.timestamp)) + '</small>';
+                if (actorAttrs.length) {
+                    html += '</button>';
+                } else {
+                    html += '</div>';
+                }
+                html += '</div>';
             }
 
-            var bubbleClass = isSelf ? 'chat-bubble chat-bubble-self' : 'chat-bubble chat-bubble-other';
-            html += '<div class="' + bubbleClass + '">' + linkify(m.text) + '</div>';
+            html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + linkify(message.text || '') + '</div>';
+            prevSender = message.sender;
+            prevTime = message.timestamp || 0;
+        });
 
-            prevSender = m.sender;
-            prevTime = m.timestamp;
+        if (prevSender.length) {
+            html += '</div></div>';
         }
-
-        if (prevSender) html += '</div></div>'; /* close last group */
 
         msgContainer.innerHTML = html;
-
-        /* Render avatars */
-        if (typeof Avatars !== 'undefined' && Avatars.draw) {
-            var avatarEls = msgContainer.querySelectorAll('div[data-avatar]');
-            var users = [];
-            avatarEls.forEach(function (el) {
-                var u = el.getAttribute('data-avatar');
-                if (u && u !== '0') users.push(u);
-            });
-            if (users.length) Avatars.draw(users);
-        }
-
-        scrollToBottom();
-    }
-
-    function appendMessage(msg) {
-        /* Quick append: just re-render for now (grouping logic is complex) */
-        renderMessages();
-    }
-
-    function scrollToBottom() {
+        renderEmbeddedAvatars(msgContainer);
+        renderLocalAvatars(msgContainer);
+        renderAvatarFallbacks(msgContainer);
         requestAnimationFrame(function () {
             msgContainer.scrollTop = msgContainer.scrollHeight;
         });
     }
 
-    /* ---- Events ---- */
-    function onNewMessage(e) {
-        appendMessage(e.detail);
+    function renderAll() {
+        var activeView = getActiveView();
+        renderViewLabel(activeView);
+        renderStatus(chatService && chatService.getStatus ? chatService.getStatus() : {});
+        renderRooms();
+        renderPrivateThreads();
+        renderUsers();
+        renderMessages();
+        updateQueryString(activeView);
+        updateComposer();
     }
 
-    function onHistoryLoaded() {
+    function syncRouteIntoService() {
+        var route = parseRoute();
+        var activeView = getActiveView();
+
+        if (route.privateName.length && isLoggedIn) {
+            if (
+                activeView.type !== 'private' ||
+                normalizeUpper(activeView.name || '') !== normalizeUpper(route.privateName) ||
+                normalizeUpper(activeView.system || '') !== normalizeUpper(route.privateSystem)
+            ) {
+                chatService.openPrivateThread(route.privateName, route.privateSystem, '');
+                return true;
+            }
+            return false;
+        }
+
+        if (
+            activeView.type !== 'channel' ||
+            normalizeUpper(activeView.name || '') !== normalizeUpper(route.channel)
+        ) {
+            chatService.setActiveChannel(route.channel);
+            return true;
+        }
+
+        return false;
+    }
+
+    function onMessagesUpdated() {
         renderMessages();
     }
 
-    function onUsersUpdated(e) {
-        var users = e.detail || [];
-        userCount.textContent = users.length + ' user' + (users.length !== 1 ? 's' : '');
-        renderUsers(users);
+    function onRoomsUpdated() {
+        renderRooms();
     }
 
-    window.addEventListener('chat:newMessage', onNewMessage);
-    window.addEventListener('chat:historyLoaded', onHistoryLoaded);
-    window.addEventListener('chat:usersUpdated', onUsersUpdated);
+    function onPrivateUpdated() {
+        renderPrivateThreads();
+    }
 
-    if (chatInput) {
-        chatInput.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var text = chatText.value.trim();
-            if (!text) return;
-            chatText.value = '';
-            window.ChatService && window.ChatService.send(text);
+    function onUsersUpdated(e) {
+        users = e.detail || [];
+        renderUsers();
+    }
+
+    function onStatusUpdated(e) {
+        renderStatus(e.detail || {});
+    }
+
+    function onViewChanged(e) {
+        var view = e.detail || getActiveView();
+        renderViewLabel(view);
+        renderRooms();
+        renderPrivateThreads();
+        updateQueryString(view);
+        updateComposer();
+    }
+
+    function openPrivateFromButton(button) {
+        var name;
+
+        if (!button || !chatService || !chatService.openPrivateThread) {
+            return;
+        }
+
+        name = button.getAttribute('data-private-user') || button.getAttribute('data-private-nav');
+        if (!name) {
+            return;
+        }
+
+        chatService.openPrivateThread(
+            name,
+            button.getAttribute('data-private-system'),
+            button.getAttribute('data-private-avatar')
+        );
+    }
+
+    function openRoomModal() {
+        if (!roomModal) {
+            return;
+        }
+        roomModal.classList.add('is-open');
+        roomModal.setAttribute('aria-hidden', 'false');
+        if (roomInput) {
+            roomInput.focus();
+            roomInput.select();
+        }
+    }
+
+    function closeRoomModal() {
+        if (!roomModal) {
+            return;
+        }
+        roomModal.classList.remove('is-open');
+        roomModal.setAttribute('aria-hidden', 'true');
+        if (roomInput) {
+            roomInput.value = '';
+        }
+    }
+
+    if (!chatService) {
+        renderStatus({
+            type: 'error',
+            message: 'Chat service is not available on this page.',
+            showRetry: false
+        });
+        return;
+    }
+
+    window.addEventListener('chat:messagesUpdated', onMessagesUpdated);
+    window.addEventListener('chat:roomsUpdated', onRoomsUpdated);
+    window.addEventListener('chat:privateUpdated', onPrivateUpdated);
+    window.addEventListener('chat:usersUpdated', onUsersUpdated);
+    window.addEventListener('chat:status', onStatusUpdated);
+    window.addEventListener('chat:viewChanged', onViewChanged);
+
+    if (userCount) {
+        userCount.addEventListener('click', function () {
+            usersPanel.classList.toggle('is-open');
+            if (!usersPanel.classList.contains('is-open')) {
+                return;
+            }
+            chatService.getUsers();
         });
     }
 
-    /* Tell ChatService this page is active */
-    if (window.ChatService) {
-        window.ChatService.setChatPageActive(true);
-        window.ChatService.loadHistory();
-        window.ChatService.getUsers();
+    if (usersClose) {
+        usersClose.addEventListener('click', function () {
+            usersPanel.classList.remove('is-open');
+        });
     }
 
-    /* Cleanup on navigate away */
+    if (statusRetry) {
+        statusRetry.addEventListener('click', function () {
+            chatService.retrySync();
+        });
+    }
+
+    if (roomsList) {
+        roomsList.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-room]');
+            if (!button) return;
+            chatService.setActiveChannel(button.getAttribute('data-room'));
+        });
+    }
+
+    if (privateList) {
+        privateList.addEventListener('click', function (event) {
+            openPrivateFromButton(event.target.closest('[data-private-nav]'));
+        });
+    }
+
+    if (usersList) {
+        usersList.addEventListener('click', function (event) {
+            openPrivateFromButton(event.target.closest('[data-private-user]'));
+        });
+    }
+
+    if (msgContainer) {
+        msgContainer.addEventListener('click', function (event) {
+            openPrivateFromButton(event.target.closest('[data-private-user]'));
+        });
+    }
+
+    if (roomForm) {
+        roomForm.addEventListener('submit', function (event) {
+            var raw = roomInput ? trimText(roomInput.value) : '';
+            var nextRoom = sanitizeChannelName(raw);
+
+            event.preventDefault();
+            if (!raw.length || !nextRoom.length) {
+                return;
+            }
+
+            chatService.createRoom(nextRoom).then(function (ok) {
+                if (!ok) return;
+                closeRoomModal();
+            });
+        });
+    }
+
+    if (roomOpen) {
+        roomOpen.addEventListener('click', openRoomModal);
+    }
+
+    if (roomClose) {
+        roomClose.addEventListener('click', closeRoomModal);
+    }
+
+    if (roomCancel) {
+        roomCancel.addEventListener('click', closeRoomModal);
+    }
+
+    if (roomModal) {
+        roomModal.addEventListener('click', function (event) {
+            if (event.target === roomModal) {
+                closeRoomModal();
+            }
+        });
+    }
+
+    if (chatInput) {
+        chatInput.addEventListener('submit', function (event) {
+            var text = chatText.value.replace(/^\s+|\s+$/g, '');
+
+            event.preventDefault();
+            if (!text.length) return;
+
+            chatService.send(text).then(function (ok) {
+                if (!ok) return;
+                chatText.value = '';
+            });
+        });
+    }
+
+    chatService.setChatPageActive(true);
+    renderAll();
+    if (!syncRouteIntoService()) {
+        chatService.loadHistory();
+        chatService.getUsers();
+    }
+
+    window.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && roomModal && roomModal.classList.contains('is-open')) {
+            closeRoomModal();
+        }
+    });
+
     function cleanup() {
-        window.removeEventListener('chat:newMessage', onNewMessage);
-        window.removeEventListener('chat:historyLoaded', onHistoryLoaded);
+        window.removeEventListener('chat:messagesUpdated', onMessagesUpdated);
+        window.removeEventListener('chat:roomsUpdated', onRoomsUpdated);
+        window.removeEventListener('chat:privateUpdated', onPrivateUpdated);
         window.removeEventListener('chat:usersUpdated', onUsersUpdated);
+        window.removeEventListener('chat:status', onStatusUpdated);
+        window.removeEventListener('chat:viewChanged', onViewChanged);
         window.removeEventListener('spa:beforeNavigate', cleanup);
-        if (window.ChatService) window.ChatService.setChatPageActive(false);
+        chatService.setChatPageActive(false);
     }
-    window.addEventListener('spa:beforeNavigate', cleanup);
 
+    window.addEventListener('spa:beforeNavigate', cleanup);
 })();
 </script>

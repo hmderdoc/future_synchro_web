@@ -237,14 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
         });
 
-        registerEventListener('chat', function (e) {
-            try {
-                var data = JSON.parse(e.data);
-                window.dispatchEvent(new CustomEvent('chat:message', { detail: data }));
-            } catch (err) {
-                console.error('chat SSE parse error', err);
-            }
-        }, { channel: 'main' });
     }
 
     // Start SSE
@@ -255,6 +247,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }, '');
         var es = new EventSource('./api/events.ssjs' + qs);
         window._sbbsEventSource = es;
+        es.onopen = function () {
+            window.dispatchEvent(new CustomEvent('sbbs:sseOpen'));
+        };
+        es.onerror = function () {
+            window.dispatchEvent(new CustomEvent('sbbs:sseError'));
+        };
         Object.keys(_sbbs_events).forEach(function (e) {
             es.addEventListener(e, _sbbs_events[e].callback);
         });
