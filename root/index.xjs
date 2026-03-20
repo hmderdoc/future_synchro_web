@@ -227,7 +227,7 @@
 
 <!-- Terminal Panel (persistent, hidden by default) -->
 <?xjs if (settings.ftelnet) { ?>
-<div id="terminal-panel" class="terminal-panel d-none">
+<div id="terminal-panel" class="terminal-panel is-hidden" aria-hidden="true">
     <div id="terminal-iframe-container" style="flex:1;min-height:0;overflow:hidden;width:100%;"></div>
 </div>
 <?xjs } ?>

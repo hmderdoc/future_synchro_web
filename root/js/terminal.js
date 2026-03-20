@@ -24,6 +24,7 @@
     var isAnimating = false;
     var isSecure = location.protocol === 'https:';
     var resizeTimer = null;
+    var restoreTimer = null;
 
     /* ============================================================
      *  Responsive screen size calculation
@@ -53,6 +54,48 @@
         } else {
             pendingMessages.push(msg);
         }
+    }
+
+    function afterNextPaint(cb) {
+        if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(cb);
+        } else {
+            setTimeout(cb, 0);
+        }
+    }
+
+    function setPanelHidden(hidden) {
+        if (!panel) return;
+        panel.classList.toggle('is-hidden', hidden);
+        panel.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    }
+
+    function focusTerminal() {
+        if (!iframe) return;
+        try { iframe.focus(); } catch (_) { }
+        try {
+            if (iframe.contentWindow &&
+                typeof iframe.contentWindow.focus === 'function') {
+                iframe.contentWindow.focus();
+            }
+        } catch (_) { }
+        sendToIframe({ cmd: 'focus' });
+    }
+
+    function restoreTerminalViewport() {
+        clearTimeout(restoreTimer);
+        afterNextPaint(function () {
+            if (!isVisible || !initialized || !iframeReady) return;
+            sendToIframe({ cmd: 'resize' });
+            sendToIframe({ cmd: 'refit' });
+            focusTerminal();
+            restoreTimer = setTimeout(function () {
+                if (!isVisible || !iframeReady) return;
+                sendToIframe({ cmd: 'resize' });
+                sendToIframe({ cmd: 'refit' });
+                focusTerminal();
+            }, 180);
+        });
     }
 
     window.addEventListener('message', function (e) {
@@ -89,9 +132,13 @@
                     iframe.contentWindow.postMessage(
                         pendingMessages.shift(), location.origin);
                 }
+                if (isVisible) restoreTerminalViewport();
                 break;
 
             case 'status':
+                if (isConnected && !msg.connected && isVisible) {
+                    setTimeout(hidePanel, 1200);
+                }
                 isConnected = msg.connected;
                 updateStatus();
                 break;
@@ -136,6 +183,7 @@
         iframe.src = './terminal-iframe.html';
         iframe.style.cssText =
             'border:none;width:100%;height:100%;display:block;background:#000;';
+        iframe.tabIndex = -1;
         iframe.setAttribute('allow', 'autoplay');
         iframeContainer.appendChild(iframe);
         initialized = true;
@@ -233,12 +281,12 @@
         document.body.classList.add('terminal-open');
 
         function afterShow() {
-            panel.classList.remove('d-none');
+            setPanelHidden(false);
             isVisible = true;
             if (!initialized) {
                 createIframe();
             } else {
-                sendToIframe({ cmd: 'refit' });
+                restoreTerminalViewport();
                 if (!isConnected) {
                     sendToIframe({ cmd: 'connect' });
                 }
@@ -255,10 +303,13 @@
     function hidePanel() {
         if (!panel || !isVisible || isAnimating) return;
         isAnimating = true;
+        clearTimeout(restoreTimer);
 
         playCrtOffAnimation(function () {
-            panel.classList.add('d-none');
+            setPanelHidden(true);
             document.body.classList.remove('terminal-open');
+            try { if (iframe) iframe.blur(); } catch (_) { }
+            sendToIframe({ cmd: 'blur' });
             isVisible = false;
             isAnimating = false;
         });

@@ -38,6 +38,7 @@
     var _currentChannel = DEFAULT_CHANNEL;
     var _activeView = { type: 'channel', name: DEFAULT_CHANNEL, system: '', avatar: '' };
     var _status = { type: '', message: '', showRetry: false };
+    var _guestMode = false;
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
@@ -769,7 +770,7 @@
     }
 
     function startReconcileLoop() {
-        if (_reconcileTimer) return;
+        if (_guestMode || _reconcileTimer) return;
         _reconcileTimer = setInterval(function () {
             reconcileState(false);
         }, RECONCILE_INTERVAL);
@@ -802,7 +803,7 @@
     }
 
     function scheduleReconnect() {
-        if (_reconnectTimer) return;
+        if (_guestMode || _reconnectTimer) return;
         _reconnectTimer = setTimeout(function () {
             _reconnectTimer = 0;
             connectEvents(true);
@@ -810,6 +811,7 @@
     }
 
     function connectEvents(isReconnect) {
+        if (_guestMode) return;
         if (!window.EventSource) {
             _realtimeHealthy = false;
             refreshStatus();
@@ -1106,6 +1108,15 @@
 
         dispatchView();
         dispatchRooms();
+
+        if (!isLoggedIn()) {
+            // Guest snapshot mode: one-time fetch, no SSE or polling
+            _guestMode = true;
+            loadRoomSummaries(false);
+            loadActiveHistory(false);
+            return;
+        }
+
         dispatchPrivateThreads();
         loadRoomSummaries(false).then(function () {
             loadPresenceMap(true);
@@ -1139,6 +1150,7 @@
         },
         setActiveChannel: function (name) { setActivePublicChannel(name, true); },
         openPrivateThread: openPrivateThread,
+        isGuestMode: function () { return _guestMode; },
         setChatPageActive: setChatPageActive,
         _renderEmbeddedAvatars: renderEmbeddedAvatars
     };
@@ -1154,5 +1166,10 @@
         closeEventSource();
     });
 
-    initializeFromLocation();
+    // Defer init until sbbsConfig is available (set later in index.xjs)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeFromLocation);
+    } else {
+        initializeFromLocation();
+    }
 })();

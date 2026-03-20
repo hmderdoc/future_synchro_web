@@ -159,6 +159,21 @@
         if (cc) cc.scrollTop = cc.scrollHeight;
     }
 
+    function focusTerminal() {
+        var canvas = document.querySelector('#fTelnetContainer canvas');
+        try { window.focus(); } catch (_) {}
+        if (!canvas) return;
+        if (!canvas.hasAttribute('tabindex')) canvas.tabIndex = 0;
+        try { canvas.focus({ preventScroll: true }); }
+        catch (e) { try { canvas.focus(); } catch (_) {} }
+    }
+
+    function blurTerminal() {
+        var active = document.activeElement;
+        if (!active || typeof active.blur !== 'function') return;
+        try { active.blur(); } catch (_) { }
+    }
+
     function applyCanvasScale(size) {
         if (!size) return;
         var canvas = document.querySelector('#fTelnetContainer canvas');
@@ -214,7 +229,7 @@
 
         var opts = new fTelnetOptions();
         opts.BareLFtoCRLF = false;
-        opts.BitsPerSecond = 100000000;
+        opts.BitsPerSecond = 921600;
         opts.Emulation = 'ansi-bbs';
         opts.Enter = '\r';
         opts.Font = 'CP437';
@@ -399,6 +414,14 @@
 
             case 'refit':
                 forceFontRecalc();
+                break;
+
+            case 'focus':
+                focusTerminal();
+                break;
+
+            case 'blur':
+                blurTerminal();
                 break;
         }
     });

@@ -458,7 +458,7 @@
                 </form>
 <?xjs } else { ?>
                 <div class="chat-web-login">
-                    <a href="/?page=000-login.xjs">Log in</a> to send messages and open private chats.
+                    You are viewing a snapshot of recent chat. <a href="/?page=000-login.xjs">Log in</a> for live updates, messaging, and private chats.
                 </div>
 <?xjs } ?>
             </div>
