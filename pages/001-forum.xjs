@@ -202,7 +202,7 @@
 					<span class="bin-icon" data-icon="link"></span>
 				</a>
 				<button class="btn btn-default icon" data-button-reply title="<? locale.write('label_reply'); ?>" aria-label="<? locale.write('label_reply'); ?>">
-					<span class="bin-icon" data-icon="comment"></span>
+					<span class="bin-icon" data-icon="irc"></span>
 				</button>
 				<button class="btn-uv btn btn-default icon" data-button-upvote>
 					<span title="Upvotes" class="bin-icon" data-icon="thumbs_up"></span>
@@ -421,7 +421,7 @@
             <input id="forum-new-poll-field-TYPE-NUMBER-template" class="form-control" name="forum-new-poll-field-TYPE" type="text" maxlength="70">
         </div>
         <div class="col-sm-1">
-            <button type="button" class="btn btn-danger" onclick="$('#forum-new-poll-field-container-template').remove()">
+            <button type="button" class="btn btn-danger" onclick="this.closest('.form-group').remove()">
 				<span class="bin-icon" data-icon="stop"></span>
 			</button>
 		</div>
@@ -452,28 +452,34 @@
     <? var sub = msg_area.sub[request.get_param('sub')]; ?>
 
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_message'); ?>" title="<? locale.write('button_post_message'); ?>" onclick="addNew('<? write(sub.code); ?>')">
-        <span class="bin-icon" data-icon="pencil"></span>
+        <span class="bin-icon" data-icon="doc_edit"></span>
     </button>
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_poll'); ?>" title="<? locale.write('button_post_poll'); ?>" onclick="addPoll('<? write(sub.code); ?>')">
         <span class="bin-icon" data-icon="poll"></span>
     </button>
 
+    <?xjs
+        var _sc = sub.scan_cfg || 0;
+        var _scNew = (_sc & SCAN_CFG_NEW) && !(_sc & SCAN_CFG_YONLY);
+        var _scYou = !!(_sc & SCAN_CFG_YONLY);
+        var _scOff = !_scNew && !_scYou;
+    ?>
     <div class="pull-right">
-        <button id="scan-cfg-new" class="btn btn-default icon" aria-label="<? locale.write('button_scan_new'); ?>" title="<? locale.write('button_scan_new'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 1)">
-            <span class="bin-icon" data-icon="checkmark"></span>
+        <button id="scan-cfg-new" class="btn <? write(_scNew ? 'btn-primary' : 'btn-default'); ?> icon" aria-label="<? locale.write('button_scan_new'); ?>" title="<? locale.write('button_scan_new'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 1)">
+            <span class="bin-icon" data-icon="heart"></span>
         </button>
-        <button id="scan-cfg-youonly" class="btn btn-default icon" aria-label="<? locale.write('button_scan_you'); ?>" title="<? locale.write('button_scan_you'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 2)">
-            <span class="bin-icon" data-icon="users"></span>
+        <button id="scan-cfg-youonly" class="btn <? write(_scYou ? 'btn-primary' : 'btn-default'); ?> icon" aria-label="<? locale.write('button_scan_you'); ?>" title="<? locale.write('button_scan_you'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 2)">
+            <span class="bin-icon" data-icon="at_symbol"></span>
         </button>
-        <button id="scan-cfg-off" class="btn btn-primary icon" aria-label="<? locale.write('button_scan_off'); ?>" title="<? locale.write('button_scan_off'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 0)">
+        <button id="scan-cfg-off" class="btn <? write(_scOff ? 'btn-primary' : 'btn-default'); ?> icon" aria-label="<? locale.write('button_scan_off'); ?>" title="<? locale.write('button_scan_off'); ?>" onclick="setScanCfg('<? write(sub.code); ?>', 0)">
             <span class="bin-icon" data-icon="stop"></span>
         </button>
     </div>
 
     <div id="forum-sort-controls" class="btn-group" style="margin-bottom:0.75em;">
-        <button class="btn btn-default btn-sm active" data-sort="activity" onclick="setSort('activity')" title="Sort by most recent reply"><span class="bin-icon" data-icon="bar_chart"></span>Activity</button>
+        <button class="btn btn-default btn-sm active" data-sort="activity" onclick="setSort('activity')" title="Sort by most recent reply"><span class="bin-icon" data-icon="fire"></span>Activity</button>
         <button class="btn btn-default btn-sm" data-sort="started" onclick="setSort('started')" title="Sort by thread creation date"><span class="bin-icon" data-icon="calendar"></span>Started</button>
-        <button class="btn btn-default btn-sm" data-sort="subject" onclick="setSort('subject')" title="Sort alphabetically by subject"><span class="bin-icon" data-icon="doc_edit"></span>Subject</button>
+        <button class="btn btn-default btn-sm" data-sort="subject" onclick="setSort('subject')" title="Sort alphabetically by subject"><span class="bin-icon" data-icon="sysinfo"></span>Subject</button>
         <button class="btn btn-default btn-sm" data-sort="replies" onclick="setSort('replies')" title="Sort by number of replies"><span class="bin-icon" data-icon="chat_new"></span>Replies</button>
         <button class="btn btn-default btn-sm" data-sort="sender" onclick="setSort('sender')" title="Sort alphabetically by author"><span class="bin-icon" data-icon="users"></span>Sender</button>
     </div>

@@ -161,6 +161,19 @@
     document.addEventListener('click', function (e) {
         var a = e.target.closest('a');
         if (!a) return;
+
+        // Force external links to open in a new tab (critical for PWA)
+        if (a.href && !a.target) {
+            try {
+                var u = new URL(a.href, location.origin);
+                if (u.origin !== location.origin) {
+                    e.preventDefault();
+                    window.open(a.href, '_blank', 'noopener');
+                    return;
+                }
+            } catch (ex) {}
+        }
+
         if (!isInternalLink(a)) return;
 
         e.preventDefault();

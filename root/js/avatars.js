@@ -1,7 +1,7 @@
 function Avatarizer() {
 
     const cache = { local : {}, network : {} };
-    const graphics_converter = new GraphicsConverter('./images/cp437-ibm-vga8.png', 8, 16, 64, 4);
+    const graphics_converter = GraphicsConverter.shared();
 
     function populate_image(target, image) {
         document.querySelectorAll("[name='avatar-" + target + "']").forEach(
@@ -40,7 +40,7 @@ function Avatarizer() {
 
 const Avatars = new ( function () {
 
-    const gc = new GraphicsConverter('./images/cp437-ibm-vga8.png', 8, 16, 64, 4);
+    const gc = GraphicsConverter.shared();
 
     function draw(data) {
         const img = new Image();

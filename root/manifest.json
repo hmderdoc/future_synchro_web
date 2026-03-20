@@ -1,0 +1,24 @@
+{
+  "name": "futureland.today",
+  "short_name": "futureland",
+  "description": "futureland.today BBS — chat, forums, games, and more",
+  "start_url": "./?page=000-home.xjs",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "./images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

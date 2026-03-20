@@ -99,6 +99,11 @@
     <meta name="csrf-token" content="<? write(getCsrfToken()); ?>">
     <title><? write(page_ctrl.title + ': ' + system.name); ?></title>
     <link rel="icon" href="./images/favicon.ico">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./images/apple-touch-icon.png">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     <link href="./css/style.css" rel="stylesheet">
     <? if (settings.darkmode_allow) { ?>
@@ -116,15 +121,19 @@
     if (_binIconDir && _binIconDir.slice(-1) !== '/' && _binIconDir.slice(-1) !== '\\') _binIconDir += '/';
     _binIconDir += 'future_shell/assets/';
     var _binIconMap = {
-        home: 'home2', forum: 'forum', files: 'folder126a',
-        games: 'games', chat: 'chat', terminal: 'monitor',
-        register: 'edit', mail: 'messages', logout: 'exit',
+        home: 'home2', forum: 'forum_lda', files: 'floppy_disk_icon_final',
+        games: 'games', chat: 'json_chat_lda', terminal: 'sysop',
+        register: 'edit', mail: 'mailbox', logout: 'exit',
         bar_chart: 'bar_chart', calendar: 'calendar',
-        doc_edit: 'doc_edit', chat_new: 'chat_new', users: 'users',
+        doc_edit: 'doc_edit', chat_new: 'chat_new', users: 'smiley',
         search: 'search', trash: 'trash_can', pencil: 'hand_pencil_icon',
         thumbs_up: 'thumbs_up', thumbs_down: 'thumbs_down',
-        comment: 'chat_new', checkmark: 'checkmark', stop: 'stop',
-        link: 'WALLETLINK', poll: 'bar_chart', group: 'group'
+        comment: 'chat_new', checkmark: 'checkmark', stop: 'stop_sign_icon',
+        link: 'WALLETLINK', poll: 'bar_chart', group: 'group',
+        oneliners: 'oneliner', nodespy: 'sbbslist', webmonitor: 'bar_chart',
+        fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
+        heart: 'heart_normal',
+        at_symbol: 'at_symbol'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -219,7 +228,7 @@
 <!-- Terminal Panel (persistent, hidden by default) -->
 <?xjs if (settings.ftelnet) { ?>
 <div id="terminal-panel" class="terminal-panel d-none">
-    <div id="fTelnetContainer" class="fTelnetContainer"></div>
+    <div id="terminal-iframe-container" style="flex:1;min-height:0;overflow:hidden;width:100%;"></div>
 </div>
 <?xjs } ?>
 
@@ -300,7 +309,6 @@
 
 <!-- Scripts -->
 <?xjs if (settings.ftelnet) { ?>
-<script id="fTelnetScript" src="<? write(ftelnet_url); ?>"></script>
 <script src="./js/terminal.js?_v=<? write(time()); ?>"></script>
 <?xjs } ?>
 <?xjs if (broker_enabled && broker_addr && broker_ws_port && broker_wss_port) { ?>
@@ -309,5 +317,24 @@
 <?xjs } ?>
 <script src="./js/spa.js?_v=<? write(time()); ?>"></script>
 <div id="chat-toasts"></div>
+
+<!-- PWA Service Worker -->
+<script>
+if ('serviceWorker' in navigator) {
+    var _swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (_swRefreshing) return;
+        _swRefreshing = true;
+        window.location.reload();
+    });
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./sw.js').then(function (reg) {
+            console.log('SW registered, scope:', reg.scope);
+        }).catch(function (err) {
+            console.log('SW registration failed:', err);
+        });
+    });
+}
+</script>
 </body>
 </html>

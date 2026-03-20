@@ -1,4 +1,4 @@
-<!--Home-->
+<!--HIDDEN:Home-->
 
 <?xjs
     require('sbbsdefs.js', 'SYS_CLOSED');

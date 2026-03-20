@@ -22,7 +22,7 @@
     background: #000;
     display: flex;
     flex-direction: column;
-    padding-top: 56px; /* navbar height */
+    padding-top: var(--navbar-h, 56px); /* measured by JS */
 }
 
 /* fTelnet container fills remaining space - block layout so fTelnet can measure */
@@ -102,7 +102,7 @@ body.terminal-open {
 /* Mobile: terminal full-width */
 @media (max-width: 767.98px) {
     .terminal-panel {
-        padding-top: 48px;
+        padding-top: var(--navbar-h, 48px);
     }
 
     .spa-container {

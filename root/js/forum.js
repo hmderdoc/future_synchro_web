@@ -48,7 +48,17 @@ async function postNew(sub) {
     if (data.success) {
         var el = document.getElementById('newmessage');
         if (el) el.remove();
-        insertParam('notice', 'Your message has been posted.');
+        var notice = document.createElement('div');
+        notice.id = 'noticebox';
+        notice.className = 'alert alert-success';
+        notice.textContent = 'Your message has been posted.';
+        var container = document.getElementById('forum-list-container');
+        if (container) container.parentNode.insertBefore(notice, container);
+        setTimeout(function () {
+            notice.style.transition = 'opacity 1s';
+            notice.style.opacity = '0';
+            setTimeout(function () { notice.remove(); }, 1000);
+        }, 3000);
     }
     btn.disabled = false;
 }
@@ -69,7 +79,17 @@ async function postReply(sub, id) {
         if (quoteBtn) quoteBtn.disabled = false;
         var replyBox = document.getElementById('replybox-' + id);
         if (replyBox) replyBox.remove();
-        insertParam('notice', 'Your message has been posted.');
+        var notice = document.createElement('div');
+        notice.id = 'noticebox';
+        notice.className = 'alert alert-success';
+        notice.textContent = 'Your reply has been posted.';
+        var container = document.getElementById('forum-list-container');
+        if (container) container.parentNode.insertBefore(notice, container);
+        setTimeout(function () {
+            notice.style.transition = 'opacity 1s';
+            notice.style.opacity = '0';
+            setTimeout(function () { notice.remove(); }, 1000);
+        }, 3000);
     } else {
         btn.disabled = false;
     }
@@ -81,7 +101,6 @@ async function deleteMessage(sub, id) {
     if (res.success) {
         var el = document.getElementById('li-' + id);
         if (el) el.remove();
-        insertParam('notice', 'Message deleted.');
     }
 }
 
@@ -101,10 +120,11 @@ function addNew(sub) {
         bodyEl.value = bodyEl.value + '\r\n' + data.signature;
         bodyEl.setSelectionRange(0, 0);
     });
-    window.location.hash = '#newmessage';
+    document.getElementById('newmessage').scrollIntoView({ behavior: 'smooth', block: 'end' });
     document.getElementById('newmessage-body').addEventListener('keydown', function (evt) {
         evt.stopImmediatePropagation();
     });
+    if (typeof renderAllBinIcons === 'function') renderAllBinIcons(document.getElementById('newmessage'));
 }
 
 async function submitPoll(sub) {
@@ -150,7 +170,17 @@ async function submitPoll(sub) {
     if (res.success) {
         var el = document.getElementById('newpoll');
         if (el) el.remove();
-        insertParam('notice', 'Your poll has been posted.');
+        var notice = document.createElement('div');
+        notice.id = 'noticebox';
+        notice.className = 'alert alert-success';
+        notice.textContent = 'Your poll has been posted.';
+        var container = document.getElementById('forum-list-container');
+        if (container) container.parentNode.insertBefore(notice, container);
+        setTimeout(function () {
+            notice.style.transition = 'opacity 1s';
+            notice.style.opacity = '0';
+            setTimeout(function () { notice.remove(); }, 1000);
+        }, 3000);
     }
 
 }
@@ -173,7 +203,7 @@ function addPollField(type, elem) {
             '</div>' +
             '<div class="col-sm-1">' +
                 '<button type="button" class="btn btn-danger" onclick="document.getElementById(\'' + prefix + '-container-' + number + '\').remove()">' +
-                    '<span class="glyphicon glyphicon-remove"></span>' +
+                    '<span class="bin-icon" data-icon="trash"></span>' +
                 '</button> ' +
             '</div>' +
         '</div>'
@@ -235,10 +265,10 @@ function addPoll(sub) {
                         '</button>' +
                         '<div class="pull-right">' +
                             '<button type="button" title="Add another comment" class="btn btn-success" onclick="addPollField(\'comment\', \'#newpoll-comment-group\')">' +
-                                '<span class="glyphicon glyphicon-pencil"></span>' +
+                                '<span class="bin-icon" data-icon="pencil"></span>' +
                             '</button> ' +
                             '<button type="button" title="Add another answer" class="btn btn-success" onclick="addPollField(\'answer\', \'#newpoll-answer-group\')">' +
-                                '<span class="glyphicon glyphicon-plus"></span>' +
+                                '<span class="bin-icon" data-icon="checkmark"></span>' +
                             '</button> ' +
                         '</div>' +
                     '</div>' +
@@ -249,7 +279,7 @@ function addPoll(sub) {
     addPollField('comment', '#newpoll-comment-group');
     addPollField('answer', '#newpoll-answer-group');
     addPollField('answer', '#newpoll-answer-group');
-    window.location.hash = '#newpoll';
+    document.getElementById('newpoll').scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 
 // Add a reply input form to the page for message with number 'id' in sub 'sub'
@@ -271,6 +301,7 @@ function addReply(sub, id) {
     document.getElementById('replytext-' + id).addEventListener('keydown', function (evt) {
         evt.stopImmediatePropagation();
     });
+    if (typeof renderAllBinIcons === 'function') renderAllBinIcons(document.getElementById('replybox-' + id));
 }
 
 function onSubUnreadCount(data) {
@@ -399,15 +430,16 @@ async function getMailBody(id) {
             'title="Reply to this message" ' +
             'name="reply-' + id + '" ' +
             'onclick="addReply(\'mail\',' + id + ')">' +
-            '<span class="glyphicon glyphicon-comment"></span>' +
+            '<span class="bin-icon" data-icon="irc"></span>' +
             '</button>' +
             '<button class="btn btn-default icon" aria-label="Delete this message" ' +
             'title="Delete this message" onclick="deleteMessage(\'mail\',' + id + ')">' +
-            '<span class="glyphicon glyphicon-trash"></span>' +
+            '<span class="bin-icon" data-icon="trash"></span>' +
             '</button>';
         if (data.buttons) str += data.buttons.join('');
         tgt.innerHTML = str;
         tgt.hidden = false;
+        if (typeof renderAllBinIcons === 'function') renderAllBinIcons(tgt);
     }
 }
 

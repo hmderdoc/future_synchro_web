@@ -1,0 +1,60 @@
+<!--Oneliners-->
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><span class="bin-icon" data-icon="chat"></span>Oneliners</span>
+        <button class="btn btn-sm btn-outline-secondary" id="ol-refresh-btn" title="Refresh">&#x21bb;</button>
+    </div>
+    <div class="card-body p-0">
+        <div id="ol-list" class="ol-list">
+            <div class="text-muted p-3">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Post form (shown only for logged-in users) -->
+<div class="card mb-3" id="ol-post-card" style="display:none;">
+    <div class="card-header">Post a One-Liner</div>
+    <div class="card-body">
+        <!-- Color toolbar -->
+        <div class="mb-2" id="ol-color-bar">
+            <small class="text-muted me-1">Colors:</small>
+            <button type="button" class="ol-color-btn" data-code="K" style="background:#000;color:#555;" title="Black">K</button>
+            <button type="button" class="ol-color-btn" data-code="R" style="background:#aa0000;" title="Red">R</button>
+            <button type="button" class="ol-color-btn" data-code="G" style="background:#00aa00;" title="Green">G</button>
+            <button type="button" class="ol-color-btn" data-code="Y" style="background:#aa5500;" title="Brown">Y</button>
+            <button type="button" class="ol-color-btn" data-code="B" style="background:#0000aa;" title="Blue">B</button>
+            <button type="button" class="ol-color-btn" data-code="M" style="background:#aa00aa;" title="Magenta">M</button>
+            <button type="button" class="ol-color-btn" data-code="C" style="background:#00aaaa;" title="Cyan">C</button>
+            <button type="button" class="ol-color-btn" data-code="W" style="background:#aaaaaa;color:#333;" title="Light Gray">W</button>
+            <span class="mx-1">|</span>
+            <button type="button" class="ol-color-btn" data-code="HK" style="background:#555555;" title="Dark Gray">hK</button>
+            <button type="button" class="ol-color-btn" data-code="HR" style="background:#ff5555;" title="Light Red">hR</button>
+            <button type="button" class="ol-color-btn" data-code="HG" style="background:#55ff55;color:#333;" title="Light Green">hG</button>
+            <button type="button" class="ol-color-btn" data-code="HY" style="background:#ffff55;color:#333;" title="Yellow">hY</button>
+            <button type="button" class="ol-color-btn" data-code="HB" style="background:#5555ff;" title="Light Blue">hB</button>
+            <button type="button" class="ol-color-btn" data-code="HM" style="background:#ff55ff;" title="Light Magenta">hM</button>
+            <button type="button" class="ol-color-btn" data-code="HC" style="background:#55ffff;color:#333;" title="Light Cyan">hC</button>
+            <button type="button" class="ol-color-btn" data-code="HW" style="background:#ffffff;color:#333;" title="White">hW</button>
+            <span class="mx-1">|</span>
+            <button type="button" class="ol-color-btn ol-color-reset" data-code="N" title="Reset">&#x23CE;</button>
+        </div>
+        <!-- Preview -->
+        <div class="mb-2 p-2 ol-preview-box" id="ol-preview" style="display:none;">
+            <small class="text-muted">Preview:</small>
+            <span id="ol-preview-text"></span>
+        </div>
+        <!-- Input -->
+        <form id="ol-post-form" class="d-flex gap-2">
+            <input type="text" id="ol-input" class="form-control form-control-sm font-monospace"
+                   maxlength="200" placeholder="Type your one-liner..." autocomplete="off">
+            <button type="submit" class="btn btn-primary btn-sm text-nowrap">Send</button>
+        </form>
+        <small class="text-muted">Use the color buttons above to insert color codes. Max 200 chars.</small>
+    </div>
+</div>
+
+<?xjs write('<script src="./js/oneliners.js?_v=' + time() + '"></script>'); ?>
+<script>
+    if (typeof initOneliners === 'function') initOneliners();
+</script>

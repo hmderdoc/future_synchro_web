@@ -51,19 +51,23 @@
 <script type="text/javascript">
 
     function selectAllMail() {
-        $('input.mail-select').each(function () {
-            $(this).prop('checked', $(this).prop('checked') ? false : true);
+        document.querySelectorAll('input.mail-select').forEach(function (cb) {
+            cb.checked = !cb.checked;
         });
     }
 
     async function deleteSelectedMail() {
-        const numbers = [];
-        $('input.mail-select:checked').each(function () {
-            numbers.push($(this).attr('id').split('-')[1]);
+        var numbers = [];
+        document.querySelectorAll('input.mail-select:checked').forEach(function (cb) {
+            numbers.push(cb.id.split('-')[1]);
         });
-        const data = await v4_get('./api/forum.ssjs?call=delete-mail&number=' + numbers.join('&number='));
+        if (!numbers.length) return;
+        var data = await v4_get('./api/forum.ssjs?call=delete-mail&number=' + numbers.join('&number='));
         if (!data.success) return;
-        numbers.forEach(e => $('#li-' + e).remove());
+        numbers.forEach(function (e) {
+            var el = document.getElementById('li-' + e);
+            if (el) el.remove();
+        });
     }
 
 </script>
@@ -73,21 +77,27 @@
         <? write(http_request.query.notice[0]); ?>
     </div>
     <script type="text/javascript">
-        $("#noticebox").fadeOut(3000, function () {
-            $("#noticebox").remove();
-        });
+        (function () {
+            var box = document.getElementById('noticebox');
+            if (!box) return;
+            setTimeout(function () {
+                box.style.transition = 'opacity 1s';
+                box.style.opacity = '0';
+                setTimeout(function () { box.remove(); }, 1000);
+            }, 3000);
+        })();
     </script>
 <? } ?>
 
 <? if (!(user.security.restrictions&UFLAG_E) && !(user.security.restrictions&UFLAG_M)) { ?>
 	<button class="btn btn-default icon" aria-label="<? write(locale.strings.page_mail.button_post_new); ?>" title="<? write(locale.strings.page_mail.button_post_new); ?>" onclick="addNew('mail')">
-		<span class="glyphicon glyphicon-pencil"></span>
+		<span class="bin-icon" data-icon="doc_edit"></span>
 	</button>
 	<button class="btn btn-default icon" aria-label="<? write(locale.strings.page_mail.button_select_all); ?>" title="<? write(locale.strings.page_mail.button_select_all); ?>" onclick="selectAllMail()">
-		<span class="glyphicon glyphicon-check"></span>
+		<span class="bin-icon" data-icon="checkmark"></span>
 	</button>
 	<button class="btn btn-default icon" aria-label="<? write(locale.strings.page_mail.button_delete_selected); ?>" title="<? write(locale.strings.page_mail.button_delete_selected); ?>" onclick="deleteSelectedMail()">
-		<span class="glyphicon glyphicon-trash"></span>
+		<span class="bin-icon" data-icon="trash"></span>
 	</button>
 <? } ?>
 

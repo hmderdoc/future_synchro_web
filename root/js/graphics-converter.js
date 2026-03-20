@@ -49,14 +49,14 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         const container = document.createElement('div');
 
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.canvas.width = cols * font_width;
         ctx.canvas.height = rows * font_height;
         ctx.fillStyle = COLORS[0];
         ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
         const spritesheet_canvas = document.createElement('canvas');
-        const spritesheet_ctx = spritesheet_canvas.getContext('2d');
+        const spritesheet_ctx = spritesheet_canvas.getContext('2d', { willReadFrequently: true });
         spritesheet_ctx.canvas.width = spritesheet_columns * font_width;
         spritesheet_ctx.canvas.height = spritesheet_rows * font_height;
         spritesheet_canvas.style.display = 'none';
@@ -64,12 +64,22 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         container.appendChild(canvas);
         container.appendChild(spritesheet_canvas);
 
-        const img = new Image();
-        img.addEventListener('load', () => {
-            spritesheet_ctx.drawImage(img, 0, 0);
+        // Cache spritesheet images globally to avoid redundant loads
+        var imgCache = GraphicsConverter._imgCache || (GraphicsConverter._imgCache = {});
+        function onReady(loadedImg) {
+            spritesheet_ctx.drawImage(loadedImg, 0, 0);
             callback({ container, ctx, spritesheet_ctx });
-        });
-        img.src = spritesheet_src;
+        }
+        if (imgCache[spritesheet_src]) {
+            onReady(imgCache[spritesheet_src]);
+        } else {
+            const img = new Image();
+            img.addEventListener('load', () => {
+                imgCache[spritesheet_src] = img;
+                onReady(img);
+            });
+            img.src = spritesheet_src;
+        }
 
     }
 
@@ -277,3 +287,13 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
     }
 
 }
+
+
+// Shared singleton — avoids creating multiple GC instances
+GraphicsConverter._shared = null;
+GraphicsConverter.shared = function () {
+    if (!GraphicsConverter._shared) {
+        GraphicsConverter._shared = new GraphicsConverter();
+    }
+    return GraphicsConverter._shared;
+};

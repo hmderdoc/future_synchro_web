@@ -13,12 +13,10 @@
 (function () {
     'use strict';
 
-    var gc = null;
     var cache = {};   // name -> dataURL
 
     function getGc() {
-        if (!gc) gc = new GraphicsConverter();
-        return gc;
+        return GraphicsConverter.shared();
     }
 
     /**

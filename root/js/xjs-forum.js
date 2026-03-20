@@ -28,6 +28,31 @@ function formatMessageDate(t) {
     return (new Date(t * 1000)).toLocaleString();
 }
 
+// Safely write to localStorage; evict old forum caches on quota error
+function safeSetItem(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+            // Evict all forum-related caches and retry once
+            var toRemove = [];
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && (k.endsWith('-threadList') || k.match(/^[a-z]+-[a-z]+-\d+$/))) {
+                    toRemove.push(k);
+                }
+            }
+            toRemove.forEach(function(k) { localStorage.removeItem(k); });
+            try {
+                localStorage.setItem(key, value);
+            } catch (_) {
+                // Still failing — give up silently; page works fine without cache
+            }
+        }
+    }
+}
+
+
 async function setScanCfg(sub, cfg) {
 	var opts = [
         'scan-cfg-off',
@@ -48,6 +73,21 @@ async function setScanCfg(sub, cfg) {
 	});
 }
 
+
+
+function showInlineNotice(msg) {
+    var existing = document.getElementById('forum-inline-notice');
+    if (existing) existing.remove();
+    var notice = document.createElement('div');
+    notice.id = 'forum-inline-notice';
+    notice.className = 'alert alert-success alert-dismissible';
+    notice.setAttribute('role', 'alert');
+    notice.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+    var container = document.getElementById('forum-list-container') || document.getElementById('content');
+    if (container) container.parentNode.insertBefore(notice, container);
+    setTimeout(function () { var el = document.getElementById('forum-inline-notice'); if (el) el.remove(); }, 5000);
+}
+
 async function addNew(sub) {
 
     if (document.getElementById('newmessage') !== null) return;
@@ -60,7 +100,7 @@ async function addNew(sub) {
     li.id = 'newmessage-li';
     li.className = 'list-group-item';
     li.appendChild(elem);
-    document.getElementById('forum-list-container').appendChild(li);
+    document.getElementById('forum-list-container').prepend(li);
 
     elem.removeAttribute('hidden');
 
@@ -68,21 +108,95 @@ async function addNew(sub) {
     const nmb = elem.getElementsByTagName('textarea')[0];
     nmb.value += `\r\n${data.signature}`;
     nmb.setSelectionRange(0, 0);
-	window.location.hash = '#newmessage';
+	document.getElementById('newmessage').scrollIntoView({ behavior: 'smooth', block: 'end' });
 	nmb.onkeydown = evt => evt.stopImmediatePropagation();
 
 }
 
+
+// After posting, refresh the visible content without full page reload
+async function refreshThreadList(sub) {
+    // Clear existing threads from DOM
+    var container = document.getElementById('forum-list-container');
+    if (!container) return;
+    container.querySelectorAll('[data-thread]').forEach(function (el) { el.remove(); });
+    // Reset scroll state so listThreads will fetch fresh
+    _threadScrollLoading = false;
+    _threadScrollExhausted = false;
+    _threadScrollCursor = null;
+    // Clear localStorage cache for this sub's thread list
+    localStorage.removeItem(sub + '-threadList');
+    // Re-fetch
+    await listThreads(sub, _threadPageSize);
+}
+
+async function refreshMessageList(sub, thread) {
+    // Find the last visible message number
+    var lastMsg = lastVisibleMessage();
+    if (lastMsg === null) return;
+    // Fetch messages after the last one we have
+    // Clear localStorage cache so we get fresh data
+    localStorage.removeItem(sub + '-' + thread);
+    _msgScrollLoading = false;
+    // Fetch all messages fresh, but only render the new ones
+    var data = await v4_fetch_jsonl('./api/forum.ssjs?call=get-thread&sub=' + sub + '&thread=' + thread + '&count=100&after=' + lastMsg);
+    if (!data || !data.length) return;
+    var users = [];
+    data.forEach(function (e) {
+        var elemId = 'forum-message-' + e.number;
+        if (document.getElementById(elemId)) return; // Already rendered
+        var elem = document.getElementById('forum-message-template').cloneNode(true);
+        elem.id = elemId;
+        elem.setAttribute('data-message', e.number);
+        elem.querySelector('a[data-message-anchor]').id = e.number;
+        elem.querySelector('strong[data-message-from]').innerHTML = e.from;
+        var akey;
+        if (e.from_net_addr) {
+            akey = e.from + '@' + e.from_net_addr;
+            elem.querySelector('span[data-message-from-address]').innerHTML = '@' + e.from_net_addr;
+            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', e.from + '@' + e.from_net_addr);
+        } else {
+            akey = e.from;
+            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', e.from);
+        }
+        elem.querySelector('strong[data-message-to]').innerHTML = e.to;
+        elem.querySelector('strong[data-message-date]').innerHTML = formatMessageDate(e.when_written_time);
+        elem.querySelector('span[data-upvote-count]').innerHTML = e.votes ? e.votes.up : 0;
+        elem.querySelector('span[data-downvote-count]').innerHTML = e.votes ? e.votes.down : 0;
+        elem.querySelector('div[data-message-body]').innerHTML = e.body;
+        elem.querySelector('a[data-direct-link]').setAttribute('href', '#' + e.number);
+        var deleteBtn = elem.querySelector('button[data-button-delete]');
+        if (deleteBtn) deleteBtn.onclick = function () { deleteMessage(sub, e.number); };
+        var replyBtn = elem.querySelector('button[data-button-reply]');
+        if (replyBtn) replyBtn.onclick = function () { addReply(sub, e.number); };
+        var upvoteBtn = elem.querySelector('button[data-button-upvote]');
+        if (upvoteBtn) upvoteBtn.onclick = function () { vote(sub, e.number, true); };
+        var downvoteBtn = elem.querySelector('button[data-button-downvote]');
+        if (downvoteBtn) downvoteBtn.onclick = function () { vote(sub, e.number, false); };
+        elem.removeAttribute('hidden');
+        if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+        document.getElementById('forum-list-container').appendChild(elem);
+        if (users.indexOf(akey) < 0) users.push(akey);
+    });
+    if (users.length && typeof Avatars !== 'undefined' && Avatars.draw) Avatars.draw(users);
+    // Scroll to the new message
+    var lastNewEl = document.getElementById('forum-message-' + data[data.length - 1].number);
+    if (lastNewEl) lastNewEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 async function postNew(sub) {
 
-    document.getElementById('newmessage').getElementsByTagName('input')[2].setAttribute('disabled', true);
+    var _nm = document.getElementById('newmessage');
+    var _inputs = _nm.getElementsByTagName('input');
+    var _textarea = _nm.getElementsByTagName('textarea')[0];
+    _inputs[2].setAttribute('disabled', true);
 
 	const data = await v4_post('./api/forum.ssjs', {
 		call: 'post',
 		sub,
-		to: document.getElementById('newmessage-to').value,
-		subject: document.getElementById('newmessage-subject').value,
-		body: document.getElementById('newmessage-body').value,
+		to: _inputs[0].value,
+		subject: _inputs[1].value,
+		body: _textarea.value,
 	});
 
     document.getElementById('newmessage').getElementsByTagName('input')[2].setAttribute('disabled', true);
@@ -90,7 +204,8 @@ async function postNew(sub) {
     if (data.success) {
         const li = document.getElementById('newmessage-li');
         li.parentNode.removeChild(li);
-		insertParam('notice', 'Your message has been posted.'); // This is stupid.
+		showInlineNotice('Your message has been posted.');
+		await refreshThreadList(sub);
 	}
 
 }
@@ -128,7 +243,9 @@ async function postReply(sub, id) {
         document.getElementById(`quote-${id}`).setAttribute('disabled', false);
         const rb = document.getElementById(`replybox-${id}`);
         rb.parentNode.removeChild(rb);
-		insertParam('notice', 'Your message has been posted.'); // This is stupid.
+		showInlineNotice('Your message has been posted.');
+		var _thread = new URLSearchParams(window.location.search).get('thread');
+		if (_thread) await refreshMessageList(sub, _thread);
 	} else {
         document.getElementById(`reply-button-${id}`).setAttribute('disabled', false);
 	}
@@ -156,7 +273,7 @@ async function deleteMessage(sub, id) {
     if (res.success) {
         var el = document.getElementById('forum-message-' + id);
         if (el) el.remove();
-        insertParam('notice', 'Message deleted.');
+        showInlineNotice('Message deleted.');
     }
 }
 
@@ -218,7 +335,8 @@ async function postNewPoll(sub) {
 	if (res.success) {
         const np = document.getElementById('forum-new-poll');
         np.parentNode.removeChild(np);
-		insertParam('notice', 'Your poll has been posted.'); // This is stupid
+		showInlineNotice('Your poll has been posted.');
+		await refreshThreadList(sub);
 	}
 
 }
@@ -237,12 +355,12 @@ function addPoll(sub) {
     li.id = 'newpoll-li';
     li.className = 'list-group-item';
     li.appendChild(elem);
-    document.getElementById('forum-list-container').appendChild(li);
+    document.getElementById('forum-list-container').prepend(li);
 
     addPollField('comment', 'newpoll-comment-group');
 	addPollField('answer', 'newpoll-answer-group');
 	addPollField('answer', 'newpoll-answer-group');
-	window.location.hash = '#newpoll';
+	document.getElementById('forum-new-poll').scrollIntoView({ behavior: 'smooth', block: 'end' });
 
 }
 
@@ -309,7 +427,7 @@ async function listMessages(sub, thread, count, after) {
         // Always fetch fresh on first load; cache is only for scroll-more
         data = await v4_fetch_jsonl(`./api/forum.ssjs?call=get-thread&sub=${sub}&thread=${thread}&count=${count}`);
     }
-    if (data && data.length) localStorage.setItem(`${sub}-${thread}`, JSON.stringify(data));
+    if (data && data.length) safeSetItem(`${sub}-${thread}`, JSON.stringify(data));
     loadingMessage.stop();
 
     if (!data || !data.length) {
@@ -428,7 +546,7 @@ function onThreadStats(data) {
                 cache.threads[idx].unread = v.unread;
                 cache.threads[idx].votes = v.votes;
             }
-            localStorage.setItem(`${data.sub}-threadList`, JSON.stringify(cache));
+            safeSetItem(`${data.sub}-threadList`, JSON.stringify(cache));
         }
 
         const elem = document.getElementById(`forum-thread-link-${k}`);
@@ -943,7 +1061,7 @@ function renderForumIcon(elem, b64) {
         return;
     }
     try {
-        var gc = new GraphicsConverter();
+        var gc = GraphicsConverter.shared();
         gc.from_bin(atob(b64), 12, 6, function (url) {
             _forumIconCache[b64] = url;
             var img = document.createElement('img');
@@ -1152,19 +1270,23 @@ function threadNav() {
         switch (evt.keyCode) {
             case 37:
                 if (idx > 0) {
-                    window.location.hash = items[idx - 1].getAttribute('data-message');
+                    cur.classList.remove('current');
+                    items[idx - 1].classList.add('current');
+                    items[idx - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     evt.preventDefault();
                 }
                 break;
             case 39:
                 if (idx < items.length - 1) {
-                    window.location.hash = items[idx + 1].getAttribute('data-message');
+                    cur.classList.remove('current');
+                    items[idx + 1].classList.add('current');
+                    items[idx + 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     evt.preventDefault();
                 }
                 break;
         }
     });
-    window.addEventListener('hashchange', setCurrentFromHash);
+    // keyboard nav uses direct DOM manipulation, no hashchange needed
 }
 
 // --- Poll interaction ---

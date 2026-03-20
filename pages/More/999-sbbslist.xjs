@@ -97,7 +97,7 @@
 			writeln('<li class="list-group-item striped">');
 			writeln('<p class="h4">');
 			if (typeof e.web_site === 'string' && e.web_site !== '') {
-				writeln('<a href="http://' + e.web_site + '">' + e.name + '</a>');
+				writeln('<a href="http://' + e.web_site + '" target="_blank" rel="noopener">' + e.name + '</a>');
 			} else {
 				writeln(e.name);
 			}

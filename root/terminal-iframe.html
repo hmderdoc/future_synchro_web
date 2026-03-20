@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+    }
+    .fTelnetContainer {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+    }
+    .fTelnetClientContainer {
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+    canvas { display: block; }
+    .fTelnetStatusBar { display: none !important; }
+    .fTelnetConnectButton { display: none !important; }
+    .fTelnetKeyboardWrapper { display: none !important; }
+    .fTelnetFocusWarning,
+    .fTelnetFocusWarningBar { display: none !important; }
+    .fTelnetScrollback { display: none !important; }
+    .fTelnetMenuButton,
+    .fTelnetMenuButtons { display: none !important; }
+    .fTelnetInitMessage { display: none !important; }
+</style>
+</head>
+<body>
+<div id="fTelnetContainer" class="fTelnetContainer"></div>
+<script>
+(function () {
+    'use strict';
+
+    var client = null;
+    var isConnected = false;
+    var currentColumns = 0;
+    var currentRows = 0;
+    var currentSize = null;
+
+    /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
+       Same order as fTelnet's GetBestFit — this IS the contract. */
+    var CP437_FONTS = [
+        { w: 12, h: 23 },
+        { w: 10, h: 19 },
+        { w:  9, h: 16 },
+        { w:  8, h: 16 },
+        { w:  8, h: 14 },
+        { w:  8, h: 13 },
+        { w:  8, h: 12 },
+        { w:  7, h: 12 },
+        { w:  6, h:  8 }
+    ];
+    var MIN_COLS = 80, MIN_ROWS = 24, MAX_COLS = 160, MAX_ROWS = 60;
+
+    function getScreenSize() {
+        var W = window.innerWidth;
+        var H = window.innerHeight;
+        var font = CP437_FONTS[CP437_FONTS.length - 1];
+        for (var i = 0; i < CP437_FONTS.length; i++) {
+            var f = CP437_FONTS[i];
+            if (Math.floor(W / f.w) >= MIN_COLS && Math.floor(H / f.h) >= MIN_ROWS) {
+                font = f;
+                break;
+            }
+        }
+        // 1) Maximum rows, no safety subtraction
+        var rows = Math.max(Math.min(Math.floor(H / font.h), MAX_ROWS), MIN_ROWS);
+        // 2) Scale to fill leftover vertical pixels (cap so MIN_COLS still fits)
+        var vScale = H / (rows * font.h);
+        var maxScale = W / (MIN_COLS * font.w);
+        var scale = Math.min(vScale, maxScale);
+        // 3) Columns based on scaled font width
+        var cols = Math.max(Math.min(Math.floor(W / (font.w * scale)), MAX_COLS), MIN_COLS);
+        return { columns: cols, rows: rows, scale: scale, fontW: font.w, fontH: font.h };
+    }
+
+    function sendToParent(msg) {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage(msg, location.origin);
+        }
+    }
+
+    function sendArrowKey(direction) {
+        var key = direction === 'up' ? 'ArrowUp' : 'ArrowDown';
+        var keyCode = direction === 'up' ? 38 : 40;
+        window.dispatchEvent(new KeyboardEvent('keydown', {
+            key: key, code: key, keyCode: keyCode, which: keyCode, bubbles: true
+        }));
+    }
+
+    function attachInputHandlers(container) {
+        var wheelHandler = function (e) {
+            if (e.deltaY > 0) sendArrowKey('down');
+            else if (e.deltaY < 0) sendArrowKey('up');
+        };
+        container.addEventListener('wheel', wheelHandler, { passive: true });
+
+        var startX = 0, startY = 0, startTime = 0, tapActive = false;
+        var TAP_MOVE = 10, SWIPE_THRESH = 40, MAX_TAP = 300;
+
+        var touchStart = function (e) {
+            if (e.touches.length !== 1) { tapActive = false; return; }
+            var t = e.touches[0];
+            startX = t.clientX; startY = t.clientY;
+            startTime = Date.now(); tapActive = true;
+        };
+        var touchMove = function (e) {
+            if (!tapActive || e.touches.length !== 1) return;
+            var t = e.touches[0];
+            if (Math.abs(t.clientX - startX) > TAP_MOVE ||
+                Math.abs(t.clientY - startY) > TAP_MOVE) tapActive = false;
+        };
+        var touchEnd = function (e) {
+            if (!tapActive || e.changedTouches.length !== 1) return;
+            var t = e.changedTouches[0];
+            var dx = t.clientX - startX, dy = t.clientY - startY;
+            var absDx = Math.abs(dx), absDy = Math.abs(dy);
+            var duration = Date.now() - startTime;
+            tapActive = false;
+            if (absDx < TAP_MOVE && absDy < TAP_MOVE && duration < MAX_TAP) {
+                var target = document.elementFromPoint(t.clientX, t.clientY);
+                if (target) {
+                    var init = { bubbles: true, cancelable: true,
+                        clientX: t.clientX, clientY: t.clientY,
+                        button: 0, buttons: 1, view: window };
+                    if (window.PointerEvent) {
+                        target.dispatchEvent(new PointerEvent('pointerdown', init));
+                        target.dispatchEvent(new PointerEvent('pointerup', init));
+                    }
+                    target.dispatchEvent(new MouseEvent('mousedown', init));
+                    target.dispatchEvent(new MouseEvent('mouseup', init));
+                    target.dispatchEvent(new MouseEvent('click', init));
+                }
+                return;
+            }
+            if (absDy > SWIPE_THRESH && absDy > absDx) {
+                sendArrowKey(dy > 0 ? 'down' : 'up');
+            }
+        };
+        var touchCancel = function () { tapActive = false; };
+        container.addEventListener('touchstart', touchStart, { passive: true });
+        container.addEventListener('touchmove', touchMove, { passive: true });
+        container.addEventListener('touchend', touchEnd, { passive: true });
+        container.addEventListener('touchcancel', touchCancel, { passive: true });
+    }
+
+    function scrollToBottom() {
+        var cc = document.querySelector('.fTelnetClientContainer');
+        if (cc) cc.scrollTop = cc.scrollHeight;
+    }
+
+    function applyCanvasScale(size) {
+        if (!size) return;
+        var canvas = document.querySelector('#fTelnetContainer canvas');
+        if (!canvas) return;
+        if (!size.scale || Math.abs(size.scale - 1) < 0.001) {
+            canvas.style.transform = '';
+            canvas.style.marginLeft = '0';
+            return;
+        }
+        canvas.style.transformOrigin = '0 0';
+        canvas.style.transform = 'scale(' + size.scale + ')';
+        var scaledW = size.columns * size.fontW * size.scale;
+        var leftover = window.innerWidth - scaledW;
+        canvas.style.marginLeft = (leftover > 1 ? Math.floor(leftover / 2) : 0) + 'px';
+    }
+
+    function forceFontRecalc() {
+        [100, 500, 1200].forEach(function (ms) {
+            setTimeout(function () {
+                if (!client || !client._Crt) return;
+                var cc = document.querySelector('.fTelnetClientContainer');
+                if (cc) {
+                    cc.style.width = '';
+                    cc.style.height = '';
+                    cc.style.overflow = 'hidden';
+                    void cc.offsetHeight;
+                }
+                if (typeof client._Crt.SetFont === 'function') {
+                    client._Crt.SetFont(client._Crt.Font
+                        ? client._Crt.Font.Name : 'CP437');
+                }
+                scrollToBottom();
+                applyCanvasScale(currentSize);
+            }, ms);
+        });
+    }
+
+
+
+    function initTerminal(cfg) {
+        if (typeof fTelnetOptions === 'undefined' ||
+            typeof fTelnetClient === 'undefined') {
+            setTimeout(function () { initTerminal(cfg); }, 200);
+            return;
+        }
+
+        var isSecure = cfg.isSecure;
+        var servicePort = cfg.isLoggedIn ? cfg.rloginPort : cfg.telnetPort;
+        var size = getScreenSize();
+        currentSize = size;
+        currentColumns = size.columns;
+        currentRows = size.rows;
+
+        var opts = new fTelnetOptions();
+        opts.BareLFtoCRLF = false;
+        opts.BitsPerSecond = 100000000;
+        opts.Emulation = 'ansi-bbs';
+        opts.Enter = '\r';
+        opts.Font = 'CP437';
+        opts.ForceWss = false;
+        opts.Hostname = cfg.hostname;
+        opts.LocalEcho = false;
+        opts.ScreenColumns = currentColumns;
+        opts.ScreenRows = currentRows;
+        opts.SplashScreen = cfg.ftelnetSplash;
+
+        if (isSecure) {
+            opts.Port = 443;
+            opts.ForceWss = true;
+            opts.WebSocketUrlPath = '/ws?Port=' + servicePort;
+        } else {
+            opts.Port = cfg.wsp;
+            opts.WebSocketUrlPath = '?Port=' + servicePort;
+        }
+
+        if (cfg.isLoggedIn) {
+            opts.ConnectionType = 'rlogin';
+            opts.RLoginClientUsername = cfg.userPassword;
+            opts.RLoginServerUsername = cfg.userAlias;
+            opts.RLoginTerminalType = 'ansi-bbs-cp437';
+        } else {
+            opts.ConnectionType = 'telnet';
+        }
+
+        try {
+            client = new fTelnetClient('fTelnetContainer', opts);
+        } catch (err) {
+            console.error('[iframe] fTelnetClient crash:', err,
+                'cols=' + currentColumns, 'rows=' + currentRows,
+                'W=' + window.innerWidth, 'H=' + window.innerHeight);
+            sendToParent({ type: 'error', message: 'fTelnet init: ' + err.message });
+            return;
+        }
+        window._ftClient = client;
+
+
+
+        if (client.OnConnectionConnect) {
+            var origConnect = client.OnConnectionConnect;
+            client.OnConnectionConnect = function () {
+                isConnected = true;
+                sendToParent({ type: 'status', connected: true });
+                if (origConnect) origConnect.apply(this, arguments);
+                scrollToBottom();
+                setTimeout(scrollToBottom, 200);
+                setTimeout(scrollToBottom, 1000);
+            };
+        }
+        if (client.OnConnectionClose) {
+            var origClose = client.OnConnectionClose;
+            client.OnConnectionClose = function () {
+                isConnected = false;
+                sendToParent({ type: 'status', connected: false });
+                if (origClose) origClose.apply(this, arguments);
+            };
+        }
+
+        client.Connect();
+        var container = document.getElementById('fTelnetContainer');
+        if (container) attachInputHandlers(container);
+        forceFontRecalc();
+        [150, 600, 1300].forEach(function (ms) {
+            setTimeout(function () { applyCanvasScale(currentSize); }, ms);
+        });
+        sendToParent({ type: 'ready' });
+    }
+
+    document.addEventListener('click', function () {
+        sendToParent({ type: 'click' });
+    });
+
+    window.addEventListener('message', function (e) {
+        if (e.origin !== location.origin) return;
+        var msg = e.data;
+        if (!msg || !msg.cmd) return;
+
+        switch (msg.cmd) {
+            case 'init':
+                var script = document.createElement('script');
+                script.id = 'fTelnetScript';
+                script.src = msg.config.ftelnetUrl;
+                script.onload = function () { initTerminal(msg.config); };
+                script.onerror = function () {
+                    sendToParent({ type: 'error',
+                        message: 'Failed to load fTelnet script' });
+                };
+                document.head.appendChild(script);
+                break;
+
+            case 'connect':
+                if (client) {
+                    try { client.Connect(); } catch (ex) {}
+                }
+                break;
+
+            case 'disconnect':
+                if (client) {
+                    try { client.Disconnect(msg.force !== false); } catch (ex) {}
+                }
+                break;
+
+            case 'rlogin':
+                if (!client || !client.Options) break;
+                if (isConnected) {
+                    try { client.Disconnect(); } catch (ex) {}
+                }
+                client.Options.ConnectionType = 'rlogin';
+                client.Options.RLoginClientUsername = msg.password;
+                client.Options.RLoginServerUsername = msg.username;
+                if (msg.isSecure) {
+                    client.Options.WebSocketUrlPath =
+                        '/ws?Port=' + msg.rloginPort;
+                } else {
+                    client.Options.WebSocketUrlPath =
+                        '?Port=' + msg.rloginPort;
+                }
+                client.Connect();
+                break;
+
+            case 'xtrn':
+                if (!client) break;
+                if (isConnected) {
+                    try { client.Disconnect(false); } catch (ex) {}
+                }
+                client._Options.RLoginTerminalType = 'xtrn=' + msg.code;
+                client.Connect();
+                break;
+
+            case 'logout':
+                if (client && isConnected) {
+                    try { client.Disconnect(); } catch (ex) {}
+                }
+                if (client && client.Options) {
+                    client.Options.ConnectionType = 'telnet';
+                    if (msg.isSecure) {
+                        client.Options.WebSocketUrlPath =
+                            '/ws?Port=' + msg.telnetPort;
+                    } else {
+                        client.Options.WebSocketUrlPath =
+                            '?Port=' + msg.telnetPort;
+                    }
+                }
+                isConnected = false;
+                sendToParent({ type: 'status', connected: false });
+                break;
+
+            case 'resize':
+                if (!client || !client._Crt) break;
+                var cc = document.querySelector('.fTelnetClientContainer');
+                if (cc) {
+                    cc.style.width = '';
+                    cc.style.height = '';
+                    cc.style.overflow = 'hidden';
+                }
+                if (typeof client._Crt.SetFont === 'function') {
+                    client._Crt.SetFont(client._Crt.Font
+                        ? client._Crt.Font.Name : 'CP437');
+                }
+                scrollToBottom();
+                var newSize = getScreenSize();
+                currentSize = newSize;
+                if (isConnected &&
+                    (newSize.columns !== currentColumns ||
+                     newSize.rows !== currentRows)) {
+                    currentColumns = newSize.columns;
+                    currentRows = newSize.rows;
+                    if (typeof client._Crt.SetScreenSize === 'function') {
+                        client._Crt.SetScreenSize(currentColumns, currentRows);
+                    }
+                    if (typeof client._Crt.SetFont === 'function') {
+                        client._Crt.SetFont(client._Crt.Font
+                            ? client._Crt.Font.Name : 'CP437');
+                    }
+                }
+                scrollToBottom();
+                setTimeout(function () { applyCanvasScale(currentSize); }, 200);
+                break;
+
+            case 'refit':
+                forceFontRecalc();
+                break;
+        }
+    });
+
+    sendToParent({ type: 'loaded' });
+})();
+</script>
+</body>
+</html>

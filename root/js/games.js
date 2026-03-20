@@ -8,7 +8,7 @@
     if (!window._gamesData) return;
 
     var data = window._gamesData;
-    var gc = new GraphicsConverter('./images/cp437-ibm-vga8.png', 8, 16, 64, 4);
+    var gc = GraphicsConverter.shared();
 
     var sortMode = 'time';
     var monthIndex = 0;
