@@ -28,12 +28,16 @@ function emit(obj) {
     last_send = time();
 }
 
+var _isGuest = (user.number < 1 || user.alias === settings.guest);
+var _guestAllowed = { nodelist: true, forum: true };
+
 const callbacks = {};
 if (file_isdir(settings.web_lib + 'events')) {
     if (Array.isArray(http_request.query.subscribe)) {
         http_request.query.subscribe.forEach(function (e) {
-            const base = file_getname(e).replace(file_getext(e), '');
-            const script = settings.web_lib + 'events/' + base + '.js';
+            var base = file_getname(e).replace(file_getext(e), '');
+            if (_isGuest && !_guestAllowed[base]) return;
+            var script = settings.web_lib + 'events/' + base + '.js';
             try {
                 if (file_exists(script)) callbacks[e] = load({}, script);
             } catch (err) {
