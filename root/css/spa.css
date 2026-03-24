@@ -414,17 +414,25 @@ body.terminal-open {
 .forum-item-content h4 {
     margin-top: 0;
 }
+/* Breadcrumb link: inline-flex keeps icon+text on one line */
+.breadcrumb li a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 /* Breadcrumb icons */
 .bc-icon {
     display: inline-block;
-    width: 32px;
-    height: 32px;
+    width: 20px;
+    height: 20px;
     overflow: hidden;
     vertical-align: middle;
+    flex-shrink: 0;
 }
 .bc-icon .forum-icon-img {
-    width: 32px;
-    height: 32px;
+    width: 20px;
+    height: 20px;
 }
 /* CGA theme overrides */
 [data-theme="cga"] .forum-icon {
@@ -442,12 +450,12 @@ body.terminal-open {
         height: 64px;
     }
     .bc-icon {
-        width: 24px;
-        height: 24px;
+        width: 16px;
+        height: 16px;
     }
     .bc-icon .forum-icon-img {
-        width: 24px;
-        height: 24px;
+        width: 16px;
+        height: 16px;
     }
 }
 

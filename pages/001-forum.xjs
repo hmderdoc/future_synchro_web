@@ -224,19 +224,19 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>&group=<? request.write_param('group'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>&group=<? request.write_param('group'); ?>">
                 <span class="bc-icon" data-bc-icon="<? write(_fIconFind(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].name, 'group') || ''); ?>"></span>
                 <? write(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].name); ?>
             </a>
         </li>
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>">
                 <span class="bc-icon" data-bc-icon="<? write(_fIconFind(request.get_param('sub'), 'boards') || ''); ?>"></span>
                 <? write(msg_area.sub[request.get_param('sub')].name); ?>
             </a>
@@ -439,19 +439,19 @@
 
 	<ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>&group=<? write(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].number); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>&group=<? write(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].number); ?>">
                 <span class="bc-icon" data-bc-icon="<? write(_fIconFind(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].name, 'group') || ''); ?>"></span>
                 <? write(msg_area.grp_list[msg_area.sub[request.get_param('sub')].grp_index].name); ?>
             </a>
         </li>
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>">
                 <span class="bc-icon" data-bc-icon="<? write(_fIconFind(request.get_param('sub'), 'boards') || ''); ?>"></span>
                 <? write(msg_area.sub[request.get_param('sub')].name); ?>
             </a>
@@ -566,13 +566,13 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
         </li>
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>&group=<? request.write_param('group'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>&group=<? request.write_param('group'); ?>">
                 <span class="bc-icon" data-bc-icon="<? write(_fIconFind(msg_area.grp_list[request.get_param('group')].name, 'group') || ''); ?>"></span>
                 <? write(msg_area.grp_list[request.get_param('group')].name); ?>
             </a>
@@ -618,7 +618,7 @@
 
     <ol class="breadcrumb">
         <li>
-            <a href="./?page=<? request.write_param('page'); ?>" class="d-flex align-items-center gap-1">
+            <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
                 <? locale.write('title'); ?>
             </a>
