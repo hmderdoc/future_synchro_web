@@ -68,6 +68,66 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				user.downloaded_file(dircode, file_getname(file.path));
 			}
 			break;
+		case 'stream-file':
+			var sdir = request.get_param('dir');
+			var sfn  = request.has_param('file') ? request.get_param('file').toLowerCase() : '';
+			if (sdir !== undefined
+				&& file_area.dir[sdir] !== undefined
+				&& file_area.dir[sdir].can_download
+				&& user.compare_ars(file_area.dir[sdir].download_ars)
+				&& sfn
+			) {
+				var sfileBase = new OldFileBase(sdir);
+				var sfile = null;
+				sfileBase.some(function (e) {
+					if (e.name.toLowerCase() !== sfn) return false;
+					if (e.path !== undefined) { sfile = e; return true; }
+				});
+				sfileBase = undefined;
+				if (sfile === null) { reply.error = 'File not found'; break; }
+				http_reply.header['Content-Type'] = 'audio/mpeg';
+				http_reply.header['Content-Disposition'] = 'inline';
+				http_reply.header['Content-Length'] = file_size(sfile.path);
+				http_reply.header['Accept-Ranges'] = 'bytes';
+				http_reply.header['Cache-Control'] = 'public, max-age=86400';
+				var sf = new File(sfile.path);
+				sf.open('rb');
+				for (var sn = 0; sn < sf.length; sn += CHUNK_SIZE) {
+					var sr = sf.length - sf.position;
+					write(sf.read(sr > CHUNK_SIZE ? CHUNK_SIZE : sr));
+					yield(false);
+				}
+				sf.close();
+				sf = undefined;
+				reply = false;
+			}
+			break;
+		case 'list-files':
+			var ldir = request.get_param('dir');
+			if (ldir !== undefined
+				&& file_area.dir[ldir] !== undefined
+				&& file_area.dir[ldir].can_download
+				&& user.compare_ars(file_area.dir[ldir].download_ars)
+			) {
+				var fb = new FileBase(ldir);
+				if (fb.open()) {
+					var flist = fb.get_list('*.mp3', FileBase.DETAIL.NORM, 0, true, FileBase.SORT.DATE_D);
+					fb.close();
+					reply = [];
+					for (var fi = 0; fi < flist.length; fi++) {
+						reply.push({
+							name: flist[fi].name,
+							desc: flist[fi].desc || '',
+							added: flist[fi].added || 0
+						});
+					}
+				} else {
+					reply.error = 'Could not open file directory';
+				}
+			} else {
+				reply.error = 'Invalid directory or access denied';
+			}
+			break;
 		default:
 			break;
 	}

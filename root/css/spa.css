@@ -1177,3 +1177,220 @@ div.message pre.ansi {
             0 0 4px 2px rgba(200, 220, 255, 0.1);
     }
 }
+
+/* ================================================================
+   BBS Radio — persistent navbar MP3 player
+   ================================================================ */
+
+/* Brand icon (replaces text) */
+.brand-icon {
+    height: 28px;
+    width: auto;
+    image-rendering: pixelated;
+}
+.brand-label {
+    margin-left: 0.35em;
+}
+
+/* --- Radio container --- */
+#radio-container {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    gap: 0;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Transport buttons group — fixed width so layout doesn't shift */
+.radio-controls {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: 72px;
+    justify-content: center;
+}
+
+.radio-btn {
+    background: none;
+    border: none;
+    color: #0ff;
+    font-size: 14px;
+    padding: 2px 4px;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.radio-btn:hover {
+    opacity: 1;
+    color: #fff;
+}
+.radio-btn-play {
+    font-size: 18px;
+    width: 28px;
+    text-align: center;
+}
+
+/* Visualizer canvas */
+#radio-viz {
+    height: 24px;
+    width: 48px;
+    flex-shrink: 0;
+    margin: 0 2px;
+    border-radius: 2px;
+}
+
+/* Volume slider */
+.radio-volume {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 50px;
+    height: 4px;
+    background: rgba(0, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+    margin: 0 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.radio-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #0ff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.radio-volume::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #0ff;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+}
+
+/* Track name */
+.radio-track-name {
+    color: #0ff;
+    font-size: 0.75rem;
+    width: 120px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 4px;
+    line-height: 1.2;
+}
+
+/* Playlist dropdown panel */
+.radio-playlist-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1060;
+    background: #0a0a1e;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 8px;
+    min-width: 280px;
+    max-width: 360px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+.radio-playlist-panel.show {
+    display: block;
+}
+
+.radio-tracklist {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.radio-track-item {
+    padding: 5px 8px;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 2px;
+    transition: background 0.1s;
+}
+.radio-track-item:hover {
+    background: rgba(0, 255, 255, 0.08);
+    color: #fff;
+}
+.radio-track-item.active {
+    background: rgba(0, 255, 255, 0.15);
+    color: #0ff;
+}
+.radio-track-empty {
+    color: #555;
+    font-size: 0.8rem;
+    padding: 12px 8px;
+    text-align: center;
+}
+
+/* Scrollbar styling for playlist */
+.radio-tracklist::-webkit-scrollbar { width: 6px; }
+.radio-tracklist::-webkit-scrollbar-track { background: transparent; }
+.radio-tracklist::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.2); border-radius: 3px; }
+.radio-tracklist::-webkit-scrollbar-thumb:hover { background: rgba(0,255,255,0.4); }
+
+/* ================================================================
+   Progressive responsive: icon-only navbar at tight widths
+   ================================================================ */
+
+/* Level 1 (< 1200px / below xl): left nav labels hide, icons stand alone */
+@media (max-width: 1199.98px) {
+    .navbar-nav.me-auto .nav-label {
+        display: none;
+    }
+    /* Brand label also hides — icon only */
+    .brand-label {
+        display: none;
+    }
+}
+
+/* Level 2 (< 992px / below lg): all remaining labels hide, radio compacts */
+@media (max-width: 991.98px) {
+    .nav-label {
+        display: none;
+    }
+    .radio-track-name {
+        width: 80px;
+    }
+    #radio-viz {
+        width: 36px;
+    }
+    .radio-volume {
+        width: 36px;
+    }
+}
+
+/* Level 3 (< 768px / below md): Bootstrap hamburger kicks in.
+   Radio compacts further. */
+@media (max-width: 767.98px) {
+    #radio-container {
+        margin-right: 0.25rem;
+    }
+    #radio-viz {
+        width: 32px;
+        height: 20px;
+    }
+    .radio-track-name {
+        display: none;
+    }
+    .radio-volume {
+        display: none;
+    }
+    .radio-playlist-panel {
+        min-width: 240px;
+        right: -40px;
+    }
+}
