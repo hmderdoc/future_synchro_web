@@ -23,7 +23,11 @@
         height: 100% !important;
         overflow: hidden !important;
     }
-    canvas { display: block; }
+    canvas {
+        display: block;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: pixelated;
+    }
     .fTelnetStatusBar { display: none !important; }
     .fTelnetConnectButton { display: none !important; }
     .fTelnetKeyboardWrapper { display: none !important; }
@@ -178,13 +182,22 @@
         if (!size) return;
         var canvas = document.querySelector('#fTelnetContainer canvas');
         if (!canvas) return;
+        /* Always clear any CSS transform — we scale via CSS width/height
+           so that offsetX/offsetY and getBoundingClientRect() stay in the
+           same coordinate space.  CSS transform:scale() breaks fTelnet's
+           MousePositionToScreenPosition() because offsetX is in the
+           untransformed space while getBoundingClientRect() returns the
+           transformed dimensions. */
+        canvas.style.transform = '';
+        canvas.style.transformOrigin = '';
         if (!size.scale || Math.abs(size.scale - 1) < 0.001) {
-            canvas.style.transform = '';
+            canvas.style.width = '';
+            canvas.style.height = '';
             canvas.style.marginLeft = '0';
             return;
         }
-        canvas.style.transformOrigin = '0 0';
-        canvas.style.transform = 'scale(' + size.scale + ')';
+        canvas.style.width = Math.round(canvas.width * size.scale) + 'px';
+        canvas.style.height = Math.round(canvas.height * size.scale) + 'px';
         var scaledW = size.columns * size.fontW * size.scale;
         var leftover = window.innerWidth - scaledW;
         canvas.style.marginLeft = (leftover > 1 ? Math.floor(leftover / 2) : 0) + 'px';
