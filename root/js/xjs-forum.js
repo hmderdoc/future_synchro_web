@@ -191,13 +191,16 @@ async function postNew(sub) {
     var _textarea = _nm.getElementsByTagName('textarea')[0];
     _inputs[2].setAttribute('disabled', true);
 
-	const data = await v4_post('./api/forum.ssjs', {
+	var _postData = {
 		call: 'post',
 		sub,
 		to: _inputs[0].value,
 		subject: _inputs[1].value,
 		body: _textarea.value,
-	});
+	};
+	// If the ANSI editor was used, body is base64-encoded raw CP437.
+	if (_textarea.dataset.ansi === '1') _postData.ansi = '1';
+	const data = await v4_post('./api/forum.ssjs', _postData);
 
     document.getElementById('newmessage').getElementsByTagName('input')[2].setAttribute('disabled', true);
 
@@ -233,12 +236,15 @@ async function addReply(sub, id) {
 
 async function postReply(sub, id) {
     document.getElementById(`reply-button-${id}`).setAttribute('disabled', true);
-	const data = await v4_post('./api/forum.ssjs', {
+	var _replyEl = document.getElementById(`replytext-${id}`);
+	var _postData = {
 		call: 'post-reply',
 		sub,
-		body: document.getElementById(`replytext-${id}`).value,
+		body: _replyEl.value,
 		pid: id,
-	});
+	};
+	if (_replyEl.dataset.ansi === '1') _postData.ansi = '1';
+	const data = await v4_post('./api/forum.ssjs', _postData);
 	if (data.success) {
         document.getElementById(`quote-${id}`).setAttribute('disabled', false);
         const rb = document.getElementById(`replybox-${id}`);

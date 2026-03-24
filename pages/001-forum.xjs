@@ -33,6 +33,12 @@
 <script type="text/javascript" src="./js/xjs-forum.js"></script>
 <script type="text/javascript" src="./js/cache.js"></script>
 
+<?xjs if (request.has_param('sub') && request.get_param('sub') === 'local-aidefinitions') { ?>
+<script type="text/javascript" src="./js/bin-avatar-upload.js"></script>
+<?xjs } ?>
+<script type="text/javascript" src="./js/ansi-editor.js"></script>
+<script type="text/javascript" src="./js/ansi-editor-forum.js"></script>
+
 <?xjs
     var _searchScope = 'forum';
     var _searchGroup = '';
@@ -265,6 +271,7 @@
         <strong><? locale.write('label_form_reply'); ?></strong>
         <textarea rows="8" class="form-control reply" id="replytext-ID"></textarea>
         <button id="quote-ID" class="btn" onclick="quotify('ID')"><? locale.write('button_quote_message'); ?></button>
+	<button class="btn btn-default ansi-editor-toggle" type="button" onclick="launchAnsiEditor(this.parentNode.querySelector('textarea'))">ANSI Art</button>
         <input id="reply-button-ID" class="btn btn-primary" type="submit" value="Submit" onclick="postReply('SUB', 'ID')" />
     </div>
 
@@ -322,6 +329,7 @@
         <br />
         <textarea class="form-control" rows="8"></textarea>
         <br />
+		<button class="btn btn-default ansi-editor-toggle" type="button" onclick="launchAnsiEditor(this.parentNode.querySelector('textarea'))">ANSI Art</button>
 		<input class="btn btn-primary" type="submit" value="<? locale.write('button_submit', 'main') ?>" onclick="postNew('SUB')" />
     </div>
 
@@ -334,6 +342,7 @@
         <button id="quote-ID" class="btn" onclick="quotify('ID')">
             <? locale.write('button_quote_message'); ?>
         </button>
+        <button class="btn btn-default ansi-editor-toggle" type="button" onclick="launchAnsiEditor(this.parentNode.querySelector('textarea'))">ANSI Art</button>
 		<input id="reply-button-ID" class="btn btn-primary" type="submit" value="Submit" onclick="postReply('SUB', 'ID')" />
     </div>
 
