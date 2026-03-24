@@ -358,3 +358,162 @@
 .me-hidden {
     display: none !important;
 }
+
+/* ─── Tool list (vertical layout) ─── */
+.me-tool-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+
+/* ─── Fill toggle (outline/filled for rect/ellipse) ─── */
+.me-fill-toggle {
+    display: none;
+    flex-direction: row;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0;
+}
+.me-fill-toggle.me-visible {
+    display: flex;
+}
+.me-fill-opt {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    color: #6c7086;
+}
+.me-fill-opt:hover {
+    color: #cdd6f4;
+}
+.me-fill-opt.me-active {
+    background: #45475a;
+    color: #cdd6f4;
+    border-color: #585b70;
+}
+
+/* ─── Action bar — left/right sections ─── */
+.me-action-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.me-action-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.me-action-bar {
+    justify-content: space-between;
+}
+
+/* ─── Shape overlay (rubber-band preview) ─── */
+.me-shape-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    z-index: 5;
+}
+
+/* ─── Resize overlay (modal dialog) ─── */
+.me-resize-overlay {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 101;
+    min-width: 240px;
+}
+.me-resize-overlay.me-visible {
+    display: block;
+}
+.me-resize-overlay h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #cdd6f4;
+    text-align: center;
+}
+.me-resize-form {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.me-resize-form label {
+    color: #a6adc8;
+    font-size: 12px;
+}
+.me-resize-input {
+    width: 100%;
+    padding: 4px 8px;
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 3px;
+    color: #cdd6f4;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.me-resize-input:focus {
+    outline: none;
+    border-color: #89b4fa;
+}
+
+/* ─── Status bar — clickable dimensions ─── */
+.me-status-dim {
+    text-decoration: underline dotted;
+    cursor: pointer;
+    color: #a6adc8;
+}
+.me-status-dim:hover {
+    color: #89b4fa;
+}
+
+/* ─── Mini preview panel ─── */
+.me-preview {
+    width: 220px;
+    background: #181825;
+    border-left: 1px solid #313244;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.me-preview-label {
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #6c7086;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #313244;
+}
+.me-preview-wrapper {
+    padding: 10px;
+    overflow: hidden;
+}
+.me-preview-canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+.me-view-frame {
+    position: absolute;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    box-sizing: border-box;
+}

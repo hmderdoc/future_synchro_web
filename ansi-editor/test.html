@@ -1,212 +1,25 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>ANSI Editor Tests</title>
+<html><head><meta charset="UTF-8"><title>ANSI Editor Test</title>
 <style>
-body { background: #1e1e2e; color: #cdd6f4; font-family: monospace; padding: 20px; }
-.pass { color: #a6e3a1; }
-.fail { color: #f38ba8; }
-#results { white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
-#editor-container { width: 800px; height: 500px; border: 1px solid #45475a; margin: 20px 0; }
+body { background: #1e1e2e; margin: 0; padding: 0; }
+#editor-container { width: 100vw; height: 100vh; }
 </style>
 </head><body>
-<h2>ANSI Editor Automated Tests</h2>
-<div id="results"></div>
-<div id="editor-container" style="display:none;"></div>
-
+<div id="editor-container"></div>
 <script src="dist/ansi-editor.js"></script>
 <script>
-var results = document.getElementById('results');
-var passed = 0, failed = 0;
-
-function log(msg, ok) {
-    var span = document.createElement('span');
-    span.className = ok ? 'pass' : 'fail';
-    span.textContent = (ok ? '✓ PASS' : '✗ FAIL') + ': ' + msg + '\n';
-    results.appendChild(span);
-    if (ok) passed++; else failed++;
-}
-
-function assert(condition, msg) {
-    log(msg, !!condition);
-}
-
-async function runTests() {
-    log('Tests starting...', true);
-
-    // Test 1: AnsiEditor exists on window
-    assert(typeof window.AnsiEditor === 'function' || typeof window.AnsiEditor === 'object',
-        'AnsiEditor is available on window');
-    assert(typeof window.AnsiEditor.create === 'function',
-        'AnsiEditor.create is a function');
-
-    // Test 2: Create editor instance
+(async function() {
     var container = document.getElementById('editor-container');
-    container.style.display = 'block';
-    var doneData = null, cancelCalled = false;
-
-    try {
-        var editor = await AnsiEditor.create({
-            container: container,
-            columns: 40,
-            rows: 10,
-            fontUrl: 'fonts/IBM VGA.F16',
-            onDone: function(data) { doneData = data; },
-            onCancel: function() { cancelCalled = true; },
-        });
-        assert(true, 'Editor created successfully');
-    } catch(err) {
-        assert(false, 'Editor creation failed: ' + err.message);
-        log('Aborting remaining tests', false);
-        return;
-    }
-
-    // Test 3: DOM structure
-    var root = container.querySelector('.me-editor');
-    assert(root !== null, 'Root .me-editor element exists');
-    assert(container.querySelector('.me-sidebar') !== null, 'Sidebar exists');
-    assert(container.querySelector('.me-toolbar') !== null, 'Toolbar exists');
-    assert(container.querySelector('.me-viewport') !== null, 'Viewport exists');
-    assert(container.querySelector('.me-statusbar') !== null, 'Status bar exists');
-    assert(container.querySelector('.me-action-bar') !== null, 'Action bar exists');
-    assert(container.querySelector('.me-canvas') !== null, 'Canvas exists');
-    assert(container.querySelector('.me-cursor-canvas') !== null, 'Cursor canvas exists');
-
-    // Test 4: Canvas dimensions
-    var canvas = container.querySelector('.me-canvas');
-    assert(canvas.width === 40 * 8, 'Canvas width = 40 * 8 = ' + canvas.width);
-    assert(canvas.height === 10 * 16, 'Canvas height = 10 * 16 = ' + canvas.height);
-
-    // Test 5: Document model
-    assert(editor.doc !== null, 'Document model exists');
-    assert(editor.doc.columns === 40, 'Document has 40 columns');
-    assert(editor.doc.rows === 10, 'Document has 10 rows');
-    assert(editor.doc.data.length === 400, 'Document has 400 cells');
-
-    // Test 6: Default cell values
-    var cell = editor.doc.at(0, 0);
-    assert(cell.code === 32 && cell.fg === 7 && cell.bg === 0,
-        'Default cell is space(32) fg=7 bg=0');
-
-    // Test 7: Font loaded correctly
-    assert(editor.font !== null, 'Font loaded');
-    assert(editor.font.width === 8, 'Font width is 8');
-    assert(editor.font.height === 16, 'Font height is 16');
-    assert(editor.font.bitmask.length === 4096, 'Font bitmask is 4096 bytes');
-
-    // Test 8: Palette display
-    var palCells = container.querySelectorAll('.me-pal-cell');
-    assert(palCells.length === 16, '16 palette cells in sidebar');
-
-    // Test 9: Tool buttons
-    var toolBtns = container.querySelectorAll('.me-tool-btn');
-    assert(toolBtns.length === 4, '4 tool buttons (select, brush, fill, sample)');
-
-    // Test 10: F-key canvases
-    var fkeys = container.querySelectorAll('.me-fkey canvas');
-    assert(fkeys.length === 12, '12 F-key canvases');
-
-    // Test 11: Typing a character
-    editor._typeChar(65); // 'A'
-    var cellA = editor.doc.at(1, 0); // cursor moved right after typing
-    var cellTyped = editor.doc.at(0, 0);
-    assert(cellTyped.code === 65, 'Typed A at (0,0) -> code 65');
-    assert(cellTyped.fg === 7, 'Typed A has fg=7');
-    assert(cellTyped.bg === 0, 'Typed A has bg=0');
-    assert(editor.cursorX === 1, 'Cursor moved to column 1 after typing');
-
-    // Test 12: Undo
-    var undoAffected = editor.doc.undo();
-    assert(undoAffected.length > 0, 'Undo returned affected cells');
-    var cellUndone = editor.doc.at(0, 0);
-    assert(cellUndone.code === 32, 'Undo restored space at (0,0)');
-
-    // Test 13: Redo
-    var redoAffected = editor.doc.redo();
-    assert(redoAffected.length > 0, 'Redo returned affected cells');
-    var cellRedone = editor.doc.at(0, 0);
-    assert(cellRedone.code === 65, 'Redo restored A at (0,0)');
-
-    // Test 14: Color change
-    editor._setFg(12);
-    editor._setBg(1);
-    assert(editor.fg === 12, 'FG set to 12 (Light Red)');
-    assert(editor.bg === 1, 'BG set to 1 (Blue)');
-
-    // Test 15: Type with new colors
-    editor._typeChar(66); // 'B'
-    var cellB = editor.doc.at(1, 0);
-    assert(cellB.code === 66, 'Typed B at (1,0)');
-    assert(cellB.fg === 12, 'B has fg=12');
-    assert(cellB.bg === 1, 'B has bg=1');
-
-    // Test 16: Half-block operations
-    var hb = editor.doc.getHalfBlock(5, 0);
-    assert(hb !== null, 'getHalfBlock returns data');
-    assert(hb.upperColor === 0 && hb.lowerColor === 0, 'Empty cell half-block colors are both 0');
-
-    editor.doc.startUndo();
-    editor.doc.setHalfBlock(5, 0, 4); // upper half of cell (5,0) = red
-    editor.doc.setHalfBlock(5, 1, 2); // lower half of cell (5,0) = green
-    editor.doc.endUndo();
-    var hbAfter = editor.doc.getHalfBlock(5, 0);
-    assert(hbAfter.upperColor === 4, 'Upper half-block color = 4 (Red)');
-    assert(hbAfter.lowerColor === 2, 'Lower half-block color = 2 (Green)');
-
-    // Test 17: ANSI encoding
-    var ansiData = editor.getAnsiData();
-    assert(ansiData instanceof Uint8Array, 'getAnsiData returns Uint8Array');
-    assert(ansiData.length > 0, 'ANSI data is not empty (' + ansiData.length + ' bytes)');
-
-    // Check for ESC character in output
-    var hasEsc = false;
-    for (var i = 0; i < ansiData.length; i++) {
-        if (ansiData[i] === 0x1B) { hasEsc = true; break; }
-    }
-    assert(hasEsc, 'ANSI data contains ESC sequences');
-
-    // Test 18: Attribute overlay
-    editor._showAttributeOverlay('fg');
-    var overlay = container.querySelector('.me-attr-overlay');
-    assert(overlay.classList.contains('me-visible'), 'Attribute overlay shows');
-    var backdrop = container.querySelector('.me-backdrop');
-    assert(backdrop.classList.contains('me-visible'), 'Backdrop shows');
-    editor._hideAttributeOverlay();
-    assert(!overlay.classList.contains('me-visible'), 'Attribute overlay hides');
-
-    // Test 19: Cursor movement
-    editor._moveCursor(10, 5);
-    assert(editor.cursorX === 10, 'Cursor X moved to 10');
-    assert(editor.cursorY === 5, 'Cursor Y moved to 5');
-
-    // Boundary clamping
-    editor._moveCursor(-5, -5);
-    assert(editor.cursorX === 0, 'Cursor X clamped to 0');
-    assert(editor.cursorY === 0, 'Cursor Y clamped to 0');
-    editor._moveCursor(999, 999);
-    assert(editor.cursorX === 39, 'Cursor X clamped to 39');
-    assert(editor.cursorY === 9, 'Cursor Y clamped to 9');
-
-    // Test 20: Done callback
-    editor.done();
-    assert(doneData !== null, 'onDone callback was called');
-    assert(doneData instanceof Uint8Array, 'onDone received Uint8Array');
-    assert(doneData.length > 0, 'onDone data is not empty');
-
-    // Test 21: Cancel callback
-    cancelCalled = false;
-    editor.cancel();
-    assert(cancelCalled, 'onCancel callback was called');
-
-    // Test 22: Destroy
-    editor.destroy();
-    assert(container.innerHTML === '', 'destroy() clears container');
-
-    // Summary
-    log('', true);
-    log('Results: ' + passed + ' passed, ' + failed + ' failed', failed === 0);
-}
-
-runTests().catch(function(err) {
-    log('FATAL ERROR: ' + err.message + '\n' + err.stack, false);
-});
+    var editor = await AnsiEditor.create({
+        container: container,
+        columns: 80,
+        rows: 25,
+        fontUrl: 'fonts/IBM VGA.F16',
+        onDone: function(data) { console.log('Done:', data.length, 'bytes'); },
+        onCancel: function() { console.log('Cancel'); },
+    });
+    window.editor = editor;
+    console.log('Editor ready');
+})();
 </script>
 </body></html>

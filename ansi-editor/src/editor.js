@@ -18,16 +18,24 @@ import { Font } from './lib/font.js';
 import { TextDocument } from './lib/document.js';
 import { Renderer } from './lib/renderer.js';
 import { encodeAsAnsi } from './lib/ansi.js';
+import { detectFileType, getContentBytes, parseSauce, loadAnsi, loadBin } from './lib/sauce.js';
+import { bresenhamLine, rectOutline, rectFilled, ellipseOutline, ellipseFilled, ellipseFromDrag } from './lib/shapes.js';
 import cssText from './editor.css';
 
 // ─── Constants ───
 
-const TOOLS = ['select', 'brush', 'fill', 'sample'];
-const TOOL_LABELS = { select: 'K', brush: 'B', fill: 'F', sample: '\u2299' };
-const TOOL_TIPS = {
-    select: 'Keyboard Mode (Alt+K)', brush: 'Brush Mode (Alt+B)',
-    fill: 'Fill Mode (Alt+F)',       sample: 'Sample Mode (Alt+S)',
+const TOOLS = ['select', 'brush', 'line', 'rect', 'ellipse', 'fill', 'sample'];
+const TOOL_LABELS = {
+    select: 'K', brush: 'B', line: '╲', rect: '▭', ellipse: '◯',
+    fill: 'F', sample: '⊙',
 };
+const TOOL_TIPS = {
+    select:  'Keyboard Mode (Alt+K)',  brush:   'Brush Mode (Alt+B)',
+    line:    'Line Tool (Alt+L)',      rect:    'Rectangle Tool (Alt+R)',
+    ellipse: 'Ellipse Tool (Alt+E)',   fill:    'Fill Mode (Alt+F)',
+    sample:  'Sample Mode (Alt+S)',
+};
+const SHAPE_TOOLS = ['line', 'rect', 'ellipse'];
 const BRUSH_MODES = ['half_block', 'custom_block', 'shading'];
 const BRUSH_MODE_LABELS = { half_block: 'Half', custom_block: 'Char', shading: 'Shade' };
 
@@ -73,6 +81,12 @@ export class AnsiEditor {
         this._lastMouseY = -1;
         this._lastMouseHalfY = -1;
 
+        // Shape tool state
+        this.shapeFilled = false;
+        this._shapeStartX = -1;
+        this._shapeStartY = -1;
+        this._shapeOverlay = null;
+
         this.font = null;
         this.doc = null;
         this.renderer = null;
@@ -103,6 +117,7 @@ export class AnsiEditor {
         this._updateToolbar();
         this._selectTool('select');
         this._setupInput();
+        this._updatePreview();
         this.el.root.focus();
     }
 
@@ -124,10 +139,23 @@ export class AnsiEditor {
         const viewport = this._buildViewport();
         const statusbar = this._buildStatusBar();
         main.append(toolbar, viewport, statusbar);
-        body.append(sidebar, main);
+
+        const preview = this._buildPreview();
+        body.append(sidebar, main, preview);
 
         const actionBar = document.createElement('div');
         actionBar.className = 'me-action-bar';
+
+        const actionLeft = document.createElement('div');
+        actionLeft.className = 'me-action-left';
+        const btnLoad = document.createElement('button');
+        btnLoad.className = 'me-btn';
+        btnLoad.textContent = 'Load File';
+        btnLoad.onclick = () => this._promptLoadFile();
+        actionLeft.appendChild(btnLoad);
+
+        const actionRight = document.createElement('div');
+        actionRight.className = 'me-action-right';
         const btnCancel = document.createElement('button');
         btnCancel.className = 'me-btn';
         btnCancel.textContent = 'Cancel';
@@ -136,14 +164,16 @@ export class AnsiEditor {
         btnDone.className = 'me-btn me-btn-done';
         btnDone.textContent = 'Done';
         btnDone.onclick = () => this.done();
-        actionBar.append(btnCancel, btnDone);
+        actionRight.append(btnCancel, btnDone);
+        actionBar.append(actionLeft, actionRight);
 
         const backdrop = document.createElement('div');
         backdrop.className = 'me-backdrop';
-        backdrop.onclick = () => this._hideAttributeOverlay();
+        backdrop.onclick = () => this._hideOverlay();
         const overlay = this._buildAttributeOverlay();
+        const resizeOverlay = this._buildResizeOverlay();
 
-        root.append(body, actionBar, backdrop, overlay);
+        root.append(body, actionBar, backdrop, overlay, resizeOverlay);
         this.el.root = root;
         this.el.backdrop = backdrop;
         this.container.innerHTML = '';
@@ -189,7 +219,8 @@ export class AnsiEditor {
         const sep = document.createElement('div');
         sep.className = 'me-sep';
 
-        const toolBtns = document.createElement('div');
+        const toolList = document.createElement('div');
+        toolList.className = 'me-tool-list';
         this.el.toolBtns = {};
         for (const tool of TOOLS) {
             const btn = document.createElement('div');
@@ -197,11 +228,29 @@ export class AnsiEditor {
             btn.textContent = TOOL_LABELS[tool];
             btn.title = TOOL_TIPS[tool];
             btn.onclick = () => this._selectTool(tool);
-            toolBtns.appendChild(btn);
+            toolList.appendChild(btn);
             this.el.toolBtns[tool] = btn;
         }
 
-        sidebar.append(colors, palette, sep, toolBtns);
+        // Fill toggle (outline vs filled) for rect/ellipse
+        const fillToggle = document.createElement('div');
+        fillToggle.className = 'me-fill-toggle';
+        const optOutline = document.createElement('div');
+        optOutline.className = 'me-fill-opt me-active';
+        optOutline.textContent = '▭';
+        optOutline.title = 'Outline';
+        optOutline.onclick = () => { this.shapeFilled = false; this._updateFillToggle(); };
+        const optFilled = document.createElement('div');
+        optFilled.className = 'me-fill-opt';
+        optFilled.textContent = '■';
+        optFilled.title = 'Filled';
+        optFilled.onclick = () => { this.shapeFilled = true; this._updateFillToggle(); };
+        fillToggle.append(optOutline, optFilled);
+        this.el.fillToggle = fillToggle;
+        this.el.fillOptOutline = optOutline;
+        this.el.fillOptFilled = optFilled;
+
+        sidebar.append(colors, palette, sep, toolList, fillToggle);
         return sidebar;
     }
 
@@ -292,6 +341,10 @@ export class AnsiEditor {
         this.el.canvas = canvas;
         this.el.cursorCanvas = cursorCanvas;
         this.el.editingLayer = editingLayer;
+
+        // Update preview on scroll
+        viewport.addEventListener('scroll', () => this._updateViewFrame());
+
         return viewport;
     }
 
@@ -301,6 +354,9 @@ export class AnsiEditor {
         const pos = document.createElement('span');
         this.el.statusPos = pos;
         const dim = document.createElement('span');
+        dim.className = 'me-status-dim';
+        dim.title = 'Click to resize canvas';
+        dim.onclick = () => this._showResizeOverlay();
         this.el.statusDim = dim;
         const mode = document.createElement('span');
         this.el.statusMode = mode;
@@ -332,12 +388,150 @@ export class AnsiEditor {
         const closeBtn = document.createElement('button');
         closeBtn.className = 'me-btn';
         closeBtn.textContent = 'Close';
-        closeBtn.onclick = () => this._hideAttributeOverlay();
+        closeBtn.onclick = () => this._hideOverlay();
         actions.appendChild(closeBtn);
         overlay.append(title, grid, actions);
         this.el.attrOverlay = overlay;
         this._attrTarget = 'fg';
         return overlay;
+    }
+
+    // ─── Resize Overlay ───
+
+    _buildResizeOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'me-resize-overlay';
+
+        const title = document.createElement('h3');
+        title.textContent = 'Set Canvas Size';
+
+        const form = document.createElement('div');
+        form.className = 'me-resize-form';
+
+        const lblC = document.createElement('label');
+        lblC.textContent = 'Columns:';
+        const inpC = document.createElement('input');
+        inpC.type = 'number'; inpC.min = '1'; inpC.max = '3000';
+        inpC.className = 'me-resize-input';
+
+        const lblR = document.createElement('label');
+        lblR.textContent = 'Rows:';
+        const inpR = document.createElement('input');
+        inpR.type = 'number'; inpR.min = '1'; inpR.max = '10000';
+        inpR.className = 'me-resize-input';
+
+        form.append(lblC, inpC, lblR, inpR);
+
+        const actions = document.createElement('div');
+        actions.className = 'me-attr-actions';
+        const btnOk = document.createElement('button');
+        btnOk.className = 'me-btn me-btn-done';
+        btnOk.textContent = 'Resize';
+        btnOk.onclick = () => this._doResize(parseInt(inpC.value), parseInt(inpR.value));
+        const btnCancel = document.createElement('button');
+        btnCancel.className = 'me-btn';
+        btnCancel.textContent = 'Cancel';
+        btnCancel.onclick = () => this._hideOverlay();
+        actions.append(btnOk, btnCancel);
+
+        overlay.append(title, form, actions);
+        this.el.resizeOverlay = overlay;
+        this.el.resizeColsInput = inpC;
+        this.el.resizeRowsInput = inpR;
+        return overlay;
+    }
+
+    // ─── Mini Preview Panel ───
+
+    _buildPreview() {
+        const panel = document.createElement('div');
+        panel.className = 'me-preview';
+
+        const label = document.createElement('div');
+        label.className = 'me-preview-label';
+        label.textContent = 'Preview';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'me-preview-wrapper';
+        wrapper.style.position = 'relative';
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'me-preview-canvas';
+        canvas.width = 1; canvas.height = 1;
+
+        const viewFrame = document.createElement('div');
+        viewFrame.className = 'me-view-frame';
+        viewFrame.style.display = 'block';
+
+        wrapper.append(canvas, viewFrame);
+        panel.append(label, wrapper);
+
+        this.el.preview = panel;
+        this.el.previewWrapper = wrapper;
+        this.el.previewCanvas = canvas;
+        this.el.viewFrame = viewFrame;
+
+        // Click preview to scroll
+        wrapper.addEventListener('mousedown', (e) => this._handlePreviewMouse(e));
+        wrapper.addEventListener('mousemove', (e) => { if (this._previewDrag) this._handlePreviewMouse(e); });
+        document.addEventListener('mouseup', () => { this._previewDrag = false; });
+        this._previewDrag = false;
+
+        return panel;
+    }
+
+    _updatePreview() {
+        const src = this.renderer.canvas;
+        const dst = this.el.previewCanvas;
+        if (!dst || !src) return;
+
+        const maxW = 200;
+        const scale = maxW / src.width;
+        dst.width = Math.round(src.width * scale);
+        dst.height = Math.round(src.height * scale);
+        dst.style.width = dst.width + 'px';
+        dst.style.height = dst.height + 'px';
+
+        const ctx = dst.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(src, 0, 0, dst.width, dst.height);
+
+        this._updateViewFrame();
+    }
+
+    _updateViewFrame() {
+        const vp = this.el.viewport;
+        const dst = this.el.previewCanvas;
+        const vf = this.el.viewFrame;
+        if (!vp || !dst || !vf) return;
+
+        const src = this.renderer.canvas;
+        const scale = dst.width / src.width;
+
+        const frameW = Math.round(vp.clientWidth * scale);
+        const frameH = Math.round(vp.clientHeight * scale);
+        const frameX = Math.round(vp.scrollLeft * scale);
+        const frameY = Math.round(vp.scrollTop * scale);
+
+        vf.style.width = Math.min(frameW, dst.width) + 'px';
+        vf.style.height = Math.min(frameH, dst.height) + 'px';
+        vf.style.left = frameX + 'px';
+        vf.style.top = frameY + 'px';
+    }
+
+    _handlePreviewMouse(e) {
+        this._previewDrag = true;
+        const dst = this.el.previewCanvas;
+        const vp = this.el.viewport;
+        const src = this.renderer.canvas;
+        const rect = dst.getBoundingClientRect();
+        const scale = src.width / dst.width;
+
+        const px = (e.clientX - rect.left) * scale;
+        const py = (e.clientY - rect.top) * scale;
+        vp.scrollLeft = px - vp.clientWidth / 2;
+        vp.scrollTop = py - vp.clientHeight / 2;
+        this._updateViewFrame();
     }
 
     // ═══ INPUT ═══
@@ -378,21 +572,27 @@ export class AnsiEditor {
 
         if (e.key === 'Escape') {
             e.preventDefault();
-            if (this.el.attrOverlay.classList.contains('me-visible')) {
-                this._hideAttributeOverlay();
+            // Cancel shape in progress
+            if (this._shapeOverlay) { this._destroyOverlay(); return; }
+            if (this.el.attrOverlay.classList.contains('me-visible') ||
+                this.el.resizeOverlay.classList.contains('me-visible')) {
+                this._hideOverlay();
             } else {
                 this._showAttributeOverlay('fg');
             }
             return;
         }
 
-        // Alt+key tool shortcuts (work in any mode)
+        // Alt+key tool shortcuts
         if (e.altKey && !ctrl) {
             switch (e.key.toLowerCase()) {
-                case 'k': e.preventDefault(); this._selectTool('select'); return;
-                case 'b': e.preventDefault(); this._selectTool('brush'); return;
-                case 'f': e.preventDefault(); this._selectTool('fill'); return;
-                case 's': e.preventDefault(); this._selectTool('sample'); return;
+                case 'k': e.preventDefault(); this._selectTool('select');  return;
+                case 'b': e.preventDefault(); this._selectTool('brush');   return;
+                case 'l': e.preventDefault(); this._selectTool('line');    return;
+                case 'r': e.preventDefault(); this._selectTool('rect');    return;
+                case 'e': e.preventDefault(); this._selectTool('ellipse'); return;
+                case 'f': e.preventDefault(); this._selectTool('fill');    return;
+                case 's': e.preventDefault(); this._selectTool('sample');  return;
             }
         }
 
@@ -422,7 +622,15 @@ export class AnsiEditor {
             case 'End':        e.preventDefault(); this._moveCursor(this.columns - 1, this.cursorY); break;
             case 'PageUp':     e.preventDefault(); this._moveCursor(this.cursorX, Math.max(0, this.cursorY - 25)); break;
             case 'PageDown':   e.preventDefault(); this._moveCursor(this.cursorX, Math.min(this.rows - 1, this.cursorY + 25)); break;
-            case 'Enter':      e.preventDefault(); this._moveCursor(0, Math.min(this.rows - 1, this.cursorY + 1)); break;
+            case 'Enter':
+                e.preventDefault();
+                // Auto-grow if at last row
+                if (this.cursorY >= this.rows - 1) {
+                    this.doc.growRows(1); this.rows = this.doc.rows;
+                    this._rebuildCanvas();
+                }
+                this._moveCursor(0, this.cursorY + 1);
+                break;
             case 'Backspace':  e.preventDefault(); this._backspace(); break;
             case 'Delete':     e.preventDefault(); this._deleteKey(); break;
             case 'Insert':     e.preventDefault(); this.insertMode = !this.insertMode; this._updateStatusBar(); break;
@@ -434,6 +642,11 @@ export class AnsiEditor {
             default:
                 if (!ctrl && !e.altKey && e.key.length === 1) {
                     e.preventDefault();
+                    // Auto-grow if typing at the end of the last row
+                    if (this.cursorY >= this.rows - 1 && this.cursorX >= this.columns - 1) {
+                        this.doc.growRows(1); this.rows = this.doc.rows;
+                        this._rebuildCanvas();
+                    }
                     var code = charToCp437(e.key);
                     this._typeChar(code);
                 }
@@ -454,6 +667,13 @@ export class AnsiEditor {
         this._lastMouseY = pos.y;
         this._lastMouseHalfY = pos.halfY;
 
+        if (SHAPE_TOOLS.includes(this.activeTool)) {
+            this._shapeStartX = pos.x;
+            this._shapeStartY = pos.y;
+            this._createOverlay();
+            return;
+        }
+
         switch (this.activeTool) {
             case 'select': this._moveCursor(pos.x, pos.y); break;
             case 'brush': this.doc.startUndo(); this._brushDraw(pos.x, pos.y, pos.halfY, e.button); break;
@@ -465,6 +685,15 @@ export class AnsiEditor {
     _handleMouseMove(e) {
         if (!this._mouseDown) return;
         var pos = this._getCanvasXY(e);
+
+        if (SHAPE_TOOLS.includes(this.activeTool) && this._shapeOverlay) {
+            // Clamp to canvas
+            var mx = Math.max(0, Math.min(this.columns - 1, pos.x));
+            var my = Math.max(0, Math.min(this.rows - 1, pos.y));
+            this._updateShapeOverlay(this._shapeStartX, this._shapeStartY, mx, my);
+            return;
+        }
+
         if (pos.x < 0 || pos.x >= this.columns || pos.y < 0 || pos.y >= this.rows) return;
         if (pos.x === this._lastMouseX && pos.halfY === this._lastMouseHalfY) return;
 
@@ -481,7 +710,173 @@ export class AnsiEditor {
     _handleMouseUp(e) {
         if (!this._mouseDown) return;
         this._mouseDown = false;
+
+        if (SHAPE_TOOLS.includes(this.activeTool) && this._shapeOverlay) {
+            var pos = this._getCanvasXY(e);
+            var mx = Math.max(0, Math.min(this.columns - 1, pos.x));
+            var my = Math.max(0, Math.min(this.rows - 1, pos.y));
+            this._commitShape(this._shapeStartX, this._shapeStartY, mx, my);
+            this._destroyOverlay();
+            return;
+        }
+
         if (this.activeTool === 'brush') this.doc.endUndo();
+    }
+
+    // ═══ SHAPE OVERLAY ═══
+
+    _createOverlay() {
+        const c = document.createElement('canvas');
+        c.className = 'me-shape-overlay';
+        c.width = this.renderer.width;
+        c.height = this.renderer.height;
+        c.style.width = this.el.canvas.style.width;
+        c.style.height = this.el.canvas.style.height;
+        this.el.editingLayer.appendChild(c);
+        this._shapeOverlay = c;
+    }
+
+    _updateShapeOverlay(x0, y0, x1, y1) {
+        const c = this._shapeOverlay;
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height);
+
+        const points = this._getShapePoints(x0, y0, x1, y1);
+        const fw = this.font.width, fh = this.font.height;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        for (const p of points) {
+            if (p.x >= 0 && p.x < this.columns && p.y >= 0 && p.y < this.rows) {
+                ctx.fillRect(p.x * fw, p.y * fh, fw, fh);
+            }
+        }
+    }
+
+    _destroyOverlay() {
+        if (this._shapeOverlay) {
+            this._shapeOverlay.remove();
+            this._shapeOverlay = null;
+        }
+    }
+
+    _getShapePoints(x0, y0, x1, y1) {
+        switch (this.activeTool) {
+            case 'line':
+                return bresenhamLine(x0, y0, x1, y1);
+            case 'rect':
+                return this.shapeFilled ? rectFilled(x0, y0, x1, y1) : rectOutline(x0, y0, x1, y1);
+            case 'ellipse': {
+                const { cx, cy, rx, ry } = ellipseFromDrag(x0, y0, x1, y1);
+                return this.shapeFilled ? ellipseFilled(cx, cy, rx, ry) : ellipseOutline(cx, cy, rx, ry);
+            }
+            default:
+                return [];
+        }
+    }
+
+    _commitShape(x0, y0, x1, y1) {
+        const points = this._getShapePoints(x0, y0, x1, y1);
+        if (points.length === 0) return;
+
+        // Use the current brush character (default: full block 219)
+        const code = this.customBlockChar;
+        this.doc.startUndo();
+        const affected = [];
+        for (const p of points) {
+            if (p.x >= 0 && p.x < this.columns && p.y >= 0 && p.y < this.rows) {
+                this.doc.changeData(p.x, p.y, code, this.fg, this.bg);
+                affected.push({ x: p.x, y: p.y });
+            }
+        }
+        this.doc.endUndo();
+        this._renderCells(affected);
+        this._updatePreview();
+    }
+
+    // ═══ FILE LOADING ═══
+
+    _promptLoadFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.ans,.bin,.asc,.diz,.nfo,.ice';
+        input.onchange = () => {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                const bytes = new Uint8Array(reader.result);
+                this.loadBytes(bytes, file.name);
+            };
+            reader.readAsArrayBuffer(file);
+        };
+        input.click();
+    }
+
+    loadBytes(bytes, filename) {
+        const info = detectFileType(filename, bytes);
+        const sauce = info.sauce;
+        const content = getContentBytes(bytes, sauce);
+        const cols = info.columns;
+
+        let result;
+        if (info.type === 'bin') {
+            result = loadBin(content, cols);
+        } else {
+            result = loadAnsi(content, cols, 0);
+        }
+
+        // Ensure grid is fully padded to cols*rows
+        const totalCells = cols * result.rows;
+        while (result.grid.length < totalCells) {
+            result.grid.push({ code: 32, fg: 7, bg: 0 });
+        }
+        this.doc.replaceAll(result.grid, cols, result.rows);
+        this.columns = cols;
+        this.rows = result.rows;
+        this._rebuildCanvas();
+        this._moveCursor(0, 0);
+        this._updateStatusBar();
+    }
+
+    // ═══ CANVAS RESIZE ═══
+
+    _showResizeOverlay() {
+        this.el.resizeColsInput.value = this.columns;
+        this.el.resizeRowsInput.value = this.rows;
+        this.el.backdrop.classList.add('me-visible');
+        this.el.resizeOverlay.classList.add('me-visible');
+        this.el.resizeColsInput.focus();
+    }
+
+    _doResize(newCols, newRows) {
+        if (isNaN(newCols) || isNaN(newRows) || newCols < 1 || newRows < 1) return;
+        this.doc.resize(newCols, newRows);
+        this.columns = newCols;
+        this.rows = newRows;
+        this._rebuildCanvas();
+        this._moveCursor(
+            Math.min(this.cursorX, this.columns - 1),
+            Math.min(this.cursorY, this.rows - 1)
+        );
+        this._hideOverlay();
+        this._updateStatusBar();
+    }
+
+    setCanvasSize(cols, rows) {
+        this._doResize(cols, rows);
+    }
+
+    _rebuildCanvas() {
+        this.renderer = new Renderer(this.doc, this.font);
+        this.renderer.render();
+        const canvas = this.renderer.canvas;
+        canvas.className = 'me-canvas';
+        canvas.style.width = this.renderer.width + 'px';
+        canvas.style.height = this.renderer.height + 'px';
+        this.el.canvas.replaceWith(canvas);
+        this.el.canvas = canvas;
+        this._updatePreview();
     }
 
     // ═══ RENDERING ═══
@@ -553,8 +948,15 @@ export class AnsiEditor {
         this.el.brushModes.classList.toggle('me-visible', name === 'brush');
         this.el.cursorCanvas.classList.toggle('me-hidden', name !== 'select');
         this.el.viewport.style.cursor = name === 'select' ? 'text' : 'crosshair';
+        // Show fill toggle for rect/ellipse
+        this.el.fillToggle.classList.toggle('me-visible', name === 'rect' || name === 'ellipse');
         this._updateToolbar();
         this._updateStatusBar();
+    }
+
+    _updateFillToggle() {
+        this.el.fillOptOutline.classList.toggle('me-active', !this.shapeFilled);
+        this.el.fillOptFilled.classList.toggle('me-active', this.shapeFilled);
     }
 
     // ── Select tool helpers ──
@@ -574,6 +976,7 @@ export class AnsiEditor {
             if (!this.insertMode) break;
         }
         this._moveCursor(this.cursorX + 1, this.cursorY);
+        this._updatePreview();
     }
 
     _typeFkey(num) {
@@ -688,6 +1091,7 @@ export class AnsiEditor {
         }
         this.doc.endUndo();
         for (var k in affected) this._renderCell(affected[k].x, affected[k].y);
+        this._updatePreview();
     }
 
     // ── Sample tool ──
@@ -700,7 +1104,7 @@ export class AnsiEditor {
         this._selectTool('select');
     }
 
-    // ═══ ATTRIBUTE OVERLAY ═══
+    // ═══ OVERLAYS ═══
 
     _showAttributeOverlay(target) {
         this._attrTarget = target || 'fg';
@@ -713,26 +1117,30 @@ export class AnsiEditor {
         this.el.attrOverlay.classList.add('me-visible');
     }
 
-    _hideAttributeOverlay() {
+    _hideOverlay() {
         this.el.backdrop.classList.remove('me-visible');
         this.el.attrOverlay.classList.remove('me-visible');
+        this.el.resizeOverlay.classList.remove('me-visible');
     }
+
+    // Keep legacy name for compatibility
+    _hideAttributeOverlay() { this._hideOverlay(); }
 
     _onAttrPick(color) {
         if (this._attrTarget === 'fg') this._setFg(color);
         else this._setBg(color);
-        this._hideAttributeOverlay();
+        this._hideOverlay();
     }
 
     // ═══ UNDO/REDO ═══
 
     _undo() {
         var affected = this.doc.undo();
-        if (affected.length > 0) { this._renderCells(affected); this._updateCursor(); }
+        if (affected.length > 0) { this._renderCells(affected); this._updateCursor(); this._updatePreview(); }
     }
     _redo() {
         var affected = this.doc.redo();
-        if (affected.length > 0) { this._renderCells(affected); this._updateCursor(); }
+        if (affected.length > 0) { this._renderCells(affected); this._updateCursor(); this._updatePreview(); }
     }
 
     // ═══ TOOLBAR ═══

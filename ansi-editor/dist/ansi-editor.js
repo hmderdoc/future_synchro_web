@@ -563,6 +563,62 @@ var AnsiEditorModule = (() => {
         this.data[start + i] = { code: 32, fg: 7, bg: 0 };
       }
     }
+    /**
+     * Resize the document canvas. Preserves existing content that fits.
+     * @param {number} newColumns
+     * @param {number} newRows
+     */
+    resize(newColumns, newRows) {
+      if (newColumns < 1 || newRows < 1)
+        return;
+      if (newColumns > 3e3 || newRows > 1e4)
+        return;
+      if (newColumns === this.columns && newRows === this.rows)
+        return;
+      const newData = new Array(newColumns * newRows);
+      for (let i = 0; i < newData.length; i++) {
+        newData[i] = { code: 32, fg: 7, bg: 0 };
+      }
+      const copyRows = Math.min(this.rows, newRows);
+      const copyCols = Math.min(this.columns, newColumns);
+      for (let y = 0; y < copyRows; y++) {
+        for (let x = 0; x < copyCols; x++) {
+          newData[y * newColumns + x] = this.data[y * this.columns + x];
+        }
+      }
+      this.data = newData;
+      this.columns = newColumns;
+      this.rows = newRows;
+      this.undoStack = [];
+      this.redoStack = [];
+      this._currentUndo = null;
+    }
+    /**
+     * Add rows at the bottom of the document.
+     * @param {number} count  Number of rows to add
+     */
+    growRows(count) {
+      for (let r = 0; r < count; r++) {
+        for (let c = 0; c < this.columns; c++) {
+          this.data.push({ code: 32, fg: 7, bg: 0 });
+        }
+        this.rows++;
+      }
+    }
+    /**
+     * Replace entire document data (used by file loader).
+     * @param {Array} data     Flat array of {code, fg, bg}
+     * @param {number} columns
+     * @param {number} rows
+     */
+    replaceAll(data, columns, rows) {
+      this.data = data;
+      this.columns = columns;
+      this.rows = rows;
+      this.undoStack = [];
+      this.redoStack = [];
+      this._currentUndo = null;
+    }
   };
 
   // src/lib/renderer.js
@@ -692,18 +748,402 @@ var AnsiEditorModule = (() => {
     return new Uint8Array(out);
   }
 
+  // src/lib/sauce.js
+  function parseSauce(bytes) {
+    if (bytes.length < 128)
+      return null;
+    const offset = bytes.length - 128;
+    if (bytes[offset] !== 83 || bytes[offset + 1] !== 65 || bytes[offset + 2] !== 85 || bytes[offset + 3] !== 67 || bytes[offset + 4] !== 69)
+      return null;
+    const decoder = new TextDecoder("ascii");
+    const str = (off, len) => decoder.decode(bytes.slice(off, off + len)).replace(/\0+$/, "").trim();
+    const u16 = (off) => bytes[off] | bytes[off + 1] << 8;
+    const u32 = (off) => bytes[off] | bytes[off + 1] << 8 | bytes[off + 2] << 16 | bytes[off + 3] << 24;
+    return {
+      title: str(offset + 7, 35),
+      author: str(offset + 42, 20),
+      group: str(offset + 62, 20),
+      date: str(offset + 82, 8),
+      fileSize: u32(offset + 90),
+      dataType: bytes[offset + 94],
+      fileType: bytes[offset + 95],
+      tInfo1: u16(offset + 96),
+      // width
+      tInfo2: u16(offset + 98),
+      // height (number of lines)
+      tInfo3: u16(offset + 100),
+      tInfo4: u16(offset + 102),
+      comments: bytes[offset + 104],
+      tFlags: bytes[offset + 105],
+      tInfoS: str(offset + 106, 22)
+    };
+  }
+  function getContentBytes(bytes, sauce) {
+    if (!sauce)
+      return bytes;
+    let end = bytes.length - 128;
+    if (sauce.comments > 0) {
+      end -= 5 + sauce.comments * 64;
+    }
+    if (end > 0 && bytes[end - 1] === 26)
+      end--;
+    return bytes.slice(0, end);
+  }
+  function loadAnsi(data, columns, maxRows) {
+    columns = columns || 80;
+    maxRows = maxRows || 1e3;
+    let rows = 25;
+    const grid = [];
+    const ensure = (r) => {
+      while (grid.length < (r + 1) * columns) {
+        grid.push({ code: 32, fg: 7, bg: 0 });
+      }
+      if (r + 1 > rows)
+        rows = r + 1;
+    };
+    let cx = 0, cy = 0;
+    let fg = 7, bg = 0;
+    let savedX = 0, savedY = 0;
+    let i = 0;
+    while (i < data.length) {
+      const b = data[i];
+      if (b === 27 && i + 1 < data.length && data[i + 1] === 91) {
+        i += 2;
+        let params = "";
+        while (i < data.length && data[i] >= 32 && data[i] <= 63) {
+          params += String.fromCharCode(data[i]);
+          i++;
+        }
+        if (i >= data.length)
+          break;
+        const cmd = String.fromCharCode(data[i]);
+        i++;
+        const nums = params.split(";").map((s) => s === "" ? void 0 : parseInt(s, 10));
+        switch (cmd) {
+          case "A":
+            cy = Math.max(0, cy - (nums[0] || 1));
+            break;
+          case "B":
+            cy += nums[0] || 1;
+            if (maxRows && cy >= maxRows)
+              cy = maxRows - 1;
+            break;
+          case "C":
+            cx += nums[0] || 1;
+            if (cx >= columns)
+              cx = columns - 1;
+            break;
+          case "D":
+            cx = Math.max(0, cx - (nums[0] || 1));
+            break;
+          case "H":
+          case "f":
+            cy = Math.max(0, (nums[0] || 1) - 1);
+            cx = Math.max(0, (nums[1] || 1) - 1);
+            if (cx >= columns)
+              cx = columns - 1;
+            break;
+          case "J":
+            {
+              const n = nums[0] || 0;
+              if (n === 2) {
+                for (let j = 0; j < grid.length; j++) {
+                  grid[j] = { code: 32, fg, bg };
+                }
+              }
+            }
+            break;
+          case "K":
+            {
+              const n = nums[0] || 0;
+              ensure(cy);
+              if (n === 0) {
+                for (let x = cx; x < columns; x++) {
+                  grid[cy * columns + x] = { code: 32, fg, bg };
+                }
+              } else if (n === 1) {
+                for (let x = 0; x <= cx; x++) {
+                  grid[cy * columns + x] = { code: 32, fg, bg };
+                }
+              } else if (n === 2) {
+                for (let x = 0; x < columns; x++) {
+                  grid[cy * columns + x] = { code: 32, fg, bg };
+                }
+              }
+            }
+            break;
+          case "s":
+            savedX = cx;
+            savedY = cy;
+            break;
+          case "u":
+            cx = savedX;
+            cy = savedY;
+            break;
+          case "m":
+            if (nums.length === 0 || nums.length === 1 && nums[0] === void 0) {
+              fg = 7;
+              bg = 0;
+            } else {
+              for (let j = 0; j < nums.length; j++) {
+                const n = nums[j] === void 0 ? 0 : nums[j];
+                if (n === 0) {
+                  fg = 7;
+                  bg = 0;
+                } else if (n === 1) {
+                  fg |= 8;
+                } else if (n === 5) {
+                  bg |= 8;
+                } else if (n === 7) {
+                  const t = fg;
+                  fg = bg;
+                  bg = t;
+                } else if (n === 22) {
+                  fg &= 7;
+                } else if (n === 25) {
+                  bg &= 7;
+                } else if (n >= 30 && n <= 37) {
+                  fg = fg & 8 | n - 30;
+                } else if (n >= 40 && n <= 47) {
+                  bg = bg & 8 | n - 40;
+                }
+              }
+            }
+            break;
+          default:
+            break;
+        }
+        continue;
+      }
+      if (b === 13) {
+        cx = 0;
+        i++;
+        continue;
+      }
+      if (b === 10) {
+        cy++;
+        if (maxRows && cy >= maxRows)
+          cy = maxRows - 1;
+        i++;
+        continue;
+      }
+      if (b === 9) {
+        cx = Math.min(columns - 1, cx + 8 & ~7);
+        i++;
+        continue;
+      }
+      if (cy < maxRows) {
+        ensure(cy);
+        grid[cy * columns + cx] = { code: b, fg, bg };
+        cx++;
+        if (cx >= columns) {
+          cx = 0;
+          cy++;
+          if (maxRows && cy >= maxRows)
+            cy = maxRows - 1;
+        }
+      }
+      i++;
+    }
+    return { grid, rows };
+  }
+  function loadBin(data, columns) {
+    columns = columns || 160;
+    const grid = [];
+    const totalCells = Math.floor(data.length / 2);
+    for (let i = 0; i < totalCells; i++) {
+      const code = data[i * 2];
+      const attr = data[i * 2 + 1];
+      grid.push({
+        code,
+        fg: attr & 15,
+        bg: attr >> 4 & 15
+      });
+    }
+    const rows = Math.ceil(totalCells / columns);
+    while (grid.length < rows * columns) {
+      grid.push({ code: 32, fg: 7, bg: 0 });
+    }
+    return { grid, rows };
+  }
+  function detectFileType(filename, bytes) {
+    const sauce = parseSauce(bytes);
+    const ext = (filename || "").split(".").pop().toLowerCase();
+    if (sauce && sauce.dataType === 5) {
+      return {
+        type: "bin",
+        sauce,
+        columns: sauce.tInfo1 * 2 || 160,
+        // SAUCE TInfo1 for BIN is width/2
+        rows: null
+      };
+    }
+    if (sauce && sauce.dataType === 1) {
+      return {
+        type: "ans",
+        sauce,
+        columns: sauce.tInfo1 || 80,
+        rows: sauce.tInfo2 || null
+      };
+    }
+    if (ext === "bin") {
+      return { type: "bin", sauce, columns: 160, rows: null };
+    }
+    return { type: "ans", sauce, columns: 80, rows: null };
+  }
+
+  // src/lib/shapes.js
+  function bresenhamLine(x0, y0, x1, y1) {
+    const points = [];
+    let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+    let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    let cx = x0, cy = y0;
+    while (true) {
+      points.push({ x: cx, y: cy });
+      if (cx === x1 && cy === y1)
+        break;
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        cx += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        cy += sy;
+      }
+    }
+    return points;
+  }
+  function rectOutline(x0, y0, x1, y1) {
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const set = /* @__PURE__ */ new Set();
+    const pts = [];
+    const add = (x, y) => {
+      const k = x + "," + y;
+      if (!set.has(k)) {
+        set.add(k);
+        pts.push({ x, y });
+      }
+    };
+    for (let x = minX; x <= maxX; x++) {
+      add(x, minY);
+      add(x, maxY);
+    }
+    for (let y = minY + 1; y < maxY; y++) {
+      add(minX, y);
+      add(maxX, y);
+    }
+    return pts;
+  }
+  function rectFilled(x0, y0, x1, y1) {
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const pts = [];
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        pts.push({ x, y });
+      }
+    }
+    return pts;
+  }
+  function ellipseOutline(cx, cy, rx, ry) {
+    if (rx <= 0 || ry <= 0)
+      return [{ x: cx, y: cy }];
+    const set = /* @__PURE__ */ new Set();
+    const pts = [];
+    const add = (x2, y2) => {
+      const k = x2 + "," + y2;
+      if (!set.has(k)) {
+        set.add(k);
+        pts.push({ x: x2, y: y2 });
+      }
+    };
+    const plot4 = (x2, y2) => {
+      add(cx + x2, cy + y2);
+      add(cx - x2, cy + y2);
+      add(cx + x2, cy - y2);
+      add(cx - x2, cy - y2);
+    };
+    let x = 0, y = ry;
+    let rx2 = rx * rx, ry2 = ry * ry;
+    let px = 0, py = 2 * rx2 * y;
+    let p;
+    p = ry2 - rx2 * ry + 0.25 * rx2;
+    while (px < py) {
+      plot4(x, y);
+      x++;
+      px += 2 * ry2;
+      if (p < 0) {
+        p += ry2 + px;
+      } else {
+        y--;
+        py -= 2 * rx2;
+        p += ry2 + px - py;
+      }
+    }
+    p = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
+    while (y >= 0) {
+      plot4(x, y);
+      y--;
+      py -= 2 * rx2;
+      if (p > 0) {
+        p += rx2 - py;
+      } else {
+        x++;
+        px += 2 * ry2;
+        p += rx2 - py + px;
+      }
+    }
+    return pts;
+  }
+  function ellipseFilled(cx, cy, rx, ry) {
+    if (rx <= 0 || ry <= 0)
+      return [{ x: cx, y: cy }];
+    const pts = [];
+    for (let y = cy - ry; y <= cy + ry; y++) {
+      for (let x = cx - rx; x <= cx + rx; x++) {
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx / (rx * rx) + dy * dy / (ry * ry) <= 1) {
+          pts.push({ x, y });
+        }
+      }
+    }
+    return pts;
+  }
+  function ellipseFromDrag(sx, sy, dx, dy) {
+    const cx = Math.round((sx + dx) / 2);
+    const cy = Math.round((sy + dy) / 2);
+    const rx = Math.abs(Math.round((dx - sx) / 2));
+    const ry = Math.abs(Math.round((dy - sy) / 2));
+    return { cx, cy, rx, ry };
+  }
+
   // src/editor.css
-  var editor_default = "/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n   ANSI Editor \u2014 Styles (prefixed with .me- for isolation)\n   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */\n\n/* \u2500\u2500\u2500 Root container \u2500\u2500\u2500 */\n.me-editor {\n    display: flex;\n    flex-direction: column;\n    width: 100%;\n    height: 100%;\n    background: #1e1e2e;\n    color: #cdd6f4;\n    font-family: system-ui, -apple-system, sans-serif;\n    font-size: 12px;\n    outline: none;\n    overflow: hidden;\n    user-select: none;\n    position: relative;\n}\n\n/* \u2500\u2500\u2500 Body (sidebar + main) \u2500\u2500\u2500 */\n.me-body {\n    display: flex;\n    flex: 1;\n    min-height: 0;\n}\n\n/* \u2500\u2500\u2500 Sidebar \u2500\u2500\u2500 */\n.me-sidebar {\n    width: 48px;\n    background: #181825;\n    border-right: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 6px 4px;\n    gap: 6px;\n    flex-shrink: 0;\n}\n\n/* Current FG/BG color display */\n.me-current-colors {\n    position: relative;\n    width: 36px;\n    height: 36px;\n    margin-bottom: 4px;\n}\n.me-color-swatch {\n    position: absolute;\n    border: 2px solid #585b70;\n    cursor: pointer;\n}\n.me-color-swatch:hover {\n    border-color: #cdd6f4;\n}\n.me-color-bg {\n    width: 24px;\n    height: 24px;\n    bottom: 0;\n    right: 0;\n    z-index: 0;\n}\n.me-color-fg {\n    width: 24px;\n    height: 24px;\n    top: 0;\n    left: 0;\n    z-index: 1;\n}\n\n/* Palette grid */\n.me-palette {\n    display: grid;\n    grid-template-columns: repeat(2, 1fr);\n    gap: 2px;\n    width: 36px;\n}\n.me-pal-cell {\n    width: 16px;\n    height: 16px;\n    border: 1px solid transparent;\n    cursor: pointer;\n    transition: border-color 0.1s;\n}\n.me-pal-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-pal-fg {\n    border-color: #f5e0dc !important;\n    box-shadow: inset 0 0 0 1px #1e1e2e;\n}\n.me-pal-bg {\n    outline: 2px dashed #a6adc8;\n    outline-offset: -1px;\n}\n\n/* Separator */\n.me-sep {\n    width: 32px;\n    height: 1px;\n    background: #313244;\n    margin: 4px 0;\n}\n\n/* Tool buttons */\n.me-tool-btn {\n    width: 32px;\n    height: 28px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    background: #313244;\n    border-radius: 4px;\n    cursor: pointer;\n    font-weight: bold;\n    font-size: 13px;\n    color: #bac2de;\n    margin-bottom: 3px;\n    transition: background 0.15s;\n}\n.me-tool-btn:hover {\n    background: #45475a;\n}\n.me-tool-btn.me-active {\n    background: #89b4fa;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Main area \u2500\u2500\u2500 */\n.me-main {\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n    min-width: 0;\n}\n\n/* \u2500\u2500\u2500 Toolbar \u2500\u2500\u2500 */\n.me-toolbar {\n    height: 44px;\n    background: #181825;\n    border-bottom: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 8px;\n    gap: 4px;\n    flex-shrink: 0;\n}\n\n.me-fkey-nav {\n    cursor: pointer;\n    padding: 2px 4px;\n    color: #6c7086;\n    font-size: 11px;\n}\n.me-fkey-nav:hover {\n    color: #cdd6f4;\n}\n\n.me-fkey-group {\n    display: flex;\n    gap: 2px;\n}\n.me-fkey {\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    cursor: pointer;\n    padding: 2px;\n    border-radius: 3px;\n}\n.me-fkey:hover {\n    background: #313244;\n}\n.me-fkey canvas {\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-fkey-label {\n    font-size: 8px;\n    color: #6c7086;\n    margin-top: 1px;\n}\n\n.me-toolbar-sep {\n    width: 1px;\n    height: 28px;\n    background: #313244;\n    margin: 0 6px;\n}\n\n.me-brush-modes {\n    display: none;\n    gap: 3px;\n}\n.me-brush-modes.me-visible {\n    display: flex;\n}\n.me-brush-mode {\n    padding: 3px 8px;\n    background: #313244;\n    border-radius: 3px;\n    cursor: pointer;\n    font-size: 11px;\n    color: #bac2de;\n}\n.me-brush-mode:hover {\n    background: #45475a;\n}\n.me-brush-mode.me-active {\n    background: #a6e3a1;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Viewport \u2500\u2500\u2500 */\n.me-viewport {\n    flex: 1;\n    overflow: auto;\n    background: #11111b;\n    cursor: crosshair;\n    position: relative;\n}\n.me-canvas-container {\n    position: relative;\n    display: inline-block;\n}\n.me-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-editing-layer {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n}\n.me-cursor-canvas {\n    position: absolute;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n\n/* Cursor blink animation */\n@keyframes me-blink {\n    0%, 50%  { opacity: 1; }\n    51%, 100% { opacity: 0; }\n}\n.me-cursor-blink {\n    animation: me-blink 1s step-end infinite;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2500\u2500\u2500 */\n.me-statusbar {\n    height: 24px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 10px;\n    gap: 16px;\n    font-size: 11px;\n    color: #6c7086;\n    flex-shrink: 0;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2500\u2500\u2500 */\n.me-action-bar {\n    height: 40px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    justify-content: flex-end;\n    padding: 0 12px;\n    gap: 8px;\n    flex-shrink: 0;\n}\n.me-btn {\n    padding: 5px 16px;\n    border: 1px solid #45475a;\n    border-radius: 4px;\n    background: #313244;\n    color: #cdd6f4;\n    cursor: pointer;\n    font-size: 12px;\n}\n.me-btn:hover {\n    background: #45475a;\n}\n.me-btn-done {\n    background: #89b4fa;\n    color: #1e1e2e;\n    border-color: #89b4fa;\n    font-weight: bold;\n}\n.me-btn-done:hover {\n    background: #74c7ec;\n}\n\n/* \u2500\u2500\u2500 Attribute overlay (color picker) \u2500\u2500\u2500 */\n.me-backdrop {\n    display: none;\n    position: absolute;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.5);\n    z-index: 100;\n}\n.me-backdrop.me-visible {\n    display: block;\n}\n.me-attr-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 200px;\n}\n.me-attr-overlay.me-visible {\n    display: block;\n}\n.me-attr-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-attr-grid {\n    display: grid;\n    grid-template-columns: repeat(8, 1fr);\n    gap: 4px;\n    margin-bottom: 12px;\n}\n.me-attr-cell {\n    width: 28px;\n    height: 28px;\n    border: 2px solid transparent;\n    border-radius: 3px;\n    cursor: pointer;\n}\n.me-attr-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-attr-cell.me-selected {\n    border-color: #f5e0dc;\n    box-shadow: 0 0 0 2px #f5e0dc40;\n}\n.me-attr-actions {\n    text-align: center;\n}\n\n/* Utility */\n.me-hidden {\n    display: none !important;\n}\n";
+  var editor_default = "/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n   ANSI Editor \u2014 Styles (prefixed with .me- for isolation)\n   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */\n\n/* \u2500\u2500\u2500 Root container \u2500\u2500\u2500 */\n.me-editor {\n    display: flex;\n    flex-direction: column;\n    width: 100%;\n    height: 100%;\n    background: #1e1e2e;\n    color: #cdd6f4;\n    font-family: system-ui, -apple-system, sans-serif;\n    font-size: 12px;\n    outline: none;\n    overflow: hidden;\n    user-select: none;\n    position: relative;\n}\n\n/* \u2500\u2500\u2500 Body (sidebar + main) \u2500\u2500\u2500 */\n.me-body {\n    display: flex;\n    flex: 1;\n    min-height: 0;\n}\n\n/* \u2500\u2500\u2500 Sidebar \u2500\u2500\u2500 */\n.me-sidebar {\n    width: 48px;\n    background: #181825;\n    border-right: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 6px 4px;\n    gap: 6px;\n    flex-shrink: 0;\n}\n\n/* Current FG/BG color display */\n.me-current-colors {\n    position: relative;\n    width: 36px;\n    height: 36px;\n    margin-bottom: 4px;\n}\n.me-color-swatch {\n    position: absolute;\n    border: 2px solid #585b70;\n    cursor: pointer;\n}\n.me-color-swatch:hover {\n    border-color: #cdd6f4;\n}\n.me-color-bg {\n    width: 24px;\n    height: 24px;\n    bottom: 0;\n    right: 0;\n    z-index: 0;\n}\n.me-color-fg {\n    width: 24px;\n    height: 24px;\n    top: 0;\n    left: 0;\n    z-index: 1;\n}\n\n/* Palette grid */\n.me-palette {\n    display: grid;\n    grid-template-columns: repeat(2, 1fr);\n    gap: 2px;\n    width: 36px;\n}\n.me-pal-cell {\n    width: 16px;\n    height: 16px;\n    border: 1px solid transparent;\n    cursor: pointer;\n    transition: border-color 0.1s;\n}\n.me-pal-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-pal-fg {\n    border-color: #f5e0dc !important;\n    box-shadow: inset 0 0 0 1px #1e1e2e;\n}\n.me-pal-bg {\n    outline: 2px dashed #a6adc8;\n    outline-offset: -1px;\n}\n\n/* Separator */\n.me-sep {\n    width: 32px;\n    height: 1px;\n    background: #313244;\n    margin: 4px 0;\n}\n\n/* Tool buttons */\n.me-tool-btn {\n    width: 32px;\n    height: 28px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    background: #313244;\n    border-radius: 4px;\n    cursor: pointer;\n    font-weight: bold;\n    font-size: 13px;\n    color: #bac2de;\n    margin-bottom: 3px;\n    transition: background 0.15s;\n}\n.me-tool-btn:hover {\n    background: #45475a;\n}\n.me-tool-btn.me-active {\n    background: #89b4fa;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Main area \u2500\u2500\u2500 */\n.me-main {\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n    min-width: 0;\n}\n\n/* \u2500\u2500\u2500 Toolbar \u2500\u2500\u2500 */\n.me-toolbar {\n    height: 44px;\n    background: #181825;\n    border-bottom: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 8px;\n    gap: 4px;\n    flex-shrink: 0;\n}\n\n.me-fkey-nav {\n    cursor: pointer;\n    padding: 2px 4px;\n    color: #6c7086;\n    font-size: 11px;\n}\n.me-fkey-nav:hover {\n    color: #cdd6f4;\n}\n\n.me-fkey-group {\n    display: flex;\n    gap: 2px;\n}\n.me-fkey {\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    cursor: pointer;\n    padding: 2px;\n    border-radius: 3px;\n}\n.me-fkey:hover {\n    background: #313244;\n}\n.me-fkey canvas {\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-fkey-label {\n    font-size: 8px;\n    color: #6c7086;\n    margin-top: 1px;\n}\n\n.me-toolbar-sep {\n    width: 1px;\n    height: 28px;\n    background: #313244;\n    margin: 0 6px;\n}\n\n.me-brush-modes {\n    display: none;\n    gap: 3px;\n}\n.me-brush-modes.me-visible {\n    display: flex;\n}\n.me-brush-mode {\n    padding: 3px 8px;\n    background: #313244;\n    border-radius: 3px;\n    cursor: pointer;\n    font-size: 11px;\n    color: #bac2de;\n}\n.me-brush-mode:hover {\n    background: #45475a;\n}\n.me-brush-mode.me-active {\n    background: #a6e3a1;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Viewport \u2500\u2500\u2500 */\n.me-viewport {\n    flex: 1;\n    overflow: auto;\n    background: #11111b;\n    cursor: crosshair;\n    position: relative;\n}\n.me-canvas-container {\n    position: relative;\n    display: inline-block;\n}\n.me-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-editing-layer {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n}\n.me-cursor-canvas {\n    position: absolute;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n\n/* Cursor blink animation */\n@keyframes me-blink {\n    0%, 50%  { opacity: 1; }\n    51%, 100% { opacity: 0; }\n}\n.me-cursor-blink {\n    animation: me-blink 1s step-end infinite;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2500\u2500\u2500 */\n.me-statusbar {\n    height: 24px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 10px;\n    gap: 16px;\n    font-size: 11px;\n    color: #6c7086;\n    flex-shrink: 0;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2500\u2500\u2500 */\n.me-action-bar {\n    height: 40px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    justify-content: flex-end;\n    padding: 0 12px;\n    gap: 8px;\n    flex-shrink: 0;\n}\n.me-btn {\n    padding: 5px 16px;\n    border: 1px solid #45475a;\n    border-radius: 4px;\n    background: #313244;\n    color: #cdd6f4;\n    cursor: pointer;\n    font-size: 12px;\n}\n.me-btn:hover {\n    background: #45475a;\n}\n.me-btn-done {\n    background: #89b4fa;\n    color: #1e1e2e;\n    border-color: #89b4fa;\n    font-weight: bold;\n}\n.me-btn-done:hover {\n    background: #74c7ec;\n}\n\n/* \u2500\u2500\u2500 Attribute overlay (color picker) \u2500\u2500\u2500 */\n.me-backdrop {\n    display: none;\n    position: absolute;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.5);\n    z-index: 100;\n}\n.me-backdrop.me-visible {\n    display: block;\n}\n.me-attr-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 200px;\n}\n.me-attr-overlay.me-visible {\n    display: block;\n}\n.me-attr-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-attr-grid {\n    display: grid;\n    grid-template-columns: repeat(8, 1fr);\n    gap: 4px;\n    margin-bottom: 12px;\n}\n.me-attr-cell {\n    width: 28px;\n    height: 28px;\n    border: 2px solid transparent;\n    border-radius: 3px;\n    cursor: pointer;\n}\n.me-attr-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-attr-cell.me-selected {\n    border-color: #f5e0dc;\n    box-shadow: 0 0 0 2px #f5e0dc40;\n}\n.me-attr-actions {\n    text-align: center;\n}\n\n/* Utility */\n.me-hidden {\n    display: none !important;\n}\n\n/* \u2500\u2500\u2500 Tool list (vertical layout) \u2500\u2500\u2500 */\n.me-tool-list {\n    display: flex;\n    flex-direction: column;\n    gap: 2px;\n    padding: 4px 0;\n}\n\n/* \u2500\u2500\u2500 Fill toggle (outline/filled for rect/ellipse) \u2500\u2500\u2500 */\n.me-fill-toggle {\n    display: none;\n    flex-direction: row;\n    justify-content: center;\n    gap: 2px;\n    padding: 4px 0;\n}\n.me-fill-toggle.me-visible {\n    display: flex;\n}\n.me-fill-opt {\n    width: 20px;\n    height: 20px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    font-size: 14px;\n    cursor: pointer;\n    border-radius: 3px;\n    border: 1px solid transparent;\n    color: #6c7086;\n}\n.me-fill-opt:hover {\n    color: #cdd6f4;\n}\n.me-fill-opt.me-active {\n    background: #45475a;\n    color: #cdd6f4;\n    border-color: #585b70;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2014 left/right sections \u2500\u2500\u2500 */\n.me-action-left {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-right {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-bar {\n    justify-content: space-between;\n}\n\n/* \u2500\u2500\u2500 Shape overlay (rubber-band preview) \u2500\u2500\u2500 */\n.me-shape-overlay {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n    z-index: 5;\n}\n\n/* \u2500\u2500\u2500 Resize overlay (modal dialog) \u2500\u2500\u2500 */\n.me-resize-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 240px;\n}\n.me-resize-overlay.me-visible {\n    display: block;\n}\n.me-resize-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-resize-form {\n    display: grid;\n    grid-template-columns: auto 1fr;\n    gap: 8px;\n    align-items: center;\n    margin-bottom: 12px;\n}\n.me-resize-form label {\n    color: #a6adc8;\n    font-size: 12px;\n}\n.me-resize-input {\n    width: 100%;\n    padding: 4px 8px;\n    background: #313244;\n    border: 1px solid #45475a;\n    border-radius: 3px;\n    color: #cdd6f4;\n    font-size: 13px;\n    box-sizing: border-box;\n}\n.me-resize-input:focus {\n    outline: none;\n    border-color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2014 clickable dimensions \u2500\u2500\u2500 */\n.me-status-dim {\n    text-decoration: underline dotted;\n    cursor: pointer;\n    color: #a6adc8;\n}\n.me-status-dim:hover {\n    color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Mini preview panel \u2500\u2500\u2500 */\n.me-preview {\n    width: 220px;\n    background: #181825;\n    border-left: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    flex-shrink: 0;\n    overflow: hidden;\n}\n.me-preview-label {\n    padding: 6px 10px;\n    font-size: 11px;\n    color: #6c7086;\n    text-transform: uppercase;\n    letter-spacing: 0.5px;\n    border-bottom: 1px solid #313244;\n}\n.me-preview-wrapper {\n    padding: 10px;\n    overflow: hidden;\n}\n.me-preview-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-view-frame {\n    position: absolute;\n    border: 1px solid rgba(255, 255, 255, 0.6);\n    pointer-events: none;\n    box-sizing: border-box;\n}\n";
 
   // src/editor.js
-  var TOOLS = ["select", "brush", "fill", "sample"];
-  var TOOL_LABELS = { select: "K", brush: "B", fill: "F", sample: "\u2299" };
+  var TOOLS = ["select", "brush", "line", "rect", "ellipse", "fill", "sample"];
+  var TOOL_LABELS = {
+    select: "K",
+    brush: "B",
+    line: "\u2572",
+    rect: "\u25AD",
+    ellipse: "\u25EF",
+    fill: "F",
+    sample: "\u2299"
+  };
   var TOOL_TIPS = {
     select: "Keyboard Mode (Alt+K)",
     brush: "Brush Mode (Alt+B)",
+    line: "Line Tool (Alt+L)",
+    rect: "Rectangle Tool (Alt+R)",
+    ellipse: "Ellipse Tool (Alt+E)",
     fill: "Fill Mode (Alt+F)",
     sample: "Sample Mode (Alt+S)"
   };
+  var SHAPE_TOOLS = ["line", "rect", "ellipse"];
   var BRUSH_MODES = ["half_block", "custom_block", "shading"];
   var BRUSH_MODE_LABELS = { half_block: "Half", custom_block: "Char", shading: "Shade" };
   var FKEY_SETS = [
@@ -744,6 +1184,10 @@ var AnsiEditorModule = (() => {
       this._lastMouseX = -1;
       this._lastMouseY = -1;
       this._lastMouseHalfY = -1;
+      this.shapeFilled = false;
+      this._shapeStartX = -1;
+      this._shapeStartY = -1;
+      this._shapeOverlay = null;
       this.font = null;
       this.doc = null;
       this.renderer = null;
@@ -770,6 +1214,7 @@ var AnsiEditorModule = (() => {
       this._updateToolbar();
       this._selectTool("select");
       this._setupInput();
+      this._updatePreview();
       this.el.root.focus();
     }
     // ═══ DOM BUILDING ═══
@@ -786,9 +1231,19 @@ var AnsiEditorModule = (() => {
       const viewport = this._buildViewport();
       const statusbar = this._buildStatusBar();
       main.append(toolbar, viewport, statusbar);
-      body.append(sidebar, main);
+      const preview = this._buildPreview();
+      body.append(sidebar, main, preview);
       const actionBar = document.createElement("div");
       actionBar.className = "me-action-bar";
+      const actionLeft = document.createElement("div");
+      actionLeft.className = "me-action-left";
+      const btnLoad = document.createElement("button");
+      btnLoad.className = "me-btn";
+      btnLoad.textContent = "Load File";
+      btnLoad.onclick = () => this._promptLoadFile();
+      actionLeft.appendChild(btnLoad);
+      const actionRight = document.createElement("div");
+      actionRight.className = "me-action-right";
       const btnCancel = document.createElement("button");
       btnCancel.className = "me-btn";
       btnCancel.textContent = "Cancel";
@@ -797,12 +1252,14 @@ var AnsiEditorModule = (() => {
       btnDone.className = "me-btn me-btn-done";
       btnDone.textContent = "Done";
       btnDone.onclick = () => this.done();
-      actionBar.append(btnCancel, btnDone);
+      actionRight.append(btnCancel, btnDone);
+      actionBar.append(actionLeft, actionRight);
       const backdrop = document.createElement("div");
       backdrop.className = "me-backdrop";
-      backdrop.onclick = () => this._hideAttributeOverlay();
+      backdrop.onclick = () => this._hideOverlay();
       const overlay = this._buildAttributeOverlay();
-      root.append(body, actionBar, backdrop, overlay);
+      const resizeOverlay = this._buildResizeOverlay();
+      root.append(body, actionBar, backdrop, overlay, resizeOverlay);
       this.el.root = root;
       this.el.backdrop = backdrop;
       this.container.innerHTML = "";
@@ -845,7 +1302,8 @@ var AnsiEditorModule = (() => {
       }
       const sep = document.createElement("div");
       sep.className = "me-sep";
-      const toolBtns = document.createElement("div");
+      const toolList = document.createElement("div");
+      toolList.className = "me-tool-list";
       this.el.toolBtns = {};
       for (const tool of TOOLS) {
         const btn = document.createElement("div");
@@ -853,10 +1311,32 @@ var AnsiEditorModule = (() => {
         btn.textContent = TOOL_LABELS[tool];
         btn.title = TOOL_TIPS[tool];
         btn.onclick = () => this._selectTool(tool);
-        toolBtns.appendChild(btn);
+        toolList.appendChild(btn);
         this.el.toolBtns[tool] = btn;
       }
-      sidebar.append(colors, palette, sep, toolBtns);
+      const fillToggle = document.createElement("div");
+      fillToggle.className = "me-fill-toggle";
+      const optOutline = document.createElement("div");
+      optOutline.className = "me-fill-opt me-active";
+      optOutline.textContent = "\u25AD";
+      optOutline.title = "Outline";
+      optOutline.onclick = () => {
+        this.shapeFilled = false;
+        this._updateFillToggle();
+      };
+      const optFilled = document.createElement("div");
+      optFilled.className = "me-fill-opt";
+      optFilled.textContent = "\u25A0";
+      optFilled.title = "Filled";
+      optFilled.onclick = () => {
+        this.shapeFilled = true;
+        this._updateFillToggle();
+      };
+      fillToggle.append(optOutline, optFilled);
+      this.el.fillToggle = fillToggle;
+      this.el.fillOptOutline = optOutline;
+      this.el.fillOptFilled = optFilled;
+      sidebar.append(colors, palette, sep, toolList, fillToggle);
       return sidebar;
     }
     _buildToolbar() {
@@ -933,6 +1413,7 @@ var AnsiEditorModule = (() => {
       this.el.canvas = canvas;
       this.el.cursorCanvas = cursorCanvas;
       this.el.editingLayer = editingLayer;
+      viewport.addEventListener("scroll", () => this._updateViewFrame());
       return viewport;
     }
     _buildStatusBar() {
@@ -941,6 +1422,9 @@ var AnsiEditorModule = (() => {
       const pos = document.createElement("span");
       this.el.statusPos = pos;
       const dim = document.createElement("span");
+      dim.className = "me-status-dim";
+      dim.title = "Click to resize canvas";
+      dim.onclick = () => this._showResizeOverlay();
       this.el.statusDim = dim;
       const mode = document.createElement("span");
       this.el.statusMode = mode;
@@ -971,12 +1455,132 @@ var AnsiEditorModule = (() => {
       const closeBtn = document.createElement("button");
       closeBtn.className = "me-btn";
       closeBtn.textContent = "Close";
-      closeBtn.onclick = () => this._hideAttributeOverlay();
+      closeBtn.onclick = () => this._hideOverlay();
       actions.appendChild(closeBtn);
       overlay.append(title, grid, actions);
       this.el.attrOverlay = overlay;
       this._attrTarget = "fg";
       return overlay;
+    }
+    // ─── Resize Overlay ───
+    _buildResizeOverlay() {
+      const overlay = document.createElement("div");
+      overlay.className = "me-resize-overlay";
+      const title = document.createElement("h3");
+      title.textContent = "Set Canvas Size";
+      const form = document.createElement("div");
+      form.className = "me-resize-form";
+      const lblC = document.createElement("label");
+      lblC.textContent = "Columns:";
+      const inpC = document.createElement("input");
+      inpC.type = "number";
+      inpC.min = "1";
+      inpC.max = "3000";
+      inpC.className = "me-resize-input";
+      const lblR = document.createElement("label");
+      lblR.textContent = "Rows:";
+      const inpR = document.createElement("input");
+      inpR.type = "number";
+      inpR.min = "1";
+      inpR.max = "10000";
+      inpR.className = "me-resize-input";
+      form.append(lblC, inpC, lblR, inpR);
+      const actions = document.createElement("div");
+      actions.className = "me-attr-actions";
+      const btnOk = document.createElement("button");
+      btnOk.className = "me-btn me-btn-done";
+      btnOk.textContent = "Resize";
+      btnOk.onclick = () => this._doResize(parseInt(inpC.value), parseInt(inpR.value));
+      const btnCancel = document.createElement("button");
+      btnCancel.className = "me-btn";
+      btnCancel.textContent = "Cancel";
+      btnCancel.onclick = () => this._hideOverlay();
+      actions.append(btnOk, btnCancel);
+      overlay.append(title, form, actions);
+      this.el.resizeOverlay = overlay;
+      this.el.resizeColsInput = inpC;
+      this.el.resizeRowsInput = inpR;
+      return overlay;
+    }
+    // ─── Mini Preview Panel ───
+    _buildPreview() {
+      const panel = document.createElement("div");
+      panel.className = "me-preview";
+      const label = document.createElement("div");
+      label.className = "me-preview-label";
+      label.textContent = "Preview";
+      const wrapper = document.createElement("div");
+      wrapper.className = "me-preview-wrapper";
+      wrapper.style.position = "relative";
+      const canvas = document.createElement("canvas");
+      canvas.className = "me-preview-canvas";
+      canvas.width = 1;
+      canvas.height = 1;
+      const viewFrame = document.createElement("div");
+      viewFrame.className = "me-view-frame";
+      viewFrame.style.display = "block";
+      wrapper.append(canvas, viewFrame);
+      panel.append(label, wrapper);
+      this.el.preview = panel;
+      this.el.previewWrapper = wrapper;
+      this.el.previewCanvas = canvas;
+      this.el.viewFrame = viewFrame;
+      wrapper.addEventListener("mousedown", (e) => this._handlePreviewMouse(e));
+      wrapper.addEventListener("mousemove", (e) => {
+        if (this._previewDrag)
+          this._handlePreviewMouse(e);
+      });
+      document.addEventListener("mouseup", () => {
+        this._previewDrag = false;
+      });
+      this._previewDrag = false;
+      return panel;
+    }
+    _updatePreview() {
+      const src = this.renderer.canvas;
+      const dst = this.el.previewCanvas;
+      if (!dst || !src)
+        return;
+      const maxW = 200;
+      const scale = maxW / src.width;
+      dst.width = Math.round(src.width * scale);
+      dst.height = Math.round(src.height * scale);
+      dst.style.width = dst.width + "px";
+      dst.style.height = dst.height + "px";
+      const ctx = dst.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(src, 0, 0, dst.width, dst.height);
+      this._updateViewFrame();
+    }
+    _updateViewFrame() {
+      const vp = this.el.viewport;
+      const dst = this.el.previewCanvas;
+      const vf = this.el.viewFrame;
+      if (!vp || !dst || !vf)
+        return;
+      const src = this.renderer.canvas;
+      const scale = dst.width / src.width;
+      const frameW = Math.round(vp.clientWidth * scale);
+      const frameH = Math.round(vp.clientHeight * scale);
+      const frameX = Math.round(vp.scrollLeft * scale);
+      const frameY = Math.round(vp.scrollTop * scale);
+      vf.style.width = Math.min(frameW, dst.width) + "px";
+      vf.style.height = Math.min(frameH, dst.height) + "px";
+      vf.style.left = frameX + "px";
+      vf.style.top = frameY + "px";
+    }
+    _handlePreviewMouse(e) {
+      this._previewDrag = true;
+      const dst = this.el.previewCanvas;
+      const vp = this.el.viewport;
+      const src = this.renderer.canvas;
+      const rect = dst.getBoundingClientRect();
+      const scale = src.width / dst.width;
+      const px = (e.clientX - rect.left) * scale;
+      const py = (e.clientY - rect.top) * scale;
+      vp.scrollLeft = px - vp.clientWidth / 2;
+      vp.scrollTop = py - vp.clientHeight / 2;
+      this._updateViewFrame();
     }
     // ═══ INPUT ═══
     _setupInput() {
@@ -1017,8 +1621,12 @@ var AnsiEditorModule = (() => {
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        if (this.el.attrOverlay.classList.contains("me-visible")) {
-          this._hideAttributeOverlay();
+        if (this._shapeOverlay) {
+          this._destroyOverlay();
+          return;
+        }
+        if (this.el.attrOverlay.classList.contains("me-visible") || this.el.resizeOverlay.classList.contains("me-visible")) {
+          this._hideOverlay();
         } else {
           this._showAttributeOverlay("fg");
         }
@@ -1033,6 +1641,18 @@ var AnsiEditorModule = (() => {
           case "b":
             e.preventDefault();
             this._selectTool("brush");
+            return;
+          case "l":
+            e.preventDefault();
+            this._selectTool("line");
+            return;
+          case "r":
+            e.preventDefault();
+            this._selectTool("rect");
+            return;
+          case "e":
+            e.preventDefault();
+            this._selectTool("ellipse");
             return;
           case "f":
             e.preventDefault();
@@ -1094,7 +1714,12 @@ var AnsiEditorModule = (() => {
           break;
         case "Enter":
           e.preventDefault();
-          this._moveCursor(0, Math.min(this.rows - 1, this.cursorY + 1));
+          if (this.cursorY >= this.rows - 1) {
+            this.doc.growRows(1);
+            this.rows = this.doc.rows;
+            this._rebuildCanvas();
+          }
+          this._moveCursor(0, this.cursorY + 1);
           break;
         case "Backspace":
           e.preventDefault();
@@ -1119,6 +1744,11 @@ var AnsiEditorModule = (() => {
         default:
           if (!ctrl && !e.altKey && e.key.length === 1) {
             e.preventDefault();
+            if (this.cursorY >= this.rows - 1 && this.cursorX >= this.columns - 1) {
+              this.doc.growRows(1);
+              this.rows = this.doc.rows;
+              this._rebuildCanvas();
+            }
             var code = charToCp437(e.key);
             this._typeChar(code);
           }
@@ -1137,6 +1767,12 @@ var AnsiEditorModule = (() => {
       this._lastMouseX = pos.x;
       this._lastMouseY = pos.y;
       this._lastMouseHalfY = pos.halfY;
+      if (SHAPE_TOOLS.includes(this.activeTool)) {
+        this._shapeStartX = pos.x;
+        this._shapeStartY = pos.y;
+        this._createOverlay();
+        return;
+      }
       switch (this.activeTool) {
         case "select":
           this._moveCursor(pos.x, pos.y);
@@ -1157,6 +1793,12 @@ var AnsiEditorModule = (() => {
       if (!this._mouseDown)
         return;
       var pos = this._getCanvasXY(e);
+      if (SHAPE_TOOLS.includes(this.activeTool) && this._shapeOverlay) {
+        var mx = Math.max(0, Math.min(this.columns - 1, pos.x));
+        var my = Math.max(0, Math.min(this.rows - 1, pos.y));
+        this._updateShapeOverlay(this._shapeStartX, this._shapeStartY, mx, my);
+        return;
+      }
       if (pos.x < 0 || pos.x >= this.columns || pos.y < 0 || pos.y >= this.rows)
         return;
       if (pos.x === this._lastMouseX && pos.halfY === this._lastMouseHalfY)
@@ -1174,8 +1816,155 @@ var AnsiEditorModule = (() => {
       if (!this._mouseDown)
         return;
       this._mouseDown = false;
+      if (SHAPE_TOOLS.includes(this.activeTool) && this._shapeOverlay) {
+        var pos = this._getCanvasXY(e);
+        var mx = Math.max(0, Math.min(this.columns - 1, pos.x));
+        var my = Math.max(0, Math.min(this.rows - 1, pos.y));
+        this._commitShape(this._shapeStartX, this._shapeStartY, mx, my);
+        this._destroyOverlay();
+        return;
+      }
       if (this.activeTool === "brush")
         this.doc.endUndo();
+    }
+    // ═══ SHAPE OVERLAY ═══
+    _createOverlay() {
+      const c = document.createElement("canvas");
+      c.className = "me-shape-overlay";
+      c.width = this.renderer.width;
+      c.height = this.renderer.height;
+      c.style.width = this.el.canvas.style.width;
+      c.style.height = this.el.canvas.style.height;
+      this.el.editingLayer.appendChild(c);
+      this._shapeOverlay = c;
+    }
+    _updateShapeOverlay(x0, y0, x1, y1) {
+      const c = this._shapeOverlay;
+      if (!c)
+        return;
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, c.width, c.height);
+      const points = this._getShapePoints(x0, y0, x1, y1);
+      const fw = this.font.width, fh = this.font.height;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      for (const p of points) {
+        if (p.x >= 0 && p.x < this.columns && p.y >= 0 && p.y < this.rows) {
+          ctx.fillRect(p.x * fw, p.y * fh, fw, fh);
+        }
+      }
+    }
+    _destroyOverlay() {
+      if (this._shapeOverlay) {
+        this._shapeOverlay.remove();
+        this._shapeOverlay = null;
+      }
+    }
+    _getShapePoints(x0, y0, x1, y1) {
+      switch (this.activeTool) {
+        case "line":
+          return bresenhamLine(x0, y0, x1, y1);
+        case "rect":
+          return this.shapeFilled ? rectFilled(x0, y0, x1, y1) : rectOutline(x0, y0, x1, y1);
+        case "ellipse": {
+          const { cx, cy, rx, ry } = ellipseFromDrag(x0, y0, x1, y1);
+          return this.shapeFilled ? ellipseFilled(cx, cy, rx, ry) : ellipseOutline(cx, cy, rx, ry);
+        }
+        default:
+          return [];
+      }
+    }
+    _commitShape(x0, y0, x1, y1) {
+      const points = this._getShapePoints(x0, y0, x1, y1);
+      if (points.length === 0)
+        return;
+      const code = this.customBlockChar;
+      this.doc.startUndo();
+      const affected = [];
+      for (const p of points) {
+        if (p.x >= 0 && p.x < this.columns && p.y >= 0 && p.y < this.rows) {
+          this.doc.changeData(p.x, p.y, code, this.fg, this.bg);
+          affected.push({ x: p.x, y: p.y });
+        }
+      }
+      this.doc.endUndo();
+      this._renderCells(affected);
+      this._updatePreview();
+    }
+    // ═══ FILE LOADING ═══
+    _promptLoadFile() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".ans,.bin,.asc,.diz,.nfo,.ice";
+      input.onchange = () => {
+        const file = input.files[0];
+        if (!file)
+          return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const bytes = new Uint8Array(reader.result);
+          this.loadBytes(bytes, file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+      input.click();
+    }
+    loadBytes(bytes, filename) {
+      const info = detectFileType(filename, bytes);
+      const sauce = info.sauce;
+      const content = getContentBytes(bytes, sauce);
+      const cols = info.columns;
+      let result;
+      if (info.type === "bin") {
+        result = loadBin(content, cols);
+      } else {
+        result = loadAnsi(content, cols, 0);
+      }
+      const totalCells = cols * result.rows;
+      while (result.grid.length < totalCells) {
+        result.grid.push({ code: 32, fg: 7, bg: 0 });
+      }
+      this.doc.replaceAll(result.grid, cols, result.rows);
+      this.columns = cols;
+      this.rows = result.rows;
+      this._rebuildCanvas();
+      this._moveCursor(0, 0);
+      this._updateStatusBar();
+    }
+    // ═══ CANVAS RESIZE ═══
+    _showResizeOverlay() {
+      this.el.resizeColsInput.value = this.columns;
+      this.el.resizeRowsInput.value = this.rows;
+      this.el.backdrop.classList.add("me-visible");
+      this.el.resizeOverlay.classList.add("me-visible");
+      this.el.resizeColsInput.focus();
+    }
+    _doResize(newCols, newRows) {
+      if (isNaN(newCols) || isNaN(newRows) || newCols < 1 || newRows < 1)
+        return;
+      this.doc.resize(newCols, newRows);
+      this.columns = newCols;
+      this.rows = newRows;
+      this._rebuildCanvas();
+      this._moveCursor(
+        Math.min(this.cursorX, this.columns - 1),
+        Math.min(this.cursorY, this.rows - 1)
+      );
+      this._hideOverlay();
+      this._updateStatusBar();
+    }
+    setCanvasSize(cols, rows) {
+      this._doResize(cols, rows);
+    }
+    _rebuildCanvas() {
+      this.renderer = new Renderer(this.doc, this.font);
+      this.renderer.render();
+      const canvas = this.renderer.canvas;
+      canvas.className = "me-canvas";
+      canvas.style.width = this.renderer.width + "px";
+      canvas.style.height = this.renderer.height + "px";
+      this.el.canvas.replaceWith(canvas);
+      this.el.canvas = canvas;
+      this._updatePreview();
     }
     // ═══ RENDERING ═══
     _fullRender() {
@@ -1255,8 +2044,13 @@ var AnsiEditorModule = (() => {
       this.el.brushModes.classList.toggle("me-visible", name === "brush");
       this.el.cursorCanvas.classList.toggle("me-hidden", name !== "select");
       this.el.viewport.style.cursor = name === "select" ? "text" : "crosshair";
+      this.el.fillToggle.classList.toggle("me-visible", name === "rect" || name === "ellipse");
       this._updateToolbar();
       this._updateStatusBar();
+    }
+    _updateFillToggle() {
+      this.el.fillOptOutline.classList.toggle("me-active", !this.shapeFilled);
+      this.el.fillOptFilled.classList.toggle("me-active", this.shapeFilled);
     }
     // ── Select tool helpers ──
     _typeChar(code) {
@@ -1276,6 +2070,7 @@ var AnsiEditorModule = (() => {
           break;
       }
       this._moveCursor(this.cursorX + 1, this.cursorY);
+      this._updatePreview();
     }
     _typeFkey(num) {
       var set = FKEY_SETS[this.fkeySetIndex];
@@ -1403,6 +2198,7 @@ var AnsiEditorModule = (() => {
       this.doc.endUndo();
       for (var k in affected)
         this._renderCell(affected[k].x, affected[k].y);
+      this._updatePreview();
     }
     // ── Sample tool ──
     _doSample(x, y) {
@@ -1413,7 +2209,7 @@ var AnsiEditorModule = (() => {
       this._setBg(block.bg);
       this._selectTool("select");
     }
-    // ═══ ATTRIBUTE OVERLAY ═══
+    // ═══ OVERLAYS ═══
     _showAttributeOverlay(target) {
       this._attrTarget = target || "fg";
       this.el.attrTitle.textContent = this._attrTarget === "fg" ? "Foreground Color" : "Background Color";
@@ -1424,16 +2220,21 @@ var AnsiEditorModule = (() => {
       this.el.backdrop.classList.add("me-visible");
       this.el.attrOverlay.classList.add("me-visible");
     }
-    _hideAttributeOverlay() {
+    _hideOverlay() {
       this.el.backdrop.classList.remove("me-visible");
       this.el.attrOverlay.classList.remove("me-visible");
+      this.el.resizeOverlay.classList.remove("me-visible");
+    }
+    // Keep legacy name for compatibility
+    _hideAttributeOverlay() {
+      this._hideOverlay();
     }
     _onAttrPick(color) {
       if (this._attrTarget === "fg")
         this._setFg(color);
       else
         this._setBg(color);
-      this._hideAttributeOverlay();
+      this._hideOverlay();
     }
     // ═══ UNDO/REDO ═══
     _undo() {
@@ -1441,6 +2242,7 @@ var AnsiEditorModule = (() => {
       if (affected.length > 0) {
         this._renderCells(affected);
         this._updateCursor();
+        this._updatePreview();
       }
     }
     _redo() {
@@ -1448,6 +2250,7 @@ var AnsiEditorModule = (() => {
       if (affected.length > 0) {
         this._renderCells(affected);
         this._updateCursor();
+        this._updatePreview();
       }
     }
     // ═══ TOOLBAR ═══

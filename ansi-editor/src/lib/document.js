@@ -169,4 +169,64 @@ export class TextDocument {
             this.data[start + i] = { code: 32, fg: 7, bg: 0 };
         }
     }
+
+    /**
+     * Resize the document canvas. Preserves existing content that fits.
+     * @param {number} newColumns
+     * @param {number} newRows
+     */
+    resize(newColumns, newRows) {
+        if (newColumns < 1 || newRows < 1) return;
+        if (newColumns > 3000 || newRows > 10000) return;
+        if (newColumns === this.columns && newRows === this.rows) return;
+
+        const newData = new Array(newColumns * newRows);
+        for (let i = 0; i < newData.length; i++) {
+            newData[i] = { code: 32, fg: 7, bg: 0 };
+        }
+
+        const copyRows = Math.min(this.rows, newRows);
+        const copyCols = Math.min(this.columns, newColumns);
+        for (let y = 0; y < copyRows; y++) {
+            for (let x = 0; x < copyCols; x++) {
+                newData[y * newColumns + x] = this.data[y * this.columns + x];
+            }
+        }
+
+        this.data = newData;
+        this.columns = newColumns;
+        this.rows = newRows;
+        // Clear undo/redo since indices are invalidated
+        this.undoStack = [];
+        this.redoStack = [];
+        this._currentUndo = null;
+    }
+
+    /**
+     * Add rows at the bottom of the document.
+     * @param {number} count  Number of rows to add
+     */
+    growRows(count) {
+        for (let r = 0; r < count; r++) {
+            for (let c = 0; c < this.columns; c++) {
+                this.data.push({ code: 32, fg: 7, bg: 0 });
+            }
+            this.rows++;
+        }
+    }
+
+    /**
+     * Replace entire document data (used by file loader).
+     * @param {Array} data     Flat array of {code, fg, bg}
+     * @param {number} columns
+     * @param {number} rows
+     */
+    replaceAll(data, columns, rows) {
+        this.data = data;
+        this.columns = columns;
+        this.rows = rows;
+        this.undoStack = [];
+        this.redoStack = [];
+        this._currentUndo = null;
+    }
 }
