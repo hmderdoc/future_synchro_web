@@ -104,6 +104,7 @@
             e.stopPropagation();
             elPanel.classList.toggle('show');
             if (elPanel.classList.contains('show')) {
+                refreshPlaylist();   // fetch latest songs on open
                 elSearch.focus();
             }
         });
@@ -192,6 +193,50 @@
             .catch(function (err) {
                 console.error('[radio] fetch error:', err);
                 elTrack.textContent = 'Radio offline';
+            });
+    }
+
+    // =========================================================
+    //  Refresh playlist (on-demand when panel opens)
+    //  Merges new songs into the existing playlist without
+    //  disrupting the current queue or playback.
+    // =========================================================
+    function refreshPlaylist() {
+        fetch(API_URL)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!Array.isArray(data) || data.length === 0) return;
+
+                // Build a set of filenames we already know about
+                var known = {};
+                for (var i = 0; i < playlist.length; i++) {
+                    known[playlist[i].name] = true;
+                }
+
+                // Find genuinely new tracks
+                var added = 0;
+                for (var j = 0; j < data.length; j++) {
+                    if (!known[data[j].name]) {
+                        playlist.push(data[j]);
+                        queue.push(playlist.length - 1);  // append to end of shuffle queue
+                        added++;
+                    }
+                }
+
+                if (added > 0) {
+                    console.log('[radio] refreshed: ' + added + ' new track(s), '
+                                + playlist.length + ' total');
+                    renderTrackList(elSearch.value.trim().toLowerCase());
+                    // Update the idle track counter if nothing is playing
+                    if (!isPlaying && queuePos < 0) {
+                        elTrack.textContent = '\u266B ' + playlist.length + ' tracks';
+                    }
+                } else {
+                    console.log('[radio] refresh: no new tracks');
+                }
+            })
+            .catch(function (err) {
+                console.warn('[radio] refresh error:', err);
             });
     }
 
