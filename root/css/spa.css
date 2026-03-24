@@ -1300,6 +1300,10 @@ div.message pre.ansi {
     text-overflow: ellipsis;
     margin: 0 4px;
     line-height: 1.2;
+    cursor: pointer;
+}
+.radio-track-name:hover {
+    color: #fff;
 }
 
 /* Playlist dropdown panel */

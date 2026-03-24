@@ -33,7 +33,7 @@
     var vizRAF    = null;
 
     // --- DOM refs (set in init) ---
-    var elPlay, elPrev, elNext, elTrack, elViz, elListBtn, elVolume;
+    var elPlay, elPrev, elNext, elTrack, elViz, elVolume;
     var elPanel, elSearch, elTracklist, elContainer;
     var vizW, vizH, vizCtx;
 
@@ -47,7 +47,6 @@
         elNext      = document.getElementById('radio-next');
         elTrack     = document.getElementById('radio-track');
         elViz       = document.getElementById('radio-viz');
-        elListBtn   = document.getElementById('radio-list-btn');
         elPanel     = document.getElementById('radio-playlist-panel');
         elSearch    = document.getElementById('radio-search');
         elTracklist = document.getElementById('radio-tracklist');
@@ -100,8 +99,8 @@
             });
         }
 
-        // Playlist panel toggle
-        elListBtn.addEventListener('click', function (e) {
+        // Playlist panel toggle (click the song name to open)
+        elTrack.addEventListener('click', function (e) {
             e.stopPropagation();
             elPanel.classList.toggle('show');
             if (elPanel.classList.contains('show')) {
@@ -109,7 +108,7 @@
             }
         });
         document.addEventListener('click', function (e) {
-            if (elPanel && !elPanel.contains(e.target) && e.target !== elListBtn) {
+            if (elPanel && !elPanel.contains(e.target) && e.target !== elTrack) {
                 elPanel.classList.remove('show');
             }
         });
