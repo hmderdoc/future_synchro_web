@@ -74,6 +74,22 @@ export function getContentBytes(bytes, sauce) {
 }
 
 /**
+ * Convert ANSI SGR color index (0-7) to CGA/BIN palette index.
+ * ANSI SGR: 0=Black, 1=Red, 2=Green, 3=Yellow, 4=Blue, 5=Magenta, 6=Cyan, 7=White
+ * CGA/BIN:  0=Black, 1=Blue, 2=Green, 3=Cyan,   4=Red,  5=Magenta, 6=Brown, 7=LightGray
+ * Swaps: 1<->4 (Red<->Blue), 3<->6 (Yellow<->Cyan)
+ */
+function ansiToCga(c) {
+    switch (c) {
+        case 1: return 4;
+        case 4: return 1;
+        case 3: return 6;
+        case 6: return 3;
+        default: return c;
+    }
+}
+
+/**
  * Load an ANS file: parse ANSI escape sequences into a grid.
  * Uses a virtual screen approach — processes bytes sequentially,
  * maintaining cursor position and current attributes.
@@ -191,8 +207,8 @@ export function loadAnsi(data, columns, maxRows) {
                             else if (n === 7) { const t = fg; fg = bg; bg = t; } // reverse
                             else if (n === 22) { fg &= 7; }    // normal intensity
                             else if (n === 25) { bg &= 7; }    // blink off
-                            else if (n >= 30 && n <= 37) { fg = (fg & 8) | (n - 30); }
-                            else if (n >= 40 && n <= 47) { bg = (bg & 8) | (n - 40); }
+                            else if (n >= 30 && n <= 37) { fg = (fg & 8) | ansiToCga(n - 30); }
+                            else if (n >= 40 && n <= 47) { bg = (bg & 8) | ansiToCga(n - 40); }
                         }
                     }
                     break;

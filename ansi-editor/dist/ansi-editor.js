@@ -680,6 +680,20 @@ var AnsiEditorModule = (() => {
   };
 
   // src/lib/ansi.js
+  function cgaToAnsi(c) {
+    switch (c) {
+      case 1:
+        return 4;
+      case 4:
+        return 1;
+      case 3:
+        return 6;
+      case 6:
+        return 3;
+      default:
+        return c;
+    }
+  }
   function encodeAsAnsi(doc, opts = {}) {
     const iceColors = opts.iceColors || false;
     const out = [];
@@ -710,9 +724,9 @@ var AnsiEditorModule = (() => {
             p.push(1);
           if (wantBlink)
             p.push(5);
-          p.push(30 + wantFg);
+          p.push(30 + cgaToAnsi(wantFg));
           if (wantBg !== 0)
-            p.push(40 + wantBg);
+            p.push(40 + cgaToAnsi(wantBg));
           pushSGR(p);
           curBold = wantBold;
           curBlink = wantBlink;
@@ -729,11 +743,11 @@ var AnsiEditorModule = (() => {
             curBlink = true;
           }
           if (wantFg !== curFg) {
-            p.push(30 + wantFg);
+            p.push(30 + cgaToAnsi(wantFg));
             curFg = wantFg;
           }
           if (wantBg !== curBg) {
-            p.push(40 + wantBg);
+            p.push(40 + cgaToAnsi(wantBg));
             curBg = wantBg;
           }
           if (p.length > 0)
@@ -788,6 +802,20 @@ var AnsiEditorModule = (() => {
     if (end > 0 && bytes[end - 1] === 26)
       end--;
     return bytes.slice(0, end);
+  }
+  function ansiToCga(c) {
+    switch (c) {
+      case 1:
+        return 4;
+      case 4:
+        return 1;
+      case 3:
+        return 6;
+      case 6:
+        return 3;
+      default:
+        return c;
+    }
   }
   function loadAnsi(data, columns, maxRows) {
     columns = columns || 80;
@@ -903,9 +931,9 @@ var AnsiEditorModule = (() => {
                 } else if (n === 25) {
                   bg &= 7;
                 } else if (n >= 30 && n <= 37) {
-                  fg = fg & 8 | n - 30;
+                  fg = fg & 8 | ansiToCga(n - 30);
                 } else if (n >= 40 && n <= 47) {
-                  bg = bg & 8 | n - 40;
+                  bg = bg & 8 | ansiToCga(n - 40);
                 }
               }
             }
@@ -1121,12 +1149,12 @@ var AnsiEditorModule = (() => {
   }
 
   // src/editor.css
-  var editor_default = "/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n   ANSI Editor \u2014 Styles (prefixed with .me- for isolation)\n   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */\n\n/* \u2500\u2500\u2500 Root container \u2500\u2500\u2500 */\n.me-editor {\n    display: flex;\n    flex-direction: column;\n    width: 100%;\n    height: 100%;\n    background: #1e1e2e;\n    color: #cdd6f4;\n    font-family: system-ui, -apple-system, sans-serif;\n    font-size: 12px;\n    outline: none;\n    overflow: hidden;\n    user-select: none;\n    position: relative;\n}\n\n/* \u2500\u2500\u2500 Body (sidebar + main) \u2500\u2500\u2500 */\n.me-body {\n    display: flex;\n    flex: 1;\n    min-height: 0;\n}\n\n/* \u2500\u2500\u2500 Sidebar \u2500\u2500\u2500 */\n.me-sidebar {\n    width: 48px;\n    background: #181825;\n    border-right: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 6px 4px;\n    gap: 6px;\n    flex-shrink: 0;\n}\n\n/* Current FG/BG color display */\n.me-current-colors {\n    position: relative;\n    width: 36px;\n    height: 36px;\n    margin-bottom: 4px;\n}\n.me-color-swatch {\n    position: absolute;\n    border: 2px solid #585b70;\n    cursor: pointer;\n}\n.me-color-swatch:hover {\n    border-color: #cdd6f4;\n}\n.me-color-bg {\n    width: 24px;\n    height: 24px;\n    bottom: 0;\n    right: 0;\n    z-index: 0;\n}\n.me-color-fg {\n    width: 24px;\n    height: 24px;\n    top: 0;\n    left: 0;\n    z-index: 1;\n}\n\n/* Palette grid */\n.me-palette {\n    display: grid;\n    grid-template-columns: repeat(2, 1fr);\n    gap: 2px;\n    width: 36px;\n}\n.me-pal-cell {\n    width: 16px;\n    height: 16px;\n    border: 1px solid transparent;\n    cursor: pointer;\n    transition: border-color 0.1s;\n}\n.me-pal-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-pal-fg {\n    border-color: #f5e0dc !important;\n    box-shadow: inset 0 0 0 1px #1e1e2e;\n}\n.me-pal-bg {\n    outline: 2px dashed #a6adc8;\n    outline-offset: -1px;\n}\n\n/* Separator */\n.me-sep {\n    width: 32px;\n    height: 1px;\n    background: #313244;\n    margin: 4px 0;\n}\n\n/* Tool buttons */\n.me-tool-btn {\n    width: 32px;\n    height: 28px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    background: #313244;\n    border-radius: 4px;\n    cursor: pointer;\n    font-weight: bold;\n    font-size: 13px;\n    color: #bac2de;\n    margin-bottom: 3px;\n    transition: background 0.15s;\n}\n.me-tool-btn:hover {\n    background: #45475a;\n}\n.me-tool-btn.me-active {\n    background: #89b4fa;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Main area \u2500\u2500\u2500 */\n.me-main {\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n    min-width: 0;\n}\n\n/* \u2500\u2500\u2500 Toolbar \u2500\u2500\u2500 */\n.me-toolbar {\n    height: 44px;\n    background: #181825;\n    border-bottom: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 8px;\n    gap: 4px;\n    flex-shrink: 0;\n}\n\n.me-fkey-nav {\n    cursor: pointer;\n    padding: 2px 4px;\n    color: #6c7086;\n    font-size: 11px;\n}\n.me-fkey-nav:hover {\n    color: #cdd6f4;\n}\n\n.me-fkey-group {\n    display: flex;\n    gap: 2px;\n}\n.me-fkey {\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    cursor: pointer;\n    padding: 2px;\n    border-radius: 3px;\n}\n.me-fkey:hover {\n    background: #313244;\n}\n.me-fkey canvas {\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-fkey-label {\n    font-size: 8px;\n    color: #6c7086;\n    margin-top: 1px;\n}\n\n.me-toolbar-sep {\n    width: 1px;\n    height: 28px;\n    background: #313244;\n    margin: 0 6px;\n}\n\n.me-brush-modes {\n    display: none;\n    gap: 3px;\n}\n.me-brush-modes.me-visible {\n    display: flex;\n}\n.me-brush-mode {\n    padding: 3px 8px;\n    background: #313244;\n    border-radius: 3px;\n    cursor: pointer;\n    font-size: 11px;\n    color: #bac2de;\n}\n.me-brush-mode:hover {\n    background: #45475a;\n}\n.me-brush-mode.me-active {\n    background: #a6e3a1;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Viewport \u2500\u2500\u2500 */\n.me-viewport {\n    flex: 1;\n    overflow: auto;\n    background: #11111b;\n    cursor: crosshair;\n    position: relative;\n}\n.me-canvas-container {\n    position: relative;\n    display: inline-block;\n}\n.me-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-editing-layer {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n}\n.me-cursor-canvas {\n    position: absolute;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n\n/* Cursor blink animation */\n@keyframes me-blink {\n    0%, 50%  { opacity: 1; }\n    51%, 100% { opacity: 0; }\n}\n.me-cursor-blink {\n    animation: me-blink 1s step-end infinite;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2500\u2500\u2500 */\n.me-statusbar {\n    height: 24px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 10px;\n    gap: 16px;\n    font-size: 11px;\n    color: #6c7086;\n    flex-shrink: 0;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2500\u2500\u2500 */\n.me-action-bar {\n    height: 40px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    justify-content: flex-end;\n    padding: 0 12px;\n    gap: 8px;\n    flex-shrink: 0;\n}\n.me-btn {\n    padding: 5px 16px;\n    border: 1px solid #45475a;\n    border-radius: 4px;\n    background: #313244;\n    color: #cdd6f4;\n    cursor: pointer;\n    font-size: 12px;\n}\n.me-btn:hover {\n    background: #45475a;\n}\n.me-btn-done {\n    background: #89b4fa;\n    color: #1e1e2e;\n    border-color: #89b4fa;\n    font-weight: bold;\n}\n.me-btn-done:hover {\n    background: #74c7ec;\n}\n\n/* \u2500\u2500\u2500 Attribute overlay (color picker) \u2500\u2500\u2500 */\n.me-backdrop {\n    display: none;\n    position: absolute;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.5);\n    z-index: 100;\n}\n.me-backdrop.me-visible {\n    display: block;\n}\n.me-attr-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 200px;\n}\n.me-attr-overlay.me-visible {\n    display: block;\n}\n.me-attr-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-attr-grid {\n    display: grid;\n    grid-template-columns: repeat(8, 1fr);\n    gap: 4px;\n    margin-bottom: 12px;\n}\n.me-attr-cell {\n    width: 28px;\n    height: 28px;\n    border: 2px solid transparent;\n    border-radius: 3px;\n    cursor: pointer;\n}\n.me-attr-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-attr-cell.me-selected {\n    border-color: #f5e0dc;\n    box-shadow: 0 0 0 2px #f5e0dc40;\n}\n.me-attr-actions {\n    text-align: center;\n}\n\n/* Utility */\n.me-hidden {\n    display: none !important;\n}\n\n/* \u2500\u2500\u2500 Tool list (vertical layout) \u2500\u2500\u2500 */\n.me-tool-list {\n    display: flex;\n    flex-direction: column;\n    gap: 2px;\n    padding: 4px 0;\n}\n\n/* \u2500\u2500\u2500 Fill toggle (outline/filled for rect/ellipse) \u2500\u2500\u2500 */\n.me-fill-toggle {\n    display: none;\n    flex-direction: row;\n    justify-content: center;\n    gap: 2px;\n    padding: 4px 0;\n}\n.me-fill-toggle.me-visible {\n    display: flex;\n}\n.me-fill-opt {\n    width: 20px;\n    height: 20px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    font-size: 14px;\n    cursor: pointer;\n    border-radius: 3px;\n    border: 1px solid transparent;\n    color: #6c7086;\n}\n.me-fill-opt:hover {\n    color: #cdd6f4;\n}\n.me-fill-opt.me-active {\n    background: #45475a;\n    color: #cdd6f4;\n    border-color: #585b70;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2014 left/right sections \u2500\u2500\u2500 */\n.me-action-left {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-right {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-bar {\n    justify-content: space-between;\n}\n\n/* \u2500\u2500\u2500 Shape overlay (rubber-band preview) \u2500\u2500\u2500 */\n.me-shape-overlay {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n    z-index: 5;\n}\n\n/* \u2500\u2500\u2500 Resize overlay (modal dialog) \u2500\u2500\u2500 */\n.me-resize-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 240px;\n}\n.me-resize-overlay.me-visible {\n    display: block;\n}\n.me-resize-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-resize-form {\n    display: grid;\n    grid-template-columns: auto 1fr;\n    gap: 8px;\n    align-items: center;\n    margin-bottom: 12px;\n}\n.me-resize-form label {\n    color: #a6adc8;\n    font-size: 12px;\n}\n.me-resize-input {\n    width: 100%;\n    padding: 4px 8px;\n    background: #313244;\n    border: 1px solid #45475a;\n    border-radius: 3px;\n    color: #cdd6f4;\n    font-size: 13px;\n    box-sizing: border-box;\n}\n.me-resize-input:focus {\n    outline: none;\n    border-color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2014 clickable dimensions \u2500\u2500\u2500 */\n.me-status-dim {\n    text-decoration: underline dotted;\n    cursor: pointer;\n    color: #a6adc8;\n}\n.me-status-dim:hover {\n    color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Mini preview panel \u2500\u2500\u2500 */\n.me-preview {\n    width: 220px;\n    background: #181825;\n    border-left: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    flex-shrink: 0;\n    overflow: hidden;\n}\n.me-preview-label {\n    padding: 6px 10px;\n    font-size: 11px;\n    color: #6c7086;\n    text-transform: uppercase;\n    letter-spacing: 0.5px;\n    border-bottom: 1px solid #313244;\n}\n.me-preview-wrapper {\n    padding: 10px;\n    overflow: hidden;\n}\n.me-preview-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-view-frame {\n    position: absolute;\n    border: 1px solid rgba(255, 255, 255, 0.6);\n    pointer-events: none;\n    box-sizing: border-box;\n}\n";
+  var editor_default = "/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n   ANSI Editor \u2014 Styles (prefixed with .me- for isolation)\n   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */\n\n/* \u2500\u2500\u2500 Root container \u2500\u2500\u2500 */\n.me-editor {\n    display: flex;\n    flex-direction: column;\n    width: 100%;\n    height: 100%;\n    background: #1e1e2e;\n    color: #cdd6f4;\n    font-family: system-ui, -apple-system, sans-serif;\n    font-size: 12px;\n    outline: none;\n    overflow: hidden;\n    user-select: none;\n    position: relative;\n}\n\n/* \u2500\u2500\u2500 Body (sidebar + main) \u2500\u2500\u2500 */\n.me-body {\n    display: flex;\n    flex: 1;\n    min-height: 0;\n}\n\n/* \u2500\u2500\u2500 Sidebar \u2500\u2500\u2500 */\n.me-sidebar {\n    width: 48px;\n    background: #181825;\n    border-right: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 6px 4px;\n    gap: 6px;\n    flex-shrink: 0;\n}\n\n/* Current FG/BG color display */\n.me-current-colors {\n    position: relative;\n    width: 36px;\n    height: 36px;\n    margin-bottom: 4px;\n}\n.me-color-swatch {\n    position: absolute;\n    border: 2px solid #585b70;\n    cursor: pointer;\n}\n.me-color-swatch:hover {\n    border-color: #cdd6f4;\n}\n.me-color-bg {\n    width: 24px;\n    height: 24px;\n    bottom: 0;\n    right: 0;\n    z-index: 0;\n}\n.me-color-fg {\n    width: 24px;\n    height: 24px;\n    top: 0;\n    left: 0;\n    z-index: 1;\n}\n\n/* Palette grid */\n.me-palette {\n    display: grid;\n    grid-template-columns: repeat(2, 1fr);\n    gap: 2px;\n    width: 36px;\n}\n.me-pal-cell {\n    width: 16px;\n    height: 16px;\n    border: 1px solid transparent;\n    cursor: pointer;\n    transition: border-color 0.1s;\n}\n.me-pal-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-pal-fg {\n    border-color: #f5e0dc !important;\n    box-shadow: inset 0 0 0 1px #1e1e2e;\n}\n.me-pal-bg {\n    outline: 2px dashed #a6adc8;\n    outline-offset: -1px;\n}\n\n/* Separator */\n.me-sep {\n    width: 32px;\n    height: 1px;\n    background: #313244;\n    margin: 4px 0;\n}\n\n/* Tool buttons */\n.me-tool-btn {\n    width: 32px;\n    height: 28px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    background: #313244;\n    border-radius: 4px;\n    cursor: pointer;\n    font-weight: bold;\n    font-size: 13px;\n    color: #bac2de;\n    margin-bottom: 3px;\n    transition: background 0.15s;\n}\n.me-tool-btn:hover {\n    background: #45475a;\n}\n.me-tool-btn.me-active {\n    background: #89b4fa;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Main area \u2500\u2500\u2500 */\n.me-main {\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n    min-width: 0;\n}\n\n/* \u2500\u2500\u2500 Toolbar \u2500\u2500\u2500 */\n.me-toolbar {\n    height: 44px;\n    background: #181825;\n    border-bottom: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 8px;\n    gap: 4px;\n    flex-shrink: 0;\n}\n\n.me-fkey-nav {\n    cursor: pointer;\n    padding: 2px 4px;\n    color: #6c7086;\n    font-size: 11px;\n}\n.me-fkey-nav:hover {\n    color: #cdd6f4;\n}\n\n.me-fkey-group {\n    display: flex;\n    gap: 2px;\n}\n.me-fkey {\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    cursor: pointer;\n    padding: 2px;\n    border-radius: 3px;\n}\n.me-fkey:hover {\n    background: #313244;\n}\n.me-fkey canvas {\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-fkey-label {\n    font-size: 8px;\n    color: #6c7086;\n    margin-top: 1px;\n}\n\n.me-toolbar-sep {\n    width: 1px;\n    height: 28px;\n    background: #313244;\n    margin: 0 6px;\n}\n\n.me-brush-modes {\n    display: none;\n    gap: 3px;\n}\n.me-brush-modes.me-visible {\n    display: flex;\n}\n.me-brush-mode {\n    padding: 3px 8px;\n    background: #313244;\n    border-radius: 3px;\n    cursor: pointer;\n    font-size: 11px;\n    color: #bac2de;\n}\n.me-brush-mode:hover {\n    background: #45475a;\n}\n.me-brush-mode.me-active {\n    background: #a6e3a1;\n    color: #1e1e2e;\n}\n\n/* \u2500\u2500\u2500 Viewport \u2500\u2500\u2500 */\n.me-viewport {\n    flex: 1;\n    overflow: auto;\n    background: #11111b;\n    cursor: crosshair;\n    position: relative;\n}\n.me-canvas-container {\n    position: relative;\n    display: inline-block;\n}\n.me-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-editing-layer {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n}\n.me-cursor-canvas {\n    position: absolute;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n\n/* Cursor blink animation */\n@keyframes me-blink {\n    0%, 50%  { opacity: 1; }\n    51%, 100% { opacity: 0; }\n}\n.me-cursor-blink {\n    animation: me-blink 1s step-end infinite;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2500\u2500\u2500 */\n.me-statusbar {\n    height: 24px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    padding: 0 10px;\n    gap: 16px;\n    font-size: 11px;\n    color: #6c7086;\n    flex-shrink: 0;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2500\u2500\u2500 */\n.me-action-bar {\n    height: 40px;\n    background: #181825;\n    border-top: 1px solid #313244;\n    display: flex;\n    align-items: center;\n    justify-content: flex-end;\n    padding: 0 12px;\n    gap: 8px;\n    flex-shrink: 0;\n}\n.me-btn {\n    padding: 5px 16px;\n    border: 1px solid #45475a;\n    border-radius: 4px;\n    background: #313244;\n    color: #cdd6f4;\n    cursor: pointer;\n    font-size: 12px;\n}\n.me-btn:hover {\n    background: #45475a;\n}\n.me-btn-done {\n    background: #89b4fa;\n    color: #1e1e2e;\n    border-color: #89b4fa;\n    font-weight: bold;\n}\n.me-btn-done:hover {\n    background: #74c7ec;\n}\n\n/* \u2500\u2500\u2500 Attribute overlay (color picker) \u2500\u2500\u2500 */\n.me-backdrop {\n    display: none;\n    position: absolute;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.5);\n    z-index: 100;\n}\n.me-backdrop.me-visible {\n    display: block;\n}\n.me-attr-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 200px;\n}\n.me-attr-overlay.me-visible {\n    display: block;\n}\n.me-attr-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-attr-grid {\n    display: grid;\n    grid-template-columns: repeat(8, 1fr);\n    gap: 4px;\n    margin-bottom: 12px;\n}\n.me-attr-cell {\n    width: 28px;\n    height: 28px;\n    border: 2px solid transparent;\n    border-radius: 3px;\n    cursor: pointer;\n}\n.me-attr-cell:hover {\n    border-color: #cdd6f4;\n}\n.me-attr-cell.me-selected {\n    border-color: #f5e0dc;\n    box-shadow: 0 0 0 2px #f5e0dc40;\n}\n.me-attr-actions {\n    text-align: center;\n}\n\n/* Utility */\n.me-hidden {\n    display: none !important;\n}\n\n/* \u2500\u2500\u2500 Tool list (vertical layout) \u2500\u2500\u2500 */\n.me-tool-list {\n    display: flex;\n    flex-direction: column;\n    gap: 2px;\n    padding: 4px 0;\n}\n\n/* \u2500\u2500\u2500 Fill toggle (outline/filled for rect/ellipse) \u2500\u2500\u2500 */\n.me-fill-toggle {\n    display: none;\n    flex-direction: row;\n    justify-content: center;\n    gap: 2px;\n    padding: 4px 0;\n}\n.me-fill-toggle.me-visible {\n    display: flex;\n}\n.me-fill-opt {\n    width: 20px;\n    height: 20px;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    font-size: 14px;\n    cursor: pointer;\n    border-radius: 3px;\n    border: 1px solid transparent;\n    color: #6c7086;\n}\n.me-fill-opt:hover {\n    color: #cdd6f4;\n}\n.me-fill-opt.me-active {\n    background: #45475a;\n    color: #cdd6f4;\n    border-color: #585b70;\n}\n\n/* \u2500\u2500\u2500 Action bar \u2014 left/right sections \u2500\u2500\u2500 */\n.me-action-left {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-right {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n.me-action-bar {\n    justify-content: space-between;\n}\n\n/* \u2500\u2500\u2500 Shape overlay (rubber-band preview) \u2500\u2500\u2500 */\n.me-shape-overlay {\n    position: absolute;\n    top: 0;\n    left: 0;\n    pointer-events: none;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n    z-index: 5;\n}\n\n/* \u2500\u2500\u2500 Resize overlay (modal dialog) \u2500\u2500\u2500 */\n.me-resize-overlay {\n    display: none;\n    position: absolute;\n    top: 50%;\n    left: 50%;\n    transform: translate(-50%, -50%);\n    background: #1e1e2e;\n    border: 1px solid #45475a;\n    border-radius: 8px;\n    padding: 16px;\n    z-index: 101;\n    min-width: 240px;\n}\n.me-resize-overlay.me-visible {\n    display: block;\n}\n.me-resize-overlay h3 {\n    margin: 0 0 12px 0;\n    font-size: 14px;\n    color: #cdd6f4;\n    text-align: center;\n}\n.me-resize-form {\n    display: grid;\n    grid-template-columns: auto 1fr;\n    gap: 8px;\n    align-items: center;\n    margin-bottom: 12px;\n}\n.me-resize-form label {\n    color: #a6adc8;\n    font-size: 12px;\n}\n.me-resize-input {\n    width: 100%;\n    padding: 4px 8px;\n    background: #313244;\n    border: 1px solid #45475a;\n    border-radius: 3px;\n    color: #cdd6f4;\n    font-size: 13px;\n    box-sizing: border-box;\n}\n.me-resize-input:focus {\n    outline: none;\n    border-color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Status bar \u2014 clickable dimensions \u2500\u2500\u2500 */\n.me-status-dim {\n    text-decoration: underline dotted;\n    cursor: pointer;\n    color: #a6adc8;\n}\n.me-status-dim:hover {\n    color: #89b4fa;\n}\n\n/* \u2500\u2500\u2500 Mini preview panel \u2500\u2500\u2500 */\n.me-preview {\n    width: 220px;\n    background: #181825;\n    border-left: 1px solid #313244;\n    display: flex;\n    flex-direction: column;\n    flex-shrink: 0;\n    overflow: hidden;\n}\n.me-preview-label {\n    padding: 6px 10px;\n    font-size: 11px;\n    color: #6c7086;\n    text-transform: uppercase;\n    letter-spacing: 0.5px;\n    border-bottom: 1px solid #313244;\n}\n.me-preview-wrapper {\n    padding: 10px;\n    overflow: hidden;\n}\n.me-preview-canvas {\n    display: block;\n    image-rendering: pixelated;\n    image-rendering: crisp-edges;\n}\n.me-view-frame {\n    position: absolute;\n    border: 1px solid rgba(255, 255, 255, 0.6);\n    pointer-events: none;\n    box-sizing: border-box;\n}\n\n/* Selection overlay */\n.me-selection-overlay {\n    position: absolute;\n    border: 2px dashed #f5e0dc;\n    background: rgba(205, 214, 244, 0.1);\n    pointer-events: none;\n    z-index: 5;\n    box-sizing: border-box;\n}\n.me-selection-overlay.me-hidden {\n    display: none;\n}\n";
 
   // src/editor.js
   var TOOLS = ["select", "brush", "line", "rect", "ellipse", "fill", "sample"];
   var TOOL_LABELS = {
-    select: "K",
+    select: "\u2B1A",
     brush: "B",
     line: "\u2572",
     rect: "\u25AD",
@@ -1135,7 +1163,7 @@ var AnsiEditorModule = (() => {
     sample: "\u2299"
   };
   var TOOL_TIPS = {
-    select: "Keyboard Mode (Alt+K)",
+    select: "Select Mode (Alt+K)",
     brush: "Brush Mode (Alt+B)",
     line: "Line Tool (Alt+L)",
     rect: "Rectangle Tool (Alt+R)",
@@ -1284,17 +1312,19 @@ var AnsiEditorModule = (() => {
       const palette = document.createElement("div");
       palette.className = "me-palette";
       this.el.palCells = [];
-      for (let i = 0; i < 16; i++) {
+      const palOrder = [0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
+      for (const ci of palOrder) {
         const cell = document.createElement("div");
         cell.className = "me-pal-cell";
-        cell.style.backgroundColor = rgbString(ega[i]);
-        cell.title = "Color " + i;
+        cell.style.backgroundColor = rgbString(ega[ci]);
+        cell.title = "Color " + ci;
+        cell.dataset.colorIndex = ci;
         cell.addEventListener("mousedown", (e) => {
           e.preventDefault();
           if (e.button === 0)
-            this._setFg(i);
+            this._setFg(ci);
           else if (e.button === 2)
-            this._setBg(i);
+            this._setBg(ci);
         });
         cell.addEventListener("contextmenu", (e) => e.preventDefault());
         palette.appendChild(cell);
@@ -1405,7 +1435,10 @@ var AnsiEditorModule = (() => {
       cursorCanvas.height = this.font.height;
       cursorCanvas.style.width = this.font.width + "px";
       cursorCanvas.style.height = this.font.height + "px";
+      const selectionOverlay = document.createElement("div");
+      selectionOverlay.className = "me-selection-overlay me-hidden";
       editingLayer.appendChild(cursorCanvas);
+      editingLayer.appendChild(selectionOverlay);
       container.append(canvas, editingLayer);
       viewport.appendChild(container);
       this.el.viewport = viewport;
@@ -1413,6 +1446,7 @@ var AnsiEditorModule = (() => {
       this.el.canvas = canvas;
       this.el.cursorCanvas = cursorCanvas;
       this.el.editingLayer = editingLayer;
+      this.el.selectionOverlay = selectionOverlay;
       viewport.addEventListener("scroll", () => this._updateViewFrame());
       return viewport;
     }
@@ -1619,10 +1653,35 @@ var AnsiEditorModule = (() => {
         this._redo();
         return;
       }
+      if (ctrl && e.key === "c" && this._selection) {
+        e.preventDefault();
+        this._copySelection();
+        return;
+      }
+      if (ctrl && e.key === "x" && this._selection) {
+        e.preventDefault();
+        this._cutSelection();
+        return;
+      }
+      if (ctrl && e.key === "v" && this._clipboard) {
+        e.preventDefault();
+        this._pasteClipboard();
+        return;
+      }
+      if (ctrl && e.key === "a" && this.activeTool === "select") {
+        e.preventDefault();
+        this._selection = { sx: 0, sy: 0, dx: this.columns - 1, dy: this.rows - 1 };
+        this._updateSelectionOverlay();
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         if (this._shapeOverlay) {
           this._destroyOverlay();
+          return;
+        }
+        if (this._selection) {
+          this._clearSelection();
           return;
         }
         if (this.el.attrOverlay.classList.contains("me-visible") || this.el.resizeOverlay.classList.contains("me-visible")) {
@@ -1630,6 +1689,11 @@ var AnsiEditorModule = (() => {
         } else {
           this._showAttributeOverlay("fg");
         }
+        return;
+      }
+      if (e.key === "Delete" && this._selection && this.activeTool === "select") {
+        e.preventDefault();
+        this._eraseSelection();
         return;
       }
       if (e.altKey && !ctrl) {
@@ -2028,10 +2092,11 @@ var AnsiEditorModule = (() => {
     _updatePalette() {
       this.el.fgSwatch.style.backgroundColor = rgbString(ega[this.fg]);
       this.el.bgSwatch.style.backgroundColor = rgbString(ega[this.bg]);
-      for (var i = 0; i < 16; i++) {
+      for (var i = 0; i < this.el.palCells.length; i++) {
         var cell = this.el.palCells[i];
-        cell.classList.toggle("me-pal-fg", i === this.fg);
-        cell.classList.toggle("me-pal-bg", i === this.bg);
+        var ci = parseInt(cell.dataset.colorIndex || i);
+        cell.classList.toggle("me-pal-fg", ci === this.fg);
+        cell.classList.toggle("me-pal-bg", ci === this.bg);
       }
       this._updateFkeyDisplay();
     }
@@ -2236,6 +2301,90 @@ var AnsiEditorModule = (() => {
         this._setBg(color);
       this._hideOverlay();
     }
+    // ═══ SELECTION ═══
+    _updateSelectionOverlay() {
+      var ov = this.el.selectionOverlay;
+      if (!ov)
+        return;
+      if (!this._selection) {
+        ov.classList.add("me-hidden");
+        return;
+      }
+      var s = this._selection;
+      var fw = this.font.width, fh = this.font.height;
+      ov.style.left = s.sx * fw + "px";
+      ov.style.top = s.sy * fh + "px";
+      ov.style.width = (s.dx - s.sx + 1) * fw + "px";
+      ov.style.height = (s.dy - s.sy + 1) * fh + "px";
+      ov.classList.remove("me-hidden");
+    }
+    _clearSelection() {
+      this._selection = null;
+      this._selDragStart = null;
+      if (this.el.selectionOverlay)
+        this.el.selectionOverlay.classList.add("me-hidden");
+    }
+    _getSelectionBlocks() {
+      if (!this._selection)
+        return null;
+      var s = this._selection;
+      var cols = s.dx - s.sx + 1;
+      var rows = s.dy - s.sy + 1;
+      var data = [];
+      for (var y = s.sy; y <= s.dy; y++) {
+        for (var x = s.sx; x <= s.dx; x++) {
+          var block = this.doc.at(x, y);
+          data.push(block ? { code: block.code, fg: block.fg, bg: block.bg } : { code: 32, fg: 7, bg: 0 });
+        }
+      }
+      return { columns: cols, rows, data };
+    }
+    _copySelection() {
+      this._clipboard = this._getSelectionBlocks();
+    }
+    _cutSelection() {
+      this._clipboard = this._getSelectionBlocks();
+      this._eraseSelection();
+    }
+    _eraseSelection() {
+      if (!this._selection)
+        return;
+      var s = this._selection;
+      this.doc.startUndo();
+      var affected = [];
+      for (var y = s.sy; y <= s.dy; y++) {
+        for (var x = s.sx; x <= s.dx; x++) {
+          this.doc.changeData(x, y, 32, 7, 0);
+          affected.push({ x, y });
+        }
+      }
+      this.doc.endUndo();
+      this._renderCells(affected);
+      this._clearSelection();
+      this._updatePreview();
+    }
+    _pasteClipboard() {
+      if (!this._clipboard)
+        return;
+      var cb = this._clipboard;
+      this.doc.startUndo();
+      var affected = [];
+      for (var cy = 0; cy < cb.rows; cy++) {
+        for (var cx = 0; cx < cb.columns; cx++) {
+          var tx = this.cursorX + cx;
+          var ty = this.cursorY + cy;
+          if (tx < this.columns && ty < this.rows) {
+            var block = cb.data[cy * cb.columns + cx];
+            this.doc.changeData(tx, ty, block.code, block.fg, block.bg);
+            affected.push({ x: tx, y: ty });
+          }
+        }
+      }
+      this.doc.endUndo();
+      this._renderCells(affected);
+      this._clearSelection();
+      this._updatePreview();
+    }
     // ═══ UNDO/REDO ═══
     _undo() {
       var affected = this.doc.undo();
@@ -2283,7 +2432,13 @@ var AnsiEditorModule = (() => {
       this.el.statusPos.textContent = "Ln " + (this.cursorY + 1) + ", Col " + (this.cursorX + 1);
       this.el.statusDim.textContent = this.columns + " \xD7 " + this.rows;
       this.el.statusMode.textContent = this.insertMode ? "INS" : "OVR";
-      this.el.statusTool.textContent = TOOL_TIPS[this.activeTool] || "";
+      if (this._selection) {
+        var s = this._selection;
+        var sw = s.dx - s.sx + 1, sh = s.dy - s.sy + 1;
+        this.el.statusTool.textContent = "Selection: " + sw + "\xD7" + sh;
+      } else {
+        this.el.statusTool.textContent = TOOL_TIPS[this.activeTool] || "";
+      }
     }
     // ═══ PUBLIC API ═══
     getAnsiData() {

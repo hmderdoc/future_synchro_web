@@ -26,11 +26,11 @@ import cssText from './editor.css';
 
 const TOOLS = ['select', 'brush', 'line', 'rect', 'ellipse', 'fill', 'sample'];
 const TOOL_LABELS = {
-    select: 'K', brush: 'B', line: '╲', rect: '▭', ellipse: '◯',
+    select: '⬚', brush: 'B', line: '╲', rect: '▭', ellipse: '◯',
     fill: 'F', sample: '⊙',
 };
 const TOOL_TIPS = {
-    select:  'Keyboard Mode (Alt+K)',  brush:   'Brush Mode (Alt+B)',
+    select:  'Select Mode (Alt+K)',  brush:   'Brush Mode (Alt+B)',
     line:    'Line Tool (Alt+L)',      rect:    'Rectangle Tool (Alt+R)',
     ellipse: 'Ellipse Tool (Alt+E)',   fill:    'Fill Mode (Alt+F)',
     sample:  'Sample Mode (Alt+S)',
@@ -201,15 +201,18 @@ export class AnsiEditor {
         const palette = document.createElement('div');
         palette.className = 'me-palette';
         this.el.palCells = [];
-        for (let i = 0; i < 16; i++) {
+        // Moebius palette layout: 2 columns — dark (0-7) left, bright (8-15) right
+        const palOrder = [0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
+        for (const ci of palOrder) {
             const cell = document.createElement('div');
             cell.className = 'me-pal-cell';
-            cell.style.backgroundColor = rgbString(ega[i]);
-            cell.title = 'Color ' + i;
+            cell.style.backgroundColor = rgbString(ega[ci]);
+            cell.title = 'Color ' + ci;
+            cell.dataset.colorIndex = ci;
             cell.addEventListener('mousedown', (e) => {
                 e.preventDefault();
-                if (e.button === 0) this._setFg(i);
-                else if (e.button === 2) this._setBg(i);
+                if (e.button === 0) this._setFg(ci);
+                else if (e.button === 2) this._setBg(ci);
             });
             cell.addEventListener('contextmenu', (e) => e.preventDefault());
             palette.appendChild(cell);
@@ -332,7 +335,11 @@ export class AnsiEditor {
         cursorCanvas.style.width = this.font.width + 'px';
         cursorCanvas.style.height = this.font.height + 'px';
 
+        const selectionOverlay = document.createElement('div');
+        selectionOverlay.className = 'me-selection-overlay me-hidden';
+
         editingLayer.appendChild(cursorCanvas);
+        editingLayer.appendChild(selectionOverlay);
         container.append(canvas, editingLayer);
         viewport.appendChild(container);
 
@@ -341,6 +348,7 @@ export class AnsiEditor {
         this.el.canvas = canvas;
         this.el.cursorCanvas = cursorCanvas;
         this.el.editingLayer = editingLayer;
+        this.el.selectionOverlay = selectionOverlay;
 
         // Update preview on scroll
         viewport.addEventListener('scroll', () => this._updateViewFrame());
@@ -570,16 +578,36 @@ export class AnsiEditor {
         if (ctrl && e.key === 'z') { e.preventDefault(); this._undo(); return; }
         if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); this._redo(); return; }
 
+        // Clipboard: Ctrl+C / Ctrl+X / Ctrl+V
+        if (ctrl && e.key === 'c' && this._selection) { e.preventDefault(); this._copySelection(); return; }
+        if (ctrl && e.key === 'x' && this._selection) { e.preventDefault(); this._cutSelection(); return; }
+        if (ctrl && e.key === 'v' && this._clipboard) { e.preventDefault(); this._pasteClipboard(); return; }
+        if (ctrl && e.key === 'a' && this.activeTool === 'select') {
+            e.preventDefault();
+            this._selection = { sx: 0, sy: 0, dx: this.columns - 1, dy: this.rows - 1 };
+            this._updateSelectionOverlay();
+            return;
+        }
+
         if (e.key === 'Escape') {
             e.preventDefault();
             // Cancel shape in progress
             if (this._shapeOverlay) { this._destroyOverlay(); return; }
+            // Cancel selection
+            if (this._selection) { this._clearSelection(); return; }
             if (this.el.attrOverlay.classList.contains('me-visible') ||
                 this.el.resizeOverlay.classList.contains('me-visible')) {
                 this._hideOverlay();
             } else {
                 this._showAttributeOverlay('fg');
             }
+            return;
+        }
+
+        // Delete erases selection
+        if (e.key === 'Delete' && this._selection && this.activeTool === 'select') {
+            e.preventDefault();
+            this._eraseSelection();
             return;
         }
 
@@ -930,10 +958,11 @@ export class AnsiEditor {
     _updatePalette() {
         this.el.fgSwatch.style.backgroundColor = rgbString(ega[this.fg]);
         this.el.bgSwatch.style.backgroundColor = rgbString(ega[this.bg]);
-        for (var i = 0; i < 16; i++) {
+        for (var i = 0; i < this.el.palCells.length; i++) {
             var cell = this.el.palCells[i];
-            cell.classList.toggle('me-pal-fg', i === this.fg);
-            cell.classList.toggle('me-pal-bg', i === this.bg);
+            var ci = parseInt(cell.dataset.colorIndex || i);
+            cell.classList.toggle('me-pal-fg', ci === this.fg);
+            cell.classList.toggle('me-pal-bg', ci === this.bg);
         }
         this._updateFkeyDisplay();
     }
@@ -1132,6 +1161,90 @@ export class AnsiEditor {
         this._hideOverlay();
     }
 
+    // ═══ SELECTION ═══
+
+    _updateSelectionOverlay() {
+        var ov = this.el.selectionOverlay;
+        if (!ov) return;
+        if (!this._selection) { ov.classList.add('me-hidden'); return; }
+        var s = this._selection;
+        var fw = this.font.width, fh = this.font.height;
+        ov.style.left = (s.sx * fw) + 'px';
+        ov.style.top = (s.sy * fh) + 'px';
+        ov.style.width = ((s.dx - s.sx + 1) * fw) + 'px';
+        ov.style.height = ((s.dy - s.sy + 1) * fh) + 'px';
+        ov.classList.remove('me-hidden');
+    }
+
+    _clearSelection() {
+        this._selection = null;
+        this._selDragStart = null;
+        if (this.el.selectionOverlay) this.el.selectionOverlay.classList.add('me-hidden');
+    }
+
+    _getSelectionBlocks() {
+        if (!this._selection) return null;
+        var s = this._selection;
+        var cols = s.dx - s.sx + 1;
+        var rows = s.dy - s.sy + 1;
+        var data = [];
+        for (var y = s.sy; y <= s.dy; y++) {
+            for (var x = s.sx; x <= s.dx; x++) {
+                var block = this.doc.at(x, y);
+                data.push(block ? { code: block.code, fg: block.fg, bg: block.bg } : { code: 32, fg: 7, bg: 0 });
+            }
+        }
+        return { columns: cols, rows: rows, data: data };
+    }
+
+    _copySelection() {
+        this._clipboard = this._getSelectionBlocks();
+    }
+
+    _cutSelection() {
+        this._clipboard = this._getSelectionBlocks();
+        this._eraseSelection();
+    }
+
+    _eraseSelection() {
+        if (!this._selection) return;
+        var s = this._selection;
+        this.doc.startUndo();
+        var affected = [];
+        for (var y = s.sy; y <= s.dy; y++) {
+            for (var x = s.sx; x <= s.dx; x++) {
+                this.doc.changeData(x, y, 32, 7, 0);
+                affected.push({ x, y });
+            }
+        }
+        this.doc.endUndo();
+        this._renderCells(affected);
+        this._clearSelection();
+        this._updatePreview();
+    }
+
+    _pasteClipboard() {
+        if (!this._clipboard) return;
+        var cb = this._clipboard;
+        this.doc.startUndo();
+        var affected = [];
+        for (var cy = 0; cy < cb.rows; cy++) {
+            for (var cx = 0; cx < cb.columns; cx++) {
+                var tx = this.cursorX + cx;
+                var ty = this.cursorY + cy;
+                if (tx < this.columns && ty < this.rows) {
+                    var block = cb.data[cy * cb.columns + cx];
+                    this.doc.changeData(tx, ty, block.code, block.fg, block.bg);
+                    affected.push({ x: tx, y: ty });
+                }
+            }
+        }
+        this.doc.endUndo();
+        this._renderCells(affected);
+        this._clearSelection();
+        this._updatePreview();
+    }
+
     // ═══ UNDO/REDO ═══
 
     _undo() {
@@ -1178,7 +1291,13 @@ export class AnsiEditor {
         this.el.statusPos.textContent = 'Ln ' + (this.cursorY + 1) + ', Col ' + (this.cursorX + 1);
         this.el.statusDim.textContent = this.columns + ' \u00D7 ' + this.rows;
         this.el.statusMode.textContent = this.insertMode ? 'INS' : 'OVR';
-        this.el.statusTool.textContent = TOOL_TIPS[this.activeTool] || '';
+        if (this._selection) {
+            var s = this._selection;
+            var sw = s.dx - s.sx + 1, sh = s.dy - s.sy + 1;
+            this.el.statusTool.textContent = 'Selection: ' + sw + '\u00D7' + sh;
+        } else {
+            this.el.statusTool.textContent = TOOL_TIPS[this.activeTool] || '';
+        }
     }
 
     // ═══ PUBLIC API ═══

@@ -517,3 +517,16 @@
     pointer-events: none;
     box-sizing: border-box;
 }
+
+/* Selection overlay */
+.me-selection-overlay {
+    position: absolute;
+    border: 2px dashed #f5e0dc;
+    background: rgba(205, 214, 244, 0.1);
+    pointer-events: none;
+    z-index: 5;
+    box-sizing: border-box;
+}
+.me-selection-overlay.me-hidden {
+    display: none;
+}

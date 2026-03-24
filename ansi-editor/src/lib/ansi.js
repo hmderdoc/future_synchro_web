@@ -9,6 +9,21 @@
  *   BG 8-15 -> ESC[5;40-47m   (blink = high intensity BG in iCE mode)
  */
 
+/**
+ * Convert CGA palette index (low 3 bits) to ANSI SGR color code.
+ * CGA: 0=Black, 1=Blue, 2=Green, 3=Cyan, 4=Red, 5=Magenta, 6=Brown, 7=LightGray
+ * SGR: 0=Black, 1=Red,  2=Green, 3=Yellow, 4=Blue, 5=Magenta, 6=Cyan,  7=White
+ */
+function cgaToAnsi(c) {
+    switch (c) {
+        case 1: return 4;
+        case 4: return 1;
+        case 3: return 6;
+        case 6: return 3;
+        default: return c;
+    }
+}
+
 export function encodeAsAnsi(doc, opts = {}) {
     const iceColors = opts.iceColors || false;
     const out = [];
@@ -44,8 +59,8 @@ export function encodeAsAnsi(doc, opts = {}) {
                 const p = [0];  // reset
                 if (wantBold) p.push(1);
                 if (wantBlink) p.push(5);
-                p.push(30 + wantFg);
-                if (wantBg !== 0) p.push(40 + wantBg);
+                p.push(30 + cgaToAnsi(wantFg));
+                if (wantBg !== 0) p.push(40 + cgaToAnsi(wantBg));
                 pushSGR(p);
                 curBold = wantBold;
                 curBlink = wantBlink;
@@ -55,8 +70,8 @@ export function encodeAsAnsi(doc, opts = {}) {
                 const p = [];
                 if (wantBold && !curBold)  { p.push(1); curBold = true; }
                 if (wantBlink && !curBlink) { p.push(5); curBlink = true; }
-                if (wantFg !== curFg)       { p.push(30 + wantFg); curFg = wantFg; }
-                if (wantBg !== curBg)       { p.push(40 + wantBg); curBg = wantBg; }
+                if (wantFg !== curFg)       { p.push(30 + cgaToAnsi(wantFg)); curFg = wantFg; }
+                if (wantBg !== curBg)       { p.push(40 + cgaToAnsi(wantBg)); curBg = wantBg; }
                 if (p.length > 0) pushSGR(p);
             }
 
