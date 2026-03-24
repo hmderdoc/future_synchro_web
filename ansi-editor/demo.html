@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANSI Editor Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1e1e2e; color: #cdd6f4;
+            font-family: system-ui, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding: 24px;
+        }
+        h1 { margin-bottom: 16px; font-size: 1.4em; }
+        #editor-container { width: 100%; max-width: 1024px; height: 640px;
+            border: 1px solid #45475a; border-radius: 6px; overflow: hidden; }
+        #output { margin-top: 16px; width: 100%; max-width: 1024px; }
+        #output h2 { font-size: 1.1em; margin-bottom: 8px; }
+        #output textarea { width: 100%; height: 120px; background: #11111b;
+            color: #a6e3a1; border: 1px solid #45475a; border-radius: 4px;
+            font-family: monospace; font-size: 12px; padding: 8px; resize: vertical; }
+        .info { color: #6c7086; font-size: 0.85em; margin-top: 4px; }
+        .controls { margin-top: 12px; display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .controls input, .controls button { background: #313244; color: #cdd6f4;
+            border: 1px solid #45475a; border-radius: 4px; padding: 4px 8px; }
+        .controls button { cursor: pointer; }
+        .controls button:hover { background: #45475a; }
+    </style>
+</head>
+<body>
+    <h1>ANSI Art Editor Demo</h1>
+    <div class="controls">
+        <label>Columns: <input type="number" id="cols" value="80" min="1" max="320"></label>
+        <label>Rows: <input type="number" id="rows" value="25" min="1" max="200"></label>
+        <button onclick="launch()">Launch Editor</button>
+    </div>
+    <div id="editor-container" style="display:none;"></div>
+    <div id="output" style="display:none;">
+        <h2>ANSI Output</h2>
+        <textarea id="ansi-output" readonly></textarea>
+        <div class="info" id="ansi-info"></div>
+    </div>
+
+    <script src="dist/ansi-editor.js"></script>
+    <script>
+        var currentEditor = null;
+        async function launch() {
+            var container = document.getElementById('editor-container');
+            var cols = parseInt(document.getElementById('cols').value) || 80;
+            var rows = parseInt(document.getElementById('rows').value) || 25;
+            container.style.display = 'block';
+            document.getElementById('output').style.display = 'none';
+            if (currentEditor) currentEditor.destroy();
+            currentEditor = await AnsiEditor.create({
+                container: container,
+                columns: cols,
+                rows: rows,
+                fontUrl: 'fonts/IBM VGA.F16',
+                onDone: function(ansiBytes) {
+                    container.style.display = 'none';
+                    document.getElementById('output').style.display = 'block';
+                    var text = new TextDecoder('latin1').decode(ansiBytes);
+                    document.getElementById('ansi-output').value = text;
+                    document.getElementById('ansi-info').textContent =
+                        ansiBytes.length + ' bytes | ' + cols + 'x' + rows;
+                    currentEditor.destroy();
+                    currentEditor = null;
+                },
+                onCancel: function() {
+                    container.style.display = 'none';
+                    currentEditor.destroy();
+                    currentEditor = null;
+                },
+            });
+        }
+        launch();
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "ansi-editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Embeddable ANSI art editor (Moebius-inspired)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "setup": "bash setup.sh"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "puppeteer": "^24.40.0"
+  }
+}
