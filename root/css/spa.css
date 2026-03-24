@@ -101,6 +101,23 @@ body.terminal-open {
     vertical-align: super;
 }
 
+/* Terminal button — must not inflate navbar height */
+#btn-terminal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    max-height: 38px;
+    padding: 2px 8px;
+    vertical-align: middle;
+}
+#btn-terminal .bin-icon-img {
+    height: 24px;
+}
+#btn-terminal .badge {
+    vertical-align: middle;
+}
+
 /* Dark mode support */
 [data-bs-theme="dark"] .terminal-panel {
     /* already black, no border needed */
