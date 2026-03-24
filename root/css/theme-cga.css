@@ -428,6 +428,12 @@
     border-radius: 0;
 }
 
+[data-theme="cga"] .breadcrumb > li + li:before {
+    content: " > ";
+    color: #FF55FF;
+    padding: 0 3px;
+}
+
 [data-theme="cga"] .breadcrumb a {
     color: #55FFFF;
 }

@@ -249,7 +249,8 @@ animation: indicator-fade 3s ease 0s 1 alternate !important;
 }
 
 .breadcrumb li {
-	display: inline;
+	display: inline-block;
+	vertical-align: middle;
 }
 
 .dark {
