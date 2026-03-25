@@ -166,32 +166,45 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container<? if (settings.layout_full_width) write('-fluid'); ?>">
         <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><img src="./images/icon-192.png" alt="<? write(settings.brand || system.name); ?>" class="brand-icon"><span class="nav-label brand-label"><? write(settings.brand || system.name); ?></span></a>
+
+        <!-- Mobile-visible toolbar items (outside collapse) -->
+        <div class="navbar-mobile-controls d-md-none">
+            <canvas id="radio-viz" width="48" height="24" title="BBS Radio"></canvas>
+<?xjs if (settings.ftelnet) { ?>
+            <button class="btn btn-outline-light btn-sm" id="btn-terminal-mobile" type="button" title="Toggle Terminal">
+                <span id="terminal-status-mobile" class="badge rounded-pill bg-secondary" style="width:8px;height:8px;display:inline-block;"></span>
+                <span class="bin-icon" data-icon="terminal"></span>
+            </button>
+<?xjs } ?>
+        </div>
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
         <div class="collapse navbar-collapse" id="navbarMain">
             <ul class="navbar-nav me-auto">
 <?xjs nav_pages.forEach(function(e) { navItem(e, ''); }); ?>
             </ul>
             <ul class="navbar-nav ms-auto align-items-center">
 
-                <!-- BBS Radio -->
-                <li class="nav-item" id="radio-container">
+                <!-- BBS Radio (desktop layout) -->
+                <li class="nav-item d-none d-md-flex" id="radio-container">
                     <div class="radio-controls">
                         <button class="radio-btn" id="radio-prev" title="Previous">⏮</button>
                         <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">▶</button>
                         <button class="radio-btn" id="radio-next" title="Next">⏭</button>
                     </div>
-                    <canvas id="radio-viz" width="48" height="24" title="BBS Radio"></canvas>
                     <span class="radio-track-name" id="radio-track">♫ Radio</span>
                     <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                    <canvas id="radio-viz-desktop" width="48" height="24" title="BBS Radio" class="radio-viz-canvas"></canvas>
                     <div class="radio-playlist-panel" id="radio-playlist-panel">
                         <input type="text" class="form-control form-control-sm mb-1" id="radio-search" placeholder="Search tracks...">
                         <div id="radio-tracklist" class="radio-tracklist"></div>
                     </div>
                 </li>
 <?xjs if (settings.ftelnet) { ?>
-                <li class="nav-item">
+                <li class="nav-item d-none d-md-block">
                     <button class="btn btn-outline-light btn-sm me-2" id="btn-terminal" type="button" title="Toggle Terminal">
                         <span id="terminal-status" class="badge rounded-pill bg-secondary" style="width:8px;height:8px;display:inline-block;"></span>
                         <span class="bin-icon" data-icon="terminal"></span><span class="nav-label">Terminal</span>
@@ -243,6 +256,17 @@
         </div>
     </div>
 </nav>
+
+<!-- Mobile Transport Bar (below navbar, visible on mobile only) -->
+<div class="mobile-transport-bar d-md-none">
+    <div class="radio-controls">
+        <button class="radio-btn" id="radio-prev-mobile" title="Previous">⏮</button>
+        <button class="radio-btn radio-btn-play" id="radio-play-mobile" title="Play BBS Radio">▶</button>
+        <button class="radio-btn" id="radio-next-mobile" title="Next">⏭</button>
+    </div>
+    <span class="radio-track-name" id="radio-track-mobile">♫ Radio</span>
+    <input type="range" id="radio-volume-mobile" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+</div>
 
 <!-- Terminal Panel (persistent, hidden by default) -->
 <?xjs if (settings.ftelnet) { ?>

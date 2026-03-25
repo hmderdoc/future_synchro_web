@@ -196,6 +196,14 @@
         startAnim();
         fetchLyrics();
 
+        // Auto-start music if nothing is playing
+        var radio = window.sbbsRadio;
+        if (radio && !radio.isPlaying) {
+            // Trigger play via the play button click
+            var playBtn = document.getElementById("radio-play") || document.getElementById("radio-play-mobile");
+            if (playBtn) playBtn.click();
+        }
+
         console.log('[viz] opened');
     }
 
@@ -616,6 +624,14 @@
         lrcIndex  = -1;
         if (elLyrics) elLyrics.textContent = '';
         if (isOpen) fetchLyrics();
+
+        // Auto-start music if nothing is playing
+        var radio = window.sbbsRadio;
+        if (radio && !radio.isPlaying) {
+            // Trigger play via the play button click
+            var playBtn = document.getElementById("radio-play") || document.getElementById("radio-play-mobile");
+            if (playBtn) playBtn.click();
+        }
     }
 
     function fetchLyrics() {
