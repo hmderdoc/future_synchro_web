@@ -18,6 +18,7 @@
     var presetKeys    = [];
     var presetIndex   = 0;
     var presetTimer   = null;
+    var presetMap     = null;   // cached preset map from getPresets()
 
     // Canvas refs
     var milkCanvas    = null;   // Butterchurn WebGL
@@ -205,7 +206,16 @@
         }
 
         try {
-            var BC = window.butterchurn.default || window.butterchurn;
+            // v3 UMD: createVisualizer is on window.butterchurn directly
+            // v2 UMD: createVisualizer is on window.butterchurn.default
+            var BC = (typeof window.butterchurn.createVisualizer === 'function')
+                   ? window.butterchurn
+                   : window.butterchurn.default;
+            if (!BC || !BC.createVisualizer) {
+                console.error('[viz] butterchurn.createVisualizer not found');
+                return;
+            }
+
             bcViz = BC.createVisualizer(
                 radio.audioCtx, milkCanvas,
                 {
@@ -219,30 +229,35 @@
 
             bcViz.connectAudio(radio.analyserNode || radio.gainNode);
 
+            // Load presets (handle both v2 and v3 export styles)
             if (window.butterchurnPresets) {
-                var BP = window.butterchurnPresets.default || window.butterchurnPresets;
-                var all = BP.getPresets();
-                presetKeys = Object.keys(all);
+                var BP = window.butterchurnPresets;
+                if (typeof BP.getPresets !== 'function' && BP.default) {
+                    BP = BP.default;
+                }
+                if (typeof BP.getPresets === 'function') {
+                    presetMap = BP.getPresets();
+                    presetKeys = Object.keys(presetMap);
+                }
                 if (presetKeys.length) {
                     presetIndex = Math.floor(Math.random() * presetKeys.length);
-                    bcViz.loadPreset(all[presetKeys[presetIndex]], 0);
+                    bcViz.loadPreset(presetMap[presetKeys[presetIndex]], 0);
+                    console.log('[viz] butterchurn loaded ' + presetKeys.length + ' presets');
                     console.log('[viz] preset:', presetKeys[presetIndex]);
                     presetTimer = setInterval(cyclePreset,
                         25000 + Math.random() * 15000);
                 }
             }
-            console.log('[viz] butterchurn ready');
+            console.log('[viz] butterchurn ready (v' + (BC === window.butterchurn ? '3' : '2') + ')');
         } catch (e) {
             console.error('[viz] butterchurn init failed:', e);
         }
     }
 
     function cyclePreset() {
-        if (!bcViz || !presetKeys.length) return;
+        if (!bcViz || !presetKeys.length || !presetMap) return;
         presetIndex = Math.floor(Math.random() * presetKeys.length);
-        var BP = window.butterchurnPresets.default || window.butterchurnPresets;
-        var all = BP.getPresets();
-        bcViz.loadPreset(all[presetKeys[presetIndex]], 2.0);
+        bcViz.loadPreset(presetMap[presetKeys[presetIndex]], 2.0);
     }
 
     // =========================================================
