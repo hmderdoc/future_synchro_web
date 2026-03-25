@@ -33,9 +33,9 @@
     var vizRAF    = null;
 
     // --- DOM refs (set in init) ---
-    var elPlay, elPrev, elNext, elTrack, elViz, elVizDesktop, elVolume;
+    var elPlay, elPrev, elNext, elTrack, elViz, elVolume;
     var elPanel, elSearch, elTracklist, elContainer;
-    var vizW, vizH, vizCtx, vizCtxDesktop;
+    var vizW, vizH, vizCtx;
 
     // =========================================================
     //  Init
@@ -79,8 +79,6 @@
             console.log('[radio] playing:', audio.src);
             isPlaying = true;
             elPlay.textContent = '\u275A\u275A'; // ❚❚ (pause icon)
-            syncMobileUI();
-            syncMobileUI();
             startViz();
         });
 
@@ -88,8 +86,6 @@
             if (!audio.ended) {
                 isPlaying = false;
                 elPlay.textContent = '\u25B6'; // ▶
-                syncMobileUI();
-                syncMobileUI();
                 // stopViz(); -- keep running for karaoke sign
             }
         });
@@ -140,82 +136,6 @@
         };
 
         // Fetch playlist from server
-
-        // --- Mobile controls (duplicates for mobile transport bar) ---
-        var elPlayMobile = document.getElementById('radio-play-mobile');
-        var elPrevMobile = document.getElementById('radio-prev-mobile');
-        var elNextMobile = document.getElementById('radio-next-mobile');
-        var elTrackMobile = document.getElementById('radio-track-mobile');
-        var elVolumeMobile = document.getElementById('radio-volume-mobile');
-        var elTermMobile = document.getElementById('btn-terminal-mobile');
-        elVizDesktop = document.getElementById('radio-viz-desktop');
-
-        // Bind mobile transport controls
-        if (elPlayMobile) elPlayMobile.addEventListener('click', togglePlay);
-        if (elPrevMobile) elPrevMobile.addEventListener('click', prevTrack);
-        if (elNextMobile) elNextMobile.addEventListener('click', nextTrack);
-        if (elVolumeMobile) {
-            elVolumeMobile.addEventListener('input', function () {
-                var vol = parseFloat(elVolumeMobile.value);
-                if (gainNode) gainNode.gain.value = vol;
-                audio.volume = vol;
-                if (elVolume) elVolume.value = vol;
-            });
-        }
-        if (elTermMobile && window.sbbsTerminal) {
-            elTermMobile.addEventListener('click', function() {
-                window.sbbsTerminal.toggle();
-            });
-        }
-
-        // Desktop radio viz (after volume) opens visualizer & init context
-        if (elVizDesktop) {
-            elVizDesktop.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (window.sbbsVisualizer) window.sbbsVisualizer.toggle();
-            });
-            elVizDesktop.style.cursor = 'pointer';
-            elVizDesktop.title = 'Click to open visualizer';
-            vizCtxDesktop = elVizDesktop.getContext('2d');
-        }
-
-        // --- Mobile controls (duplicates for mobile transport bar) ---
-        var elPlayMobile = document.getElementById('radio-play-mobile');
-        var elPrevMobile = document.getElementById('radio-prev-mobile');
-        var elNextMobile = document.getElementById('radio-next-mobile');
-        var elTrackMobile = document.getElementById('radio-track-mobile');
-        var elVolumeMobile = document.getElementById('radio-volume-mobile');
-        var elTermMobile = document.getElementById('btn-terminal-mobile');
-        elVizDesktop = document.getElementById('radio-viz-desktop');
-
-        // Bind mobile transport controls
-        if (elPlayMobile) elPlayMobile.addEventListener('click', togglePlay);
-        if (elPrevMobile) elPrevMobile.addEventListener('click', prevTrack);
-        if (elNextMobile) elNextMobile.addEventListener('click', nextTrack);
-        if (elVolumeMobile) {
-            elVolumeMobile.addEventListener('input', function () {
-                var vol = parseFloat(elVolumeMobile.value);
-                if (gainNode) gainNode.gain.value = vol;
-                audio.volume = vol;
-                if (elVolume) elVolume.value = vol;
-            });
-        }
-        if (elTermMobile && window.sbbsTerminal) {
-            elTermMobile.addEventListener('click', function() {
-                window.sbbsTerminal.toggle();
-            });
-        }
-
-        // Desktop radio viz (after volume) opens visualizer & init context
-        if (elVizDesktop) {
-            elVizDesktop.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (window.sbbsVisualizer) window.sbbsVisualizer.toggle();
-            });
-            elVizDesktop.style.cursor = 'pointer';
-            elVizDesktop.title = 'Click to open visualizer';
-            vizCtxDesktop = elVizDesktop.getContext('2d');
-        }
         fetchPlaylist();
     }
 
@@ -347,32 +267,6 @@
     // =========================================================
     //  Transport controls
     // =========================================================
-
-    // Sync mobile and desktop UI elements
-    function syncMobileUI() {
-        var elPlayMobile = document.getElementById('radio-play-mobile');
-        var elTrackMobile = document.getElementById('radio-track-mobile');
-        if (elPlayMobile && elPlay) {
-            elPlayMobile.textContent = elPlay.textContent;
-        }
-        if (elTrackMobile && elTrack) {
-            elTrackMobile.textContent = elTrack.textContent;
-        }
-    }
-
-
-    // Sync mobile and desktop UI elements
-    function syncMobileUI() {
-        var elPlayMobile = document.getElementById('radio-play-mobile');
-        var elTrackMobile = document.getElementById('radio-track-mobile');
-        if (elPlayMobile && elPlay) {
-            elPlayMobile.textContent = elPlay.textContent;
-        }
-        if (elTrackMobile && elTrack) {
-            elTrackMobile.textContent = elTrack.textContent;
-        }
-    }
-
     function togglePlay() {
         if (playlist.length === 0) return;
         ensureAudioCtx();
@@ -430,8 +324,6 @@
         audio.src = url;
         var display = t.desc || t.name.replace(/\.mp3$/i, '');
         elTrack.textContent = display;
-        syncMobileUI();
-        syncMobileUI();
         elTrack.title       = display;
         highlightCurrent(idx);
         // Notify visualizer of track change
@@ -517,7 +409,6 @@
         // If not playing, always show karaoke sign
         if (!isPlaying || !analyser) {
             drawKaraokeSign();
-            if (vizCtxDesktop && elViz) vizCtxDesktop.drawImage(elViz, 0, 0);
             vizCycleTime = now; // reset cycle
             vizShowEQ = true;   // start with EQ when music resumes
             return;
@@ -538,7 +429,6 @@
         } else {
             drawKaraokeSign();
         }
-        if (vizCtxDesktop && elViz) vizCtxDesktop.drawImage(elViz, 0, 0);
     }
 
     function drawEqualizer() {

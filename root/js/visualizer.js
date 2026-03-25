@@ -192,17 +192,10 @@
         document.body.classList.add('viz-open');
 
         setupCanvases();
-        initButterchurn();
+        // Retry Butterchurn init if audioCtx not ready yet
+        if (!initButterchurn()) { scheduleButterchurnRetry(); }
         startAnim();
         fetchLyrics();
-
-        // Auto-start music if nothing is playing
-        var radio = window.sbbsRadio;
-        if (radio && !radio.isPlaying) {
-            // Trigger play via the play button click
-            var playBtn = document.getElementById("radio-play") || document.getElementById("radio-play-mobile");
-            if (playBtn) playBtn.click();
-        }
 
         console.log('[viz] opened');
     }
@@ -324,13 +317,23 @@
     // =========================================================
     //  Butterchurn (MilkDrop)
     // =========================================================
+    var bcRetryTimer = null;
+
+    function scheduleButterchurnRetry() {
+        if (bcRetryTimer) return;
+        bcRetryTimer = setInterval(function() {
+            if (!isOpen) { clearInterval(bcRetryTimer); bcRetryTimer = null; return; }
+            if (initButterchurn()) { clearInterval(bcRetryTimer); bcRetryTimer = null; }
+        }, 250);
+    }
+
     function initButterchurn() {
-        if (!window.butterchurn || !milkCanvas) return;
+        if (!window.butterchurn || !milkCanvas) return false;
 
         var radio = window.sbbsRadio;
         if (!radio || !radio.audioCtx) {
-            console.warn('[viz] no audio context yet');
-            return;
+            console.warn('[viz] no audio context yet - will retry');
+            return false;
         }
 
         // Check WebGL availability
@@ -338,7 +341,7 @@
         if (!testCtx) {
             console.warn("[viz] WebGL2 not available");
             showWebGLWarning();
-            return;
+            return false;
         }
         try {
             // v3 UMD: createVisualizer is on window.butterchurn directly
@@ -347,8 +350,7 @@
                    ? window.butterchurn
                    : window.butterchurn.default;
             if (!BC || !BC.createVisualizer) {
-                console.error('[viz] butterchurn.createVisualizer not found');
-                return;
+                console.error('[viz] butterchurn.createVisualizer not found'); return false;
             }
 
             bcViz = BC.createVisualizer(
@@ -384,8 +386,10 @@
                 }
             }
             console.log('[viz] butterchurn ready (v' + (BC === window.butterchurn ? '3' : '2') + ')');
+            return true;
         } catch (e) {
             console.error('[viz] butterchurn init failed:', e);
+            return false;
         }
     }
 
@@ -624,14 +628,6 @@
         lrcIndex  = -1;
         if (elLyrics) elLyrics.textContent = '';
         if (isOpen) fetchLyrics();
-
-        // Auto-start music if nothing is playing
-        var radio = window.sbbsRadio;
-        if (radio && !radio.isPlaying) {
-            // Trigger play via the play button click
-            var playBtn = document.getElementById("radio-play") || document.getElementById("radio-play-mobile");
-            if (playBtn) playBtn.click();
-        }
     }
 
     function fetchLyrics() {
