@@ -684,6 +684,9 @@
         // Track changes trigger new color/font for song
         if (ni !== lrcIndex) {
             lrcIndex = ni;
+            // Pick new color and font for EACH line
+            songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
+            songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
             if (ni === 0) {
                 // New song started - pick new color and font
                 songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
@@ -835,9 +838,10 @@
         if (ni !== spitLineIdx) {
             spitLineIdx = ni;
             lastSpitWord = -1;
+            // Pick new color and font for EACH line
+            songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
+            songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
             if (ni === 0) {
-                songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
-                songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
                 spitParticles = [];
             }
         }
@@ -862,14 +866,14 @@
         // Spawn new words when we reach them
         while (lastSpitWord < wordIdx && lastSpitWord < words.length - 1) {
             lastSpitWord++;
-            spawnSpitWord(words[lastSpitWord], scheme, now, w, h);
+            spawnSpitWord(words[lastSpitWord], scheme, fontFamily, now, w, h);
         }
 
         // Render all particles
         renderSpitParticles(now, w, h, fontFamily, scheme);
     }
 
-    function spawnSpitWord(text, scheme, time, w, h) {
+    function spawnSpitWord(text, scheme, fontFamily, time, w, h) {
         // Calculate mouth position in screen space
         var cx = w / 2;
         var cy = h * 0.42;
@@ -914,13 +918,16 @@
             spawnTime: time,
             alpha: 1.0,
             headRotY: headRotY,  // capture rotation at spawn time
-            scheme: scheme
+            scheme: scheme,
+            fontFamily: fontFamily
         });
     }
 
-    function renderSpitParticles(now, w, h, fontFamily, defaultScheme) {
+
+    function renderSpitParticles(now, w, h, defaultFontFamily, defaultScheme) {
         var PARTICLE_LIFETIME = 3.0;  // seconds
         var GRAVITY = 120;  // pixels/sec^2
+        var TURN_RATE = 2.5;  // radians/sec - how fast words curve toward viewer
 
         // Update and render particles
         var activeParticles = [];
@@ -938,14 +945,28 @@
             p.vy += GRAVITY * dt;  // gravity pulls down
             p.z += p.vz * dt;
 
-            // Perspective scale based on z-depth and head rotation
-            var depthScale = 1 + p.z * 0.3;
-            depthScale = Math.max(0.3, Math.min(2.0, depthScale));
+            // Curve the word's rotation toward facing the viewer (0 radians)
+            // This makes backwards words gradually turn to face the camera
+            if (p.headRotY > 0) {
+                p.headRotY = Math.max(0, p.headRotY - TURN_RATE * dt);
+            } else if (p.headRotY < 0) {
+                p.headRotY = Math.min(0, p.headRotY + TURN_RATE * dt);
+            }
+
+            // Perspective scale based on z-depth - BIGGER effect
+            var depthScale = 1 + p.z * 0.6;  // was 0.3
+            depthScale = Math.max(0.4, Math.min(2.5, depthScale));  // wider range
 
             // Horizontal squash based on viewing angle
-            var facingAngle = Math.cos(p.headRotY);
-            var horizScale = Math.abs(facingAngle);
-            horizScale = Math.max(0.1, horizScale);
+            // With 30° tolerance: only squash when more than 60° from center
+            var TOLERANCE = Math.PI / 6;  // 30 degrees
+            var absRot = Math.abs(p.headRotY);
+            var horizScale = 1.0;
+            if (absRot > TOLERANCE) {
+                // Start squashing after tolerance zone
+                horizScale = Math.cos(absRot - TOLERANCE);
+            }
+            horizScale = Math.max(0.15, horizScale);
 
             // Alpha fade over lifetime
             p.alpha = 1 - (age / PARTICLE_LIFETIME);
@@ -958,8 +979,8 @@
 
             activeParticles.push(p);
 
-            // Calculate font size with perspective
-            var baseSize = Math.min(36, Math.max(20, h * 0.045));
+            // Calculate font size with perspective - BIGGER base
+            var baseSize = Math.min(56, Math.max(28, h * 0.07));  // was 36/20/0.045
             var fontSize = baseSize * depthScale;
 
             // Render the word with 3D perspective transform
@@ -969,22 +990,25 @@
             // Apply perspective skew - horizontal compression when sideways
             karaokeCtx.scale(horizScale, 1);
             
-            // Mirror text when facing away (headRotY > PI/2 or < -PI/2)
+            // Mirror text only when VERY far turned (> 150 degrees with tolerance)
+            // This prevents most backwards rendering due to our 30° tolerance
             var normalizedRot = ((p.headRotY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-            var isFacingAway = normalizedRot > Math.PI * 0.5 && normalizedRot < Math.PI * 1.5;
+            var isFacingAway = normalizedRot > (Math.PI * 0.5 + TOLERANCE) && 
+                               normalizedRot < (Math.PI * 1.5 - TOLERANCE);
             if (isFacingAway) {
                 karaokeCtx.scale(-1, 1);  // mirror horizontally
             }
 
-            // Set up text rendering
+            // Set up text rendering - use particle's own font
             var scheme = p.scheme || defaultScheme;
-            karaokeCtx.font = Math.round(fontSize) + 'px ' + fontFamily;
+            var pFont = p.fontFamily || defaultFontFamily;
+            karaokeCtx.font = Math.round(fontSize) + 'px ' + pFont;
             karaokeCtx.textAlign = 'center';
             karaokeCtx.textBaseline = 'middle';
             
-            // Glow effect
+            // Glow effect - bigger glow for bigger text
             karaokeCtx.shadowColor = scheme.glow;
-            karaokeCtx.shadowBlur = 8 + (1 - p.alpha) * 12;
+            karaokeCtx.shadowBlur = 12 + (1 - p.alpha) * 16;
             
             // Text color with alpha
             karaokeCtx.globalAlpha = p.alpha;
