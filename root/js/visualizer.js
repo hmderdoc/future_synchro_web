@@ -205,7 +205,8 @@
         }
 
         try {
-            bcViz = window.butterchurn.createVisualizer(
+            var BC = window.butterchurn.default || window.butterchurn;
+            bcViz = BC.createVisualizer(
                 radio.audioCtx, milkCanvas,
                 {
                     width: milkCanvas.width,
@@ -219,7 +220,8 @@
             bcViz.connectAudio(radio.analyserNode || radio.gainNode);
 
             if (window.butterchurnPresets) {
-                var all = window.butterchurnPresets.getPresets();
+                var BP = window.butterchurnPresets.default || window.butterchurnPresets;
+                var all = BP.getPresets();
                 presetKeys = Object.keys(all);
                 if (presetKeys.length) {
                     presetIndex = Math.floor(Math.random() * presetKeys.length);
@@ -238,7 +240,8 @@
     function cyclePreset() {
         if (!bcViz || !presetKeys.length) return;
         presetIndex = Math.floor(Math.random() * presetKeys.length);
-        var all = window.butterchurnPresets.getPresets();
+        var BP = window.butterchurnPresets.default || window.butterchurnPresets;
+        var all = BP.getPresets();
         bcViz.loadPreset(all[presetKeys[presetIndex]], 2.0);
     }
 
