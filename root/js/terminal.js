@@ -277,6 +277,8 @@
 
     function showPanel(skipAnimation) {
         if (!panel || isAnimating) return;
+        // Close visualizer if open
+        if (window.sbbsVisualizer && window.sbbsVisualizer.hide) window.sbbsVisualizer.hide();
         getNavbarHeight();
         document.body.classList.add('terminal-open');
 

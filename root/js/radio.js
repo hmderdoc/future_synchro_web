@@ -124,6 +124,16 @@
         vizH   = elViz.height;
         vizCtx = elViz.getContext('2d');
 
+        // Expose internals for visualizer
+        window.sbbsRadio = {
+            get audioCtx()        { return audioCtx; },
+            get analyserNode()    { return analyser; },
+            get gainNode()        { return gainNode; },
+            get audioEl()         { return audio; },
+            get currentTrackFile(){ return playlist[queue[queuePos]] ? playlist[queue[queuePos]].name : ''  ; },
+            get isPlaying()       { return isPlaying; }
+        };
+
         // Fetch playlist from server
         fetchPlaylist();
     }
@@ -315,6 +325,12 @@
         elTrack.textContent = display;
         elTrack.title       = display;
         highlightCurrent(idx);
+        // Notify visualizer of track change
+        try {
+            document.dispatchEvent(new CustomEvent('radio:trackchange', {
+                detail: { filename: t.name, display: display }
+            }));
+        } catch(e) {}
     }
 
     // =========================================================

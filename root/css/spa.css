@@ -1423,3 +1423,139 @@ div.message pre.ansi {
         right: -40px;
     }
 }
+
+/* =========================================================
+   Visualizer Panel
+   ========================================================= */
+
+/* Full-viewport overlay, mirrors terminal-panel pattern */
+.viz-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1040;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--navbar-h, 56px);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.viz-panel.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.viz-open {
+    overflow: hidden;
+}
+
+/* Canvas container: fills available space */
+.viz-canvas-container {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+}
+
+/* Stacked canvases (MilkDrop below, wireframe above) */
+.viz-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+#viz-milkdrop {
+    z-index: 0;
+    opacity: 0.55; /* dim MilkDrop so wireframe pops */
+}
+#viz-wireframe {
+    z-index: 1;
+}
+
+/* Close button */
+.viz-close {
+    position: absolute;
+    top: calc(var(--navbar-h, 56px) + 8px);
+    right: 16px;
+    z-index: 10;
+    background: transparent;
+    border: 1px solid rgba(51, 255, 51, 0.4);
+    color: #33FF33;
+    font-size: 1.6rem;
+    width: 36px;
+    height: 36px;
+    line-height: 1;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+.viz-close:hover {
+    background: rgba(51, 255, 51, 0.15);
+    border-color: #33FF33;
+}
+
+/* Lyrics overlay */
+.viz-lyrics {
+    position: absolute;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    max-width: 80%;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    font-size: clamp(1rem, 2.5vw, 2rem);
+    color: #33FF33;
+    text-shadow:
+        0 0 6px #33FF33,
+        0 0 18px rgba(51, 255, 51, 0.5),
+        0 0 40px rgba(51, 255, 51, 0.2);
+    opacity: 0.9;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Lyric flash animation */
+@keyframes viz-lyric-pop {
+    0%   { transform: translateX(-50%) scale(1.08); opacity: 1; }
+    100% { transform: translateX(-50%) scale(1);    opacity: 0.9; }
+}
+.viz-lyric-flash {
+    animation: viz-lyric-pop 0.3s ease-out;
+}
+
+/* Subtle scanline overlay on viz panel */
+.viz-panel::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.04) 2px,
+        rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 8;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767.98px) {
+    .viz-panel {
+        padding-top: var(--navbar-h, 48px);
+    }
+    .viz-close {
+        top: calc(var(--navbar-h, 48px) + 4px);
+        right: 8px;
+    }
+    .viz-lyrics {
+        max-width: 92%;
+        font-size: clamp(0.85rem, 3.5vw, 1.5rem);
+    }
+}

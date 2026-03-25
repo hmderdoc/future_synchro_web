@@ -248,6 +248,13 @@
 </div>
 <?xjs } ?>
 
+<!-- Visualizer Panel (hidden by default, toggled via radio-viz click) -->
+<div id="viz-panel" class="viz-panel is-hidden" aria-hidden="true">
+    <button class="viz-close" title="Close Visualizer">&times;</button>
+    <div class="viz-canvas-container"></div>
+    <div class="viz-lyrics"></div>
+</div>
+
 <!-- Modal (BS5) -->
 <div class="modal fade" id="popUpModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -333,6 +340,9 @@
 <?xjs } ?>
 <script src="./js/spa.js?_v=<? write(time()); ?>"></script>
 <script src="./js/radio.js?_v=<? write(time()); ?>"></script>
+<script src="./lib/butterchurn.min.js"></script>
+<script src="./lib/butterchurnPresets.min.js"></script>
+<script src="./js/visualizer.js?_v=<? write(time()); ?>"></script>
 <div id="chat-toasts"></div>
 
 <!-- PWA Service Worker -->
