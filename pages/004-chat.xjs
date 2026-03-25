@@ -5,6 +5,7 @@
     --chat-panel: #111111;
     --chat-panel-alt: #171717;
     --chat-border: #2b2b2b;
+    --chat-border-soft: rgba(255, 255, 255, 0.08);
     --chat-muted: #9e9e9e;
     --chat-fg: #efefef;
     --chat-accent: #34c6d3;
@@ -12,35 +13,64 @@
     --chat-other: #2a2a2a;
     --chat-system: #666666;
     color: var(--chat-fg);
+    min-height: 0;
+    padding: 0.9rem 0 0.45rem;
 }
 .chat-web-page .chat-web-shell {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    min-height: calc(100vh - 180px);
+    gap: 0;
+    height: calc(100vh - 148px);
+    height: calc(100dvh - 148px);
+    min-height: 0;
+    overflow: hidden;
+    padding: 1rem;
+    border: 1px solid var(--chat-border-soft);
+    border-radius: 1.35rem;
+    background:
+        radial-gradient(circle at top left, rgba(52, 198, 211, 0.12), transparent 32%),
+        linear-gradient(180deg, rgba(15, 15, 18, 0.96), rgba(8, 8, 10, 0.97));
+    box-shadow:
+        0 22px 48px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .chat-web-page .chat-web-layout {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
-    gap: 1rem;
+    gap: 1.1rem;
     align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 .chat-web-page .chat-web-sidebar,
 .chat-web-page .chat-web-main {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    min-height: 0;
 }
 .chat-web-page .chat-web-sidebar {
-    border: 1px solid var(--chat-border);
-    border-radius: 1rem;
-    background: var(--chat-panel);
-    padding: 0.9rem;
+    border: 1px solid var(--chat-border-soft);
+    border-radius: 1.1rem;
+    background: linear-gradient(180deg, rgba(18, 18, 20, 0.95), rgba(10, 10, 12, 0.96));
+    padding: 1rem;
+    overflow-y: auto;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.chat-web-page .chat-web-main {
+    min-width: 0;
+    overflow: hidden;
+    gap: 0;
 }
 .chat-web-page .chat-web-sidebar-section {
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
+}
+.chat-web-page .chat-web-sidebar-section + .chat-web-sidebar-section {
+    margin-top: 0.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .chat-web-page .chat-web-sidebar-header {
     display: flex;
@@ -54,6 +84,7 @@
 }
 .chat-web-page .chat-web-sidebar-heading {
     color: #5555ff;
+    letter-spacing: 0.04em;
 }
 .chat-web-page .chat-web-sidebar-form,
 .chat-web-page .chat-web-form {
@@ -63,26 +94,28 @@
 .chat-web-page .chat-web-sidebar-input,
 .chat-web-page .chat-web-input {
     flex: 1 1 auto;
-    border: 1px solid var(--chat-border);
-    background: #0b0b0b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #0b0b0c;
     color: var(--chat-fg);
-    border-radius: 0.75rem;
-    padding: 0.75rem 0.9rem;
+    border-radius: 0.9rem;
+    padding: 0.8rem 0.95rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .chat-web-page .chat-web-sidebar-button,
 .chat-web-page .chat-web-send,
 .chat-web-page .chat-web-status-button,
 .chat-web-page .chat-web-users-close {
-    border: 1px solid var(--chat-border);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     background: var(--chat-panel-alt);
     color: var(--chat-fg);
-    border-radius: 0.65rem;
-    padding: 0.55rem 0.8rem;
+    border-radius: 0.85rem;
+    padding: 0.65rem 0.9rem;
 }
 .chat-web-page .chat-web-send {
     background: var(--chat-accent);
     color: #041013;
     font-weight: bold;
+    min-width: 88px;
 }
 .chat-web-page .chat-web-nav-list {
     display: flex;
@@ -94,19 +127,20 @@
     color: var(--chat-muted);
 }
 .chat-web-page .chat-web-nav-item {
-    border: 1px solid var(--chat-border);
-    background: #0d0d0d;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(180deg, rgba(13, 13, 13, 0.96), rgba(10, 10, 10, 0.96));
     color: var(--chat-fg);
-    border-radius: 0.8rem;
-    padding: 0.7rem 0.8rem;
+    border-radius: 0.95rem;
+    padding: 0.8rem 0.9rem;
     text-align: left;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 .chat-web-page .chat-web-nav-item.is-active {
     border-color: var(--chat-accent);
-    background: #0c1619;
+    background: linear-gradient(180deg, rgba(10, 24, 28, 0.96), rgba(8, 18, 22, 0.96));
 }
 .chat-web-page .chat-web-nav-top {
     display: flex;
@@ -129,6 +163,39 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.chat-web-page .chat-web-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-top: 0.2rem;
+}
+.chat-web-page .chat-web-nav-action,
+.chat-web-page .chat-web-nav-state {
+    border: 1px solid var(--chat-border);
+    border-radius: 999px;
+    padding: 0.32rem 0.72rem;
+    font-size: 0.82rem;
+    line-height: 1.2;
+}
+.chat-web-page .chat-web-nav-action {
+    background: var(--chat-panel-alt);
+    color: var(--chat-fg);
+    cursor: pointer;
+}
+.chat-web-page .chat-web-nav-action.is-primary {
+    background: var(--chat-accent);
+    border-color: transparent;
+    color: #041013;
+    font-weight: bold;
+}
+.chat-web-page .chat-web-nav-state {
+    display: inline-flex;
+    align-items: center;
+    background: #0f1d21;
+    border-color: rgba(52, 198, 211, 0.35);
+    color: var(--chat-accent);
+}
 .chat-web-page .chat-web-badge {
     display: inline-flex;
     align-items: center;
@@ -147,9 +214,22 @@
 }
 .chat-web-page .chat-web-thread-row {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 12px 48px minmax(0, 1fr);
     gap: 0.65rem;
     align-items: center;
+}
+.chat-web-page .chat-web-presence-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.chat-web-page .chat-web-presence-dot.is-online {
+    background: #32d46b;
+}
+.chat-web-page .chat-web-presence-dot.is-offline {
+    background: #d45151;
 }
 .chat-web-page .chat-web-thread-avatar {
     width: 48px;
@@ -229,10 +309,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border: 1px solid var(--chat-border);
-    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.9rem;
     padding: 0.75rem 0.9rem;
     background: #101010;
+    margin: 0.85rem 0.85rem 0;
 }
 .chat-web-page .chat-web-status.is-visible {
     display: flex;
@@ -245,36 +326,35 @@
     border-color: #9c3b3b;
     background: #190909;
 }
-.chat-web-page .chat-web-users {
-    display: none;
-    border: 1px solid var(--chat-border);
-    background: var(--chat-panel);
-    border-radius: 0.75rem;
-    padding: 0.75rem;
-}
-.chat-web-page .chat-web-users.is-open {
-    display: block;
+.chat-web-page .chat-web-users-modal-card {
+    width: min(560px, 100%);
+    max-height: min(72vh, 640px);
 }
 .chat-web-page .chat-web-users-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
 }
 .chat-web-page .chat-web-users-list {
     display: grid;
     gap: 0.5rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    padding-right: 0.15rem;
 }
 .chat-web-page .chat-web-user {
     display: grid;
     grid-template-columns: 56px 1fr;
     gap: 0.6rem;
     align-items: center;
-    border: 1px solid var(--chat-border);
-    background: #0d0d0d;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(180deg, rgba(14, 14, 16, 0.96), rgba(10, 10, 12, 0.96));
     color: var(--chat-fg);
     border-radius: 0.75rem;
-    padding: 0.55rem;
+    padding: 0.65rem;
     text-align: left;
 }
 .chat-web-page .chat-web-user-avatar,
@@ -295,6 +375,18 @@
     max-width: 100%;
     max-height: 100%;
     image-rendering: pixelated;
+}
+.chat-web-page .chat-web-chatpanel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--chat-border-soft);
+    border-radius: 1.15rem;
+    background:
+        linear-gradient(180deg, rgba(6, 6, 7, 0.98), rgba(10, 10, 11, 0.99));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .chat-web-page .chat-web-avatar-placeholder {
     display: flex;
@@ -323,13 +415,14 @@
     gap: 0.2rem;
 }
 .chat-web-page .chat-web-messages {
-    flex: 1 1 auto;
-    border: 1px solid var(--chat-border);
-    background: var(--chat-bg);
-    border-radius: 1rem;
-    padding: 1rem;
+    flex: 1 1 0;
+    border: 0;
+    background: transparent;
+    border-radius: 0;
+    padding: 1rem 1rem 0.85rem;
     overflow-y: auto;
-    min-height: 440px;
+    min-height: 0;
+    margin: 0;
 }
 .chat-web-page .chat-web-system {
     text-align: center;
@@ -380,9 +473,62 @@
     background: var(--chat-other);
     color: var(--chat-fg);
 }
+.chat-web-page .chat-bubble.chat-bitmap-bubble {
+    padding: 0.45rem;
+    overflow: hidden;
+}
+.chat-web-page .chat-bitmap-shell {
+    width: 100%;
+}
+.chat-web-page .chat-bitmap-frame {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.65rem;
+    background: #000000;
+    overflow: hidden;
+}
+.chat-web-page .chat-bitmap-stage {
+    width: 100%;
+    background: #000000;
+    position: relative;
+}
+.chat-web-page .chat-bitmap-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 7rem;
+    padding: 0.9rem;
+    color: var(--chat-muted);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+.chat-web-page .chat-bitmap-stage.is-error .chat-bitmap-placeholder {
+    color: #ff8f8f;
+}
+.chat-web-page .chat-bitmap-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    background: #000000;
+}
+.chat-web-page .chat-web-form {
+    margin: 0;
+    padding: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+}
 .chat-web-page .chat-web-login {
     color: var(--chat-muted);
     text-align: center;
+    margin: 0;
+    padding: 1rem 1rem 1.1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
 }
 .chat-web-page .chat-web-login a {
     color: var(--chat-accent);
@@ -390,14 +536,30 @@
 @media (max-width: 980px) {
     .chat-web-page .chat-web-layout {
         grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+        gap: 0.9rem;
+    }
+    .chat-web-page .chat-web-sidebar {
+        max-height: 34vh;
     }
 }
 @media (max-width: 768px) {
+    .chat-web-page {
+        padding-top: 0.7rem;
+    }
+    .chat-web-page .chat-web-shell {
+        height: calc(100vh - 128px);
+        height: calc(100dvh - 128px);
+        padding: 0.8rem;
+    }
     .chat-web-page .chat-web-group {
         max-width: 100%;
     }
     .chat-web-page .chat-web-messages {
-        min-height: 360px;
+        min-height: 0;
+        padding: 0.85rem 0.85rem 0.7rem;
+    }
+    .chat-web-page .chat-web-form {
         padding: 0.75rem;
     }
 }
@@ -426,42 +588,38 @@
             </aside>
 
             <div class="chat-web-main">
-                <div class="chat-web-topbar">
-                    <div>
-                        <h3 class="chat-web-title"><i class="bi bi-chat-dots me-2"></i>Chat</h3>
-                        <div class="chat-web-channel">View: <span id="chat-view-label">#main</span></div>
+                <div class="chat-web-chatpanel">
+                    <div id="chat-status" class="chat-web-status" role="alert" aria-live="polite">
+                        <div id="chat-status-text"></div>
+                        <button id="chat-status-retry" class="chat-web-status-button" type="button">Retry now</button>
                     </div>
-                    <button id="chat-user-count" class="chat-web-count" type="button">0 users</button>
-                </div>
 
-                <div id="chat-status" class="chat-web-status" role="alert" aria-live="polite">
-                    <div id="chat-status-text"></div>
-                    <button id="chat-status-retry" class="chat-web-status-button" type="button">Retry now</button>
-                </div>
-
-                <div id="chat-users-panel" class="chat-web-users">
-                    <div class="chat-web-users-header">
-                        <strong>Online Users</strong>
-                        <button id="chat-users-close" class="chat-web-users-close" type="button">&times;</button>
+                    <div id="chat-messages" class="chat-web-messages chat-messages">
+                        <div class="chat-web-empty">Loading chat history...</div>
                     </div>
-                    <div id="chat-users-list" class="chat-web-users-list"></div>
-                </div>
-
-                <div id="chat-messages" class="chat-messages flex-grow-1 mb-2">
-                    <div class="chat-web-empty">Loading chat history...</div>
-                </div>
 
 <?xjs if (user.number > 0) { ?>
-                <form id="chat-input" class="chat-input-area chat-web-form" autocomplete="off">
-                    <input type="text" id="chat-text" class="chat-web-input" maxlength="500" placeholder="Type a message...">
-                    <button class="chat-web-send" type="submit">Send</button>
-                </form>
+                    <form id="chat-input" class="chat-input-area chat-web-form" autocomplete="off">
+                        <input type="text" id="chat-text" class="chat-web-input" maxlength="500" placeholder="Type a message...">
+                        <button class="chat-web-send" type="submit">Send</button>
+                    </form>
 <?xjs } else { ?>
-                <div class="chat-web-login">
-                    You are viewing a snapshot of recent chat. <a href="/?page=000-login.xjs">Log in</a> for live updates, messaging, and private chats.
-                </div>
+                    <div class="chat-web-login">
+                        You are viewing a snapshot of recent chat. <a href="/?page=000-login.xjs">Log in</a> for live updates, messaging, and private chats.
+                    </div>
 <?xjs } ?>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <div id="chat-users-modal" class="chat-web-modal" aria-hidden="true">
+        <div id="chat-users-panel" class="chat-web-modal-card chat-web-users-modal-card" role="dialog" aria-modal="true" aria-labelledby="chat-users-title">
+            <div class="chat-web-users-header">
+                <strong id="chat-users-title">Users in #main</strong>
+                <button id="chat-users-close" class="chat-web-users-close" type="button">&times;</button>
+            </div>
+            <div id="chat-users-list" class="chat-web-users-list"></div>
         </div>
     </div>
 
@@ -504,17 +662,22 @@
     var roomModal = document.getElementById('chat-room-modal');
     var roomClose = document.getElementById('chat-room-close');
     var roomCancel = document.getElementById('chat-room-cancel');
+    var usersModal = document.getElementById('chat-users-modal');
     var viewLabel = document.getElementById('chat-view-label');
     var userCount = document.getElementById('chat-user-count');
     var statusBox = document.getElementById('chat-status');
     var statusText = document.getElementById('chat-status-text');
     var statusRetry = document.getElementById('chat-status-retry');
     var usersPanel = document.getElementById('chat-users-panel');
+    var usersTitle = document.getElementById('chat-users-title');
     var usersList = document.getElementById('chat-users-list');
     var usersClose = document.getElementById('chat-users-close');
     var msgContainer = document.getElementById('chat-messages');
     var chatInput = document.getElementById('chat-input');
     var chatText = document.getElementById('chat-text');
+    var usersPanelRoom = getActiveView().currentChannel || 'main';
+    var usersPanelUsers = Array.isArray(users) ? users.slice() : [];
+    var usersPanelRequestToken = 0;
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
@@ -603,6 +766,11 @@
         };
     }
 
+    function getCurrentChannelName() {
+        var activeView = getActiveView();
+        return sanitizeChannelName(activeView.currentChannel || (activeView.type === 'channel' ? activeView.name : 'main') || 'main');
+    }
+
     function updateQueryString(view) {
         var next;
 
@@ -631,6 +799,12 @@
     function renderEmbeddedAvatars(root) {
         if (chatService && chatService._renderEmbeddedAvatars) {
             chatService._renderEmbeddedAvatars(root);
+        }
+    }
+
+    function renderEmbeddedBitmaps(root) {
+        if (chatService && chatService._renderEmbeddedBitmaps) {
+            chatService._renderEmbeddedBitmaps(root);
         }
     }
 
@@ -687,9 +861,79 @@
         }
     }
 
+    function renderUsersTitle() {
+        if (!usersTitle) {
+            return;
+        }
+
+        usersTitle.textContent = 'Users in #' + sanitizeChannelName(usersPanelRoom || getCurrentChannelName());
+    }
+
+    function loadUsersForRoom(roomName, silent) {
+        var requestedRoom = sanitizeChannelName(roomName || getCurrentChannelName());
+        var requestToken = ++usersPanelRequestToken;
+
+        return window.fetch('./api/chat.ssjs?action=who&channel=' + encodeURIComponent(requestedRoom), {
+            credentials: 'same-origin'
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('Unable to fetch room roster');
+            }
+
+            return response.json();
+        }).then(function (payload) {
+            if (payload && payload.error) {
+                throw new Error(String(payload.error));
+            }
+            if (
+                requestToken !== usersPanelRequestToken ||
+                normalizeUpper(usersPanelRoom) !== normalizeUpper(requestedRoom)
+            ) {
+                return false;
+            }
+
+            usersPanelUsers = payload && Array.isArray(payload.users) ? payload.users : [];
+            renderUsers();
+            return true;
+        }).catch(function () {
+            if (!silent) {
+                renderStatus({
+                    type: 'warning',
+                    message: 'Unable to load the room user list right now.',
+                    showRetry: false
+                });
+            }
+            return false;
+        });
+    }
+
+    function openUsersPanelForRoom(roomName) {
+        usersPanelRoom = sanitizeChannelName(roomName || getCurrentChannelName());
+        renderUsersTitle();
+        if (usersModal) {
+            usersModal.classList.add('is-open');
+            usersModal.setAttribute('aria-hidden', 'false');
+        }
+
+        if (normalizeUpper(usersPanelRoom) === normalizeUpper(getCurrentChannelName())) {
+            usersPanelUsers = Array.isArray(users) ? users.slice() : [];
+            renderUsers();
+        }
+
+        loadUsersForRoom(usersPanelRoom, true);
+    }
+
+    function closeUsersModal() {
+        if (!usersModal) {
+            return;
+        }
+
+        usersModal.classList.remove('is-open');
+        usersModal.setAttribute('aria-hidden', 'true');
+    }
+
     function updateUserCountButton() {
-        var activeView = getActiveView();
-        var currentChannel = activeView.currentChannel || activeView.name || 'main';
+        var currentChannel = getCurrentChannelName();
         var count = users.length;
         var rooms = getRooms();
 
@@ -729,13 +973,17 @@
 
     function renderRooms() {
         var rooms = getRooms().filter(function (room) {
-            return room.isActive || (room.userCount || 0) > 0 || (room.unreadCount || 0) > 0;
+            return normalizeUpper(room.name) === normalizeUpper(getCurrentChannelName()) || (room.userCount || 0) > 0 || (room.unreadCount || 0) > 0;
         }).slice();
         var html = '';
+        var currentChannel = getCurrentChannelName();
 
         rooms.sort(function (a, b) {
-            if ((a.isActive ? 1 : 0) !== (b.isActive ? 1 : 0)) {
-                return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
+            var aCurrent = normalizeUpper(a.name) === normalizeUpper(currentChannel) ? 1 : 0;
+            var bCurrent = normalizeUpper(b.name) === normalizeUpper(currentChannel) ? 1 : 0;
+
+            if (aCurrent !== bCurrent) {
+                return bCurrent - aCurrent;
             }
             if ((a.unreadCount || 0) !== (b.unreadCount || 0)) {
                 return (b.unreadCount || 0) - (a.unreadCount || 0);
@@ -750,7 +998,9 @@
         }
 
         rooms.forEach(function (room) {
-            html += '<button type="button" class="chat-web-nav-item' + (room.isActive ? ' is-active' : '') + '" data-room="' + escapeAttr(room.name) + '">';
+            var isCurrent = normalizeUpper(room.name) === normalizeUpper(currentChannel);
+
+            html += '<div class="chat-web-nav-item' + (isCurrent ? ' is-active' : '') + '">';
             html += '<div class="chat-web-nav-top">';
             html += '<span class="chat-web-nav-title">#' + escapeHtml(room.name) + '</span>';
             if ((room.unreadCount || 0) > 0) {
@@ -758,7 +1008,15 @@
             }
             html += '</div>';
             html += '<div class="chat-web-nav-secondary">' + escapeHtml(String(room.userCount || 0)) + ' user' + ((room.userCount || 0) === 1 ? '' : 's') + '</div>';
-            html += '</button>';
+            html += '<div class="chat-web-nav-actions">';
+            if (isCurrent) {
+                html += '<span class="chat-web-nav-state">Current</span>';
+            } else {
+                html += '<button type="button" class="chat-web-nav-action is-primary" data-room-join="' + escapeAttr(room.name) + '">Join</button>';
+            }
+            html += '<button type="button" class="chat-web-nav-action" data-room-users="' + escapeAttr(room.name) + '">Users</button>';
+            html += '</div>';
+            html += '</div>';
         });
 
         roomsList.innerHTML = html;
@@ -766,12 +1024,16 @@
     }
 
     function renderPrivateThreads() {
-        var threads = getPrivateThreads().filter(function (thread) {
-            return thread.isActive || thread.isOnline;
-        }).slice();
+        var threads = getPrivateThreads().slice();
         var html = '';
 
         threads.sort(function (a, b) {
+            var aOnline = a.isOnline ? 1 : 0;
+            var bOnline = b.isOnline ? 1 : 0;
+
+            if (aOnline !== bOnline) {
+                return bOnline - aOnline;
+            }
             if ((a.isActive ? 1 : 0) !== (b.isActive ? 1 : 0)) {
                 return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
             }
@@ -782,15 +1044,17 @@
         });
 
         if (!threads.length) {
-            privateList.innerHTML = '<div class="chat-web-nav-empty">No private chats online.</div>';
+            privateList.innerHTML = '<div class="chat-web-nav-empty">No private chats yet.</div>';
             return;
         }
 
         threads.forEach(function (thread) {
             var initial = thread.name ? thread.name.charAt(0).toUpperCase() : '?';
+            var statusClass = thread.isOnline ? 'is-online' : 'is-offline';
 
             html += '<button type="button" class="chat-web-nav-item' + (thread.isActive ? ' is-active' : '') + '" data-private-nav="' + escapeAttr(thread.name) + '" data-private-system="' + escapeAttr(thread.system || '') + '" data-private-avatar="' + escapeAttr(thread.avatar || '') + '">';
             html += '<div class="chat-web-thread-row">';
+            html += '<span class="chat-web-presence-dot ' + statusClass + '" aria-hidden="true"></span>';
             html += '<div class="chat-web-thread-avatar">';
             if (thread.avatar) {
                 html += '<div data-avatar-bin="' + escapeAttr(thread.avatar) + '"></div>';
@@ -808,6 +1072,9 @@
             if (thread.system) {
                 html += '<div class="chat-web-nav-secondary">' + escapeHtml(thread.system) + '</div>';
             }
+            if (thread.preview) {
+                html += '<div class="chat-web-nav-preview">' + escapeHtml(thread.preview) + '</div>';
+            }
             html += '</div>';
             html += '</div>';
             html += '</button>';
@@ -820,18 +1087,21 @@
 
     function renderUsers() {
         var html = '';
+        var visibleUsers = Array.isArray(usersPanelUsers) ? usersPanelUsers : [];
 
         if (!usersList) {
             return;
         }
 
-        if (!users.length) {
-            usersList.innerHTML = '<div class="chat-web-empty">No users online.</div>';
+        renderUsersTitle();
+
+        if (!visibleUsers.length) {
+            usersList.innerHTML = '<div class="chat-web-empty">No users in #' + escapeHtml(sanitizeChannelName(usersPanelRoom || getCurrentChannelName())) + '.</div>';
             updateUserCountButton();
             return;
         }
 
-        users.forEach(function (entry) {
+        visibleUsers.forEach(function (entry) {
             var initial = entry.nick ? entry.nick.charAt(0).toUpperCase() : '?';
 
             html += '<button type="button" class="chat-web-user" data-private-user="' + escapeAttr(entry.nick || '') + '" data-private-system="' + escapeAttr(entry.system || '') + '" data-private-avatar="' + escapeAttr(entry.avatar || '') + '">';
@@ -869,6 +1139,22 @@
             ' data-private-avatar="' + escapeAttr(message.avatar || '') + '"';
     }
 
+    function renderBitmapBubble(message) {
+        var cols = Math.max(1, message.bitmapWidth || 80);
+        var rows = Math.max(1, message.bitmapHeight || 25);
+        var pixelWidth = cols * 8;
+        var pixelHeight = rows * 16;
+        var label = 'image ' + cols + 'x' + rows;
+
+        return '<div class="chat-bitmap-shell" style="' + escapeAttr('max-width:' + pixelWidth + 'px;') + '">' +
+            '<div class="chat-bitmap-frame">' +
+            '<div class="chat-bitmap-stage" data-chat-bitmap-key="' + escapeAttr(message.bitmapKey || '') + '" data-chat-bitmap-alt="' + escapeAttr(label) + '" style="' + escapeAttr('aspect-ratio:' + pixelWidth + ' / ' + pixelHeight + ';') + '">' +
+            '<div class="chat-bitmap-placeholder">Rendering ' + escapeHtml(label) + '...</div>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+    }
+
     function renderMessages() {
         var msgs = getMessages();
         var html = '';
@@ -882,15 +1168,19 @@
         }
 
         msgs.forEach(function (message) {
-            var isSystem = !message.sender;
+            var displaySender = message.sender || message.bitmapFromName || '';
+            if (!displaySender && message.kind === 'bitmap' && message.bitmapKey) {
+                displaySender = 'Image';
+            }
+            var isSystem = !displaySender;
             var isSelf = !!message.isSelf;
-            var sameGroup = message.sender === prevSender && Math.abs((message.timestamp || 0) - prevTime) < groupWindow;
-            var avatarInitial = message.sender ? message.sender.charAt(0).toUpperCase() : '?';
+            var sameGroup = displaySender === prevSender && Math.abs((message.timestamp || 0) - prevTime) < groupWindow;
+            var avatarInitial = displaySender ? displaySender.charAt(0).toUpperCase() : '?';
             var actorAttrs = buildActorAttrs(message, isSelf);
 
             if (!isSelf && userAlias) {
                 isSelf =
-                    normalizeUpper(message.sender) === normalizeUpper(userAlias) &&
+                    normalizeUpper(displaySender) === normalizeUpper(userAlias) &&
                     (!message.system || !userSystemName || normalizeUpper(message.system) === normalizeUpper(userSystemName));
             }
 
@@ -929,7 +1219,7 @@
                 } else {
                     html += '<div class="chat-sender">';
                 }
-                html += '<strong>' + escapeHtml(message.sender) + '</strong>';
+                html += '<strong>' + escapeHtml(displaySender) + '</strong>';
                 if (message.system) {
                     html += ' <span class="chat-web-channel">- ' + escapeHtml(message.system) + '</span>';
                 }
@@ -942,8 +1232,12 @@
                 html += '</div>';
             }
 
-            html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + linkify(message.text || '') + '</div>';
-            prevSender = message.sender;
+            if (message.kind === 'bitmap' && message.bitmapKey) {
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble">' + renderBitmapBubble(message) + '</div>';
+            } else {
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + linkify(message.text || '') + '</div>';
+            }
+            prevSender = displaySender;
             prevTime = message.timestamp || 0;
         });
 
@@ -953,6 +1247,7 @@
 
         msgContainer.innerHTML = html;
         renderEmbeddedAvatars(msgContainer);
+        renderEmbeddedBitmaps(msgContainer);
         renderLocalAvatars(msgContainer);
         renderAvatarFallbacks(msgContainer);
         requestAnimationFrame(function () {
@@ -1013,7 +1308,10 @@
 
     function onUsersUpdated(e) {
         users = e.detail || [];
-        renderUsers();
+        if (normalizeUpper(usersPanelRoom) === normalizeUpper(getCurrentChannelName())) {
+            usersPanelUsers = Array.isArray(users) ? users.slice() : [];
+            renderUsers();
+        }
     }
 
     function onStatusUpdated(e) {
@@ -1087,20 +1385,8 @@
     window.addEventListener('chat:status', onStatusUpdated);
     window.addEventListener('chat:viewChanged', onViewChanged);
 
-    if (userCount) {
-        userCount.addEventListener('click', function () {
-            usersPanel.classList.toggle('is-open');
-            if (!usersPanel.classList.contains('is-open')) {
-                return;
-            }
-            chatService.getUsers();
-        });
-    }
-
     if (usersClose) {
-        usersClose.addEventListener('click', function () {
-            usersPanel.classList.remove('is-open');
-        });
+        usersClose.addEventListener('click', closeUsersModal);
     }
 
     if (statusRetry) {
@@ -1111,9 +1397,17 @@
 
     if (roomsList) {
         roomsList.addEventListener('click', function (event) {
-            var button = event.target.closest('[data-room]');
-            if (!button) return;
-            chatService.setActiveChannel(button.getAttribute('data-room'));
+            var joinButton = event.target.closest('[data-room-join]');
+            var usersButton = event.target.closest('[data-room-users]');
+
+            if (joinButton) {
+                chatService.setActiveChannel(joinButton.getAttribute('data-room-join'));
+                return;
+            }
+
+            if (usersButton) {
+                openUsersPanelForRoom(usersButton.getAttribute('data-room-users'));
+            }
         });
     }
 
@@ -1172,6 +1466,14 @@
         });
     }
 
+    if (usersModal) {
+        usersModal.addEventListener('click', function (event) {
+            if (event.target === usersModal) {
+                closeUsersModal();
+            }
+        });
+    }
+
     if (chatInput) {
         chatInput.addEventListener('submit', function (event) {
             var text = chatText.value.replace(/^\s+|\s+$/g, '');
@@ -1194,6 +1496,10 @@
     }
 
     window.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && usersModal && usersModal.classList.contains('is-open')) {
+            closeUsersModal();
+            return;
+        }
         if (event.key === 'Escape' && roomModal && roomModal.classList.contains('is-open')) {
             closeRoomModal();
         }

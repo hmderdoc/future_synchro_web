@@ -1551,13 +1551,91 @@ body.viz-open {
         padding-top: var(--navbar-h, 48px);
     }
     .viz-close {
-        top: calc(var(--navbar-h, 48px) + 4px);
-        right: 8px;
+        top: auto;
+        bottom: 20px;
+        right: 20px;
+        z-index: 150;
+        font-size: 2rem;
+        width: 44px;
+        height: 44px;
     }
     .viz-lyrics {
         max-width: 92%;
         font-size: clamp(0.85rem, 3.5vw, 1.5rem);
     }
+}
+
+/* Playlist panel overlay when visualizer is open */
+body.viz-open .radio-playlist-panel.show {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2000;
+    max-height: 70vh;
+    width: 90vw;
+    max-width: 380px;
+}
+body.viz-open .radio-tracklist {
+    max-height: 50vh;
+}
+
+/* Viz-local track picker overlay (inside viz-panel, not navbar) */
+.viz-playlist-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    width: 90vw;
+    max-width: 380px;
+    max-height: 70vh;
+    background: #0a0a1e;
+    border: 2px solid rgba(255, 170, 0, 0.6);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 0 30px rgba(255, 170, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+}
+.viz-playlist-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #f55;
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 5;
+}
+.viz-playlist-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: 55vh;
+    margin-top: 4px;
+}
+.viz-pl-item {
+    padding: 8px 10px;
+    color: #aae;
+    font-family: "Spleen", "VT323", monospace;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s, color 0.15s;
+}
+.viz-pl-item:hover {
+    background: rgba(0, 255, 255, 0.1);
+    color: #0ff;
+}
+.viz-pl-item.viz-pl-active {
+    color: #FFAA00;
+    border-left: 3px solid #FFAA00;
+    background: rgba(255, 170, 0, 0.08);
 }
 
 /* WebGL warning notice */

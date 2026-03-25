@@ -456,6 +456,8 @@
         var cx = W / 2;
         var cy = H * 0.42;                          // above center for lyrics
         var scale = Math.min(W, H) * 0.3;
+        // Enlarge head on mobile (portrait)
+        if (window.innerWidth < 768) scale *= 1.5;
 
         headRotY += 0.007;
         breathPhase += 0.02;
@@ -1079,6 +1081,108 @@
     // =========================================================
     //  Mobile Transport Controls
     // =========================================================
+    // =========================================================
+    //  Viz-local track picker (cannot reuse #radio-playlist-panel
+    //  because on mobile it lives inside the collapsed navbar)
+    // =========================================================
+    var vizPlaylistEl = null;
+
+    function toggleVizPlaylist() {
+        if (vizPlaylistEl && vizPlaylistEl.parentNode) {
+            // Already open — close it
+            vizPlaylistEl.remove();
+            vizPlaylistEl = null;
+            return;
+        }
+
+        // Build a fresh panel with current playlist data
+        var radio = window.sbbsRadio;
+        vizPlaylistEl = document.createElement('div');
+        vizPlaylistEl.className = 'viz-playlist-overlay';
+        vizPlaylistEl.addEventListener('click', function(e) {
+            e.stopPropagation(); // don't bubble to anything beneath
+        });
+
+        var search = document.createElement('input');
+        search.type = 'text';
+        search.className = 'form-control form-control-sm mb-2';
+        search.placeholder = 'Search tracks...';
+        search.style.cssText = 'background:#111;color:#0ff;border:1px solid #0aa;';
+        vizPlaylistEl.appendChild(search);
+
+        var list = document.createElement('div');
+        list.className = 'viz-playlist-list';
+        vizPlaylistEl.appendChild(list);
+
+        // Close button
+        var closeBtn = document.createElement('button');
+        closeBtn.className = 'viz-playlist-close';
+        closeBtn.textContent = '\u2715';
+        closeBtn.title = 'Close';
+        closeBtn.addEventListener('click', function() {
+            if (vizPlaylistEl) { vizPlaylistEl.remove(); vizPlaylistEl = null; }
+        });
+        vizPlaylistEl.appendChild(closeBtn);
+
+        // Fetch and render track list
+        function renderTracks(filter) {
+            // Ask radio.js for current playlist via the API
+            var dir = (window.sbbsRadio && window.sbbsRadio.dirCode) || 'originalcontent_mp3s';
+            fetch('./api/files.ssjs?call=list-files&dir=' + dir)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!Array.isArray(data)) { list.innerHTML = '<div style="color:#f55;padding:8px;">No tracks</div>'; return; }
+                    var html = '';
+                    var currentFile = radio ? radio.currentTrackFile : '';
+                    var f = (filter || '').toLowerCase();
+                    for (var i = 0; i < data.length; i++) {
+                        var t = data[i];
+                        var name = (t.desc || t.name || '').replace(/\.mp3$/i, '');
+                        if (f && name.toLowerCase().indexOf(f) < 0
+                                && (t.name || '').toLowerCase().indexOf(f) < 0) continue;
+                        var active = (t.name === currentFile) ? ' viz-pl-active' : '';
+                        html += '<div class="viz-pl-item' + active + '" data-name="'
+                              + (t.name || '').replace(/"/g, '&quot;') + '">'
+                              + escHtml(name) + '</div>';
+                    }
+                    list.innerHTML = html || '<div style="color:#aaa;padding:8px;">No tracks found</div>';
+
+                    // Wire click handlers
+                    var items = list.querySelectorAll('.viz-pl-item');
+                    for (var j = 0; j < items.length; j++) {
+                        items[j].addEventListener('click', function() {
+                            var fname = this.getAttribute('data-name');
+                            // Use radio-track click infrastructure
+                            pickTrackByName(fname);
+                            if (vizPlaylistEl) { vizPlaylistEl.remove(); vizPlaylistEl = null; }
+                        });
+                    }
+                })
+                .catch(function() {
+                    list.innerHTML = '<div style="color:#f55;padding:8px;">Error loading tracks</div>';
+                });
+        }
+
+        search.addEventListener('input', function() {
+            renderTracks(search.value.trim());
+        });
+
+        elPanel.appendChild(vizPlaylistEl);
+        renderTracks('');
+        setTimeout(function() { search.focus(); }, 100);
+    }
+
+    function pickTrackByName(filename) {
+        // Dispatch event for radio.js to pick this track
+        document.dispatchEvent(new CustomEvent('viz:picktrack', { detail: { name: filename } }));
+    }
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
     function wireTransportControls() {
         var vizPlay = document.getElementById('viz-play');
         var vizPrev = document.getElementById('viz-prev');
@@ -1117,10 +1221,9 @@
             });
         }
         if (vizTrack) {
-            vizTrack.addEventListener('click', function() {
-                // Open the playlist panel in radio
-                var radioTrack = document.getElementById('radio-track');
-                if (radioTrack) radioTrack.click();
+            vizTrack.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleVizPlaylist();
             });
         }
 
@@ -1131,6 +1234,8 @@
     function updateTransportUI() {
         var vizPlay = document.getElementById('viz-play');
         var vizTrack = document.getElementById('viz-track-name');
+        var mobileIcon = document.getElementById('mobile-player-icon');
+        var miniEq = document.getElementById('mobile-mini-eq');
         var radio = window.sbbsRadio;
 
         if (vizPlay) {
@@ -1138,9 +1243,17 @@
         }
         if (vizTrack && radio) {
             var name = radio.currentTrackFile || 'Select Track';
-            // Clean up the filename for display
-            name = name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').substring(0, 40);
+            name = name.replace(/.[^.]+$/, '').replace(/_/g, ' ').substring(0, 35);
             vizTrack.textContent = '♫ ' + name;
+        }
+
+        // Toggle mobile icon: show mini-EQ when playing, musical note when stopped
+        if (radio && radio.isPlaying) {
+            if (mobileIcon) mobileIcon.style.display = 'none';
+            if (miniEq) miniEq.style.display = 'inline-block';
+        } else {
+            if (mobileIcon) mobileIcon.style.display = 'inline-flex';
+            if (miniEq) miniEq.style.display = 'none';
         }
     }
 

@@ -14,6 +14,10 @@
     var MAX_TOASTS = 4;
     var RECONCILE_INTERVAL = 15000;
     var RECONNECT_DELAY = 4000;
+    var LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+    var LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+    var DISTANCE_BASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+    var DISTANCE_EXTRA = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
 
     var _messages = [];
     var _users = [];
@@ -39,6 +43,7 @@
     var _activeView = { type: 'channel', name: DEFAULT_CHANNEL, system: '', avatar: '' };
     var _status = { type: '', message: '', showRetry: false };
     var _guestMode = false;
+    var _bitmapRecords = {};
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
@@ -161,6 +166,715 @@
         return d.innerHTML;
     }
 
+    function isBitmapMessageText(text) {
+        return typeof text === 'string' && text.indexOf('[BITMAP|') === 0 && text.charAt(text.length - 1) === ']';
+    }
+
+    function parseBitmapMessage(text) {
+        var inner = '';
+        var parts = [];
+        var width = 0;
+        var height = 0;
+
+        if (!isBitmapMessageText(text)) {
+            return null;
+        }
+
+        inner = text.slice(1, -1);
+        parts = inner.split('|');
+
+        if (parts.length !== 5 || parts[0] !== 'BITMAP') {
+            return null;
+        }
+
+        width = parseInt(parts[1] || '', 10) || 0;
+        height = parseInt(parts[2] || '', 10) || 0;
+
+        if (width < 1 || height < 1 || !(parts[4] || '').length || ((parts[4] || '').length % 2) !== 0) {
+            return null;
+        }
+
+        return {
+            width: width,
+            height: height,
+            fromName: parts[3] || '',
+            hexData: parts[4] || ''
+        };
+    }
+
+    function buildBitmapPreview(parsed) {
+        if (!parsed) {
+            return '[image]';
+        }
+
+        return '[image ' + String(parsed.width || 0) + 'x' + String(parsed.height || 0) + ']';
+    }
+
+    function buildMessagePreview(text) {
+        var parsed = parseBitmapMessage(text);
+
+        if (parsed) {
+            return buildBitmapPreview(parsed);
+        }
+
+        return String(text || '');
+    }
+
+    function buildBitmapKey(text) {
+        var value = String(text || '');
+        var hash = 5381;
+        var index = 0;
+        var key;
+        var suffix = 1;
+        var base;
+
+        for (index = 0; index < value.length; index += 1) {
+            hash = (((hash << 5) + hash) + value.charCodeAt(index)) >>> 0;
+        }
+
+        base = 'bmp-' + hash.toString(16) + '-' + String(value.length);
+        key = base;
+
+        while (_bitmapRecords[key] && _bitmapRecords[key].sourceText !== value) {
+            suffix += 1;
+            key = base + '-' + String(suffix);
+        }
+
+        return key;
+    }
+
+    function ensureBitmapRecord(text) {
+        var parsed = parseBitmapMessage(text);
+        var key;
+
+        if (!parsed) {
+            return null;
+        }
+
+        key = buildBitmapKey(text);
+        if (!_bitmapRecords[key]) {
+            _bitmapRecords[key] = {
+                key: key,
+                sourceText: String(text || ''),
+                fromName: parsed.fromName || '',
+                width: parsed.width || 0,
+                height: parsed.height || 0,
+                actualWidth: 0,
+                actualHeight: 0,
+                previewText: buildBitmapPreview(parsed),
+                bitmap: null,
+                dataURL: '',
+                renderPending: false,
+                error: ''
+            };
+        }
+
+        return _bitmapRecords[key];
+    }
+
+    function copyOwnProperties(source) {
+        var target = {};
+        var key;
+
+        if (!source) {
+            return target;
+        }
+
+        for (key in source) {
+            if (Object.prototype.hasOwnProperty.call(source, key)) {
+                target[key] = source[key];
+            }
+        }
+
+        return target;
+    }
+
+    function getMessageText(message) {
+        if (!message) {
+            return '';
+        }
+
+        if (typeof message.text === 'string') {
+            return message.text;
+        }
+
+        if (typeof message.str === 'string') {
+            return message.str;
+        }
+
+        return '';
+    }
+
+    function normalizeThreadSummary(summary) {
+        var next = copyOwnProperties(summary);
+
+        if (typeof next.preview === 'string' && next.preview.length) {
+            next.preview = buildMessagePreview(next.preview);
+        }
+
+        return next;
+    }
+
+    function normalizeMessage(message) {
+        var next = copyOwnProperties(message);
+        var text = getMessageText(next);
+        var record;
+
+        next.text = text;
+        next.previewText = buildMessagePreview(text);
+        next.kind = 'text';
+
+        record = ensureBitmapRecord(text);
+        if (record) {
+            next.kind = 'bitmap';
+            next.bitmapKey = record.key;
+            next.bitmapWidth = record.width || 0;
+            next.bitmapHeight = record.height || 0;
+            next.bitmapFromName = record.fromName || '';
+            next.previewText = record.previewText;
+        }
+
+        return next;
+    }
+
+    function normalizeMessages(messages) {
+        return (messages || []).map(function (message) {
+            return normalizeMessage(message);
+        });
+    }
+
+    function hexToBytes(hex) {
+        var bytes = [];
+        var index = 0;
+
+        for (index = 0; index < hex.length; index += 2) {
+            bytes.push(parseInt(hex.substr(index, 2), 16) || 0);
+        }
+
+        return bytes;
+    }
+
+    function createInflateState(bytes, offset) {
+        return {
+            bytes: bytes,
+            position: offset,
+            bitBuffer: 0,
+            bitCount: 0
+        };
+    }
+
+    function readByte(state) {
+        var value = state.bytes[state.position];
+        state.position += 1;
+        return value === undefined ? 0 : value;
+    }
+
+    function readBits(state, count) {
+        var buffer = state.bitBuffer;
+        var available = state.bitCount;
+        var out = 0;
+
+        while (available < count) {
+            buffer |= readByte(state) << available;
+            available += 8;
+        }
+
+        out = buffer & ((1 << count) - 1);
+        state.bitBuffer = buffer >>> count;
+        state.bitCount = available - count;
+        return out;
+    }
+
+    function alignByte(state) {
+        state.bitBuffer = 0;
+        state.bitCount = 0;
+    }
+
+    function reverseBits(value, count) {
+        var result = 0;
+        var index = 0;
+
+        for (index = 0; index < count; index += 1) {
+            result = (result << 1) | (value & 1);
+            value >>= 1;
+        }
+
+        return result;
+    }
+
+    function buildHuffmanTable(codeLengths) {
+        var table = {
+            maxBits: 0,
+            map: {}
+        };
+        var counts = [];
+        var nextCodes = [];
+        var code = 0;
+        var index = 0;
+
+        for (index = 0; index < codeLengths.length; index += 1) {
+            if ((codeLengths[index] || 0) > table.maxBits) {
+                table.maxBits = codeLengths[index] || 0;
+            }
+        }
+
+        for (index = 0; index <= table.maxBits; index += 1) {
+            counts[index] = 0;
+        }
+
+        for (index = 0; index < codeLengths.length; index += 1) {
+            counts[codeLengths[index] || 0] = (counts[codeLengths[index] || 0] || 0) + 1;
+        }
+
+        counts[0] = 0;
+        for (index = 1; index <= table.maxBits; index += 1) {
+            code = (code + (counts[index - 1] || 0)) << 1;
+            nextCodes[index] = code;
+        }
+
+        for (index = 0; index < codeLengths.length; index += 1) {
+            var length = codeLengths[index] || 0;
+            var nextCode;
+            var key;
+
+            if (!length) {
+                continue;
+            }
+
+            nextCode = nextCodes[length] || 0;
+            key = String(reverseBits(nextCode, length) | (length << 16));
+            table.map[key] = index;
+            nextCodes[length] = nextCode + 1;
+        }
+
+        return table;
+    }
+
+    function readHuffmanCode(table, state) {
+        var code = 0;
+        var length = 0;
+        var key;
+
+        for (length = 1; length <= table.maxBits; length += 1) {
+            code |= readBits(state, 1) << (length - 1);
+            key = String(code | (length << 16));
+            if (table.map[key] !== undefined) {
+                return table.map[key] || 0;
+            }
+        }
+
+        throw new Error('Huffman decode failed');
+    }
+
+    function buildFixedLiteralTable() {
+        var lengths = [];
+        var index = 0;
+
+        for (index = 0; index <= 287; index += 1) {
+            lengths[index] = 0;
+        }
+        for (index = 0; index <= 143; index += 1) {
+            lengths[index] = 8;
+        }
+        for (index = 144; index <= 255; index += 1) {
+            lengths[index] = 9;
+        }
+        for (index = 256; index <= 279; index += 1) {
+            lengths[index] = 7;
+        }
+        for (index = 280; index <= 287; index += 1) {
+            lengths[index] = 8;
+        }
+
+        return buildHuffmanTable(lengths);
+    }
+
+    function buildFixedDistanceTable() {
+        var lengths = [];
+        var index = 0;
+
+        for (index = 0; index < 32; index += 1) {
+            lengths[index] = 5;
+        }
+
+        return buildHuffmanTable(lengths);
+    }
+
+    function decodeDynamicTables(state) {
+        var hlit = readBits(state, 5) + 257;
+        var hdist = readBits(state, 5) + 1;
+        var hclen = readBits(state, 4) + 4;
+        var order = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+        var codeLengths = [];
+        var index = 0;
+        var codeTable;
+
+        for (index = 0; index < 19; index += 1) {
+            codeLengths[index] = 0;
+        }
+
+        for (index = 0; index < hclen; index += 1) {
+            codeLengths[order[index] || 0] = readBits(state, 3);
+        }
+
+        codeTable = buildHuffmanTable(codeLengths);
+
+        function readLengths(count) {
+            var out = [];
+            var previous = 0;
+
+            while (out.length < count) {
+                var symbol = readHuffmanCode(codeTable, state);
+                var repeat = 0;
+                var repeatIndex = 0;
+
+                if (symbol <= 15) {
+                    out.push(symbol);
+                    previous = symbol;
+                    continue;
+                }
+
+                if (symbol === 16) {
+                    repeat = 3 + readBits(state, 2);
+                    for (repeatIndex = 0; repeatIndex < repeat; repeatIndex += 1) {
+                        out.push(previous);
+                    }
+                    continue;
+                }
+
+                if (symbol === 17) {
+                    repeat = 3 + readBits(state, 3);
+                    previous = 0;
+                    for (repeatIndex = 0; repeatIndex < repeat; repeatIndex += 1) {
+                        out.push(0);
+                    }
+                    continue;
+                }
+
+                if (symbol === 18) {
+                    repeat = 11 + readBits(state, 7);
+                    previous = 0;
+                    for (repeatIndex = 0; repeatIndex < repeat; repeatIndex += 1) {
+                        out.push(0);
+                    }
+                    continue;
+                }
+
+                throw new Error('Bad RLE in code lengths');
+            }
+
+            return out;
+        }
+
+        return {
+            lit: buildHuffmanTable(readLengths(hlit)),
+            dist: buildHuffmanTable(readLengths(hdist))
+        };
+    }
+
+    function inflateRaw(bytes, start) {
+        var state = createInflateState(bytes, start);
+        var output = [];
+        var fixedLiterals = buildFixedLiteralTable();
+        var fixedDistances = buildFixedDistanceTable();
+        var done = false;
+
+        while (!done) {
+            var isFinal = readBits(state, 1);
+            var blockType = readBits(state, 2);
+            var literalTable = null;
+            var distanceTable = null;
+            var length = 0;
+            var notLength = 0;
+            var index = 0;
+
+            if (blockType === 0) {
+                alignByte(state);
+                length = readByte(state) | (readByte(state) << 8);
+                notLength = readByte(state) | (readByte(state) << 8);
+                if ((length ^ 65535) !== notLength) {
+                    throw new Error('Stored block length mismatch');
+                }
+                for (index = 0; index < length; index += 1) {
+                    output.push(readByte(state));
+                }
+            } else {
+                if (blockType === 1) {
+                    literalTable = fixedLiterals;
+                    distanceTable = fixedDistances;
+                } else if (blockType === 2) {
+                    var tables = decodeDynamicTables(state);
+                    literalTable = tables.lit;
+                    distanceTable = tables.dist;
+                } else {
+                    throw new Error('Invalid DEFLATE block type');
+                }
+
+                while (literalTable && distanceTable) {
+                    var symbol = readHuffmanCode(literalTable, state);
+                    var lengthIndex;
+                    var distanceSymbol;
+                    var distance;
+                    var base;
+                    var copyIndex;
+
+                    if (symbol < 256) {
+                        output.push(symbol);
+                        continue;
+                    }
+                    if (symbol === 256) {
+                        break;
+                    }
+
+                    lengthIndex = symbol - 257;
+                    length = (LENGTH_BASE[lengthIndex] || 0) + ((LENGTH_EXTRA[lengthIndex] || 0) ? readBits(state, LENGTH_EXTRA[lengthIndex] || 0) : 0);
+                    distanceSymbol = readHuffmanCode(distanceTable, state);
+                    distance = (DISTANCE_BASE[distanceSymbol] || 0) + ((DISTANCE_EXTRA[distanceSymbol] || 0) ? readBits(state, DISTANCE_EXTRA[distanceSymbol] || 0) : 0);
+                    base = output.length - distance;
+
+                    if (base < 0) {
+                        throw new Error('Invalid DEFLATE distance');
+                    }
+
+                    for (copyIndex = 0; copyIndex < length; copyIndex += 1) {
+                        output.push(output[base + copyIndex] || 0);
+                    }
+                }
+            }
+
+            if (isFinal) {
+                done = true;
+            }
+        }
+
+        return output;
+    }
+
+    function inflateZlib(bytes, offset) {
+        var position = offset || 0;
+        var cmf = bytes[position] || 0;
+        var flg = bytes[position + 1] || 0;
+
+        position += 2;
+        if ((cmf & 15) !== 8) {
+            throw new Error('Unsupported zlib compression method');
+        }
+        if (flg & 32) {
+            position += 4;
+        }
+
+        return inflateRaw(bytes, position);
+    }
+
+    function decodeBitmap(hexData, expectedWidth, expectedHeight) {
+        var compressed = hexToBytes(hexData);
+        var decompressed = inflateZlib(compressed, 0);
+        var bitmap = [];
+        var dataHeight = 0;
+        var dataLength = 0;
+        var slicePoint = 0;
+        var totalPixels = 0;
+        var dataWidth = 0;
+        var width = 0;
+        var height = 0;
+        var index = 0;
+
+        if (decompressed.length < 4) {
+            return {
+                bitmap: bitmap,
+                width: 0,
+                height: 0,
+                actualWidth: 0,
+                actualHeight: 0
+            };
+        }
+
+        dataHeight = decompressed[0] || 0;
+        if (dataHeight < 1) {
+            return {
+                bitmap: bitmap,
+                width: 0,
+                height: 0,
+                actualWidth: 0,
+                actualHeight: 0
+            };
+        }
+
+        dataLength = decompressed.length - 1;
+        slicePoint = Math.floor(dataLength / 3);
+        totalPixels = slicePoint;
+        dataWidth = Math.floor(totalPixels / dataHeight);
+        width = expectedWidth || dataWidth;
+        height = expectedHeight || dataHeight;
+
+        if (width * height !== totalPixels) {
+            width = dataWidth;
+            height = dataHeight;
+        }
+
+        for (index = 0; index < totalPixels; index += 1) {
+            bitmap.push({
+                charCode: decompressed[1 + slicePoint * 2 + index] || 32,
+                fg: decompressed[1 + index] || 0,
+                bg: decompressed[1 + slicePoint + index] || 0
+            });
+        }
+
+        return {
+            bitmap: bitmap,
+            width: width,
+            height: height,
+            actualWidth: dataWidth,
+            actualHeight: dataHeight
+        };
+    }
+
+    function decodeBitmapRecord(record) {
+        var parsed;
+        var decoded;
+
+        if (!record) {
+            return null;
+        }
+
+        if (record.bitmap && record.width > 0 && record.height > 0) {
+            return record;
+        }
+
+        parsed = parseBitmapMessage(record.sourceText);
+        if (!parsed) {
+            throw new Error('Invalid bitmap payload');
+        }
+
+        decoded = decodeBitmap(parsed.hexData, parsed.width, parsed.height);
+        if (!decoded.bitmap.length || !decoded.width || !decoded.height) {
+            throw new Error('Decoded bitmap was empty');
+        }
+
+        record.bitmap = decoded.bitmap;
+        record.width = decoded.width || parsed.width || 0;
+        record.height = decoded.height || parsed.height || 0;
+        record.actualWidth = decoded.actualWidth || record.width;
+        record.actualHeight = decoded.actualHeight || record.height;
+        record.previewText = buildBitmapPreview({ width: record.width, height: record.height });
+        return record;
+    }
+
+    function updateBitmapElement(el, record) {
+        var text;
+        var placeholder;
+        var img;
+
+        if (!el) {
+            return;
+        }
+
+        while (el.firstChild) {
+            el.removeChild(el.firstChild);
+        }
+
+        el.classList.remove('is-loading', 'is-ready', 'is-error');
+        text = el.getAttribute('data-chat-bitmap-alt') || (record && record.previewText) || '[image]';
+        if (record && record.width > 0 && record.height > 0) {
+            el.style.aspectRatio = String(record.width * 8) + ' / ' + String(record.height * 16);
+            if (
+                el.parentNode &&
+                el.parentNode.parentNode &&
+                el.parentNode.parentNode.classList &&
+                el.parentNode.parentNode.classList.contains('chat-bitmap-shell')
+            ) {
+                el.parentNode.parentNode.style.maxWidth = String(record.width * 8) + 'px';
+            }
+        }
+
+        if (record && record.dataURL) {
+            img = new Image();
+            img.className = 'chat-bitmap-image';
+            img.alt = text;
+            img.src = record.dataURL;
+            el.classList.add('is-ready');
+            el.appendChild(img);
+            return;
+        }
+
+        placeholder = document.createElement('div');
+        placeholder.className = 'chat-bitmap-placeholder';
+
+        if (!record || record.error) {
+            placeholder.textContent = 'Image unavailable';
+            el.classList.add('is-error');
+        } else {
+            placeholder.textContent = 'Rendering ' + text + '...';
+            el.classList.add('is-loading');
+        }
+
+        el.appendChild(placeholder);
+    }
+
+    function refreshBitmapElements(key, root) {
+        var scope = root || document;
+        var elements;
+
+        if (!key) {
+            return;
+        }
+
+        elements = scope.querySelectorAll('[data-chat-bitmap-key="' + key + '"]');
+        elements.forEach(function (el) {
+            updateBitmapElement(el, _bitmapRecords[key] || null);
+        });
+    }
+
+    function renderBitmapRecord(record) {
+        if (!record || record.dataURL || record.renderPending || record.error) {
+            return;
+        }
+
+        if (typeof GraphicsConverter === 'undefined' || !GraphicsConverter.shared) {
+            return;
+        }
+
+        try {
+            decodeBitmapRecord(record);
+        } catch (err) {
+            record.error = err && err.message ? err.message : 'Decode failed';
+            refreshBitmapElements(record.key);
+            return;
+        }
+
+        if (!GraphicsConverter.shared().from_bitmap_cells) {
+            return;
+        }
+
+        record.renderPending = true;
+        GraphicsConverter.shared().from_bitmap_cells(record.bitmap, record.width, record.height, function (dataURL) {
+            record.renderPending = false;
+            record.dataURL = dataURL || '';
+            if (!record.dataURL && !record.error) {
+                record.error = 'Render failed';
+            }
+            refreshBitmapElements(record.key);
+        }, true);
+    }
+
+    function renderEmbeddedBitmaps(root) {
+        var elements = (root || document).querySelectorAll('[data-chat-bitmap-key]');
+
+        if (!elements.length) {
+            return;
+        }
+
+        elements.forEach(function (el) {
+            var key = el.getAttribute('data-chat-bitmap-key');
+            var record = key ? _bitmapRecords[key] : null;
+
+            updateBitmapElement(el, record);
+            if (record && !record.dataURL && !record.renderPending && !record.error) {
+                renderBitmapRecord(record);
+            }
+        });
+    }
+
     function renderEmbeddedAvatars(root) {
         var els = (root || document).querySelectorAll('div[data-avatar-bin]:empty');
         if (!els.length || typeof GraphicsConverter === 'undefined' || !GraphicsConverter.shared) return;
@@ -238,7 +952,7 @@
             : (msg.sender || 'System');
         textDiv = document.createElement('div');
         textDiv.className = 'chat-toast-text';
-        textDiv.textContent = (msg.text || '').substring(0, 200);
+        textDiv.textContent = (msg.previewText || buildMessagePreview(getMessageText(msg))).substring(0, 200);
         contentDiv.appendChild(senderDiv);
         contentDiv.appendChild(textDiv);
         toast.appendChild(contentDiv);
@@ -362,6 +1076,7 @@
     }
 
     function upsertPrivateThread(summary) {
+        summary = normalizeThreadSummary(summary);
         var key = buildThreadKey(summary.name, summary.system || '');
         var index;
 
@@ -599,7 +1314,7 @@
         return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)).then(function (response) {
             if (response && response.error) throw new Error(String(response.error));
 
-            _messages = response && Array.isArray(response.messages) ? response.messages : [];
+            _messages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
             _unreadChannels[normalizeUpper(_currentChannel)] = 0;
             _serviceHealthy = true;
             if (!silent) refreshStatus();
@@ -622,7 +1337,7 @@
         return fetchJSON(url).then(function (response) {
             if (response && response.error) throw new Error(String(response.error));
 
-            _messages = response && Array.isArray(response.messages) ? response.messages : [];
+            _messages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
             if (response && response.peer) {
                 _activeView.system = response.peer.system || _activeView.system || '';
                 _activeView.avatar = response.peer.avatar || _activeView.avatar || '';
@@ -845,6 +1560,7 @@
             if (!payload) return;
 
             if (payload.type === 'message') {
+                payload = normalizeMessage(payload);
                 room = ensureRoom(payload.channel || _currentChannel);
                 room.lastTimestamp = Math.max(room.lastTimestamp || 0, payload.timestamp || 0);
 
@@ -873,24 +1589,25 @@
             }
 
             if (payload.type === 'private') {
+                payload = normalizeMessage(payload);
                 thread = upsertPrivateThread({
                     name: payload.peerName || payload.sender,
                     system: payload.peerSystem || payload.system || '',
                     avatar: payload.peerAvatar || payload.avatar || undefined,
                     lastTimestamp: payload.timestamp || Date.now(),
-                    preview: payload.text || ''
+                    preview: payload.previewText || payload.text || ''
                 });
                 threadKey = buildThreadKey(thread.name, thread.system || '');
 
                 if (normalizeUpper(_activeView.type) === 'PRIVATE' && threadKey === getCurrentPrivateKey()) {
-                    _messages.push({
+                    _messages.push(normalizeMessage({
                         sender: payload.sender,
                         system: payload.system,
                         text: payload.text,
                         timestamp: payload.timestamp,
                         userNumber: payload.userNumber,
                         avatar: payload.avatar
-                    });
+                    }));
                     if (_messages.length > MAX_MESSAGES) _messages.shift();
                     _unreadPrivate[threadKey] = 0;
                     dispatchMessages();
@@ -1152,7 +1869,8 @@
         openPrivateThread: openPrivateThread,
         isGuestMode: function () { return _guestMode; },
         setChatPageActive: setChatPageActive,
-        _renderEmbeddedAvatars: renderEmbeddedAvatars
+        _renderEmbeddedAvatars: renderEmbeddedAvatars,
+        _renderEmbeddedBitmaps: renderEmbeddedBitmaps
     };
 
     window.addEventListener('spa:beforeNavigate', function () {

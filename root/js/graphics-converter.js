@@ -44,6 +44,42 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         "#FFFFFF", // White
     ];
 
+    const XTERM_COLORS = (() => {
+        const palette = [
+            "#000000", "#800000", "#008000", "#808000",
+            "#000080", "#800080", "#008080", "#c0c0c0",
+            "#808080", "#ff0000", "#00ff00", "#ffff00",
+            "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
+        ];
+        const cube = [0, 95, 135, 175, 215, 255];
+
+        function componentToHex(value) {
+            const out = value.toString(16);
+            return out.length < 2 ? ('0' + out) : out;
+        }
+
+        for (let r = 0; r < 6; r += 1) {
+            for (let g = 0; g < 6; g += 1) {
+                for (let b = 0; b < 6; b += 1) {
+                    palette.push(
+                        '#' +
+                        componentToHex(cube[r]) +
+                        componentToHex(cube[g]) +
+                        componentToHex(cube[b])
+                    );
+                }
+            }
+        }
+
+        for (let index = 0; index < 24; index += 1) {
+            const level = 8 + (index * 10);
+            const hex = componentToHex(level);
+            palette.push('#' + hex + hex + hex);
+        }
+
+        return palette;
+    })();
+
     function get_workspace(cols, rows, callback) {
 
         const container = document.createElement('div');
@@ -68,7 +104,7 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         var imgCache = GraphicsConverter._imgCache || (GraphicsConverter._imgCache = {});
         function onReady(loadedImg) {
             spritesheet_ctx.drawImage(loadedImg, 0, 0);
-            callback({ container, ctx, spritesheet_ctx });
+            callback({ container, ctx, spritesheet_ctx, glyphCache: {} });
         }
         if (imgCache[spritesheet_src]) {
             onReady(imgCache[spritesheet_src]);
@@ -94,6 +130,14 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         return workspace.spritesheet_ctx.getImageData(x, y, font_width, font_height);
     }
 
+    function get_cached_character(workspace, char) {
+        const key = String(char & 0xff);
+        if (!workspace.glyphCache[key]) {
+            workspace.glyphCache[key] = get_character(workspace, char & 0xff);
+        }
+        return workspace.glyphCache[key];
+    }
+
     // Draw ImageData 'char' at coordinates 'x', 'y' on the canvas
     // Colours 'fg' and 'bg' are values from the COLOURS array
     function put_character(workspace, char, x, y, fg, bg) {
@@ -117,6 +161,18 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         img.src = data;
     }
 
+    function clamp_color_256(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return 0;
+        if (num < 0) return 0;
+        if (num > 255) return 255;
+        return num | 0;
+    }
+
+    function color_256_to_css(value) {
+        return XTERM_COLORS[clamp_color_256(value)] || XTERM_COLORS[0];
+    }
+
     this.from_bin = function (bin, cols, rows, callback, dataOnly) {
         get_workspace(cols, rows, workspace => {
             let x = 0;
@@ -138,6 +194,38 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
                     y++;
                 }
             }
+            if (dataOnly) {
+                callback(workspace.ctx.canvas.toDataURL());
+            } else {
+                get_png(workspace, img => {
+                    delete_workspace(workspace);
+                    callback(img);
+                });
+            }
+        });
+    }
+
+    this.from_bitmap_cells = function (cells, cols, rows, callback, dataOnly) {
+        get_workspace(cols, rows, workspace => {
+            const total = cols * rows;
+            for (let index = 0; index < total; index += 1) {
+                const cell = Array.isArray(cells) ? (cells[index] || null) : null;
+                const x = index % cols;
+                const y = Math.floor(index / cols);
+                const charCode = cell && typeof cell.charCode === 'number' ? (cell.charCode & 0xff) : 32;
+                const fg = color_256_to_css(cell && cell.fg);
+                const bg = color_256_to_css(cell && cell.bg);
+
+                put_character(
+                    workspace,
+                    get_cached_character(workspace, charCode),
+                    x * font_width,
+                    y * font_height,
+                    fg,
+                    bg
+                );
+            }
+
             if (dataOnly) {
                 callback(workspace.ctx.canvas.toDataURL());
             } else {

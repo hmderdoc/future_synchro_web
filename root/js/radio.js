@@ -112,8 +112,41 @@
         });
         document.addEventListener('click', function (e) {
             if (elPanel && !elPanel.contains(e.target) && e.target !== elTrack) {
+                // Also exempt clicks inside the viz-panel (transport controls)
+                var vizPanel = document.getElementById('viz-panel');
+                if (vizPanel && vizPanel.contains(e.target)) return;
                 elPanel.classList.remove('show');
             }
+        });
+
+        // When visualizer picks a track by filename
+        document.addEventListener('viz:picktrack', function (e) {
+            var name = e.detail && e.detail.name;
+            if (!name) return;
+            for (var i = 0; i < playlist.length; i++) {
+                if (playlist[i].name === name) {
+                    queuePos++;
+                    queue.splice(queuePos, 0, i);
+                    loadTrack(i);
+                    ensureAudioCtx();
+                    doPlay();
+                    return;
+                }
+            }
+            // Not in playlist yet — add it
+            playlist.push({ name: name });
+            var idx = playlist.length - 1;
+            queue.push(idx);
+            queuePos = queue.length - 1;
+            loadTrack(idx);
+            ensureAudioCtx();
+            doPlay();
+        });
+
+        // When visualizer opens the playlist panel, refresh data
+        document.addEventListener('viz:playlistopen', function () {
+            refreshPlaylist();
+            renderTrackList(elSearch ? elSearch.value.trim().toLowerCase() : '');
         });
 
         // Search / filter
@@ -134,7 +167,8 @@
             get gainNode()        { return gainNode; },
             get audioEl()         { return audio; },
             get currentTrackFile(){ return playlist[queue[queuePos]] ? playlist[queue[queuePos]].name : ''  ; },
-            get isPlaying()       { return isPlaying; }
+            get isPlaying()       { return isPlaying; },
+            get dirCode()         { return DIR_CODE; }
         };
 
         // Fetch playlist from server
@@ -421,6 +455,7 @@
         // If not playing, always show karaoke sign
         if (!isPlaying || !analyser) {
             drawKaraokeSign();
+            drawMiniEQ();
             vizCycleTime = now; // reset cycle
             vizShowEQ = true;   // start with EQ when music resumes
             return;
@@ -441,6 +476,9 @@
         } else {
             drawKaraokeSign();
         }
+
+        // Also update mobile mini-EQ if visible
+        drawMiniEQ();
     }
 
     function drawEqualizer() {
@@ -463,6 +501,32 @@
 
             vizCtx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
             vizCtx.fillRect(i * barW, vizH - barH, Math.max(barW - 1, 1), barH);
+        }
+    }
+
+    // Draw mini-EQ on mobile navbar icon
+    function drawMiniEQ() {
+        var miniCanvas = document.getElementById('mobile-mini-eq');
+        if (!miniCanvas || miniCanvas.style.display === 'none') return;
+        var ctx = miniCanvas.getContext('2d');
+        if (!ctx || !analyser) return;
+
+        var bins = analyser.frequencyBinCount;
+        var data = new Uint8Array(bins);
+        analyser.getByteFrequencyData(data);
+
+        var w = miniCanvas.width, h = miniCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw 4 bars
+        var barCount = 4;
+        var barW = (w - 4) / barCount;
+        for (var i = 0; i < barCount; i++) {
+            var idx = Math.floor((i / barCount) * bins);
+            var v = data[idx] / 255;
+            var barH = v * (h - 2);
+            ctx.fillStyle = '#55FF55';
+            ctx.fillRect(1 + i * barW, h - 1 - barH, barW - 1, barH);
         }
     }
 
