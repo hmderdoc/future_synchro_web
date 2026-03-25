@@ -86,7 +86,7 @@
             if (!audio.ended) {
                 isPlaying = false;
                 elPlay.textContent = '\u25B6'; // ▶
-                stopViz();
+                // stopViz(); -- keep running for karaoke sign
             }
         });
 
@@ -123,6 +123,7 @@
         vizW   = elViz.width;
         vizH   = elViz.height;
         vizCtx = elViz.getContext('2d');
+        startViz(); // Start animation immediately for karaoke sign
 
         // Expose internals for visualizer
         window.sbbsRadio = {
@@ -393,10 +394,44 @@
         if (vizCtx) vizCtx.clearRect(0, 0, vizW, vizH);
     }
 
+    // LED Karaoke sign state
+    var karaokeFrame = 0;
+    var vizCycleTime = 0;        // ms timestamp for cycling
+    var vizShowEQ = true;        // true = EQ, false = karaoke
+    var VIZ_EQ_DURATION = 5000;  // 5 seconds on EQ
+    var VIZ_KAR_DURATION = 3000; // 3 seconds on karaoke
+    var KARAOKE_COLORS = ['#5555FF', '#55FF55', '#FFFF55']; // blue, green, yellow
+
     function drawViz() {
         vizRAF = requestAnimationFrame(drawViz);
-        if (!analyser) return;
+        var now = performance.now();
 
+        // If not playing, always show karaoke sign
+        if (!isPlaying || !analyser) {
+            drawKaraokeSign();
+            vizCycleTime = now; // reset cycle
+            vizShowEQ = true;   // start with EQ when music resumes
+            return;
+        }
+
+        // Cycle between EQ and karaoke while playing
+        var elapsed = now - vizCycleTime;
+        if (vizShowEQ && elapsed > VIZ_EQ_DURATION) {
+            vizShowEQ = false;
+            vizCycleTime = now;
+        } else if (!vizShowEQ && elapsed > VIZ_KAR_DURATION) {
+            vizShowEQ = true;
+            vizCycleTime = now;
+        }
+
+        if (vizShowEQ) {
+            drawEqualizer();
+        } else {
+            drawKaraokeSign();
+        }
+    }
+
+    function drawEqualizer() {
         var bins = analyser.frequencyBinCount;
         var data = new Uint8Array(bins);
         analyser.getByteFrequencyData(data);
@@ -417,6 +452,49 @@
             vizCtx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
             vizCtx.fillRect(i * barW, vizH - barH, Math.max(barW - 1, 1), barH);
         }
+    }
+
+    function drawKaraokeSign() {
+        karaokeFrame++;
+        vizCtx.fillStyle = '#000022';
+        vizCtx.fillRect(0, 0, vizW, vizH);
+
+        var cx = vizW / 2;
+        var cy = vizH / 2;
+
+        // Draw animated border dots in an oval - sized to fill canvas like EQ
+        var numDots = 28;
+        var rx = vizW * 0.48;  // nearly full width
+        var ry = vizH * 0.42;  // nearly full height
+        var dotSize = 1.2;
+
+        for (var i = 0; i < numDots; i++) {
+            var angle = (i / numDots) * Math.PI * 2;
+            var x = cx + Math.cos(angle) * rx;
+            var y = cy + Math.sin(angle) * ry;
+
+            // Cycling color based on position + animation
+            var colorIdx = Math.floor((i + karaokeFrame * 0.12) / 4) % KARAOKE_COLORS.length;
+            vizCtx.fillStyle = KARAOKE_COLORS[colorIdx];
+
+            // Glow effect
+            vizCtx.shadowColor = KARAOKE_COLORS[colorIdx];
+            vizCtx.shadowBlur = 2;
+            vizCtx.beginPath();
+            vizCtx.arc(x, y, dotSize, 0, Math.PI * 2);
+            vizCtx.fill();
+        }
+        vizCtx.shadowBlur = 0;
+
+        // Draw "♫" music note in center - red LED style
+        vizCtx.font = 'bold 9px sans-serif';
+        vizCtx.textAlign = 'center';
+        vizCtx.textBaseline = 'middle';
+        vizCtx.fillStyle = '#FF5555';
+        vizCtx.shadowColor = '#FF5555';
+        vizCtx.shadowBlur = 3;
+        vizCtx.fillText('♫', cx, cy);
+        vizCtx.shadowBlur = 0;
     }
 
     // =========================================================

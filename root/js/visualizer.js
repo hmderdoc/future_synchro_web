@@ -89,6 +89,16 @@
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
 
+    // Lyric display modes
+    var LYRIC_MODE_BOUNCING = 0;
+    var LYRIC_MODE_SPITTING = 1;
+    var lyricMode = LYRIC_MODE_BOUNCING;  // default mode
+
+    // Spitting lyrics particle system
+    var spitParticles = [];  // [{text, x, y, z, vx, vy, vz, spawnTime, alpha, scale}]
+    var lastSpitWord = -1;   // index of last word spit out
+    var spitLineIdx = -1;    // current line being spit
+
     // DOM refs
     var elPanel, elLyrics, elClose;
 
@@ -149,6 +159,16 @@
 
         // Listen for track changes from radio.js
         document.addEventListener('radio:trackchange', onTrackChange);
+
+        // Keyboard shortcut: 'L' to toggle lyric mode when viz is open
+        document.addEventListener('keydown', function(e) {
+            if (!isOpen) return;
+            if (e.key === 'l' || e.key === 'L') {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                e.preventDefault();
+                toggleLyricMode();
+            }
+        });
 
         console.log('[viz] initialized');
     }
@@ -398,7 +418,11 @@
 
         if (bcViz) bcViz.render();
         drawHead(amp, bass);
-        syncLyrics();
+        if (lyricMode === LYRIC_MODE_SPITTING) {
+            syncLyricsSpitting();
+        } else {
+            syncLyrics();
+        }
     }
 
     // =========================================================
@@ -718,7 +742,7 @@
         wordIdx = Math.min(wordIdx, words.length - 1);
 
         // Ball position (bouncing arc over current word)
-        var ly = h * 0.88;  // lyrics Y position
+        var ly = h * 0.92;  // lyrics Y position
         var ballBaseY = ly - baseFontSize * 0.8;
         var currentWord = wordPositions[wordIdx];
         if (currentWord) {
@@ -779,10 +803,244 @@
         karaokeCtx.shadowBlur = 0;
     }
 
+
+    // =========================================================
+    //  Spitting Lyrics Mode - Words fly from mouth in 3D
+    // =========================================================
+    function syncLyricsSpitting() {
+        if (!karaokeCtx || !karaokeCanvas) return;
+        var r = window.sbbsRadio;
+        if (!r || !r.audioEl) return;
+
+        var w = karaokeCanvas.width;
+        var h = karaokeCanvas.height;
+        var now = r.audioEl.currentTime;
+
+        karaokeCtx.clearRect(0, 0, w, h);
+
+        if (!lrcLines.length) return;
+
+        // Find current line
+        var ni = -1;
+        var nextLineTime = Infinity;
+        for (var i = lrcLines.length - 1; i >= 0; i--) {
+            if (now >= lrcLines[i].time) {
+                ni = i;
+                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
+                break;
+            }
+        }
+
+        // New line or song?
+        if (ni !== spitLineIdx) {
+            spitLineIdx = ni;
+            lastSpitWord = -1;
+            if (ni === 0) {
+                songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
+                songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
+                spitParticles = [];
+            }
+        }
+
+        if (ni < 0) return;
+
+        var line = lrcLines[ni];
+        var scheme = LYRIC_SCHEMES[songColorIdx % LYRIC_SCHEMES.length];
+        var fontFamily = LYRIC_FONTS[songFontIdx % LYRIC_FONTS.length];
+        var words = line.text.split(/\s+/);
+
+        // Calculate line progress
+        var lineStart = line.time;
+        var lineDuration = nextLineTime - lineStart;
+        if (lineDuration > 30) lineDuration = 4;
+        var progress = Math.min(1, (now - lineStart) / lineDuration);
+
+        // Which word should be spawned?
+        var wordIdx = Math.floor(progress * words.length);
+        wordIdx = Math.min(wordIdx, words.length - 1);
+
+        // Spawn new words when we reach them
+        while (lastSpitWord < wordIdx && lastSpitWord < words.length - 1) {
+            lastSpitWord++;
+            spawnSpitWord(words[lastSpitWord], scheme, now, w, h);
+        }
+
+        // Render all particles
+        renderSpitParticles(now, w, h, fontFamily, scheme);
+    }
+
+    function spawnSpitWord(text, scheme, time, w, h) {
+        // Calculate mouth position in screen space
+        var cx = w / 2;
+        var cy = h * 0.42;
+        var scale = Math.min(w, h) * 0.3;
+
+        var cosY = Math.cos(headRotY), sinY = Math.sin(headRotY);
+        var cosX = Math.cos(headRotX), sinX = Math.sin(headRotX);
+        var FL = 4.0;
+
+        // Mouth center in 3D
+        var mx = 0, my = MOUTH_Y, mz = MOUTH_Z;
+        
+        // Transform to screen space for spawn position
+        var rx  = mx * cosY - mz * sinY;
+        var rz  = mx * sinY + mz * cosY;
+        var ry2 = my * cosX - rz * sinX;
+        var rz2 = my * sinX + rz * cosX;
+        var d   = FL / (FL + rz2);
+        
+        var spawnX = cx + rx * scale * d;
+        var spawnY = cy - ry2 * scale * d;
+
+        // Calculate ejection direction based on head rotation
+        // Words fly OUT from the face direction
+        var dirX = Math.sin(headRotY);     // left-right based on head turn
+        var dirZ = Math.cos(headRotY);     // forward based on head facing
+        
+        // Add some randomness and spread
+        var spread = 0.3;
+        var vx = dirX * 2 + (Math.random() - 0.5) * spread;
+        var vy = -0.5 - Math.random() * 0.5;  // upward arc
+        var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
+
+        spitParticles.push({
+            text: text,
+            x: spawnX,
+            y: spawnY,
+            z: 0,  // start at screen plane
+            vx: vx * 80,   // velocity scaled for pixels/sec
+            vy: vy * 80,
+            vz: vz * 0.5,  // depth velocity (for scaling effect)
+            spawnTime: time,
+            alpha: 1.0,
+            headRotY: headRotY,  // capture rotation at spawn time
+            scheme: scheme
+        });
+    }
+
+    function renderSpitParticles(now, w, h, fontFamily, defaultScheme) {
+        var PARTICLE_LIFETIME = 3.0;  // seconds
+        var GRAVITY = 120;  // pixels/sec^2
+
+        // Update and render particles
+        var activeParticles = [];
+        
+        for (var i = 0; i < spitParticles.length; i++) {
+            var p = spitParticles[i];
+            var age = now - p.spawnTime;
+            
+            if (age > PARTICLE_LIFETIME) continue;  // expired
+
+            // Physics update
+            var dt = 1/60;  // assume 60fps for consistent physics
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += GRAVITY * dt;  // gravity pulls down
+            p.z += p.vz * dt;
+
+            // Perspective scale based on z-depth and head rotation
+            var depthScale = 1 + p.z * 0.3;
+            depthScale = Math.max(0.3, Math.min(2.0, depthScale));
+
+            // Horizontal squash based on viewing angle
+            var facingAngle = Math.cos(p.headRotY);
+            var horizScale = Math.abs(facingAngle);
+            horizScale = Math.max(0.1, horizScale);
+
+            // Alpha fade over lifetime
+            p.alpha = 1 - (age / PARTICLE_LIFETIME);
+            p.alpha = Math.pow(p.alpha, 0.7);  // ease out
+
+            // Skip if off screen
+            if (p.x < -100 || p.x > w + 100 || p.y < -100 || p.y > h + 100) {
+                continue;
+            }
+
+            activeParticles.push(p);
+
+            // Calculate font size with perspective
+            var baseSize = Math.min(36, Math.max(20, h * 0.045));
+            var fontSize = baseSize * depthScale;
+
+            // Render the word with 3D perspective transform
+            karaokeCtx.save();
+            karaokeCtx.translate(p.x, p.y);
+            
+            // Apply perspective skew - horizontal compression when sideways
+            karaokeCtx.scale(horizScale, 1);
+            
+            // Mirror text when facing away (headRotY > PI/2 or < -PI/2)
+            var normalizedRot = ((p.headRotY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+            var isFacingAway = normalizedRot > Math.PI * 0.5 && normalizedRot < Math.PI * 1.5;
+            if (isFacingAway) {
+                karaokeCtx.scale(-1, 1);  // mirror horizontally
+            }
+
+            // Set up text rendering
+            var scheme = p.scheme || defaultScheme;
+            karaokeCtx.font = Math.round(fontSize) + 'px ' + fontFamily;
+            karaokeCtx.textAlign = 'center';
+            karaokeCtx.textBaseline = 'middle';
+            
+            // Glow effect
+            karaokeCtx.shadowColor = scheme.glow;
+            karaokeCtx.shadowBlur = 8 + (1 - p.alpha) * 12;
+            
+            // Text color with alpha
+            karaokeCtx.globalAlpha = p.alpha;
+            karaokeCtx.fillStyle = scheme.hi;
+            karaokeCtx.fillText(p.text, 0, 0);
+            
+            // Second pass with main color for depth
+            karaokeCtx.shadowBlur = 0;
+            karaokeCtx.globalAlpha = p.alpha * 0.6;
+            karaokeCtx.fillStyle = scheme.fg;
+            karaokeCtx.fillText(p.text, 1, 1);
+            
+            karaokeCtx.restore();
+        }
+
+        spitParticles = activeParticles;
+    }
+
+    // Toggle lyric mode (can be called externally)
+    function toggleLyricMode() {
+        lyricMode = (lyricMode + 1) % 2;
+        // Reset state when switching
+        spitParticles = [];
+        lastSpitWord = -1;
+        spitLineIdx = -1;
+        wordPositions = [];
+        ballTrail = [];
+        console.log('[viz] lyric mode:', lyricMode === LYRIC_MODE_BOUNCING ? 'bouncing ball' : 'spitting');
+        return lyricMode;
+    }
+
+    function setLyricMode(mode) {
+        if (mode === 'bouncing' || mode === LYRIC_MODE_BOUNCING) {
+            lyricMode = LYRIC_MODE_BOUNCING;
+        } else if (mode === 'spitting' || mode === LYRIC_MODE_SPITTING) {
+            lyricMode = LYRIC_MODE_SPITTING;
+        }
+        // Reset state
+        spitParticles = [];
+        lastSpitWord = -1;
+        spitLineIdx = -1;
+        wordPositions = [];
+        ballTrail = [];
+        console.log('[viz] lyric mode set to:', lyricMode === LYRIC_MODE_BOUNCING ? 'bouncing ball' : 'spitting');
+    }
+
     // =========================================================
     //  Public API
     // =========================================================
-    window.sbbsVisualizer = { show: show, hide: hide, toggle: toggle };
+    window.sbbsVisualizer = {
+        show: show,
+        hide: hide,
+        toggle: toggle,
+        toggleLyricMode: toggleLyricMode,
+        setLyricMode: setLyricMode
+    };
 
     // =========================================================
     //  Boot
