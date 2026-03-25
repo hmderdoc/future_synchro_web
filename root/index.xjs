@@ -166,10 +166,10 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container<? if (settings.layout_full_width) write('-fluid'); ?>">
         <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><img src="./images/icon-192.png" alt="<? write(settings.brand || system.name); ?>" class="brand-icon"><span class="nav-label brand-label"><? write(settings.brand || system.name); ?></span></a>
-        <!-- Mobile toolbar: viz + terminal buttons (always visible on mobile) -->
+        <!-- Mobile toolbar: music player toggle at start, terminal at end -->
         <div class="navbar-mobile-controls d-md-none">
-            <button class="btn btn-link p-1" id="btn-viz-mobile" type="button" title="Visualizer">
-                <span style="font-size:1.2rem">🎨</span>
+            <button class="btn btn-link p-1" id="btn-viz-mobile" type="button" title="Open Player">
+                <span class="mobile-player-icon">▶</span>
             </button>
 <?xjs if (settings.ftelnet) { ?>
             <button class="btn btn-link p-1" id="btn-terminal-mobile" type="button" title="Terminal">
@@ -265,6 +265,18 @@
 
 <!-- Visualizer Panel (hidden by default, toggled via radio-viz click) -->
 <div id="viz-panel" class="viz-panel is-hidden" aria-hidden="true">
+    <!-- Mobile transport controls (shown only on mobile when viz open) -->
+    <div class="viz-transport d-md-none">
+        <div class="viz-transport-controls">
+            <button class="viz-btn" id="viz-prev" title="Previous">⏮</button>
+            <button class="viz-btn viz-btn-play" id="viz-play" title="Play/Pause">▶</button>
+            <button class="viz-btn" id="viz-next" title="Next">⏭</button>
+            <input type="range" id="viz-volume" class="viz-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+        </div>
+        <div class="viz-track-info">
+            <span class="viz-track-name" id="viz-track-name">♫ Select Track</span>
+        </div>
+    </div>
     <button class="viz-close" title="Close Visualizer">&times;</button>
     <div class="viz-canvas-container"></div>
     <div class="viz-lyrics"></div>

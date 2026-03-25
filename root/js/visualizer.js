@@ -132,12 +132,12 @@
             radioViz.title = 'Click to open visualizer';
         }
 
-        // Mobile visualizer toggle button
+        // Mobile visualizer toggle button - opens viz AND starts playing if not already
         var btnVizMobile = document.getElementById('btn-viz-mobile');
         if (btnVizMobile) {
             btnVizMobile.addEventListener('click', function(e) {
                 e.stopPropagation();
-                toggle();
+                showAndPlay();
             });
         }
 
@@ -158,6 +158,8 @@
         window.addEventListener('spa:beforeNavigate', function() {
             if (isOpen) hide();
         });
+        // Wire up mobile transport controls
+        wireTransportControls();
         console.log('[viz] initialized');
     }
 
@@ -215,6 +217,18 @@
     }
 
     function toggle() { isOpen ? hide() : show(); }
+
+    // Open visualizer and start playback if not playing (for mobile button)
+    function showAndPlay() {
+        show();
+        // Start playback if not already playing
+        var radio = window.sbbsRadio;
+        if (radio && !radio.isPlaying) {
+            var playBtn = document.getElementById('radio-play');
+            if (playBtn) playBtn.click();
+        }
+        updateTransportUI();
+    }
 
     function showWebGLWarning() {
         // Show a subtle warning about WebGL being disabled
@@ -1062,6 +1076,74 @@
     }
 
     // =========================================================
+    // =========================================================
+    //  Mobile Transport Controls
+    // =========================================================
+    function wireTransportControls() {
+        var vizPlay = document.getElementById('viz-play');
+        var vizPrev = document.getElementById('viz-prev');
+        var vizNext = document.getElementById('viz-next');
+        var vizVol  = document.getElementById('viz-volume');
+        var vizTrack = document.getElementById('viz-track-name');
+
+        if (vizPlay) {
+            vizPlay.addEventListener('click', function() {
+                var radioPlay = document.getElementById('radio-play');
+                if (radioPlay) radioPlay.click();
+                setTimeout(updateTransportUI, 100);
+            });
+        }
+        if (vizPrev) {
+            vizPrev.addEventListener('click', function() {
+                var radioPrev = document.getElementById('radio-prev');
+                if (radioPrev) radioPrev.click();
+            });
+        }
+        if (vizNext) {
+            vizNext.addEventListener('click', function() {
+                var radioNext = document.getElementById('radio-next');
+                if (radioNext) radioNext.click();
+            });
+        }
+        if (vizVol) {
+            // Sync initial volume from radio
+            var radioVol = document.getElementById('radio-volume');
+            if (radioVol) vizVol.value = radioVol.value;
+            vizVol.addEventListener('input', function() {
+                if (radioVol) {
+                    radioVol.value = vizVol.value;
+                    radioVol.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+        if (vizTrack) {
+            vizTrack.addEventListener('click', function() {
+                // Open the playlist panel in radio
+                var radioTrack = document.getElementById('radio-track');
+                if (radioTrack) radioTrack.click();
+            });
+        }
+
+        // Listen for play state changes
+        document.addEventListener('radio:statechange', updateTransportUI);
+    }
+
+    function updateTransportUI() {
+        var vizPlay = document.getElementById('viz-play');
+        var vizTrack = document.getElementById('viz-track-name');
+        var radio = window.sbbsRadio;
+
+        if (vizPlay) {
+            vizPlay.textContent = (radio && radio.isPlaying) ? '❚❚' : '▶';
+        }
+        if (vizTrack && radio) {
+            var name = radio.currentTrackFile || 'Select Track';
+            // Clean up the filename for display
+            name = name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').substring(0, 40);
+            vizTrack.textContent = '♫ ' + name;
+        }
+    }
+
     //  Public API
     // =========================================================
     window.sbbsVisualizer = {

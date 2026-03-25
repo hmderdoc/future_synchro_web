@@ -78,6 +78,7 @@
         audio.addEventListener('playing', function () {
             console.log('[radio] playing:', audio.src);
             isPlaying = true;
+            document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: true } }));
             elPlay.textContent = '\u275A\u275A'; // ❚❚ (pause icon)
             startViz();
         });
@@ -85,6 +86,7 @@
         audio.addEventListener('pause', function () {
             if (!audio.ended) {
                 isPlaying = false;
+                document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: false } }));
                 elPlay.textContent = '\u25B6'; // ▶
                 // stopViz(); -- keep running for karaoke sign
             }
