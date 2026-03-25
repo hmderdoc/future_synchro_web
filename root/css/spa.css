@@ -1559,3 +1559,65 @@ body.viz-open {
         font-size: clamp(0.85rem, 3.5vw, 1.5rem);
     }
 }
+
+/* WebGL warning notice */
+.viz-webgl-notice {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+.viz-notice-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 40, 0.85);
+    border: 1px solid rgba(85, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #aaa;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.viz-notice-icon {
+    font-size: 16px;
+}
+.viz-notice-text {
+    color: #ccc;
+}
+.viz-notice-link {
+    color: #55FFFF;
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: 6px;
+}
+.viz-notice-link:hover {
+    text-decoration: underline;
+}
+.viz-notice-close {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 0 0 8px;
+    line-height: 1;
+}
+.viz-notice-close:hover {
+    color: #FF5555;
+}
+
+/* Hide old DOM lyrics - using canvas karaoke now */
+.viz-lyrics {
+    display: none !important;
+}
+
+/* Karaoke canvas layer */
+#viz-karaoke {
+    z-index: 10;
+    pointer-events: none;
+}

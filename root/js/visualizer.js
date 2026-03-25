@@ -30,6 +30,58 @@
     var lrcIndex      = -1;
     var trackFile     = '';
 
+    // Karaoke system state
+    var karaokeCanvas = null;
+    var karaokeCtx    = null;
+    var songColorIdx  = 0;
+    var songFontIdx   = 0;
+    var ballX         = 0;
+    var ballTrail     = [];     // [{x, y, alpha}, ...] phosphor trail
+    var wordPositions = [];     // [{x, width, word}, ...] for current line
+
+    // CGA-inspired color schemes (fg, highlight, glow)
+    var LYRIC_SCHEMES = [
+        { fg: '#55FFFF', hi: '#FFFFFF', glow: '#00AAAA' }, // cyan
+        { fg: '#FFFF55', hi: '#FFFFFF', glow: '#AA5500' }, // yellow
+        { fg: '#FF55FF', hi: '#FFFFFF', glow: '#AA00AA' }, // magenta
+        { fg: '#55FF55', hi: '#FFFFFF', glow: '#00AA00' }, // green
+        { fg: '#FFAA00', hi: '#FFFF55', glow: '#AA5500' }, // amber
+        { fg: '#FF5555', hi: '#FFFFFF', glow: '#AA0000' }, // red
+    ];
+
+    // Retro fonts (Spleen is local, others via Google Fonts)
+    var LYRIC_FONTS = [
+        '"Spleen", "Courier New", monospace',
+        '"VT323", "Courier New", monospace',
+        '"Press Start 2P", "Courier New", monospace',
+    ];
+
+    // Karaoke system state
+    var karaokeCanvas = null;
+    var karaokeCtx    = null;
+    var songColorIdx  = 0;
+    var songFontIdx   = 0;
+    var ballX         = 0;
+    var ballTrail     = [];     // [{x, y, alpha}, ...] phosphor trail
+    var wordPositions = [];     // [{x, width, word}, ...] for current line
+
+    // CGA-inspired color schemes (fg, highlight, glow)
+    var LYRIC_SCHEMES = [
+        { fg: '#55FFFF', hi: '#FFFFFF', glow: '#00AAAA' }, // cyan
+        { fg: '#FFFF55', hi: '#FFFFFF', glow: '#AA5500' }, // yellow
+        { fg: '#FF55FF', hi: '#FFFFFF', glow: '#AA00AA' }, // magenta
+        { fg: '#55FF55', hi: '#FFFFFF', glow: '#00AA00' }, // green
+        { fg: '#FFAA00', hi: '#FFFF55', glow: '#AA5500' }, // amber
+        { fg: '#FF5555', hi: '#FFFFFF', glow: '#AA0000' }, // red
+    ];
+
+    // Retro fonts (Spleen is local, others via Google Fonts)
+    var LYRIC_FONTS = [
+        '"Spleen", "Courier New", monospace',
+        '"VT323", "Courier New", monospace',
+        '"Press Start 2P", "Courier New", monospace',
+    ];
+
     // Head animation
     var headRotY      = 0;
     var headRotX      = 0.18;   // slight downward tilt
@@ -144,6 +196,36 @@
 
     function toggle() { isOpen ? hide() : show(); }
 
+    function showWebGLWarning() {
+        // Show a subtle warning about WebGL being disabled
+        var existing = elPanel.querySelector('.viz-webgl-notice');
+        if (existing) return;
+
+        var notice = document.createElement('div');
+        notice.className = 'viz-webgl-notice';
+        notice.innerHTML = 
+            '<div class="viz-notice-content">' +
+            '<span class="viz-notice-icon">⚡</span>' +
+            '<span class="viz-notice-text">MilkDrop effects require WebGL</span>' +
+            '<a href="https://enable-webgl.com/" target="_blank" rel="noopener" class="viz-notice-link">Enable WebGL →</a>' +
+            '<button class="viz-notice-close" title="Dismiss">×</button>' +
+            '</div>';
+        
+        notice.querySelector('.viz-notice-close').addEventListener('click', function() {
+            notice.remove();
+        });
+
+        // Auto-dismiss after 8 seconds
+        setTimeout(function() {
+            if (notice.parentNode) {
+                notice.style.opacity = '0';
+                setTimeout(function() { notice.remove(); }, 300);
+            }
+        }, 8000);
+
+        elPanel.appendChild(notice);
+    }
+
     function getNavH() {
         var n = document.querySelector('.navbar.fixed-top');
         return n ? n.offsetHeight : 56;
@@ -156,13 +238,13 @@
         var box = elPanel.querySelector('.viz-canvas-container');
         if (!box) return;
 
-        milkCanvas = box.querySelector('#viz-milkdrop');
-        if (!milkCanvas) {
-            milkCanvas = document.createElement('canvas');
-            milkCanvas.id = 'viz-milkdrop';
-            milkCanvas.className = 'viz-layer';
-            box.appendChild(milkCanvas);
-        }
+        // Always create fresh canvas to ensure clean WebGL context
+        var oldMilk = box.querySelector('#viz-milkdrop');
+        if (oldMilk) oldMilk.remove();
+        milkCanvas = document.createElement('canvas');
+        milkCanvas.id = 'viz-milkdrop';
+        milkCanvas.className = 'viz-layer';
+        box.appendChild(milkCanvas);
 
         wireCanvas = box.querySelector('#viz-wireframe');
         if (!wireCanvas) {
@@ -172,6 +254,24 @@
             box.appendChild(wireCanvas);
         }
         wireCtx = wireCanvas.getContext('2d');
+
+        // Karaoke lyrics canvas (topmost layer)
+        var oldKaraoke = box.querySelector('#viz-karaoke');
+        if (oldKaraoke) oldKaraoke.remove();
+        karaokeCanvas = document.createElement('canvas');
+        karaokeCanvas.id = 'viz-karaoke';
+        karaokeCanvas.className = 'viz-layer';
+        box.appendChild(karaokeCanvas);
+        karaokeCtx = karaokeCanvas.getContext('2d');
+
+        // Karaoke lyrics canvas (topmost layer)
+        var oldKaraoke = box.querySelector('#viz-karaoke');
+        if (oldKaraoke) oldKaraoke.remove();
+        karaokeCanvas = document.createElement('canvas');
+        karaokeCanvas.id = 'viz-karaoke';
+        karaokeCanvas.className = 'viz-layer';
+        box.appendChild(karaokeCanvas);
+        karaokeCtx = karaokeCanvas.getContext('2d');
 
         sizeCanvases();
 
@@ -186,7 +286,7 @@
         var w = box.clientWidth, h = box.clientHeight;
         if (w < 1 || h < 1) return;
 
-        [milkCanvas, wireCanvas].forEach(function (c) {
+        [milkCanvas, wireCanvas, karaokeCanvas].forEach(function (c) {
             if (c) { c.width = w; c.height = h; }
         });
 
@@ -205,6 +305,13 @@
             return;
         }
 
+        // Check WebGL availability
+        var testCtx = milkCanvas.getContext("webgl2");
+        if (!testCtx) {
+            console.warn("[viz] WebGL2 not available");
+            showWebGLWarning();
+            return;
+        }
         try {
             // v3 UMD: createVisualizer is on window.butterchurn directly
             // v2 UMD: createVisualizer is on window.butterchurn.default
@@ -525,27 +632,151 @@
     }
 
     function syncLyrics() {
-        if (!elLyrics) return;
+        // Bouncing ball karaoke system
+        if (!karaokeCtx || !karaokeCanvas) return;
         var r = window.sbbsRadio;
         if (!r || !r.audioEl) return;
+
+        var w = karaokeCanvas.width;
+        var h = karaokeCanvas.height;
+        var now = r.audioEl.currentTime;
+
+        // Clear with transparency
+        karaokeCtx.clearRect(0, 0, w, h);
+
         if (!lrcLines.length) return;
 
-        var now = r.audioEl.currentTime;
-        var ni  = -1;
+        // Find current and next line
+        var ni = -1;
+        var nextLineTime = Infinity;
         for (var i = lrcLines.length - 1; i >= 0; i--) {
-            if (now >= lrcLines[i].time) { ni = i; break; }
-        }
-        if (ni !== lrcIndex) {
-            lrcIndex = ni;
-            if (ni >= 0) {
-                elLyrics.textContent = lrcLines[ni].text;
-                elLyrics.classList.remove('viz-lyric-flash');
-                void elLyrics.offsetWidth;              // reflow trigger
-                elLyrics.classList.add('viz-lyric-flash');
-            } else {
-                elLyrics.textContent = '';
+            if (now >= lrcLines[i].time) {
+                ni = i;
+                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
+                break;
             }
         }
+
+        // Track changes trigger new color/font for song
+        if (ni !== lrcIndex) {
+            lrcIndex = ni;
+            if (ni === 0) {
+                // New song started - pick new color and font
+                songColorIdx = Math.floor(Math.random() * LYRIC_SCHEMES.length);
+                songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
+            }
+            // Reset word positions for new line
+            wordPositions = [];
+            ballTrail = [];
+        }
+
+        if (ni < 0) return;
+
+        var line = lrcLines[ni];
+        var scheme = LYRIC_SCHEMES[songColorIdx % LYRIC_SCHEMES.length];
+        var fontFamily = LYRIC_FONTS[songFontIdx % LYRIC_FONTS.length];
+
+        // Responsive font sizing
+        var baseFontSize = Math.min(48, Math.max(24, h * 0.06));
+        var testFont = baseFontSize + 'px ' + fontFamily;
+        karaokeCtx.font = testFont;
+        var textWidth = karaokeCtx.measureText(line.text).width;
+        var maxWidth = w * 0.85;
+        if (textWidth > maxWidth) {
+            baseFontSize = baseFontSize * (maxWidth / textWidth);
+        }
+        baseFontSize = Math.max(16, baseFontSize);
+
+        var font = Math.round(baseFontSize) + 'px ' + fontFamily;
+        karaokeCtx.font = font;
+        karaokeCtx.textAlign = 'left';
+        karaokeCtx.textBaseline = 'middle';
+
+        // Calculate word positions if not done
+        var words = line.text.split(/\s+/);
+        if (wordPositions.length !== words.length) {
+            wordPositions = [];
+            var totalWidth = karaokeCtx.measureText(line.text).width;
+            var startX = (w - totalWidth) / 2;
+            var currentX = startX;
+            for (var j = 0; j < words.length; j++) {
+                var wordW = karaokeCtx.measureText(words[j]).width;
+                var spaceW = karaokeCtx.measureText(' ').width;
+                wordPositions.push({ x: currentX, width: wordW, word: words[j] });
+                currentX += wordW + spaceW;
+            }
+        }
+
+        // Calculate progress through current line (0-1)
+        var lineStart = line.time;
+        var lineDuration = nextLineTime - lineStart;
+        if (lineDuration > 30) lineDuration = 4; // cap for last line
+        var progress = Math.min(1, (now - lineStart) / lineDuration);
+
+        // Find which word we're on
+        var wordIdx = Math.floor(progress * words.length);
+        wordIdx = Math.min(wordIdx, words.length - 1);
+
+        // Ball position (bouncing arc over current word)
+        var ly = h * 0.88;  // lyrics Y position
+        var ballBaseY = ly - baseFontSize * 0.8;
+        var currentWord = wordPositions[wordIdx];
+        if (currentWord) {
+            // Progress within this word
+            var wordProgress = (progress * words.length) - wordIdx;
+            var targetX = currentWord.x + currentWord.width * wordProgress;
+            
+            // Smooth ball movement
+            ballX += (targetX - ballX) * 0.15;
+            
+            // Bouncing motion
+            var bouncePhase = wordProgress * Math.PI;
+            var bounceHeight = Math.sin(bouncePhase) * baseFontSize * 0.6;
+            var ballY = ballBaseY - bounceHeight;
+
+            // Add to trail
+            ballTrail.push({ x: ballX, y: ballY, alpha: 1.0 });
+            if (ballTrail.length > 12) ballTrail.shift();
+
+            // Draw phosphor trail
+            for (var t = 0; t < ballTrail.length; t++) {
+                var trail = ballTrail[t];
+                trail.alpha *= 0.75;  // fade
+                if (trail.alpha > 0.05) {
+                    karaokeCtx.beginPath();
+                    karaokeCtx.arc(trail.x, trail.y, 6 * trail.alpha, 0, Math.PI * 2);
+                    karaokeCtx.fillStyle = scheme.glow;
+                    karaokeCtx.globalAlpha = trail.alpha * 0.5;
+                    karaokeCtx.fill();
+                }
+            }
+            karaokeCtx.globalAlpha = 1;
+
+            // Draw main ball with glow
+            karaokeCtx.shadowColor = scheme.hi;
+            karaokeCtx.shadowBlur = 15;
+            karaokeCtx.beginPath();
+            karaokeCtx.arc(ballX, ballY, 8, 0, Math.PI * 2);
+            karaokeCtx.fillStyle = scheme.hi;
+            karaokeCtx.fill();
+            karaokeCtx.shadowBlur = 0;
+        }
+
+        // Draw lyrics with highlighting
+        karaokeCtx.shadowColor = scheme.glow;
+        karaokeCtx.shadowBlur = 12;
+        
+        for (var k = 0; k < wordPositions.length; k++) {
+            var wp = wordPositions[k];
+            // Highlight words up to and including current
+            if (k <= wordIdx) {
+                karaokeCtx.fillStyle = scheme.hi;
+            } else {
+                karaokeCtx.fillStyle = scheme.fg;
+            }
+            karaokeCtx.fillText(wp.word, wp.x, ly);
+        }
+        karaokeCtx.shadowBlur = 0;
     }
 
     // =========================================================
