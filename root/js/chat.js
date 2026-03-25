@@ -354,6 +354,81 @@
         return bytes;
     }
 
+    function bytesToHex(bytes) {
+        var hex = '';
+        for (var i = 0; i < bytes.length; i++) {
+            var b = bytes[i].toString(16);
+            if (b.length < 2) b = '0' + b;
+            hex += b;
+        }
+        return hex;
+    }
+
+    /**
+     * Convert a CGA-order color index (0-15) to xterm-order.
+     * CGA:   0=Blk 1=Blu 2=Grn 3=Cyn 4=Red 5=Mag 6=Brn 7=LGry  (+8 bright)
+     * Xterm: 0=Blk 1=Red 2=Grn 3=Brn 4=Blu 5=Mag 6=Cyn 7=LGry  (+8 bright)
+     * Swaps: 1<->4, 3<->6 on the low 3 bits; preserves bright bit.
+     */
+    function cgaToXterm(c) {
+        var lo = c & 7;
+        if (lo === 1) lo = 4;
+        else if (lo === 4) lo = 1;
+        else if (lo === 3) lo = 6;
+        else if (lo === 6) lo = 3;
+        return (c & 8) | lo;
+    }
+
+    /**
+     * Encode cell grid into the BITMAP binary format.
+     * cells: array of {code, fg, bg} (from AnsiEditor TextDocument - CGA order)
+     * width/height: grid dimensions
+     * Returns Uint8Array: [height, ...fgSlice, ...bgSlice, ...charSlice]
+     * Color indices are converted from CGA to xterm order for the renderer.
+     */
+    function encodeBitmapRaw(cells, width, height) {
+        var total = width * height;
+        var buf = new Uint8Array(1 + total * 3);
+        buf[0] = height;
+        for (var i = 0; i < total; i++) {
+            var cell = cells[i] || { code: 32, fg: 7, bg: 0 };
+            buf[1 + i] = cgaToXterm(cell.fg) & 0xFF;               // fg slice
+            buf[1 + total + i] = cgaToXterm(cell.bg) & 0xFF;       // bg slice
+            buf[1 + total * 2 + i] = (cell.code || 32) & 0xFF;     // char slice
+        }
+        return buf;
+    }
+
+    /**
+     * Compress bytes using browser-native CompressionStream (zlib/deflate).
+     * Returns a Promise<Uint8Array> of zlib-compressed data.
+     */
+    function compressZlib(rawBytes) {
+        var cs = new CompressionStream('deflate');
+        var writer = cs.writable.getWriter();
+        writer.write(rawBytes);
+        writer.close();
+        return new Response(cs.readable).arrayBuffer().then(function (buf) {
+            return new Uint8Array(buf);
+        });
+    }
+
+    /**
+     * Build a complete [BITMAP|w|h|fromName|hexData] payload string.
+     * cells: array of {code, fg, bg}
+     * width, height: integer dimensions
+     * fromName: sender alias
+     * Returns Promise<string>
+     */
+    function buildBitmapPayload(cells, width, height, fromName) {
+        var raw = encodeBitmapRaw(cells, width, height);
+        return compressZlib(raw).then(function (compressed) {
+            var hex = bytesToHex(compressed);
+            return '[BITMAP|' + width + '|' + height + '|' + (fromName || '') + '|' + hex + ']';
+        });
+    }
+
+
     function createInflateState(bytes, offset) {
         return {
             bytes: bytes,
@@ -1870,7 +1945,8 @@
         isGuestMode: function () { return _guestMode; },
         setChatPageActive: setChatPageActive,
         _renderEmbeddedAvatars: renderEmbeddedAvatars,
-        _renderEmbeddedBitmaps: renderEmbeddedBitmaps
+        _renderEmbeddedBitmaps: renderEmbeddedBitmaps,
+        buildBitmapPayload: buildBitmapPayload
     };
 
     window.addEventListener('spa:beforeNavigate', function () {

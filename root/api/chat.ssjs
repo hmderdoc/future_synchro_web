@@ -712,8 +712,9 @@ switch (action) {
             break;
         }
 
-        if (messageText.length > 1000) {
-            messageText = messageText.substr(0, 1000);
+        var maxMessageLen = (messageText.indexOf('[BITMAP|') === 0) ? 32000 : 1000;
+        if (messageText.length > maxMessageLen) {
+            messageText = messageText.substr(0, maxMessageLen);
         }
         messageText = messageText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 
@@ -776,8 +777,9 @@ switch (action) {
             break;
         }
 
-        if (privateMessageText.length > 1000) {
-            privateMessageText = privateMessageText.substr(0, 1000);
+        var maxPrivateLen = (privateMessageText.indexOf('[BITMAP|') === 0) ? 32000 : 1000;
+        if (privateMessageText.length > maxPrivateLen) {
+            privateMessageText = privateMessageText.substr(0, maxPrivateLen);
         }
         privateMessageText = privateMessageText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 

@@ -1,4 +1,5 @@
 <!--Chat-->
+<script type="text/javascript" src="./js/ansi-editor.js"></script>
 <style>
 .chat-web-page {
     --chat-bg: #050505;
@@ -563,6 +564,37 @@
         padding: 0.75rem;
     }
 }
+/* ANSI Editor in chat */
+.chat-web-page .chat-ansi-toggle {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--chat-panel-alt);
+    color: var(--chat-fg);
+    border-radius: 0.85rem;
+    padding: 0.65rem 0.9rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.chat-web-page .chat-ansi-toggle.active {
+    background: var(--chat-accent);
+    color: #041013;
+    font-weight: bold;
+}
+.chat-web-page .chat-ansi-wrap {
+    display: none;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #000;
+}
+.chat-web-page .chat-ansi-wrap.active {
+    display: block;
+}
+.chat-web-page .chat-ansi-wrap .me-editor {
+    max-height: 520px;
+}
+
 </style>
 
 <div class="chat-web-page">
@@ -599,8 +631,10 @@
                     </div>
 
 <?xjs if (user.number > 0) { ?>
+                    <div id="chat-ansi-wrap" class="chat-ansi-wrap"></div>
                     <form id="chat-input" class="chat-input-area chat-web-form" autocomplete="off">
                         <input type="text" id="chat-text" class="chat-web-input" maxlength="500" placeholder="Type a message...">
+                        <button type="button" id="chat-ansi-toggle" class="chat-ansi-toggle">ANSI</button>
                         <button class="chat-web-send" type="submit">Send</button>
                     </form>
 <?xjs } else { ?>
@@ -1476,9 +1510,27 @@
 
     if (chatInput) {
         chatInput.addEventListener('submit', function (event) {
-            var text = chatText.value.replace(/^\s+|\s+$/g, '');
-
             event.preventDefault();
+
+            // If ANSI editor is active, encode cells as BITMAP and send
+            if (ansiEditorActive && ansiEditorInstance && ansiEditorInstance.doc) {
+                var doc = ansiEditorInstance.doc;
+                var cells = doc.data;
+                var cols = doc.columns;
+                var rows = doc.rows;
+                var fromName = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
+
+                chatService.buildBitmapPayload(cells, cols, rows, fromName).then(function (payload) {
+                    return chatService.send(payload);
+                }).then(function (ok) {
+                    if (!ok) return;
+                    closeAnsiEditor();
+                });
+                return;
+            }
+
+            // Normal text send
+            var text = chatText.value.replace(/^\s+|\s+$/g, '');
             if (!text.length) return;
 
             chatService.send(text).then(function (ok) {
@@ -1488,7 +1540,62 @@
         });
     }
 
-    chatService.setChatPageActive(true);
+    // ═══ ANSI Editor Toggle ═══
+    var ansiToggle = document.getElementById('chat-ansi-toggle');
+    var ansiWrap = document.getElementById('chat-ansi-wrap');
+    var ansiEditorInstance = null;
+    var ansiEditorActive = false;
+
+    function openAnsiEditor() {
+        if (!window.AnsiEditor) { console.error('AnsiEditor not loaded'); return; }
+        if (ansiEditorInstance) return; // already open
+        ansiWrap.classList.add('active');
+        chatText.style.display = 'none';
+        ansiToggle.classList.add('active');
+        ansiToggle.textContent = 'Text';
+        ansiEditorActive = true;
+
+        AnsiEditor.create({
+            container: ansiWrap,
+            columns: 80,
+            rows: 25,
+            fontUrl: './fonts/ansi-editor/IBM VGA.F16',
+            onDone: function () { /* handled by Send button instead */ },
+            onCancel: function () { closeAnsiEditor(); }
+        }).then(function (editor) {
+            ansiEditorInstance = editor;
+        }).catch(function (err) {
+            console.error('ANSI Editor create error:', err);
+            closeAnsiEditor();
+        });
+    }
+
+    function closeAnsiEditor() {
+        if (ansiEditorInstance) {
+            ansiEditorInstance.destroy();
+            ansiEditorInstance = null;
+        }
+        ansiWrap.innerHTML = '';
+        ansiWrap.classList.remove('active');
+        chatText.style.display = '';
+        if (ansiToggle) {
+            ansiToggle.classList.remove('active');
+            ansiToggle.textContent = 'ANSI';
+        }
+        ansiEditorActive = false;
+    }
+
+    if (ansiToggle) {
+        ansiToggle.addEventListener('click', function () {
+            if (ansiEditorActive) {
+                closeAnsiEditor();
+            } else {
+                openAnsiEditor();
+            }
+        });
+    }
+
+        chatService.setChatPageActive(true);
     renderAll();
     if (!syncRouteIntoService()) {
         chatService.loadHistory();
@@ -1506,6 +1613,7 @@
     });
 
     function cleanup() {
+        if (ansiEditorActive) closeAnsiEditor();
         window.removeEventListener('chat:messagesUpdated', onMessagesUpdated);
         window.removeEventListener('chat:roomsUpdated', onRoomsUpdated);
         window.removeEventListener('chat:privateUpdated', onPrivateUpdated);
