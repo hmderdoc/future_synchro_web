@@ -92,7 +92,7 @@
     // Lyric display modes
     var LYRIC_MODE_BOUNCING = 0;
     var LYRIC_MODE_SPITTING = 1;
-    var lyricMode = LYRIC_MODE_BOUNCING;  // default mode
+    var lyricMode = LYRIC_MODE_SPITTING;  // default mode
 
     // Spitting lyrics particle system
     var spitParticles = [];  // [{text, x, y, z, vx, vy, vz, spawnTime, alpha, scale}]
