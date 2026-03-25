@@ -157,6 +157,15 @@
             radioViz.title = 'Click to open visualizer';
         }
 
+        // Mobile visualizer toggle button
+        var btnVizMobile = document.getElementById('btn-viz-mobile');
+        if (btnVizMobile) {
+            btnVizMobile.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggle();
+            });
+        }
+
         // Listen for track changes from radio.js
         document.addEventListener('radio:trackchange', onTrackChange);
 

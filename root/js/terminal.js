@@ -342,6 +342,10 @@
 
     if (btnToggle) btnToggle.addEventListener('click', togglePanel);
 
+    // Mobile terminal toggle button
+    var btnTerminalMobile = document.getElementById('btn-terminal-mobile');
+    if (btnTerminalMobile) btnTerminalMobile.addEventListener('click', togglePanel);
+
     window.addEventListener('spa:beforeNavigate', function () {
         if (isVisible) hidePanel();
     });

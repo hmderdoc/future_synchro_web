@@ -319,3 +319,19 @@ animation: indicator-fade 3s ease 0s 1 alternate !important;
 	color: #111;
 	background-color: #DDD;
 }
+
+/* Mobile navbar toolbar */
+.navbar-mobile-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-right: 0.5rem;
+}
+.navbar-mobile-controls .btn {
+    color: rgba(255,255,255,0.85);
+    padding: 0.25rem 0.5rem;
+}
+.navbar-mobile-controls .btn:hover {
+    color: #fff;
+}
+
