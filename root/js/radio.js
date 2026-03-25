@@ -402,9 +402,19 @@
     var VIZ_KAR_DURATION = 3000; // 3 seconds on karaoke
     var KARAOKE_COLORS = ['#5555FF', '#55FF55', '#FFFF55']; // blue, green, yellow
 
+    var vizLastHiddenDraw = 0; // Throttle when tab hidden
+
     function drawViz() {
         vizRAF = requestAnimationFrame(drawViz);
-        var now = performance.now();
+        var now;
+
+        // Throttle to 2fps when tab is hidden (save CPU)
+        if (document.hidden) {
+            now = performance.now();
+            if (now - vizLastHiddenDraw < 500) return;
+            vizLastHiddenDraw = now;
+        }
+        now = performance.now();
 
         // If not playing, always show karaoke sign
         if (!isPlaying || !analyser) {

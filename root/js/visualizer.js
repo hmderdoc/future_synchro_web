@@ -19,6 +19,7 @@
     var presetIndex   = 0;
     var presetTimer   = null;
     var presetMap     = null;   // cached preset map from getPresets()
+    var resizeObserver = null; // stored to disconnect on close
 
     // Canvas refs
     var milkCanvas    = null;   // Butterchurn WebGL
@@ -29,32 +30,6 @@
     var lrcLines      = [];     // [{time: seconds, text: ''}, ...]
     var lrcIndex      = -1;
     var trackFile     = '';
-
-    // Karaoke system state
-    var karaokeCanvas = null;
-    var karaokeCtx    = null;
-    var songColorIdx  = 0;
-    var songFontIdx   = 0;
-    var ballX         = 0;
-    var ballTrail     = [];     // [{x, y, alpha}, ...] phosphor trail
-    var wordPositions = [];     // [{x, width, word}, ...] for current line
-
-    // CGA-inspired color schemes (fg, highlight, glow)
-    var LYRIC_SCHEMES = [
-        { fg: '#55FFFF', hi: '#FFFFFF', glow: '#00AAAA' }, // cyan
-        { fg: '#FFFF55', hi: '#FFFFFF', glow: '#AA5500' }, // yellow
-        { fg: '#FF55FF', hi: '#FFFFFF', glow: '#AA00AA' }, // magenta
-        { fg: '#55FF55', hi: '#FFFFFF', glow: '#00AA00' }, // green
-        { fg: '#FFAA00', hi: '#FFFF55', glow: '#AA5500' }, // amber
-        { fg: '#FF5555', hi: '#FFFFFF', glow: '#AA0000' }, // red
-    ];
-
-    // Retro fonts (Spleen is local, others via Google Fonts)
-    var LYRIC_FONTS = [
-        '"Spleen", "Courier New", monospace',
-        '"VT323", "Courier New", monospace',
-        '"Press Start 2P", "Courier New", monospace',
-    ];
 
     // Karaoke system state
     var karaokeCanvas = null;
@@ -179,6 +154,10 @@
             }
         });
 
+        // Close visualizer on SPA navigation
+        window.addEventListener('spa:beforeNavigate', function() {
+            if (isOpen) hide();
+        });
         console.log('[viz] initialized');
     }
 
@@ -218,7 +197,18 @@
         elPanel.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('viz-open');
 
+        // Cleanup Butterchurn (try dispose if available)
+        if (bcViz) {
+            if (typeof bcViz.dispose === 'function') bcViz.dispose();
+            else if (typeof bcViz.destroy === 'function') bcViz.destroy();
+        }
         bcViz = null;
+
+        // Disconnect ResizeObserver to prevent leaks
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+            resizeObserver = null;
+        }
         if (presetTimer) { clearInterval(presetTimer); presetTimer = null; }
 
         console.log('[viz] closed');
@@ -294,19 +284,13 @@
         box.appendChild(karaokeCanvas);
         karaokeCtx = karaokeCanvas.getContext('2d');
 
-        // Karaoke lyrics canvas (topmost layer)
-        var oldKaraoke = box.querySelector('#viz-karaoke');
-        if (oldKaraoke) oldKaraoke.remove();
-        karaokeCanvas = document.createElement('canvas');
-        karaokeCanvas.id = 'viz-karaoke';
-        karaokeCanvas.className = 'viz-layer';
-        box.appendChild(karaokeCanvas);
-        karaokeCtx = karaokeCanvas.getContext('2d');
 
         sizeCanvases();
 
-        if (window.ResizeObserver) {
-            new ResizeObserver(sizeCanvases).observe(box);
+        // Only create ResizeObserver once, store reference for cleanup
+        if (window.ResizeObserver && !resizeObserver) {
+            resizeObserver = new ResizeObserver(sizeCanvases);
+            resizeObserver.observe(box);
         }
     }
 
@@ -437,7 +421,8 @@
             bass = bs / (bc * 255);
         }
 
-        if (bcViz) bcViz.render();
+        // Skip rendering when tab is hidden or panel is not visible
+        if (bcViz && !document.hidden) bcViz.render();
         drawHead(amp, bass);
         if (lyricMode === LYRIC_MODE_SPITTING) {
             syncLyricsSpitting();
