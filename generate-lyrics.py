@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/sbbs/webv4_custom/.venv-whisper/bin/python3
 """generate-lyrics.py - Generate .lrc lyric files from MP3s using Whisper.
 
 Scans the radio MP3 directory for files without companion .lrc files,
@@ -28,6 +28,7 @@ def find_mp3_dir():
     candidates = [
         '/sbbs/files/originalcontent_mp3s',
         '/sbbs/data/files/originalcontent_mp3s',
+        '/sbbs/data/dirs/mp3s',
     ]
     # Also scan /sbbs/files/ for directories containing 'mp3' or 'original'
     for base in ['/sbbs/files', '/sbbs/data/files']:
