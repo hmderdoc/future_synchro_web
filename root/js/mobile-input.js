@@ -163,11 +163,16 @@
         '}',
         '#mi-fab:active { background:rgba(0,255,255,0.3); }',
 
-        /* Hidden textarea for native keyboard */
+        /* Hidden textarea for native keyboard.
+           Must be IN the viewport for iOS to open the soft keyboard.
+           opacity:0.01 (not 0) — iOS ignores truly invisible elements.
+           caret-color:transparent hides the blinking cursor. */
         '#mi-input {',
-        '  position:fixed; left:-9999px; top:0; width:1px; height:1px;',
-        '  opacity:0; font-size:16px; /* prevent iOS zoom */',
-        '  z-index:-1;',
+        '  position:fixed; left:0; bottom:0; width:1px; height:1px;',
+        '  opacity:0.01; font-size:16px; /* >=16px prevents iOS zoom */',
+        '  caret-color:transparent; color:transparent;',
+        '  border:none; outline:none; background:transparent;',
+        '  z-index:1; pointer-events:none;',
         '}',
 
         /* Extra-keys bar */
@@ -663,11 +668,10 @@
             fab.textContent = '🎮';
             fab.title = 'Switch to D-Pad';
             extraBar.classList.add('show');
-            // Focus the hidden input to raise the native keyboard
-            // Must be in a user-gesture handler (we're called from tap)
-            setTimeout(function () {
-                input.focus({ preventScroll: true });
-            }, 50);
+            // Focus the hidden input to raise the native keyboard.
+            // MUST be synchronous — iOS kills the user-gesture privilege
+            // if focus() is inside setTimeout/Promise/rAF.
+            input.focus({ preventScroll: true });
         } else if (mode === MODE_DPAD) {
             fab.textContent = '✕';
             fab.title = 'Dismiss Controls';
@@ -687,17 +691,23 @@
     }
 
     // Cycle: OFF → Keyboard → D-Pad → OFF
+    // Use 'click' (not touchstart) as the primary trigger — iOS Safari
+    // only grants "user activation" for keyboard focus on click/touchend.
+    // touchstart with preventDefault() kills the activation.
+    var fabTouched = false;
     fab.addEventListener('touchstart', function (e) {
-        e.preventDefault();
         e.stopPropagation();
+        fabTouched = true;
+        // Visual feedback immediately, but do NOT preventDefault —
+        // that would suppress the subsequent click event on iOS.
         if (navigator.vibrate) navigator.vibrate(15);
-        setMode((currentMode + 1) % 3);
-    }, { passive: false });
+    }, { passive: true });
 
-    // Also handle click for compat
     fab.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
+        setMode((currentMode + 1) % 3);
+        fabTouched = false;
     });
 
     // =========================================================
