@@ -877,6 +877,18 @@ div.message pre.ansi {
     width: 80ch;
     overflow: hidden;
 }
+
+/* ANSI art rendered via GraphicsConverter (canvas image) */
+div.message .ansi-render {
+    max-width: 100%;
+    overflow: hidden;
+}
+div.message .ansi-canvas-img {
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    display: block;
+}
 [data-theme="cga"] div.message blockquote {
     border-left-color: #00aa00;
     color: #00aaaa;

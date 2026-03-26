@@ -440,6 +440,7 @@ async function getMailBody(id) {
         tgt.innerHTML = str;
         tgt.hidden = false;
         if (typeof renderAllBinIcons === 'function') renderAllBinIcons(tgt);
+        if (typeof renderAnsiCanvases === 'function') renderAnsiCanvases(tgt);
     }
 }
 

@@ -175,6 +175,7 @@ async function refreshMessageList(sub, thread) {
         if (downvoteBtn) downvoteBtn.onclick = function () { vote(sub, e.number, false); };
         elem.removeAttribute('hidden');
         if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+        renderAnsiCanvases(elem);
         document.getElementById('forum-list-container').appendChild(elem);
         if (users.indexOf(akey) < 0) users.push(akey);
     });
@@ -493,6 +494,7 @@ async function listMessages(sub, thread, count, after) {
         applyVoteState(e.number);
         elem.removeAttribute('hidden');
         if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+        renderAnsiCanvases(elem);
         if (append) document.getElementById('forum-list-container').appendChild(elem);
         if (users.indexOf(akey) < 0) users.push(akey);
     });
@@ -668,6 +670,7 @@ async function listThread(e) {
 
     elem.removeAttribute('hidden');
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+    renderAnsiCanvases(elem);
     if (append) document.getElementById('forum-list-container').appendChild(elem);
 }
 
@@ -929,6 +932,7 @@ function listSearchResult(e) {
 
     elem.removeAttribute('hidden');
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
+    renderAnsiCanvases(elem);
     document.getElementById('forum-list-container').appendChild(elem);
 }
 
@@ -1365,6 +1369,66 @@ async function getGroupUnreadCounts() {
     if (res) onGroupUnreadCount(res);
 }
 
+
+/* ---- ANSI art canvas rendering (upgrade <pre class="ansi"> to GraphicsConverter image) ---- */
+var _ansiRenderCache = {};
+function renderAnsiCanvases(root) {
+    var elems = (root || document).querySelectorAll('.ansi-render[data-ansi-cells]');
+    if (!elems.length) return;
+    if (typeof GraphicsConverter === 'undefined' || !GraphicsConverter.shared) return;
+    var gc = GraphicsConverter.shared();
+    if (!gc.from_bitmap_cells) return;
+
+    elems.forEach(function (el) {
+        var b64 = el.getAttribute('data-ansi-cells');
+        var w = parseInt(el.getAttribute('data-ansi-w'), 10) || 80;
+        var h = parseInt(el.getAttribute('data-ansi-h'), 10) || 25;
+        if (!b64) return;
+
+        /* Check cache */
+        var cacheKey = w + 'x' + h + ':' + b64.substr(0, 64);
+        if (_ansiRenderCache[cacheKey]) {
+            _replaceAnsiWithImg(el, _ansiRenderCache[cacheKey], w, h);
+            return;
+        }
+
+        /* Decode base64 -> cell array for from_bitmap_cells */
+        var raw;
+        try { raw = atob(b64); } catch (e) { return; }
+        var total = w * h;
+        if (raw.length < total * 2) return;
+
+        var cells = [];
+        for (var i = 0; i < total; i++) {
+            var charCode = raw.charCodeAt(i * 2) & 0xFF;
+            var attr = raw.charCodeAt(i * 2 + 1) & 0xFF;
+            cells.push({
+                charCode: charCode,
+                fg: attr & 0xF,
+                bg: (attr >> 4) & 0xF
+            });
+        }
+
+        gc.from_bitmap_cells(cells, w, h, function (dataURL) {
+            if (!dataURL) return;
+            _ansiRenderCache[cacheKey] = dataURL;
+            _replaceAnsiWithImg(el, dataURL, w, h);
+        }, true);
+    });
+}
+
+function _replaceAnsiWithImg(el, dataURL, w, h) {
+    var img = document.createElement('img');
+    img.src = dataURL;
+    img.alt = 'ANSI art (' + w + '\u00d7' + h + ')';
+    img.className = 'ansi-canvas-img';
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.imageRendering = 'pixelated';
+    img.style.display = 'block';
+    el.innerHTML = '';
+    el.appendChild(img);
+}
 
 /* ---- Render breadcrumb icons on page load ---- */
 (function initBreadcrumbIcons() {
