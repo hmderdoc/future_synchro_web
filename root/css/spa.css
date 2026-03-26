@@ -1272,8 +1272,8 @@ div.message .ansi-canvas-img {
 
 /* Visualizer canvas */
 #radio-viz {
-    height: 24px;
-    width: 48px;
+    height: 32px;
+    width: 60px;
     flex-shrink: 0;
     margin: 0 2px;
     border-radius: 2px;
@@ -1407,7 +1407,7 @@ div.message .ansi-canvas-img {
         width: 80px;
     }
     #radio-viz {
-        width: 36px;
+        width: 48px;
     }
     .radio-volume {
         width: 36px;
@@ -1421,8 +1421,8 @@ div.message .ansi-canvas-img {
         margin-right: 0.25rem;
     }
     #radio-viz {
-        width: 32px;
-        height: 20px;
+        width: 40px;
+        height: 28px;
     }
     .radio-track-name {
         display: none;

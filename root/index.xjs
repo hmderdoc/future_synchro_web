@@ -195,7 +195,7 @@
                         <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">▶</button>
                         <button class="radio-btn" id="radio-next" title="Next">⏭</button>
                     </div>
-                    <canvas id="radio-viz" width="48" height="24" title="BBS Radio"></canvas>
+                    <canvas id="radio-viz" width="60" height="32" title="BBS Radio"></canvas>
                     <span class="radio-track-name" id="radio-track">♫ Radio</span>
                     <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
                     <div class="radio-playlist-panel" id="radio-playlist-panel">

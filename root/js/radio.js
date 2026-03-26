@@ -404,8 +404,8 @@
         vizCtx.fillStyle = '#000a00';
         vizCtx.fillRect(0, 0, W, H);
 
-        var cx = W / 2, cy = H * 0.45;
-        var S = Math.min(W, H) * 0.32;
+        var cx = W / 2, cy = H * 0.46;
+        var S = Math.min(W, H) * 0.38;
         _miniHeadRot += 0.012;
 
         var cosY = Math.cos(_miniHeadRot), sinY = Math.sin(_miniHeadRot);
@@ -468,8 +468,8 @@
         vizCtx.fillStyle = 'rgba(' + _MINI_GREEN + ',0.8)';
         var lEye = proj(-0.18, -0.05, 0.45);
         var rEye = proj(0.18, -0.05, 0.45);
-        vizCtx.beginPath(); vizCtx.arc(lEye.x, lEye.y, 1.5, 0, Math.PI * 2); vizCtx.fill();
-        vizCtx.beginPath(); vizCtx.arc(rEye.x, rEye.y, 1.5, 0, Math.PI * 2); vizCtx.fill();
+        vizCtx.beginPath(); vizCtx.arc(lEye.x, lEye.y, 1.8, 0, Math.PI * 2); vizCtx.fill();
+        vizCtx.beginPath(); vizCtx.arc(rEye.x, rEye.y, 1.8, 0, Math.PI * 2); vizCtx.fill();
 
         vizCtx.shadowBlur = 0;
     }
