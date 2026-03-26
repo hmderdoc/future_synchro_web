@@ -538,8 +538,8 @@
     var karaokeFrame = 0;
     var vizCycleTime = 0;        // ms timestamp for cycling
     var vizShowA = true;         // toggles between the two modes in current state
-    var VIZ_DUR_A = 5000;        // duration for first mode in pair
-    var VIZ_DUR_B = 3000;        // duration for second mode in pair
+    var VIZ_DUR_A = 20000;       // duration for first mode in pair
+    var VIZ_DUR_B = 15000;       // duration for second mode in pair
     var KARAOKE_COLORS = ['#5555FF', '#55FF55', '#FFFF55']; // blue, green, yellow
     var _firstPlayFired = false;  // track first play for auto-open viz
 
@@ -561,9 +561,9 @@
         // Playing: cycle EQ <-> karaoke
         if (!isPlaying || !analyser) {
             var elapsed = now - vizCycleTime;
-            if (vizShowA && elapsed > 4000) {       // head shown 4s
+            if (vizShowA && elapsed > 20000) {      // head shown 20s
                 vizShowA = false; vizCycleTime = now;
-            } else if (!vizShowA && elapsed > 3000) { // karaoke shown 3s
+            } else if (!vizShowA && elapsed > 15000) { // karaoke shown 15s
                 vizShowA = true; vizCycleTime = now;
             }
             if (vizShowA) { drawMiniHead(); } else { drawKaraokeSign(); }
