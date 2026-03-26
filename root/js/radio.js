@@ -571,7 +571,9 @@
             return;
         }
 
-        // Playing: cycle EQ <-> karaoke sign
+        // Playing + viz open:   EQ <-> karaoke  (head lives in big viz)
+        // Playing + viz hidden: EQ <-> head     (head returns to navbar)
+        var vizOpen = document.body.classList.contains('viz-open');
         var elapsed = now - vizCycleTime;
         if (vizShowA && elapsed > VIZ_DUR_A) {
             vizShowA = false; vizCycleTime = now;
@@ -581,8 +583,10 @@
 
         if (vizShowA) {
             drawEqualizer();
-        } else {
+        } else if (vizOpen) {
             drawKaraokeSign();
+        } else {
+            drawMiniHead();
         }
 
         // Also update mobile mini-EQ if visible
