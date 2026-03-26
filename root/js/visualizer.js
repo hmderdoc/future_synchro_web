@@ -187,6 +187,13 @@
         startAnim();
         fetchLyrics();
 
+        // Auto-play radio if not already playing
+        var radio = window.sbbsRadio;
+        if (radio && !radio.isPlaying) {
+            var playBtn = document.getElementById('radio-play');
+            if (playBtn) playBtn.click();
+        }
+
         console.log('[viz] opened');
     }
 
