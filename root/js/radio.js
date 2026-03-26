@@ -537,8 +537,9 @@
     // LED Karaoke sign state
     var karaokeFrame = 0;
     var vizCycleTime = 0;        // ms timestamp for cycling
-    var vizMode = 0;             // 0=EQ, 1=karaoke, 2=wireframe head
-    var VIZ_DURATIONS = [5000, 3000, 4000]; // ms per mode
+    var vizShowA = true;         // toggles between the two modes in current state
+    var VIZ_DUR_A = 5000;        // duration for first mode in pair
+    var VIZ_DUR_B = 3000;        // duration for second mode in pair
     var KARAOKE_COLORS = ['#5555FF', '#55FF55', '#FFFF55']; // blue, green, yellow
     var _firstPlayFired = false;  // track first play for auto-open viz
 
@@ -556,28 +557,32 @@
         }
         now = performance.now();
 
-        // If not playing, always show karaoke sign
+        // Paused: cycle wireframe head <-> karaoke
+        // Playing: cycle EQ <-> karaoke
         if (!isPlaying || !analyser) {
-            drawKaraokeSign();
+            var elapsed = now - vizCycleTime;
+            if (vizShowA && elapsed > 4000) {       // head shown 4s
+                vizShowA = false; vizCycleTime = now;
+            } else if (!vizShowA && elapsed > 3000) { // karaoke shown 3s
+                vizShowA = true; vizCycleTime = now;
+            }
+            if (vizShowA) { drawMiniHead(); } else { drawKaraokeSign(); }
             drawMiniEQ();
-            vizCycleTime = now; // reset cycle
-            vizMode = 0;        // start with EQ when music resumes
             return;
         }
 
-        // Cycle through modes: EQ -> karaoke -> wireframe head
+        // Playing: cycle EQ <-> karaoke sign
         var elapsed = now - vizCycleTime;
-        if (elapsed > VIZ_DURATIONS[vizMode]) {
-            vizMode = (vizMode + 1) % 3;
-            vizCycleTime = now;
+        if (vizShowA && elapsed > VIZ_DUR_A) {
+            vizShowA = false; vizCycleTime = now;
+        } else if (!vizShowA && elapsed > VIZ_DUR_B) {
+            vizShowA = true; vizCycleTime = now;
         }
 
-        if (vizMode === 0) {
+        if (vizShowA) {
             drawEqualizer();
-        } else if (vizMode === 1) {
-            drawKaraokeSign();
         } else {
-            drawMiniHead(now);
+            drawKaraokeSign();
         }
 
         // Also update mobile mini-EQ if visible
