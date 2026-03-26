@@ -387,9 +387,63 @@ if ('serviceWorker' in navigator) {
     });
     window.addEventListener('load', function () {
         navigator.serviceWorker.register('./sw.js').then(function (reg) {
-            console.log('SW registered, scope:', reg.scope);
+            console.log('[SW] registered, scope:', reg.scope);
+
+            // Check for updates immediately, then every 60 seconds.
+            // iOS Safari only checks for SW updates on navigation —
+            // this ensures the PWA detects updates even if left open.
+            reg.update().catch(function () {});
+            setInterval(function () {
+                reg.update().catch(function () {});
+            }, 60 * 1000);
+
+            // When a new SW is waiting, show an update banner
+            function promptUpdate(worker) {
+                if (!worker) return;
+                // If user already dismissed, skip (sessionStorage flag)
+                if (sessionStorage.getItem('sw-update-dismissed')) return;
+                var banner = document.createElement('div');
+                banner.id = 'sw-update-banner';
+                banner.style.cssText =
+                    'position:fixed;bottom:0;left:0;right:0;z-index:99999;' +
+                    'background:rgba(10,10,20,0.97);border-top:2px solid #0ff;' +
+                    'padding:12px 16px;display:flex;align-items:center;' +
+                    'justify-content:space-between;gap:12px;font-family:monospace;' +
+                    'color:#0ff;font-size:13px;';
+                banner.innerHTML =
+                    '<span>Update available — tap to refresh</span>' +
+                    '<div style="display:flex;gap:8px">' +
+                    '<button id="sw-update-btn" style="background:#0ff;color:#000;' +
+                    'border:none;border-radius:4px;padding:6px 16px;font-weight:bold;' +
+                    'font-family:monospace;cursor:pointer">Update</button>' +
+                    '<button id="sw-dismiss-btn" style="background:transparent;' +
+                    'color:#0ff;border:1px solid #0ff;border-radius:4px;padding:6px 12px;' +
+                    'font-family:monospace;cursor:pointer">Later</button></div>';
+                document.body.appendChild(banner);
+                document.getElementById('sw-update-btn').addEventListener('click', function () {
+                    worker.postMessage({ type: 'SKIP_WAITING' });
+                    banner.remove();
+                });
+                document.getElementById('sw-dismiss-btn').addEventListener('click', function () {
+                    banner.remove();
+                    sessionStorage.setItem('sw-update-dismissed', '1');
+                });
+            }
+
+            if (reg.waiting) {
+                promptUpdate(reg.waiting);
+            }
+            reg.addEventListener('updatefound', function () {
+                var newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', function () {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        promptUpdate(newWorker);
+                    }
+                });
+            });
         }).catch(function (err) {
-            console.log('SW registration failed:', err);
+            console.log('[SW] registration failed:', err);
         });
     });
 }
