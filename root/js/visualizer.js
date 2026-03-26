@@ -121,6 +121,18 @@
 
         elLyrics = elPanel.querySelector('.viz-lyrics');
 
+        // Tap/click canvas area to toggle lyric mode (spit <-> bouncing ball)
+        var vizBox = elPanel.querySelector('.viz-canvas-container');
+        if (vizBox) {
+            vizBox.addEventListener('click', function (e) {
+                if (!isOpen) return;
+                // Ignore clicks on buttons or interactive elements
+                if (e.target.closest('button, a, input, select')) return;
+                toggleLyricMode();
+            });
+            vizBox.style.cursor = 'pointer';
+        }
+
         // Wire #radio-viz click to toggle
         var radioViz = document.getElementById('radio-viz');
         if (radioViz) {
