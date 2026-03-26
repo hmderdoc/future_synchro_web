@@ -81,6 +81,17 @@
             document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: true } }));
             elPlay.textContent = '\u275A\u275A'; // ❚❚ (pause icon)
             startViz();
+
+            // Auto-open visualizer on the very first play of this session
+            if (!_firstPlayFired) {
+                _firstPlayFired = true;
+                if (!sessionStorage.getItem('radioPlayed')) {
+                    sessionStorage.setItem('radioPlayed', '1');
+                    if (window.sbbsVisualizer && window.sbbsVisualizer.show) {
+                        setTimeout(function () { window.sbbsVisualizer.show(); }, 300);
+                    }
+                }
+            }
         });
 
         audio.addEventListener('pause', function () {
@@ -371,6 +382,99 @@
     }
 
     // =========================================================
+    //  Mini wireframe head (navbar viz mode 2)
+    // =========================================================
+    var _miniHeadRot = 0;
+    var _MINI_GREEN = '51,255,51';
+    var _MINI_PROFILE = [
+        [0.00, -0.80], [0.22, -0.70], [0.38, -0.58],
+        [0.48, -0.42], [0.52, -0.25], [0.50, -0.08],
+        [0.46,  0.08], [0.44,  0.22], [0.42,  0.36],
+        [0.37,  0.48], [0.28,  0.58], [0.15,  0.65],
+        [0.00,  0.68]
+    ];
+    var _MINI_RING_N = 10;
+
+    function drawMiniHead() {
+        if (!vizCtx) return;
+        var W = vizW, H = vizH;
+        vizCtx.clearRect(0, 0, W, H);
+
+        // Dark background
+        vizCtx.fillStyle = '#000a00';
+        vizCtx.fillRect(0, 0, W, H);
+
+        var cx = W / 2, cy = H * 0.45;
+        var S = Math.min(W, H) * 0.32;
+        _miniHeadRot += 0.012;
+
+        var cosY = Math.cos(_miniHeadRot), sinY = Math.sin(_miniHeadRot);
+        var cosX = Math.cos(0.15), sinX = Math.sin(0.15);
+        var FL = 4.0;
+
+        function proj(x, y, z) {
+            var rx = x * cosY - z * sinY;
+            var rz = x * sinY + z * cosY;
+            var ry2 = y * cosX - rz * sinX;
+            var rz2 = y * sinX + rz * cosX;
+            var d = FL / (FL + rz2);
+            return { x: cx + rx * S * d, y: cy - ry2 * S * d };
+        }
+
+        // Generate rings
+        var rings = [];
+        for (var p = 0; p < _MINI_PROFILE.length; p++) {
+            var ring = [];
+            var rad = _MINI_PROFILE[p][0], yy = _MINI_PROFILE[p][1];
+            for (var s = 0; s < _MINI_RING_N; s++) {
+                var a = (s / _MINI_RING_N) * Math.PI * 2;
+                ring.push(proj(rad * Math.cos(a), yy, rad * Math.sin(a)));
+            }
+            rings.push(ring);
+        }
+
+        vizCtx.lineCap = vizCtx.lineJoin = 'round';
+        vizCtx.shadowBlur = 4;
+        vizCtx.shadowColor = 'rgb(' + _MINI_GREEN + ')';
+        vizCtx.strokeStyle = 'rgba(' + _MINI_GREEN + ',0.5)';
+        vizCtx.lineWidth = 0.8;
+
+        // Horizontal rings
+        for (var r = 0; r < rings.length; r++) {
+            vizCtx.beginPath();
+            for (var i = 0; i < rings[r].length; i++) {
+                var pt = rings[r][i];
+                i === 0 ? vizCtx.moveTo(pt.x, pt.y) : vizCtx.lineTo(pt.x, pt.y);
+            }
+            vizCtx.closePath();
+            vizCtx.stroke();
+        }
+
+        // Vertical ribs (every other segment)
+        vizCtx.strokeStyle = 'rgba(' + _MINI_GREEN + ',0.25)';
+        vizCtx.lineWidth = 0.5;
+        for (var s = 0; s < _MINI_RING_N; s += 2) {
+            vizCtx.beginPath();
+            for (var r2 = 0; r2 < rings.length; r2++) {
+                var pt2 = rings[r2][s];
+                r2 === 0 ? vizCtx.moveTo(pt2.x, pt2.y) : vizCtx.lineTo(pt2.x, pt2.y);
+            }
+            vizCtx.stroke();
+        }
+
+        // Eyes - two small glowing dots
+        vizCtx.shadowBlur = 6;
+        vizCtx.shadowColor = 'rgb(' + _MINI_GREEN + ')';
+        vizCtx.fillStyle = 'rgba(' + _MINI_GREEN + ',0.8)';
+        var lEye = proj(-0.18, -0.05, 0.45);
+        var rEye = proj(0.18, -0.05, 0.45);
+        vizCtx.beginPath(); vizCtx.arc(lEye.x, lEye.y, 1.5, 0, Math.PI * 2); vizCtx.fill();
+        vizCtx.beginPath(); vizCtx.arc(rEye.x, rEye.y, 1.5, 0, Math.PI * 2); vizCtx.fill();
+
+        vizCtx.shadowBlur = 0;
+    }
+
+    // =========================================================
     //  Playlist panel rendering
     // =========================================================
     function renderTrackList(filter) {
@@ -433,10 +537,10 @@
     // LED Karaoke sign state
     var karaokeFrame = 0;
     var vizCycleTime = 0;        // ms timestamp for cycling
-    var vizShowEQ = true;        // true = EQ, false = karaoke
-    var VIZ_EQ_DURATION = 5000;  // 5 seconds on EQ
-    var VIZ_KAR_DURATION = 3000; // 3 seconds on karaoke
+    var vizMode = 0;             // 0=EQ, 1=karaoke, 2=wireframe head
+    var VIZ_DURATIONS = [5000, 3000, 4000]; // ms per mode
     var KARAOKE_COLORS = ['#5555FF', '#55FF55', '#FFFF55']; // blue, green, yellow
+    var _firstPlayFired = false;  // track first play for auto-open viz
 
     var vizLastHiddenDraw = 0; // Throttle when tab hidden
 
@@ -457,24 +561,23 @@
             drawKaraokeSign();
             drawMiniEQ();
             vizCycleTime = now; // reset cycle
-            vizShowEQ = true;   // start with EQ when music resumes
+            vizMode = 0;        // start with EQ when music resumes
             return;
         }
 
-        // Cycle between EQ and karaoke while playing
+        // Cycle through modes: EQ -> karaoke -> wireframe head
         var elapsed = now - vizCycleTime;
-        if (vizShowEQ && elapsed > VIZ_EQ_DURATION) {
-            vizShowEQ = false;
-            vizCycleTime = now;
-        } else if (!vizShowEQ && elapsed > VIZ_KAR_DURATION) {
-            vizShowEQ = true;
+        if (elapsed > VIZ_DURATIONS[vizMode]) {
+            vizMode = (vizMode + 1) % 3;
             vizCycleTime = now;
         }
 
-        if (vizShowEQ) {
+        if (vizMode === 0) {
             drawEqualizer();
-        } else {
+        } else if (vizMode === 1) {
             drawKaraokeSign();
+        } else {
+            drawMiniHead(now);
         }
 
         // Also update mobile mini-EQ if visible
