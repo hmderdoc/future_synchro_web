@@ -46,9 +46,16 @@
             metaKey: false
         };
         window.dispatchEvent(new KeyboardEvent('keydown', init));
-        // For printable chars, also fire keypress
+        // Fire keypress for printable chars AND control characters
+        // (Enter=13, Backspace=8, Tab=9). fTelnet's CRT relies on
+        // keypress + charCode to transmit bytes to the server —
+        // without it, Enter/BS/Tab are seen in keydown but never
+        // sent as actual characters over the connection.
         if (key.length === 1) {
             init.charCode = key.charCodeAt(0);
+            window.dispatchEvent(new KeyboardEvent('keypress', init));
+        } else if (keyCode === 13 || keyCode === 8 || keyCode === 9) {
+            init.charCode = keyCode;
             window.dispatchEvent(new KeyboardEvent('keypress', init));
         }
         window.dispatchEvent(new KeyboardEvent('keyup', init));
