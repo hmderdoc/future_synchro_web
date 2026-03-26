@@ -170,7 +170,7 @@
         <div class="navbar-mobile-controls d-md-none justify-content-between">
             <button class="btn btn-link p-0" id="btn-viz-mobile" type="button" title="Open Player">
                 <span class="mobile-player-icon" id="mobile-player-icon">♫</span>
-                <canvas id="mobile-mini-eq" class="mobile-mini-eq" width="24" height="16" style="display:none;"></canvas>
+                <canvas id="mobile-mini-eq" class="mobile-mini-eq" width="28" height="28" style="display:none;"></canvas>
             </button>
 <?xjs if (settings.ftelnet) { ?>
             <button class="btn btn-link p-1" id="btn-terminal-mobile" type="button" title="Terminal">
