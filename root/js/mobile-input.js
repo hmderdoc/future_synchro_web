@@ -16,10 +16,16 @@
     'use strict';
 
     // =========================================================
-    //  Detect mobile — bail out on desktop
+    //  Detect mobile/touch — bail out on desktop
     // =========================================================
-    var isMobile = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent)
-        || ('ontouchstart' in window && window.innerWidth < 1024);
+    // iPadOS 13+ reports a Mac desktop UA (no "iPad" in the string),
+    // and the iframe's innerWidth doesn't reflect device width.
+    // Use maxTouchPoints as the primary reliable signal.
+    var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    var isMobileUA = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
+    // Also detect iPadOS masquerading as Mac desktop
+    var isIPad = /Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+    var isMobile = isMobileUA || isIPad || hasTouch;
     if (!isMobile) return;
 
     // =========================================================
