@@ -1042,8 +1042,10 @@ textarea.chat-web-input {
             return;
         }
 
+        var inPrivate = getActiveView().type === 'private';
+
         rooms.forEach(function (room) {
-            var isCurrent = normalizeUpper(room.name) === normalizeUpper(currentChannel);
+            var isCurrent = !inPrivate && normalizeUpper(room.name) === normalizeUpper(currentChannel);
 
             html += '<div class="chat-web-nav-item' + (isCurrent ? ' is-active' : '') + '">';
             html += '<div class="chat-web-nav-top">';
