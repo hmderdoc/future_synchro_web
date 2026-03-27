@@ -50,6 +50,42 @@
         } finally { f.close(); }
     }
 
+    function computeBuildInfo() {
+        var rootDir = backslash(web_root_dir);
+        var buildFiles = [
+            rootDir + 'index.xjs',
+            rootDir + 'sw.ssjs',
+            rootDir + 'terminal-iframe.html',
+            rootDir + 'js/mobile-input.js',
+            rootDir + 'js/terminal.js',
+            rootDir + 'js/spa.js',
+            rootDir + 'css/spa.css',
+            rootDir + 'css/style.css'
+        ];
+        var latest = 0;
+        var manifest = [];
+
+        buildFiles.forEach(function (filePath) {
+            var stamp;
+            if (!file_exists(filePath)) return;
+            stamp = file_date(filePath);
+            latest = Math.max(latest, stamp);
+            manifest.push(
+                filePath.replace(rootDir, '') + ':' +
+                file_size(filePath) + ':' + stamp
+            );
+        });
+
+        return {
+            label: latest ? strftime('%Y-%m-%d %H:%M', latest) : 'unknown',
+            token: manifest.length
+                ? md5_calc(manifest.join('\n'), true).substr(0, 8)
+                : 'unknown'
+        };
+    }
+
+    var build_info = computeBuildInfo();
+
     /* Build page list for nav */
     var nav_pages = getPageList();
 
@@ -253,6 +289,13 @@
                 </li>
 <?xjs } ?>
             </ul>
+            <div class="d-md-none px-3 pb-2 pt-1">
+                <span class="badge rounded-pill"
+                      title="Visible build marker for PWA refresh checks"
+                      style="font-family:monospace;background:rgba(0,255,255,0.12);color:#9ff;border:1px solid rgba(0,255,255,0.35);">
+                    Build <? write(build_info.label); ?> · <? write(build_info.token); ?>
+                </span>
+            </div>
         </div>
     </div>
 </nav>
@@ -357,7 +400,9 @@
         currentPage: '<? write(page); ?>',
         avatarsEnabled: true,
         darkmodeAllow: <? write(settings.darkmode_allow ? true : false); ?>,
-        darkmodeOn: <? write(settings.darkmode_on ? true : false); ?>
+        darkmodeOn: <? write(settings.darkmode_on ? true : false); ?>,
+        webBuildLabel: '<? write(build_info.label.replace(/'/g, "\\'")); ?>',
+        webBuildToken: '<? write(build_info.token); ?>'
     };
 </script>
 
@@ -386,7 +431,7 @@ if ('serviceWorker' in navigator) {
         window.location.reload();
     });
     window.addEventListener('load', function () {
-        navigator.serviceWorker.register('./sw.js').then(function (reg) {
+        navigator.serviceWorker.register('./sw.ssjs', { updateViaCache: 'none' }).then(function (reg) {
             console.log('[SW] registered, scope:', reg.scope);
 
             // Check for updates immediately, then every 60 seconds.

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# build-sw.sh — Generate sw.js with content-hashed asset manifest
+# build-sw.sh — Generate a static sw.js snapshot with a content-hashed asset manifest
 #
-# Run after any JS/CSS/HTML change. The generated sw.js includes a
-# REVISION hash derived from all asset contents — if sw.js changes by
-# even one byte, iOS Safari triggers the update cycle.
+# Runtime now registers root/sw.ssjs, which computes the same manifest
+# dynamically so the installed PWA stays evergreen without this script.
+# This helper remains available when you want a static sw.js snapshot.
 #
 # Usage: ./build-sw.sh
 #

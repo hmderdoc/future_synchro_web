@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+    :root {
+        --mi-bottom-reserved: 0px;
+    }
     html, body {
         margin: 0;
         padding: 0;
@@ -14,7 +17,7 @@
     }
     .fTelnetContainer {
         width: 100%;
-        height: 100%;
+        height: calc(100% - var(--mi-bottom-reserved));
         overflow: hidden;
         position: relative;
     }
@@ -50,6 +53,8 @@
     var currentColumns = 0;
     var currentRows = 0;
     var currentSize = null;
+    var clickSequence = 0;
+    var tapFallbackTimer = null;
 
     /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
        Same order as fTelnet's GetBestFit — this IS the contract. */
@@ -67,8 +72,10 @@
     var MIN_COLS = 80, MIN_ROWS = 24, MAX_COLS = 160, MAX_ROWS = 60;
 
     function getScreenSize() {
-        var W = window.innerWidth;
-        var H = window.innerHeight;
+        var container = document.getElementById('fTelnetContainer');
+        var rect = container ? container.getBoundingClientRect() : null;
+        var W = rect && rect.width ? rect.width : window.innerWidth;
+        var H = rect && rect.height ? rect.height : window.innerHeight;
         var font = CP437_FONTS[CP437_FONTS.length - 1];
         for (var i = 0; i < CP437_FONTS.length; i++) {
             var f = CP437_FONTS[i];
@@ -95,11 +102,223 @@
     }
 
     function sendArrowKey(direction) {
-        var key = direction === 'up' ? 'ArrowUp' : 'ArrowDown';
-        var keyCode = direction === 'up' ? 38 : 40;
+        var keyMap = {
+            up: { key: 'ArrowUp', keyCode: 38 },
+            down: { key: 'ArrowDown', keyCode: 40 },
+            left: { key: 'ArrowLeft', keyCode: 37 },
+            right: { key: 'ArrowRight', keyCode: 39 }
+        };
+        var def = keyMap[direction] || keyMap.down;
         window.dispatchEvent(new KeyboardEvent('keydown', {
-            key: key, code: key, keyCode: keyCode, which: keyCode, bubbles: true
+            key: def.key, code: def.key, keyCode: def.keyCode, which: def.keyCode, bubbles: true
         }));
+        window.dispatchEvent(new KeyboardEvent('keyup', {
+            key: def.key, code: def.key, keyCode: def.keyCode, which: def.keyCode, bubbles: true
+        }));
+    }
+
+    function repositionMobileControls() {
+        window.dispatchEvent(new Event('mi:reposition'));
+    }
+
+    function getTapTarget(clientX, clientY) {
+        var container = document.getElementById('fTelnetContainer');
+        var canvas = document.querySelector('#fTelnetContainer canvas');
+        var target = document.elementFromPoint(clientX, clientY);
+        if (target && container && container.contains(target)) return target;
+        return canvas || container || target;
+    }
+
+    function definePointerMetrics(evt, metrics) {
+        var offsetX = metrics.offsetX;
+        var offsetY = metrics.offsetY;
+        try {
+            Object.defineProperty(evt, 'offsetX', {
+                configurable: true,
+                get: function () { return offsetX; }
+            });
+            Object.defineProperty(evt, 'offsetY', {
+                configurable: true,
+                get: function () { return offsetY; }
+            });
+            Object.defineProperty(evt, 'layerX', {
+                configurable: true,
+                get: function () { return offsetX; }
+            });
+            Object.defineProperty(evt, 'layerY', {
+                configurable: true,
+                get: function () { return offsetY; }
+            });
+            Object.defineProperty(evt, 'pageX', {
+                configurable: true,
+                get: function () { return metrics.pageX; }
+            });
+            Object.defineProperty(evt, 'pageY', {
+                configurable: true,
+                get: function () { return metrics.pageY; }
+            });
+            Object.defineProperty(evt, 'screenX', {
+                configurable: true,
+                get: function () { return metrics.screenX; }
+            });
+            Object.defineProperty(evt, 'screenY', {
+                configurable: true,
+                get: function () { return metrics.screenY; }
+            });
+            Object.defineProperty(evt, 'which', {
+                configurable: true,
+                get: function () { return 1; }
+            });
+        } catch (_) {}
+        return evt;
+    }
+
+    function getPointerMetrics(clientX, clientY) {
+        var canvas = document.querySelector('#fTelnetContainer canvas');
+        var rect = canvas && canvas.getBoundingClientRect
+            ? canvas.getBoundingClientRect()
+            : { left: 0, top: 0 };
+        return {
+            offsetX: clientX - rect.left,
+            offsetY: clientY - rect.top,
+            pageX: clientX + (window.pageXOffset || 0),
+            pageY: clientY + (window.pageYOffset || 0),
+            screenX: clientX,
+            screenY: clientY
+        };
+    }
+
+    function buildDirectMouseEvent(clientX, clientY, buttons) {
+        var metrics = getPointerMetrics(clientX, clientY);
+        var target = document.querySelector('#fTelnetContainer canvas') ||
+            document.getElementById('fTelnetContainer');
+
+        return {
+            target: target,
+            srcElement: target,
+            currentTarget: target,
+            relatedTarget: null,
+            button: 0,
+            buttons: buttons,
+            which: 1,
+            detail: buttons ? 1 : 0,
+            clientX: clientX,
+            clientY: clientY,
+            pageX: metrics.pageX,
+            pageY: metrics.pageY,
+            screenX: metrics.screenX,
+            screenY: metrics.screenY,
+            offsetX: metrics.offsetX,
+            offsetY: metrics.offsetY,
+            layerX: metrics.offsetX,
+            layerY: metrics.offsetY,
+            preventDefault: function () {},
+            stopPropagation: function () {},
+            stopImmediatePropagation: function () {}
+        };
+    }
+
+    function dispatchDirectFtelnetTap(clientX, clientY) {
+        var crt = client && client._Crt;
+        var handled = false;
+
+        if (!isConnected || !crt) return false;
+
+        try {
+            if (typeof crt.OnMouseMove === 'function') {
+                crt.OnMouseMove(buildDirectMouseEvent(clientX, clientY, 0));
+            }
+            if (typeof crt.OnMouseDown === 'function') {
+                crt.OnMouseDown(buildDirectMouseEvent(clientX, clientY, 1));
+                handled = true;
+            }
+            if (typeof crt.OnMouseUp === 'function') {
+                crt.OnMouseUp(buildDirectMouseEvent(clientX, clientY, 0));
+                handled = true;
+            }
+        } catch (err) {
+            console.error('[iframe] direct fTelnet tap failed:', err);
+            return false;
+        }
+
+        return handled;
+    }
+
+    function dispatchSyntheticTap(target, clientX, clientY) {
+        var metrics;
+        var moveInit;
+        var downInit;
+        var upInit;
+        if (!target) return;
+
+        metrics = getPointerMetrics(clientX, clientY);
+        moveInit = {
+            bubbles: true,
+            cancelable: true,
+            clientX: clientX,
+            clientY: clientY,
+            screenX: metrics.screenX,
+            screenY: metrics.screenY,
+            view: window,
+            detail: 0
+        };
+        downInit = {
+            bubbles: true,
+            cancelable: true,
+            clientX: clientX,
+            clientY: clientY,
+            screenX: metrics.screenX,
+            screenY: metrics.screenY,
+            button: 0,
+            buttons: 1,
+            view: window,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            detail: 1
+        };
+        upInit = {
+            bubbles: true,
+            cancelable: true,
+            clientX: clientX,
+            clientY: clientY,
+            screenX: metrics.screenX,
+            screenY: metrics.screenY,
+            button: 0,
+            buttons: 0,
+            view: window,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            detail: 1
+        };
+
+        if (window.PointerEvent) {
+            target.dispatchEvent(
+                definePointerMetrics(new PointerEvent('pointermove', moveInit), metrics)
+            );
+            target.dispatchEvent(
+                definePointerMetrics(new PointerEvent('pointerdown', downInit), metrics)
+            );
+            target.dispatchEvent(
+                definePointerMetrics(new PointerEvent('pointerup', upInit), metrics)
+            );
+        }
+        target.dispatchEvent(
+            definePointerMetrics(new MouseEvent('mouseover', moveInit), metrics)
+        );
+        target.dispatchEvent(
+            definePointerMetrics(new MouseEvent('mousemove', moveInit), metrics)
+        );
+        target.dispatchEvent(
+            definePointerMetrics(new MouseEvent('mousedown', downInit), metrics)
+        );
+        target.dispatchEvent(
+            definePointerMetrics(new MouseEvent('mouseup', upInit), metrics)
+        );
+        target.dispatchEvent(
+            definePointerMetrics(new MouseEvent('click', upInit), metrics)
+        );
     }
 
     function attachInputHandlers(container) {
@@ -109,53 +328,71 @@
         };
         container.addEventListener('wheel', wheelHandler, { passive: true });
 
-        var startX = 0, startY = 0, startTime = 0, tapActive = false;
-        var TAP_MOVE = 10, SWIPE_THRESH = 40, MAX_TAP = 300;
+        container.style.touchAction = 'manipulation';
+
+        var startX = 0, startY = 0, startTime = 0;
+        var trackingTouch = false, tapEligible = false;
+        var TAP_MOVE = 14, MAX_TAP = 350;
 
         var touchStart = function (e) {
-            if (e.touches.length !== 1) { tapActive = false; return; }
+            if (e.touches.length !== 1) {
+                trackingTouch = false;
+                tapEligible = false;
+                return;
+            }
             var t = e.touches[0];
+            focusTerminal();
             startX = t.clientX; startY = t.clientY;
-            startTime = Date.now(); tapActive = true;
+            startTime = Date.now();
+            trackingTouch = true;
+            tapEligible = true;
         };
         var touchMove = function (e) {
-            if (!tapActive || e.touches.length !== 1) return;
+            if (!trackingTouch || e.touches.length !== 1) return;
             var t = e.touches[0];
             if (Math.abs(t.clientX - startX) > TAP_MOVE ||
-                Math.abs(t.clientY - startY) > TAP_MOVE) tapActive = false;
+                Math.abs(t.clientY - startY) > TAP_MOVE) {
+                tapEligible = false;
+                e.preventDefault();
+            }
         };
         var touchEnd = function (e) {
-            if (!tapActive || e.changedTouches.length !== 1) return;
+            var target;
+            var expectedClickSequence;
+
+            if (!trackingTouch || e.changedTouches.length !== 1) return;
             var t = e.changedTouches[0];
             var dx = t.clientX - startX, dy = t.clientY - startY;
             var absDx = Math.abs(dx), absDy = Math.abs(dy);
             var duration = Date.now() - startTime;
-            tapActive = false;
-            if (absDx < TAP_MOVE && absDy < TAP_MOVE && duration < MAX_TAP) {
-                var target = document.elementFromPoint(t.clientX, t.clientY);
-                if (target) {
-                    var init = { bubbles: true, cancelable: true,
-                        clientX: t.clientX, clientY: t.clientY,
-                        button: 0, buttons: 1, view: window };
-                    if (window.PointerEvent) {
-                        target.dispatchEvent(new PointerEvent('pointerdown', init));
-                        target.dispatchEvent(new PointerEvent('pointerup', init));
-                    }
-                    target.dispatchEvent(new MouseEvent('mousedown', init));
-                    target.dispatchEvent(new MouseEvent('mouseup', init));
-                    target.dispatchEvent(new MouseEvent('click', init));
+            trackingTouch = false;
+            focusTerminal();
+            if (tapEligible && absDx < TAP_MOVE && absDy < TAP_MOVE && duration < MAX_TAP) {
+                if (!isConnected) {
+                    sendToParent({ type: 'click' });
+                    return;
                 }
+                if (dispatchDirectFtelnetTap(t.clientX, t.clientY)) {
+                    return;
+                }
+                target = getTapTarget(t.clientX, t.clientY);
+                clearTimeout(tapFallbackTimer);
+                expectedClickSequence = clickSequence;
+                tapFallbackTimer = setTimeout(function () {
+                    if (clickSequence !== expectedClickSequence) return;
+                    dispatchSyntheticTap(target, t.clientX, t.clientY);
+                }, 380);
                 return;
             }
-            if (absDy > SWIPE_THRESH && absDy > absDx) {
-                sendArrowKey(dy > 0 ? 'down' : 'up');
-            }
         };
-        var touchCancel = function () { tapActive = false; };
-        container.addEventListener('touchstart', touchStart, { passive: true });
-        container.addEventListener('touchmove', touchMove, { passive: true });
-        container.addEventListener('touchend', touchEnd, { passive: true });
-        container.addEventListener('touchcancel', touchCancel, { passive: true });
+        var touchCancel = function () {
+            trackingTouch = false;
+            tapEligible = false;
+        };
+        container.addEventListener('touchstart', touchStart, { passive: false });
+        container.addEventListener('touchmove', touchMove, { passive: false });
+        container.addEventListener('touchend', touchEnd, { passive: false });
+        container.addEventListener('touchcancel', touchCancel, { passive: false });
     }
 
     function scrollToBottom() {
@@ -181,7 +418,10 @@
     function applyCanvasScale(size) {
         if (!size) return;
         var canvas = document.querySelector('#fTelnetContainer canvas');
-        if (!canvas) return;
+        if (!canvas) {
+            repositionMobileControls();
+            return;
+        }
         /* Always clear any CSS transform — we scale via CSS width/height
            so that offsetX/offsetY and getBoundingClientRect() stay in the
            same coordinate space.  CSS transform:scale() breaks fTelnet's
@@ -201,6 +441,7 @@
         var scaledW = size.columns * size.fontW * size.scale;
         var leftover = window.innerWidth - scaledW;
         canvas.style.marginLeft = (leftover > 1 ? Math.floor(leftover / 2) : 0) + 'px';
+        repositionMobileControls();
     }
 
     function forceFontRecalc() {
@@ -311,10 +552,12 @@
         [150, 600, 1300].forEach(function (ms) {
             setTimeout(function () { applyCanvasScale(currentSize); }, ms);
         });
+        setTimeout(repositionMobileControls, 50);
         sendToParent({ type: 'ready' });
     }
 
     document.addEventListener('click', function () {
+        clickSequence += 1;
         sendToParent({ type: 'click' });
     });
 
@@ -423,6 +666,7 @@
                 }
                 scrollToBottom();
                 setTimeout(function () { applyCanvasScale(currentSize); }, 200);
+                setTimeout(repositionMobileControls, 250);
                 break;
 
             case 'refit':
