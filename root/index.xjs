@@ -408,6 +408,7 @@
 
 <!-- Scripts -->
 <?xjs if (settings.ftelnet) { ?>
+<script src="./js/flweb.js?_v=<? write(time()); ?>"></script>
 <script src="./js/terminal.js?_v=<? write(time()); ?>"></script>
 <?xjs } ?>
 <?xjs if (broker_enabled && broker_addr && broker_ws_port && broker_wss_port) { ?>

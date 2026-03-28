@@ -1,0 +1,12 @@
+{
+  "name": "webv4-custom-playwright",
+  "private": true,
+  "scripts": {
+    "pw:test": "playwright test",
+    "pw:codegen": "playwright codegen",
+    "pw:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

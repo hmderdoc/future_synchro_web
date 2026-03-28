@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLWeb Probe</title>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: #05070b;
+        color: #d8f7ff;
+        font: 14px/1.4 monospace;
+    }
+    body {
+        padding: 24px;
+    }
+    #chat-toasts {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        width: min(360px, calc(100vw - 32px));
+        z-index: 9999;
+    }
+    .probe-card {
+        max-width: 720px;
+        padding: 20px;
+        border: 1px solid #1ee6ff55;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #0d1620, #081017);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+    .probe-title {
+        margin: 0 0 8px;
+        color: #1ee6ff;
+        font-size: 18px;
+    }
+    .probe-text {
+        margin: 0;
+        color: #9fc7d1;
+    }
+</style>
+</head>
+<body>
+<div class="probe-card">
+    <h1 class="probe-title">FLWeb Probe</h1>
+    <p class="probe-text">Minimal same-origin page for FLWeb browser bridge testing.</p>
+</div>
+<div id="chat-toasts"></div>
+<script src="./js/flweb.js"></script>
+</body>
+</html>

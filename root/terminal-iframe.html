@@ -55,6 +55,7 @@
     var currentSize = null;
     var clickSequence = 0;
     var tapFallbackTimer = null;
+    var terminalUiBuffer = '';
 
     /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
        Same order as fTelnet's GetBestFit — this IS the contract. */
@@ -99,6 +100,271 @@
         if (window.parent && window.parent !== window) {
             window.parent.postMessage(msg, location.origin);
         }
+    }
+
+    function parseTerminalUiPayload(payload) {
+        var prefix = 'FLWEB/1 ';
+        var text;
+        var packet;
+
+        if (payload === 'FLWEB:ALERT') {
+            return {
+                action: 'alert',
+                message: 'sent from terminal'
+            };
+        }
+
+        text = String(payload || '');
+        if (text.indexOf(prefix) !== 0) {
+            return null;
+        }
+
+        try {
+            packet = JSON.parse(text.slice(prefix.length));
+        } catch (err) {
+            console.warn('[flweb] invalid payload json:', err && err.message ? err.message : err);
+            return null;
+        }
+
+        if (!packet || typeof packet !== 'object' || typeof packet.action !== 'string') {
+            return null;
+        }
+
+        return packet;
+    }
+
+    function dispatchTerminalUiPayload(payload) {
+        var packet = parseTerminalUiPayload(payload);
+        if (!packet) return false;
+        sendToParent({
+            type: 'terminal-ui',
+            action: packet.action,
+            message: packet.message || null,
+            payload: packet
+        });
+        return true;
+    }
+
+    function filterTerminalUiOutput(str) {
+        var input = terminalUiBuffer + String(str || '');
+        var output = '';
+        var start = -1;
+        var end = -1;
+        var cursor = 0;
+        var payload = '';
+
+        terminalUiBuffer = '';
+
+        while ((start = input.indexOf('\x1b_', cursor)) !== -1) {
+            output += input.slice(cursor, start);
+            end = input.indexOf('\x1b\\', start + 2);
+            if (end === -1) {
+                terminalUiBuffer = input.slice(start);
+                return output;
+            }
+
+            payload = input.slice(start + 2, end);
+            if (!dispatchTerminalUiPayload(payload)) {
+                output += input.slice(start, end + 2);
+            }
+            cursor = end + 2;
+        }
+
+        output += input.slice(cursor);
+        return output;
+    }
+
+    function installTerminalUiBridge() {
+        var ansi;
+        var origWrite;
+
+        if (!client || !client._Ansi || typeof client._Ansi.Write !== 'function') {
+            return false;
+        }
+
+        ansi = client._Ansi;
+        if (ansi._flwebBridgeInstalled) {
+            return true;
+        }
+
+        origWrite = ansi.Write;
+        ansi.Write = function (str) {
+            var filtered = filterTerminalUiOutput(str);
+            if (!filtered.length) {
+                return;
+            }
+            return origWrite.call(ansi, filtered);
+        };
+        ansi._flwebBridgeInstalled = true;
+        return true;
+    }
+
+    function bytesToString(bytes) {
+        var out = '';
+        var i;
+
+        for (i = 0; i < bytes.length; i += 1) {
+            out += String.fromCharCode(bytes[i]);
+        }
+        return out;
+    }
+
+    function stringToArrayBuffer(str) {
+        var bytes = new Uint8Array(str.length);
+        var i;
+
+        for (i = 0; i < str.length; i += 1) {
+            bytes[i] = str.charCodeAt(i) & 0xff;
+        }
+        return bytes.buffer;
+    }
+
+    function filterTerminalUiMessageData(data) {
+        var text;
+        var filtered;
+
+        if (typeof data === 'string') {
+            filtered = filterTerminalUiOutput(data);
+            return {
+                supported: true,
+                suppressed: !filtered.length,
+                data: filtered
+            };
+        }
+
+        if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+            text = bytesToString(new Uint8Array(data));
+            filtered = filterTerminalUiOutput(text);
+            return {
+                supported: true,
+                suppressed: !filtered.length,
+                data: stringToArrayBuffer(filtered)
+            };
+        }
+
+        if (typeof ArrayBuffer !== 'undefined' &&
+            typeof ArrayBuffer.isView === 'function' &&
+            ArrayBuffer.isView(data)) {
+            text = bytesToString(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+            filtered = filterTerminalUiOutput(text);
+            return {
+                supported: true,
+                suppressed: !filtered.length,
+                data: stringToArrayBuffer(filtered)
+            };
+        }
+
+        return {
+            supported: false,
+            suppressed: false,
+            data: data
+        };
+    }
+
+    function deliverFilteredMessage(socket, evt, listeners, onmessageHandler) {
+        var result = filterTerminalUiMessageData(evt.data);
+        var filteredEvent;
+        var i;
+        var listener;
+
+        if (!result.supported) {
+            filteredEvent = evt;
+        } else if (result.suppressed) {
+            return;
+        } else if (result.data === evt.data) {
+            filteredEvent = evt;
+        } else {
+            filteredEvent = new MessageEvent('message', {
+                data: result.data,
+                origin: evt.origin,
+                lastEventId: evt.lastEventId,
+                source: evt.source,
+                ports: evt.ports
+            });
+        }
+
+        if (typeof onmessageHandler === 'function') {
+            onmessageHandler.call(socket, filteredEvent);
+        }
+
+        for (i = 0; i < listeners.length; i += 1) {
+            listener = listeners[i];
+            if (!listener) continue;
+            if (typeof listener === 'function') {
+                listener.call(socket, filteredEvent);
+            } else if (listener && typeof listener.handleEvent === 'function') {
+                listener.handleEvent(filteredEvent);
+            }
+        }
+    }
+
+    function installTerminalUiSocketBridge() {
+        var NativeWebSocket = window.WebSocket;
+
+        if (!NativeWebSocket || NativeWebSocket._flwebBridgeInstalled) {
+            return false;
+        }
+
+        function WrappedWebSocket(url, protocols) {
+            var socket = arguments.length > 1
+                ? new NativeWebSocket(url, protocols)
+                : new NativeWebSocket(url);
+            var nativeAdd = socket.addEventListener.bind(socket);
+            var nativeRemove = socket.removeEventListener.bind(socket);
+            var messageListeners = [];
+            var onmessageHandler = null;
+
+            nativeAdd('message', function (evt) {
+                deliverFilteredMessage(socket, evt, messageListeners, onmessageHandler);
+            });
+
+            socket.addEventListener = function (type, listener, options) {
+                if (type === 'message') {
+                    if (messageListeners.indexOf(listener) === -1) {
+                        messageListeners.push(listener);
+                    }
+                    return;
+                }
+                return nativeAdd(type, listener, options);
+            };
+
+            socket.removeEventListener = function (type, listener, options) {
+                var idx;
+
+                if (type === 'message') {
+                    idx = messageListeners.indexOf(listener);
+                    if (idx !== -1) {
+                        messageListeners.splice(idx, 1);
+                    }
+                    return;
+                }
+                return nativeRemove(type, listener, options);
+            };
+
+            try {
+                Object.defineProperty(socket, 'onmessage', {
+                    configurable: true,
+                    enumerable: true,
+                    get: function () { return onmessageHandler; },
+                    set: function (fn) {
+                        onmessageHandler = typeof fn === 'function' ? fn : null;
+                    }
+                });
+            } catch (_) {}
+
+            return socket;
+        }
+
+        WrappedWebSocket.prototype = NativeWebSocket.prototype;
+        WrappedWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+        WrappedWebSocket.OPEN = NativeWebSocket.OPEN;
+        WrappedWebSocket.CLOSING = NativeWebSocket.CLOSING;
+        WrappedWebSocket.CLOSED = NativeWebSocket.CLOSED;
+        WrappedWebSocket._flwebBridgeInstalled = true;
+        WrappedWebSocket._flwebNative = NativeWebSocket;
+
+        window.WebSocket = WrappedWebSocket;
+        return true;
     }
 
     function sendArrowKey(direction) {
@@ -467,6 +733,8 @@
 
 
 
+    installTerminalUiSocketBridge();
+
     function initTerminal(cfg) {
         if (typeof fTelnetOptions === 'undefined' ||
             typeof fTelnetClient === 'undefined') {
@@ -522,6 +790,7 @@
             return;
         }
         window._ftClient = client;
+        installTerminalUiBridge();
 
 
 

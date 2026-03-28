@@ -87,6 +87,9 @@
             window.dispatchEvent(new KeyboardEvent('keypress', init));
         }
         window.dispatchEvent(new KeyboardEvent('keyup', init));
+        if (shouldResetPredictiveContextForKey(key, code, dispatchKeyCode, o)) {
+            resetPredictiveContext();
+        }
     }
 
     function sendString(str, opts) {
@@ -179,6 +182,10 @@
     var TOOLBAR_HEIGHT = 46;
     var CONTROL_GAP = 6;
     var TOUCHBOX_MIN_HEIGHT = 86;
+    // Local feature flag for preserving short keyboard context so mobile
+    // suggestion bars can offer better next-word candidates.
+    var ENABLE_PREDICTIVE_CONTEXT = true;
+    var PREDICTIVE_CONTEXT_MAX = 512;
     var currentMode = MODE_OFF;
     var currentMapping = 'arrows-4way';
     var stickyCtrl = false, stickyAlt = false;
@@ -930,6 +937,147 @@
         return true;
     }
 
+    var predictiveContextBuffer = '';
+    var pendingBeforeInput = null;
+
+    function sanitizePredictiveInputValue(value) {
+        var clean = String(value || '').replace(/[\r\n]+/g, '');
+
+        if (clean.length > PREDICTIVE_CONTEXT_MAX) {
+            clean = clean.slice(-PREDICTIVE_CONTEXT_MAX);
+        }
+        return clean;
+    }
+
+    function setInputCaretToEnd() {
+        var len;
+
+        try {
+            len = input.value.length;
+            input.setSelectionRange(len, len);
+        } catch (_) {}
+    }
+
+    function syncPredictiveContextValue(value) {
+        predictiveContextBuffer = sanitizePredictiveInputValue(value);
+        input.value = predictiveContextBuffer;
+        setInputCaretToEnd();
+    }
+
+    function resetPredictiveContext() {
+        predictiveContextBuffer = '';
+        pendingBeforeInput = null;
+        input.value = '';
+        setInputCaretToEnd();
+    }
+
+    function commonPrefixLength(a, b) {
+        var max = Math.min(a.length, b.length);
+        var i = 0;
+
+        while (i < max && a.charCodeAt(i) === b.charCodeAt(i)) {
+            i += 1;
+        }
+        return i;
+    }
+
+    function resolveTailReplacement(previous, clean, pending) {
+        var data;
+        var replaceStart;
+
+        if (!pending || !pending.data) return null;
+        if (pending.type !== 'insertText' &&
+            pending.type !== 'insertReplacementText' &&
+            pending.type !== 'insertCompositionText' &&
+            pending.type !== 'insertFromComposition') {
+            return null;
+        }
+
+        data = sanitizePredictiveInputValue(pending.data);
+        if (!data.length) return null;
+
+        for (replaceStart = previous.length; replaceStart >= 0; replaceStart -= 1) {
+            if (sanitizePredictiveInputValue(previous.slice(0, replaceStart) + data) === clean) {
+                return {
+                    removeCount: previous.length - replaceStart,
+                    insertText: data
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function resolvePendingTailEdit(previous, clean, pending) {
+        var before;
+        var start;
+        var end;
+        var data;
+        var expected;
+
+        if (!pending || typeof pending.value !== 'string') return null;
+
+        before = sanitizePredictiveInputValue(pending.value);
+        if (before !== previous) return null;
+
+        start = typeof pending.start === 'number' ? pending.start : before.length;
+        end = typeof pending.end === 'number' ? pending.end : before.length;
+        start = Math.max(0, Math.min(before.length, start));
+        end = Math.max(start, Math.min(before.length, end));
+
+        if (pending.type === 'deleteContentBackward') {
+            if (clean.length > before.length) return null;
+            if (before.slice(0, clean.length) !== clean) return null;
+            return {
+                removeCount: before.length - clean.length,
+                insertText: ''
+            };
+        }
+
+        if (pending.type !== 'insertText' &&
+            pending.type !== 'insertReplacementText' &&
+            pending.type !== 'insertCompositionText' &&
+            pending.type !== 'insertFromComposition') {
+            return null;
+        }
+
+        if (end !== before.length) return null;
+
+        data = sanitizePredictiveInputValue(pending.data);
+        expected = sanitizePredictiveInputValue(before.slice(0, start) + data);
+        if (expected !== clean) return null;
+
+        return {
+            removeCount: before.length - start,
+            insertText: data
+        };
+    }
+
+    function shouldResetPredictiveContextForKey(key, code, keyCode, opts) {
+        var name = code || key || '';
+        var o = opts || {};
+
+        if (!ENABLE_PREDICTIVE_CONTEXT) return false;
+        if (o.ctrl || o.alt) return true;
+        if (keyCode >= 112 && keyCode <= 123) return true;
+
+        return (
+            name === 'Enter' ||
+            name === 'Escape' ||
+            name === 'Tab' ||
+            name === 'ArrowUp' ||
+            name === 'ArrowDown' ||
+            name === 'ArrowLeft' ||
+            name === 'ArrowRight' ||
+            name === 'Home' ||
+            name === 'End' ||
+            name === 'PageUp' ||
+            name === 'PageDown' ||
+            name === 'Insert' ||
+            name === 'Delete'
+        );
+    }
+
     input.addEventListener('compositionstart', function () { composing = true; });
     input.addEventListener('compositionend', function () {
         composing = false;
@@ -941,13 +1089,29 @@
         flushInput();
     });
 
+    input.addEventListener('focus', function () {
+        setInputCaretToEnd();
+    });
+
     input.addEventListener('beforeinput', function (e) {
         var opts;
 
         if (composing) return;
 
+        if (ENABLE_PREDICTIVE_CONTEXT) {
+            pendingBeforeInput = {
+                type: e.inputType || '',
+                data: typeof e.data === 'string' ? e.data : '',
+                value: String(input.value || ''),
+                start: typeof input.selectionStart === 'number' ? input.selectionStart : String(input.value || '').length,
+                end: typeof input.selectionEnd === 'number' ? input.selectionEnd : String(input.value || '').length
+            };
+        }
+
         opts = { ctrl: stickyCtrl, alt: stickyAlt, shift: false };
-        if (e.inputType === 'deleteContentBackward' && !input.value.length) {
+        if (e.inputType === 'deleteContentBackward' &&
+            !(ENABLE_PREDICTIVE_CONTEXT ? predictiveContextBuffer.length : input.value.length)) {
+            pendingBeforeInput = null;
             if (shouldSendSpecial('Backspace')) {
                 sendKey('Backspace', 'Backspace', 8, opts);
             }
@@ -962,19 +1126,89 @@
         var clean = '';
         var hadLineBreak = false;
         var opts = { ctrl: stickyCtrl, alt: stickyAlt, shift: false };
+        var pending;
+        var previous;
+        var prefixLen;
+        var removed;
+        var added;
+        var sentAnything = false;
+        var replacement;
 
-        if (!val) return;
-        input.value = '';
-        hadLineBreak = /[\r\n]/.test(String(val));
-        clean = String(val).replace(/[\r\n]+/g, '');
-        if (clean.length) {
-            sendString(clean, opts);
+        if (!ENABLE_PREDICTIVE_CONTEXT) {
+            if (!val) return;
+            input.value = '';
+            hadLineBreak = /[\r\n]/.test(String(val));
+            clean = String(val).replace(/[\r\n]+/g, '');
+            if (clean.length) {
+                sendString(clean, opts);
+            }
+            if (hadLineBreak && shouldSendSpecial('Enter')) {
+                sendKey('Enter', 'Enter', 13, opts);
+            }
+            if (!clean.length && !hadLineBreak) return;
+            consumeSticky();
+            return;
         }
+
+        pending = pendingBeforeInput;
+        pendingBeforeInput = null;
+        previous = predictiveContextBuffer;
+        hadLineBreak = /[\r\n]/.test(String(val));
+        clean = sanitizePredictiveInputValue(val);
+
+        if (!val && !previous && !hadLineBreak) return;
+
+        replacement = resolvePendingTailEdit(previous, clean, pending) ||
+            resolveTailReplacement(previous, clean, pending);
+
+        if (replacement) {
+            removed = replacement.removeCount;
+            while (removed > 0) {
+                sendKey('Backspace', 'Backspace', 8, opts);
+                removed -= 1;
+                sentAnything = true;
+            }
+            if (replacement.insertText.length) {
+                sendString(replacement.insertText, opts);
+                sentAnything = true;
+            }
+        } else if (pending &&
+            pending.type === 'deleteContentBackward' &&
+            clean.length < previous.length &&
+            previous.slice(0, clean.length) === clean) {
+            removed = previous.length - clean.length;
+            while (removed > 0) {
+                sendKey('Backspace', 'Backspace', 8, opts);
+                removed -= 1;
+                sentAnything = true;
+            }
+        } else if (clean !== previous) {
+            prefixLen = commonPrefixLength(previous, clean);
+            removed = previous.length - prefixLen;
+            added = clean.slice(prefixLen);
+
+            while (removed > 0) {
+                sendKey('Backspace', 'Backspace', 8, opts);
+                removed -= 1;
+                sentAnything = true;
+            }
+            if (added.length) {
+                sendString(added, opts);
+                sentAnything = true;
+            }
+        }
+
         if (hadLineBreak && shouldSendSpecial('Enter')) {
             sendKey('Enter', 'Enter', 13, opts);
+            sentAnything = true;
+            resetPredictiveContext();
+        } else {
+            syncPredictiveContextValue(clean);
         }
-        if (!clean.length && !hadLineBreak) return;
-        consumeSticky();
+
+        if (sentAnything) {
+            consumeSticky();
+        }
     }
 
     // Intercept special keys on the textarea
@@ -987,6 +1221,9 @@
 
         // Backspace
         if (e.key === 'Backspace') {
+            if (ENABLE_PREDICTIVE_CONTEXT && sanitizePredictiveInputValue(input.value).length) {
+                return;
+            }
             if (shouldSendSpecial('Backspace')) {
                 sendKey('Backspace', 'Backspace', 8, opts);
             }
@@ -1378,6 +1615,7 @@
         dpadOverlay.classList.remove('show');
         mappingBar.classList.remove('show');
         touchBox.classList.remove('show');
+        resetPredictiveContext();
         input.blur();
 
         if (mode === MODE_KEYBOARD) {
@@ -1442,6 +1680,7 @@
     //  Handle keyboard dismiss (user swipes keyboard down)
     // =========================================================
     input.addEventListener('blur', function () {
+        resetPredictiveContext();
         if (currentMode === MODE_KEYBOARD) {
             // Keyboard was dismissed — go to OFF
             setTimeout(function () {

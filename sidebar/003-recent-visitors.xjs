@@ -1,0 +1,68 @@
+<?xjs
+    var logonlist_lib = load({}, 'logonlist_lib.js');
+    var options = load("modopts.js", "logonlist") || {};
+    if (options.last_few_callers === undefined) options.last_few_callers = 10;
+    var ll = logonlist_lib.get(-options.last_few_callers);
+    if (!Array.isArray(ll)) ll = [];
+    ll.reverse();
+    var avatarNumbers = [];
+?>
+
+<style>
+.rv-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; }
+.rv-row + .rv-row { border-top: 1px solid rgba(255,255,255,0.08); }
+.rv-row .avatar-inline { flex-shrink: 0; }
+.rv-details { flex: 1; min-width: 0; overflow: hidden; }
+.rv-alias { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-meta { font-size: 0.78em; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+
+<div class="card mb-3">
+    <div class="card-header">Recent Visitors</div>
+    <div class="card-body p-0">
+<?xjs
+    if (ll.length === 0) {
+?>
+        <div class="p-2 text-muted">No recent visitors</div>
+<?xjs
+    }
+    ll.forEach(function (e) {
+        var un = (e.user && e.user.number) ? e.user.number : 0;
+        if (un > 0 && avatarNumbers.indexOf(un) < 0) avatarNumbers.push(un);
+        var alias = e.user ? e.user.alias.replace(/</g, '&lt;') : 'Unknown';
+        var loc = e.user && e.user.location ? e.user.location.replace(/</g, '&lt;') : '';
+        var conn = e.user ? (e.user.connection || e.protocol || '') : '';
+        var when = system.timestr(e.time);
+?>
+        <div class="rv-row">
+<?xjs if (un > 0) { ?>
+            <div data-avatar="<?xjs write(un); ?>" class="avatar-inline"></div>
+<?xjs } ?>
+            <div class="rv-details">
+                <div class="rv-alias"><?xjs write(alias); ?></div>
+                <div class="rv-meta"><?xjs write(when); ?></div>
+<?xjs if (loc || conn) { ?>
+                <div class="rv-meta"><?xjs if (loc) { write(loc); if (conn) write(' · '); } if (conn) write(conn); ?></div>
+<?xjs } ?>
+            </div>
+        </div>
+<?xjs
+    });
+?>
+    </div>
+</div>
+
+<?xjs if (avatarNumbers.length > 0) { ?>
+<script type="text/javascript">
+    (function () {
+        var nums = [<?xjs write(avatarNumbers.join(',')); ?>];
+        if (typeof Avatars !== 'undefined' && Avatars.draw) {
+            Avatars.draw(nums);
+        } else {
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof Avatars !== 'undefined' && Avatars.draw) Avatars.draw(nums);
+            });
+        }
+    })();
+</script>
+<?xjs } ?>

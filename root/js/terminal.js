@@ -152,6 +152,19 @@
             case 'error':
                 console.error('[terminal] iframe error:', msg.message);
                 break;
+
+            case 'terminal-ui':
+                if (window.FLWeb && typeof window.FLWeb.handleTerminalUi === 'function') {
+                    window.FLWeb.handleTerminalUi(msg, {
+                        terminalVisible: isVisible,
+                        sendToIframe: sendToIframe,
+                        showTerminal: showPanel,
+                        hideTerminal: hidePanel
+                    });
+                } else if (msg.action === 'alert') {
+                    window.alert(msg.message || 'sent from terminal');
+                }
+                break;
         }
     });
 

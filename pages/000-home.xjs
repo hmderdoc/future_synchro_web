@@ -5,14 +5,8 @@
 ?>
 
 <!-- Welcome -->
-<div class="card mb-3">
-    <div class="card-body">
-        <h4 class="card-title"><? write(system.name); ?></h4>
-        <p class="card-text">Welcome to <? write(system.name); ?>.</p>
-<?xjs if (user.alias === settings.guest || user.number < 1) { ?>
-        <p class="text-muted">Log in to access the terminal, send messages, and join the forums.</p>
-<?xjs } ?>
-    </div>
+<div class="card mb-3 overflow-hidden">
+    <img src="./images/vektrax_banner.png" alt="<? write(system.name); ?>" class="img-fluid w-100" style="display:block;">
 </div>
 
 <!-- System Info + Node List -->

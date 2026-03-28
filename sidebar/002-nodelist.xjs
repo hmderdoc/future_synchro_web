@@ -1,0 +1,126 @@
+<style>
+#sbbs-nodelist-body td { vertical-align: middle; }
+#sbbs-nodelist-body .nl-user-cell {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+#sbbs-nodelist-body .nl-user-cell .avatar-inline {
+    flex-shrink: 0;
+}
+#sbbs-nodelist-body .nl-user-cell .nl-username {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#sbbs-nodelist-body .nl-activity {
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
+}
+</style>
+
+<div class="card mb-3">
+    <div class="card-header">Who's Online</div>
+    <div class="card-body p-0" id="sbbs-nodelist">
+        <table class="table table-sm mb-0" style="table-layout:fixed;">
+            <colgroup>
+                <col style="width:50%;">
+                <col style="width:50%;">
+            </colgroup>
+            <thead>
+                <tr><th>User</th><th>Activity</th></tr>
+            </thead>
+            <tbody id="sbbs-nodelist-body">
+                <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script type="text/javascript">
+
+    var nll = <? write(system.node_list.length); ?>;
+    var niu = 0;
+
+    function _sb_nodelist(evt) {
+        var data = JSON.parse(evt.data);
+        var tbody = document.getElementById('sbbs-nodelist-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        niu = 0;
+        var count = 0;
+        var avatarUsers = [];
+
+        data.forEach(function (c) {
+            if (!c.user) return;
+            var tr = document.createElement('tr');
+
+            // User cell: flex container with avatar + name, no wrap
+            var tdUser = document.createElement('td');
+            var userWrap = document.createElement('div');
+            userWrap.className = 'nl-user-cell';
+
+            if (c.useron) {
+                var avatar = document.createElement('div');
+                avatar.setAttribute('data-avatar', String(c.useron));
+                avatar.className = 'avatar-inline';
+                userWrap.appendChild(avatar);
+                if (avatarUsers.indexOf(c.useron) < 0) avatarUsers.push(c.useron);
+            }
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'nl-username';
+            nameSpan.textContent = c.user;
+            userWrap.appendChild(nameSpan);
+
+            if (c.user && <? write(user.alias != settings.guest); ?>) {
+                userWrap.title = '<? write(locale.strings.sidebar_node_list.label_send_telegram); ?>';
+                userWrap.style.cursor = 'pointer';
+                userWrap.addEventListener('click', (function (u) {
+                    return function () { sendTelegram(u); };
+                })(c.user));
+            }
+            tdUser.appendChild(userWrap);
+
+            // Activity cell: clamp to fit
+            var tdActivity = document.createElement('td');
+            tdActivity.className = 'nl-activity';
+            tdActivity.textContent = c.action || c.status || '';
+            tdActivity.title = c.action || c.status || '';
+
+            tr.appendChild(tdUser);
+            tr.appendChild(tdActivity);
+            tbody.appendChild(tr);
+            if (typeof c.node === 'number' && c.user !== '') niu++;
+            count++;
+        });
+
+        if (count === 0) {
+            var tr = document.createElement('tr');
+            var td = document.createElement('td');
+            td.setAttribute('colspan', '2');
+            td.className = 'text-muted';
+            td.textContent = 'No users online';
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        }
+
+        if (avatarUsers.length && typeof Avatars !== 'undefined' && Avatars.draw) {
+            Avatars.draw(avatarUsers);
+        }
+
+        var sidebarEl = document.getElementById('sidebar');
+        if (sidebarEl) {
+            var inUseEls = sidebarEl.querySelectorAll('.sb-nodes-in-use');
+            var availEls = sidebarEl.querySelectorAll('.sb-nodes-available');
+            inUseEls.forEach(function (el) { el.textContent = niu; });
+            availEls.forEach(function (el) { el.textContent = nll - niu; });
+        }
+    }
+
+    registerEventListener('nodelist', _sb_nodelist);
+
+</script>

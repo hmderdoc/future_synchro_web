@@ -1,0 +1,39 @@
+<?xjs
+    var _sb_niu = system.node_list.reduce(function (a, c) {
+        return (c.status == 3 ? a + 1 : a);
+    }, 0);
+    require('file_size.js', 'file_size_str');
+?>
+<div class="card mb-3">
+    <div class="card-header">System Information</div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <tbody>
+                <tr><td>Sysop</td><td><?xjs write(system.operator); ?></td></tr>
+                <tr><td>Location</td><td><?xjs write(system.location); ?></td></tr>
+                <tr><td>Users</td><td><?xjs write(system.stats.total_users.toLocaleString()); ?></td></tr>
+                <tr>
+                    <td>Nodes</td>
+                    <td><?xjs write(system.nodes); ?> (<span class="text-danger sb-nodes-in-use"><?xjs write(_sb_niu); ?></span> / <span class="text-success sb-nodes-available"><?xjs write(system.nodes - _sb_niu); ?></span>)</td>
+                </tr>
+                <tr><td>Uptime</td><td><?xjs write(system.secondstr(time() - system.uptime)); ?></td></tr>
+                <tr><td>Total Calls</td><td><?xjs write(system.stats.total_logons.toLocaleString()); ?></td></tr>
+                <tr><td>Calls Today</td><td><?xjs write(system.stats.logons_today.toLocaleString()); ?></td></tr>
+                <tr><td>Total Messages</td><td><?xjs write(system.stats.total_messages.toLocaleString()); ?></td></tr>
+                <tr><td>Posts Today</td><td><?xjs write(system.stats.messages_posted_today.toLocaleString()); ?></td></tr>
+                <tr><td>Total Files</td><td><?xjs write(system.stats.total_files.toLocaleString()); ?></td></tr>
+                <tr>
+                    <td>Uploads Today</td>
+                    <td><?xjs write(system.stats.files_uploaded_today.toLocaleString()); ?> files (<?xjs write(file_size_str(system.stats.bytes_uploaded_today)); ?>)</td>
+                </tr>
+                <tr>
+                    <td>Downloads Today</td>
+                    <td><?xjs write(system.stats.files_downloaded_today.toLocaleString()); ?> files (<?xjs write(file_size_str(system.stats.bytes_downloaded_today)); ?>)</td>
+                </tr>
+<?xjs if (system.stats.date_created) { ?>
+                <tr><td>Since</td><td><?xjs write(system.datestr(system.stats.date_created)); ?></td></tr>
+<?xjs } ?>
+            </tbody>
+        </table>
+    </div>
+</div>
