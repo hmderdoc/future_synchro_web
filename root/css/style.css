@@ -152,9 +152,17 @@ pre.list {
 	border : none;
 }
 
+#sidebar > .list-group {
+	gap: 0;
+	border: none;
+}
+
 .list-group-item.sidebar {
 	overflow: hidden;
 	word-wrap: break-word;
+	background: transparent;
+	border: none;
+	padding: 0;
 }
 
 .list-group-item.sidebar:empty {

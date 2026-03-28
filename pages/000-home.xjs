@@ -2,101 +2,149 @@
 
 <?xjs
     require('sbbsdefs.js', 'SYS_CLOSED');
+
+    var _bltn_subcode = 'LOCAL-NOTICES';
+    var _bltn_max = 10;
+    var _bltn_body_maxlen = 600;
+
+    var _bltn_msgs = [];
+    var _bltn_mb = new MsgBase(_bltn_subcode);
+    if (_bltn_mb.open()) {
+        var _bltn_count = 0;
+        for (var _bm = _bltn_mb.last_msg; _bm >= _bltn_mb.first_msg && _bltn_count < _bltn_max; _bm--) {
+            var _bh = _bltn_mb.get_msg_header(_bm);
+            if (_bh === null || (_bh.attr & MSG_DELETE))
+                continue;
+            var _bb = _bltn_mb.get_msg_body(_bm) || '';
+            _bb = _bb.replace(/\x01./g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            if (_bb.length > _bltn_body_maxlen)
+                _bb = _bb.substring(0, _bltn_body_maxlen) + '...';
+            _bltn_msgs.push({
+                subject: _bh.subject.replace(/</g, '&lt;'),
+                date: system.timestr(_bh.when_written_time),
+                body: _bb.replace(/</g, '&lt;')
+            });
+            _bltn_count++;
+        }
+        _bltn_mb.close();
+    }
 ?>
 
-<!-- Welcome -->
-<div class="card mb-3 overflow-hidden">
+<!-- Welcome Banner -->
+<div class="card mb-3 overflow-hidden" style="border: 1px solid #AA00AA;">
     <img src="./images/vektrax_banner.png" alt="<? write(system.name); ?>" class="img-fluid w-100" style="display:block;">
 </div>
 
-<!-- System Info + Node List -->
-<div class="row">
-    <div class="col-md-6 mb-3">
-        <div class="card">
-            <div class="card-header">System Information</div>
-            <div class="card-body">
-                <table class="table table-sm mb-0">
-                    <tr><td>Sysop</td><td><? write(system.operator); ?></td></tr>
-                    <tr><td>Nodes</td><td><? write(system.nodes); ?></td></tr>
-                    <tr><td>Total Users</td><td><? write(system.stats.total_users); ?></td></tr>
-                    <tr><td>Total Calls</td><td><? write(system.stats.total_logons); ?></td></tr>
-                    <tr><td>Messages Posted</td><td><? write(system.stats.total_messages); ?></td></tr>
-                    <tr><td>Files Uploaded</td><td><? write(system.stats.total_files); ?></td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
+<!-- Bulletins Carousel -->
+<style>
+.bl-panel {
+    --bs-card-border-color: #AA5500;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #FFFF55;
+    border-color: #AA5500 !important;
+}
+.bl-panel > .card-header {
+    color: #FFFF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AA5500 !important;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.bl-header-left {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.bl-header-subject {
+    color: #FFFF55;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: bold;
+}
+.bl-header-date {
+    color: #55FF55;
+    font-size: 0.75em;
+    font-weight: normal;
+    white-space: nowrap;
+}
+.bl-nav { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.bl-nav button {
+    background: transparent;
+    border: 1px solid #AA5500;
+    color: #FFFF55;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.bl-nav button:hover { background: #AA5500; color: #000; }
+.bl-counter { color: #AAAAAA; font-size: 0.75em; font-weight: normal; }
+.bl-slide { display: none; padding: 12px 14px; }
+.bl-slide.active { display: block; }
+.bl-body { color: #FFFFFF; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; line-height: 1.45; }
+.bl-empty { color: #AA5500; padding: 12px 14px; }
+</style>
 
-    <div class="col-md-6 mb-3">
-        <div class="card">
-            <div class="card-header">Who's Online</div>
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0" id="home-nodelist-table">
-                    <thead>
-                        <tr><th>User</th><th>Activity</th></tr>
-                    </thead>
-                    <tbody id="home-nodelist-body">
-                        <tr><td colspan="2" class="text-muted">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
+<div class="card mb-3 bl-panel">
+    <div class="card-header">
+        <div class="bl-header-left">
+            <div class="bl-header-subject" id="bl-title"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].subject : 'Bulletins'); ?></div>
+            <div class="bl-header-date" id="bl-date"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].date : ''); ?></div>
         </div>
+<?xjs if (_bltn_msgs.length > 1) { ?>
+        <div class="bl-nav">
+            <button id="bl-prev" title="Previous">&laquo;</button>
+            <span class="bl-counter" id="bl-counter">1 / <?xjs write(_bltn_msgs.length); ?></span>
+            <button id="bl-next" title="Next">&raquo;</button>
+        </div>
+<?xjs } ?>
+    </div>
+    <div class="card-body p-0" id="bl-carousel">
+<?xjs
+    if (_bltn_msgs.length === 0) {
+?>
+        <div class="bl-empty">No bulletins posted.</div>
+<?xjs
+    }
+    _bltn_msgs.forEach(function (msg, idx) {
+?>
+        <div class="bl-slide<?xjs if (idx === 0) write(' active'); ?>" data-bl-idx="<?xjs write(idx); ?>" data-bl-subject="<?xjs write(msg.subject); ?>" data-bl-date="<?xjs write(msg.date); ?>">
+            <div class="bl-body"><?xjs write(msg.body); ?></div>
+        </div>
+<?xjs
+    });
+?>
     </div>
 </div>
 
+<?xjs if (_bltn_msgs.length > 1) { ?>
 <script>
-function _home_nodelist(evt) {
-    var data = JSON.parse(evt.data);
-    var tbody = document.getElementById('home-nodelist-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    var count = 0;
-    var avatarUsers = [];
-    data.forEach(function (c) {
-        if (!c.user) return;
-        var tr = document.createElement('tr');
-        var tdUser = document.createElement('td');
-        if (c.useron) {
-            var avatar = document.createElement('div');
-            avatar.setAttribute('data-avatar', String(c.useron));
-            avatar.className = 'avatar-inline';
-            tdUser.appendChild(avatar);
-            if (avatarUsers.indexOf(c.useron) < 0) avatarUsers.push(c.useron);
-        }
-        tdUser.appendChild(document.createTextNode(' ' + c.user));
-        var tdActivity = document.createElement('td');
-        tdActivity.textContent = c.action || c.status || '';
-        tr.appendChild(tdUser);
-        tr.appendChild(tdActivity);
-        tbody.appendChild(tr);
-        count++;
-    });
-    if (count === 0) {
-        var tr = document.createElement('tr');
-        var td = document.createElement('td');
-        td.setAttribute('colspan', '2');
-        td.className = 'text-muted';
-        td.textContent = 'No users online';
-        tr.appendChild(td);
-        tbody.appendChild(tr);
+(function () {
+    var total = <?xjs write(_bltn_msgs.length); ?>;
+    var cur = 0;
+    var slides = document.querySelectorAll('.bl-slide');
+    var counter = document.getElementById('bl-counter');
+    var titleEl = document.getElementById('bl-title');
+    var dateEl = document.getElementById('bl-date');
+
+    function show(idx) {
+        cur = ((idx % total) + total) % total;
+        slides.forEach(function (s) { s.classList.remove('active'); });
+        slides[cur].classList.add('active');
+        if (counter) counter.textContent = (cur + 1) + ' / ' + total;
+        if (titleEl) titleEl.textContent = slides[cur].getAttribute('data-bl-subject');
+        if (dateEl) dateEl.textContent = slides[cur].getAttribute('data-bl-date');
     }
-    if (avatarUsers.length && typeof Avatars !== 'undefined' && Avatars.draw) {
-        Avatars.draw(avatarUsers);
-    }
-}
-(function() {
-    function attach() {
-        if (window._sbbsEventSource) {
-            window._sbbsEventSource.addEventListener('nodelist', _home_nodelist);
-            return true;
-        }
-        return false;
-    }
-    if (!attach()) {
-        var timer = setInterval(function() {
-            if (attach()) clearInterval(timer);
-        }, 200);
-        setTimeout(function() { clearInterval(timer); }, 10000);
-    }
+
+    document.getElementById('bl-prev').addEventListener('click', function () { show(cur - 1); });
+    document.getElementById('bl-next').addEventListener('click', function () { show(cur + 1); });
 })();
 </script>
+<?xjs } ?>

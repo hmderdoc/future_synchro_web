@@ -4,17 +4,40 @@
     }, 0);
     require('file_size.js', 'file_size_str');
 ?>
-<div class="card mb-3">
+
+<style>
+.si-panel {
+    --bs-card-border-color: #55FFFF;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #55FFFF;
+    border-color: #55FFFF !important;
+}
+.si-panel > .card-header {
+    color: #55FFFF !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AA00AA !important;
+    font-weight: bold;
+}
+.si-panel .table { margin: 0; --bs-table-bg: transparent; }
+.si-panel .table td { border-color: rgba(85,255,255,0.15) !important; }
+.si-panel .table td:first-child { color: #FF55FF; padding-left: 0.6rem; font-size: 0.85em; }
+.si-panel .table td:last-child { color: #55FFFF; }
+.si-panel .si-danger { color: #FF5555; }
+.si-panel .si-success { color: #55FF55; }
+</style>
+
+<div class="card si-panel">
     <div class="card-header">System Information</div>
     <div class="card-body p-0">
-        <table class="table table-sm mb-0">
+        <table class="table table-sm">
             <tbody>
                 <tr><td>Sysop</td><td><?xjs write(system.operator); ?></td></tr>
                 <tr><td>Location</td><td><?xjs write(system.location); ?></td></tr>
                 <tr><td>Users</td><td><?xjs write(system.stats.total_users.toLocaleString()); ?></td></tr>
                 <tr>
                     <td>Nodes</td>
-                    <td><?xjs write(system.nodes); ?> (<span class="text-danger sb-nodes-in-use"><?xjs write(_sb_niu); ?></span> / <span class="text-success sb-nodes-available"><?xjs write(system.nodes - _sb_niu); ?></span>)</td>
+                    <td><?xjs write(system.nodes); ?> (<span class="si-danger sb-nodes-in-use"><?xjs write(_sb_niu); ?></span> / <span class="si-success sb-nodes-available"><?xjs write(system.nodes - _sb_niu); ?></span>)</td>
                 </tr>
                 <tr><td>Uptime</td><td><?xjs write(system.secondstr(time() - system.uptime)); ?></td></tr>
                 <tr><td>Total Calls</td><td><?xjs write(system.stats.total_logons.toLocaleString()); ?></td></tr>

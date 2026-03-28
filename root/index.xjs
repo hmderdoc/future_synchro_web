@@ -201,7 +201,7 @@
 <!-- Navbar (BS5) -->
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container<? if (settings.layout_full_width) write('-fluid'); ?>">
-        <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><img src="./images/icon-192.png" alt="<? write(settings.brand || system.name); ?>" class="brand-icon"><span class="nav-label brand-label"><? write(settings.brand || system.name); ?></span></a>
+        <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><img src="./images/icon-192.png" alt="<? write(settings.brand || system.name); ?>" class="brand-icon"><span class="nav-label brand-label"><? var _bn = (settings.brand || system.name); var _dot = _bn.lastIndexOf("."); if (_dot > 0) { write(_bn.substring(0, _dot + 1) + "\n" + _bn.substring(_dot + 1)); } else { write(_bn); } ?></span></a>
         <!-- Mobile toolbar: music player toggle at start, terminal at end -->
         <div class="navbar-mobile-controls d-md-none justify-content-between">
             <button class="btn btn-link p-0" id="btn-viz-mobile" type="button" title="Open Player">
@@ -226,14 +226,18 @@
 
                 <!-- BBS Radio -->
                 <li class="nav-item" id="radio-container">
-                    <div class="radio-controls">
-                        <button class="radio-btn" id="radio-prev" title="Previous">⏮</button>
-                        <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">▶</button>
-                        <button class="radio-btn" id="radio-next" title="Next">⏭</button>
-                    </div>
                     <canvas id="radio-viz" width="60" height="32" title="BBS Radio"></canvas>
-                    <span class="radio-track-name" id="radio-track">♫ Radio</span>
-                    <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                    <div class="radio-stack">
+                        <span class="radio-track-name" id="radio-track">INSERT DISC</span>
+                        <div class="radio-controls">
+                            <button class="radio-btn" id="radio-prev" title="Previous">⏮</button>
+                            <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">▶</button>
+                            <button class="radio-btn" id="radio-next" title="Next">⏭</button>
+                            <div class="radio-vol-wrap">
+                                <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                            </div>
+                        </div>
+                    </div>
                     <div class="radio-playlist-panel" id="radio-playlist-panel">
                         <input type="text" class="form-control form-control-sm mb-1" id="radio-search" placeholder="Search tracks...">
                         <div id="radio-tracklist" class="radio-tracklist"></div>
@@ -359,10 +363,6 @@
         <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
 <?xjs } ?>
     </div>
-    <hr>
-    <footer class="mb-3">
-        <p>&copy; <? write(system.name + ", " + strftime("%Y")); ?></p>
-    </footer>
 </div>
 
 <!-- Config passed to client JS -->

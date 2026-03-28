@@ -40,6 +40,32 @@
     // =========================================================
     //  Init
     // =========================================================
+    /* LCD display — wraps text in scrolling span; flash=true for idle blink */
+    function lcdUpdate(text, flash) {
+        if (!elTrack) return;
+        elTrack.title = text;
+        elTrack.innerHTML = '';
+        var span = document.createElement('span');
+        span.className = 'lcd-scroll';
+        span.textContent = text;
+        elTrack.appendChild(span);
+        if (flash) {
+            span.classList.add('lcd-flash');
+            return;
+        }
+        setTimeout(function() {
+            var containerW = elTrack.clientWidth;
+            var textW = span.scrollWidth;
+            if (textW > containerW) {
+                var shift = textW - containerW + 12;
+                var dur = Math.max(4, shift / 16);
+                span.style.setProperty('--lcd-shift', '-' + shift + 'px');
+                span.style.setProperty('--lcd-duration', dur + 's');
+                span.classList.add('scrolling');
+            }
+        }, 50);
+    }
+
     function init() {
         elContainer = document.getElementById('radio-container');
         elPlay      = document.getElementById('radio-play');
@@ -53,6 +79,9 @@
         elVolume    = document.getElementById('radio-volume');
 
         if (!elPlay) return; // radio HTML not present
+
+        // LCD-wrap the initial text
+        lcdUpdate('INSERT DISC', true);
 
         // Hidden <audio> element — NO crossOrigin (same-origin, avoid CORS issues)
         audio = document.createElement('audio');
@@ -80,6 +109,7 @@
             isPlaying = true;
             document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: true } }));
             elPlay.textContent = '\u275A\u275A'; // ❚❚ (pause icon)
+            elPlay.classList.add('is-playing');
             startViz();
 
             // Auto-open visualizer on the very first play of this session
@@ -99,6 +129,7 @@
                 isPlaying = false;
                 document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: false } }));
                 elPlay.textContent = '\u25B6'; // ▶
+                elPlay.classList.remove('is-playing');
                 // stopViz(); -- keep running for karaoke sign
             }
         });
@@ -110,6 +141,22 @@
                 if (gainNode) gainNode.gain.value = vol;
                 audio.volume = vol; // fallback if audio context not yet created
             });
+
+            // Auto-show/hide volume slider on interaction (touch + mouse)
+            var volWrap = elVolume.closest('.radio-vol-wrap');
+            var volTimer = null;
+            function showVol() {
+                if (volWrap) volWrap.classList.add('vol-visible');
+                clearTimeout(volTimer);
+                volTimer = setTimeout(function() {
+                    if (volWrap) volWrap.classList.remove('vol-visible');
+                }, 2500);
+            }
+            if (volWrap) {
+                volWrap.addEventListener('pointerenter', showVol);
+                elVolume.addEventListener('input', showVol);
+                elVolume.addEventListener('touchstart', showVol, { passive: true });
+            }
         }
 
         // Playlist panel toggle (click the song name to open)
@@ -235,22 +282,22 @@
             .then(function (data) {
                 if (data.error) {
                     console.warn('[radio] API error:', data.error);
-                    elTrack.textContent = 'Radio offline';
+                    lcdUpdate('INSERT DISC', true);
                     return;
                 }
                 if (!Array.isArray(data) || data.length === 0) {
-                    elTrack.textContent = 'No tracks';
+                    lcdUpdate('INSERT DISC', true);
                     return;
                 }
                 playlist = data;
                 shuffleQueue();
                 renderTrackList('');
-                elTrack.textContent = '\u266B ' + playlist.length + ' tracks';
+                lcdUpdate('INSERT DISC', true);
                 console.log('[radio] playlist loaded:', playlist.length, 'tracks');
             })
             .catch(function (err) {
                 console.error('[radio] fetch error:', err);
-                elTrack.textContent = 'Radio offline';
+                lcdUpdate('INSERT DISC', true);
             });
     }
 
@@ -287,7 +334,7 @@
                     renderTrackList(elSearch.value.trim().toLowerCase());
                     // Update the idle track counter if nothing is playing
                     if (!isPlaying && queuePos < 0) {
-                        elTrack.textContent = '\u266B ' + playlist.length + ' tracks';
+                        lcdUpdate('INSERT DISC', true);
                     }
                 } else {
                     console.log('[radio] refresh: no new tracks');
@@ -370,8 +417,9 @@
         console.log('[radio] loading track:', t.name, url);
         audio.src = url;
         var display = t.desc || t.name.replace(/\.mp3$/i, '');
-        elTrack.textContent = display;
+        lcdUpdate(display);
         elTrack.title       = display;
+        updateMediaSession(display);
         highlightCurrent(idx);
         // Notify visualizer of track change
         try {
@@ -379,6 +427,40 @@
                 detail: { filename: t.name, display: display }
             }));
         } catch(e) {}
+    }
+
+
+    // =========================================================
+    //  Media Session API — device controls (lock screen, headphones)
+    // =========================================================
+    function updateMediaSession(display) {
+        if (!('mediaSession' in navigator)) return;
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: display || 'BBS Radio',
+                artist: 'futureland.today',
+                album: 'BBS Radio'
+            });
+            navigator.mediaSession.setActionHandler('play', function() {
+                ensureAudioCtx();
+                doPlay();
+            });
+            navigator.mediaSession.setActionHandler('pause', function() {
+                audio.pause();
+                playing = false;
+                elPlay.textContent = '\u25B6';
+                elPlay.classList.remove('is-playing');
+                lcdUpdate('INSERT DISC', true);
+            });
+            navigator.mediaSession.setActionHandler('previoustrack', function() {
+                prevTrack();
+            });
+            navigator.mediaSession.setActionHandler('nexttrack', function() {
+                nextTrack();
+            });
+        } catch(e) {
+            console.warn('[radio] mediaSession error:', e);
+        }
     }
 
     // =========================================================
@@ -395,14 +477,15 @@
     ];
     var _MINI_RING_N = 10;
 
-    function drawMiniHead() {
+    function drawMiniHead(overlay) {
         if (!vizCtx) return;
         var W = vizW, H = vizH;
-        vizCtx.clearRect(0, 0, W, H);
-
-        // Dark background
-        vizCtx.fillStyle = '#000a00';
-        vizCtx.fillRect(0, 0, W, H);
+        if (!overlay) {
+            vizCtx.clearRect(0, 0, W, H);
+            vizCtx.fillStyle = '#000a00';
+            vizCtx.fillRect(0, 0, W, H);
+        }
+        if (overlay) vizCtx.globalAlpha = 0.35;
 
         var cx = W / 2, cy = H * 0.46;
         var S = Math.min(W, H) * 0.38;
@@ -472,6 +555,7 @@
         vizCtx.beginPath(); vizCtx.arc(rEye.x, rEye.y, 1.8, 0, Math.PI * 2); vizCtx.fill();
 
         vizCtx.shadowBlur = 0;
+        if (overlay) vizCtx.globalAlpha = 1.0;
     }
 
     // =========================================================
@@ -557,37 +641,15 @@
         }
         now = performance.now();
 
-        // Paused: cycle wireframe head <-> karaoke
-        // Playing: cycle EQ <-> karaoke
+        // Paused: wireframe head only
         if (!isPlaying || !analyser) {
-            var elapsed = now - vizCycleTime;
-            if (vizShowA && elapsed > 20000) {      // head shown 20s
-                vizShowA = false; vizCycleTime = now;
-            } else if (!vizShowA && elapsed > 15000) { // karaoke shown 15s
-                vizShowA = true; vizCycleTime = now;
-            }
-            if (vizShowA) { drawMiniHead(); } else { drawKaraokeSign(); }
+            drawMiniHead();
             drawMiniEQ();
             return;
         }
 
-        // Playing + viz open:   EQ <-> karaoke  (head lives in big viz)
-        // Playing + viz hidden: EQ <-> head     (head returns to navbar)
-        var vizOpen = document.body.classList.contains('viz-open');
-        var elapsed = now - vizCycleTime;
-        if (vizShowA && elapsed > VIZ_DUR_A) {
-            vizShowA = false; vizCycleTime = now;
-        } else if (!vizShowA && elapsed > VIZ_DUR_B) {
-            vizShowA = true; vizCycleTime = now;
-        }
-
-        if (vizShowA) {
-            drawEqualizer();
-        } else if (vizOpen) {
-            drawKaraokeSign();
-        } else {
-            drawMiniHead();
-        }
+        // Playing: EQ bars with wireframe head overlay (head drawn inside drawEqualizer)
+        drawEqualizer();
 
         // Also update mobile mini-EQ if visible
         drawMiniEQ();
@@ -600,20 +662,25 @@
 
         vizCtx.clearRect(0, 0, vizW, vizH);
 
-        var barW = vizW / bins;
+        var barW = Math.ceil(vizW / bins);
         for (var i = 0; i < bins; i++) {
             var v    = data[i] / 255;
             var barH = v * vizH;
+            var x    = Math.round(i * vizW / bins);
+            var w    = Math.round((i + 1) * vizW / bins) - x;
 
-            // CGA palette feel: green → cyan → white
+            // CGA palette: cyan -> magenta -> white
             var r, g, b;
-            if (v < 0.33)      { r = 0;   g = 170 + (v * 3 * 85) | 0; b = 0; }
-            else if (v < 0.66) { r = 0;   g = 255; b = ((v - 0.33) * 3 * 255) | 0; }
-            else               { r = ((v - 0.66) * 3 * 255) | 0; g = 255; b = 255; }
+            if (v < 0.33)      { r = 0;   g = (85 + v * 3 * 170) | 0; b = 255; }           // dark cyan -> cyan
+            else if (v < 0.66) { r = ((v - 0.33) * 3 * 170) | 0; g = (255 - (v - 0.33) * 3 * 100) | 0; b = 255; }  // cyan -> magenta-ish
+            else               { r = 170 + ((v - 0.66) * 3 * 85) | 0; g = (155 + (v - 0.66) * 3 * 100) | 0; b = 255; } // magenta -> white
 
             vizCtx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-            vizCtx.fillRect(i * barW, vizH - barH, Math.max(barW - 1, 1), barH);
+            vizCtx.fillRect(x, vizH - barH, w, barH);
         }
+
+        // Overlay wireframe head transparently on top of EQ bars
+        drawMiniHead(true);
     }
 
     // Draw mini-EQ on mobile navbar icon
@@ -637,7 +704,7 @@
             var idx = Math.floor((i / barCount) * bins);
             var v = data[idx] / 255;
             var barH = v * (h - 2);
-            ctx.fillStyle = '#55FF55';
+            ctx.fillStyle = '#55FFFF';
             ctx.fillRect(1 + i * barW, h - 1 - barH, barW - 1, barH);
         }
     }

@@ -9,21 +9,36 @@
 ?>
 
 <style>
-.rv-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; }
-.rv-row + .rv-row { border-top: 1px solid rgba(255,255,255,0.08); }
+.rv-panel {
+    --bs-card-border-color: #AA0000;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #FF5555;
+    border-color: #AA0000 !important;
+}
+.rv-panel > .card-header {
+    color: #FF5555 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #FFFF55 !important;
+    font-weight: bold;
+}
+.rv-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; }
+.rv-row + .rv-row { border-top: 1px solid rgba(170,0,0,0.25); }
 .rv-row .avatar-inline { flex-shrink: 0; }
 .rv-details { flex: 1; min-width: 0; overflow: hidden; }
-.rv-alias { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rv-meta { font-size: 0.78em; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-alias { color: #FF5555; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-when { color: #FFFF55; font-size: 0.78em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-loc { color: #FFFFFF; font-size: 0.75em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-conn { color: #AAAAAA; font-size: 0.75em; }
 </style>
 
-<div class="card mb-3">
+<div class="card rv-panel">
     <div class="card-header">Recent Visitors</div>
     <div class="card-body p-0">
 <?xjs
     if (ll.length === 0) {
 ?>
-        <div class="p-2 text-muted">No recent visitors</div>
+        <div class="p-2" style="color:#AA0000;">No recent visitors</div>
 <?xjs
     }
     ll.forEach(function (e) {
@@ -40,9 +55,9 @@
 <?xjs } ?>
             <div class="rv-details">
                 <div class="rv-alias"><?xjs write(alias); ?></div>
-                <div class="rv-meta"><?xjs write(when); ?></div>
+                <div class="rv-when"><?xjs write(when); ?></div>
 <?xjs if (loc || conn) { ?>
-                <div class="rv-meta"><?xjs if (loc) { write(loc); if (conn) write(' · '); } if (conn) write(conn); ?></div>
+                <div><?xjs if (loc) { ?><span class="rv-loc"><?xjs write(loc); ?></span><?xjs } if (loc && conn) { ?> <span class="rv-conn">&middot;</span> <?xjs } if (conn) { ?><span class="rv-conn"><?xjs write(conn); ?></span><?xjs } ?></div>
 <?xjs } ?>
             </div>
         </div>

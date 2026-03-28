@@ -1,0 +1,95 @@
+<?xjs
+    require('sbbsdefs.js', 'MSG_DELETE');
+
+    var _bltn_subcode = 'LOCAL-NOTICES';
+    var _bltn_max = 5;
+    var _bltn_body_maxlen = 400;
+
+    var _bltn_msgs = [];
+    var mb = new MsgBase(_bltn_subcode);
+    if (mb.open()) {
+        var count = 0;
+        for (var m = mb.last_msg; m >= mb.first_msg && count < _bltn_max; m--) {
+            var hdr = mb.get_msg_header(m);
+            if (hdr === null || (hdr.attr & MSG_DELETE) || (hdr.attr & MSG_NODISP))
+                continue;
+            var body = mb.get_msg_body(m) || '';
+            /* Strip ctrl-A codes and leading/trailing whitespace */
+            body = body.replace(/\x01./g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            if (body.length > _bltn_body_maxlen)
+                body = body.substring(0, _bltn_body_maxlen) + '...';
+            _bltn_msgs.push({
+                number: hdr.number,
+                subject: hdr.subject,
+                from: hdr.from,
+                date: system.timestr(hdr.when_written_time),
+                body: body
+            });
+            count++;
+        }
+        mb.close();
+    }
+?>
+
+<style>
+.bl-panel {
+    --bs-card-border-color: #AA5500;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #FFFF55;
+    border-color: #AA5500 !important;
+}
+.bl-panel > .card-header {
+    color: #FFFF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AA5500 !important;
+    font-weight: bold;
+}
+.bl-entry { padding: 10px 14px; }
+.bl-entry + .bl-entry { border-top: 1px solid rgba(170,85,0,0.3); }
+.bl-subject {
+    color: #FFFF55;
+    font-weight: bold;
+    font-size: 1.05em;
+    margin-bottom: 2px;
+}
+.bl-meta {
+    font-size: 0.8em;
+    margin-bottom: 4px;
+}
+.bl-date { color: #55FF55; }
+.bl-from { color: #AAAAAA; }
+.bl-body {
+    color: #FFFFFF;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+.bl-empty { color: #AA5500; padding: 12px 14px; }
+</style>
+
+<div class="card mb-3 bl-panel">
+    <div class="card-header">Bulletins</div>
+    <div class="card-body p-0">
+<?xjs
+    if (_bltn_msgs.length === 0) {
+?>
+        <div class="bl-empty">No bulletins posted.</div>
+<?xjs
+    }
+    _bltn_msgs.forEach(function (msg) {
+?>
+        <div class="bl-entry">
+            <div class="bl-subject"><?xjs write(msg.subject.replace(/</g, '&lt;')); ?></div>
+            <div class="bl-meta">
+                <span class="bl-date"><?xjs write(msg.date); ?></span>
+                <span class="bl-from"> &mdash; <?xjs write(msg.from.replace(/</g, '&lt;')); ?></span>
+            </div>
+            <div class="bl-body"><?xjs write(msg.body.replace(/</g, '&lt;')); ?></div>
+        </div>
+<?xjs
+    });
+?>
+    </div>
+</div>

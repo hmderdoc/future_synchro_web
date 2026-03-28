@@ -1,0 +1,546 @@
+<!--User List-->
+<?xjs
+
+    var pageSize = 500;
+    var guestAlias = typeof settings !== 'undefined' ? settings.guest : 'Guest';
+    var currentPageFile = '005-userlist.xjs';
+    var sortOptions = {
+        alias: {
+            label: 'Alias',
+            type: 'string',
+            defaultOrder: 'ascending',
+            ascendingLabel: 'A-Z',
+            descendingLabel: 'Z-A'
+        },
+        location: {
+            label: 'Location',
+            type: 'string',
+            defaultOrder: 'ascending',
+            ascendingLabel: 'A-Z',
+            descendingLabel: 'Z-A'
+        },
+        laston_date: {
+            label: 'Last On',
+            type: 'date',
+            defaultOrder: 'descending',
+            ascendingLabel: 'Oldest',
+            descendingLabel: 'Newest'
+        }
+    };
+
+    load('sbbsdefs.js');
+
+    function trimText(value) {
+        return value === undefined || value === null
+            ? ''
+            : String(value).replace(/^\s+|\s+$/g, '');
+    }
+
+    function escapeHtml(value) {
+        return trimText(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value);
+    }
+
+    function pluralize(value, singular) {
+        return format('%u %s%s', value, singular, value === 1 ? '' : 's');
+    }
+
+    function formatRelativeAge(deltaSeconds) {
+        var remaining = deltaSeconds;
+        var parts = [];
+        var units = [
+            { size: 24 * 60 * 60, label: 'day' },
+            { size: 60 * 60, label: 'hour' },
+            { size: 60, label: 'minute' }
+        ];
+
+        if (remaining < 60) return 'just now';
+
+        for (var i = 0; i < units.length && parts.length < 2; i++) {
+            var amount = Math.floor(remaining / units[i].size);
+            if (amount < 1) continue;
+            parts.push(pluralize(amount, units[i].label));
+            remaining -= amount * units[i].size;
+        }
+
+        return parts.join(' ') + ' ago';
+    }
+
+    function friendlyLastOnDate(lastOnDate) {
+        var delta;
+        if (typeof lastOnDate !== 'number' || lastOnDate < 1) return 'Never';
+        delta = time() - lastOnDate;
+        if (delta < 0) delta = 0;
+        if (delta < (72 * 60 * 60)) return formatRelativeAge(delta);
+        return strftime('%b %d, %Y', lastOnDate);
+    }
+
+    function currentSortState() {
+        var sortBy = null;
+        var sortOrder = null;
+
+        if (
+            typeof http_request.query.sortby !== 'undefined' &&
+            typeof http_request.query.sortorder !== 'undefined'
+        ) {
+            if (typeof sortOptions[http_request.query.sortby[0]] !== 'undefined') {
+                sortBy = http_request.query.sortby[0];
+            }
+            if (
+                http_request.query.sortorder[0] === 'ascending' ||
+                http_request.query.sortorder[0] === 'descending'
+            ) {
+                sortOrder = http_request.query.sortorder[0];
+            }
+        }
+
+        if (sortBy === null || sortOrder === null) {
+            return { by: null, order: null };
+        }
+
+        return { by: sortBy, order: sortOrder };
+    }
+
+    var sortState = currentSortState();
+
+    if (
+        typeof http_request.query.offset === 'undefined' ||
+        isNaN(parseInt(http_request.query.offset[0], 10)) ||
+        parseInt(http_request.query.offset[0], 10) < 1
+    ) {
+        var offset = 0;
+    } else {
+        var offset = parseInt(http_request.query.offset[0], 10);
+    }
+
+    function buildPageURL(nextOffset, sortBy, sortOrder) {
+        var params = ['page=' + currentPageFile];
+
+        if (sortBy !== null && typeof sortOptions[sortBy] !== 'undefined') {
+            params.push('sortby=' + sortBy);
+            params.push('sortorder=' + sortOrder);
+        }
+
+        if (typeof nextOffset === 'number' && nextOffset > 0) {
+            params.push('offset=' + nextOffset);
+        }
+
+        return './?' + params.join('&');
+    }
+
+    function toggleSortOrder(sortOrder) {
+        return sortOrder === 'ascending' ? 'descending' : 'ascending';
+    }
+
+    function compareUsers(a, b, field, sortOrder) {
+        var left = a[field];
+        var right = b[field];
+
+        if (sortOptions[field].type === 'string') {
+            left = trimText(left);
+            right = trimText(right);
+            if (left === '' && right !== '') return 1;
+            if (left !== '' && right === '') return -1;
+            left = left.toUpperCase();
+            right = right.toUpperCase();
+        } else {
+            left = parseInt(left, 10) || 0;
+            right = parseInt(right, 10) || 0;
+        }
+
+        if (left < right) return sortOrder === 'ascending' ? -1 : 1;
+        if (left > right) return sortOrder === 'ascending' ? 1 : -1;
+        return 0;
+    }
+
+    function loadUsers() {
+        var users = [];
+        var usr = new User(1);
+
+        for (var u = 1; u <= system.lastuser; u++) {
+            usr.number = u;
+            if (
+                usr.settings & USER_DELETED ||
+                usr.compare_ars('REST Q') ||
+                usr.alias === 'Guest' ||
+                usr.alias === guestAlias
+            ) {
+                continue;
+            }
+            users.push({
+                number: u,
+                alias: trimText(usr.alias),
+                location: trimText(usr.location),
+                laston_date: usr.stats.laston_date
+            });
+        }
+
+        usr = undefined;
+
+        if (sortState.by !== null) {
+            users.sort(function (a, b) {
+                var ret = compareUsers(a, b, sortState.by, sortState.order);
+                if (ret !== 0) return ret;
+                return compareUsers(a, b, 'alias', 'ascending');
+            });
+        }
+
+        return users;
+    }
+
+    function makePager(totalUsers) {
+        return {
+            previous: offset > 0
+                ? buildPageURL(Math.max(0, offset - pageSize), sortState.by, sortState.order)
+                : null,
+            next: offset + pageSize < totalUsers
+                ? buildPageURL(offset + pageSize, sortState.by, sortState.order)
+                : null
+        };
+    }
+
+    function sortOrderLabel(field, sortOrder) {
+        return sortOrder === 'ascending'
+            ? sortOptions[field].ascendingLabel
+            : sortOptions[field].descendingLabel;
+    }
+
+    function writeSortLinks() {
+        writeln(
+            '<a class="userlist-chip' + (sortState.by === null ? ' is-active' : '') + '" href="' +
+            escapeAttr(buildPageURL(0, null, null)) +
+            '">Board Order</a>'
+        );
+
+        for (var field in sortOptions) {
+            if (!sortOptions.hasOwnProperty(field)) continue;
+            var active = sortState.by === field;
+            var currentOrder = active ? sortState.order : sortOptions[field].defaultOrder;
+            var nextOrder = active ? toggleSortOrder(sortState.order) : sortOptions[field].defaultOrder;
+            var label = sortOptions[field].label;
+
+            if (active) label += ' ' + sortOrderLabel(field, currentOrder);
+
+            writeln(
+                '<a class="userlist-chip' + (active ? ' is-active' : '') + '" href="' +
+                escapeAttr(buildPageURL(0, field, nextOrder)) +
+                '">' + escapeHtml(label) + '</a>'
+            );
+        }
+    }
+
+    function writeUserTiles(users) {
+        for (var i = 0; i < users.length; i++) {
+            var location = users[i].location === '' ? 'Unknown location' : users[i].location;
+            var lastOnTitle = users[i].laston_date > 0 ? system.timestr(users[i].laston_date) : '';
+
+            writeln('<article class="userlist-card">');
+            writeln('<div class="userlist-name">' + escapeHtml(users[i].alias) + '</div>');
+            writeln(
+                '<div class="userlist-avatar-shell">' +
+                    '<div class="userlist-avatar" data-avatar="' + escapeAttr(users[i].alias) + '"></div>' +
+                '</div>'
+            );
+            writeln(
+                '<div class="userlist-location' + (users[i].location === '' ? ' is-empty' : '') + '">' +
+                escapeHtml(location) +
+                '</div>'
+            );
+            writeln(
+                '<div class="userlist-laston"' +
+                (lastOnTitle === '' ? '' : ' title="' + escapeAttr(lastOnTitle) + '"') +
+                '>' + escapeHtml(friendlyLastOnDate(users[i].laston_date)) + '</div>'
+            );
+            writeln('</article>');
+        }
+    }
+
+    var allUsers = loadUsers();
+
+    if (offset >= allUsers.length && allUsers.length > 0) {
+        offset = Math.max(0, Math.floor((allUsers.length - 1) / pageSize) * pageSize);
+    }
+
+    var pageUsers = allUsers.slice(offset, offset + pageSize);
+    var pager = makePager(allUsers.length);
+    var rangeStart = allUsers.length > 0 ? offset + 1 : 0;
+    var rangeEnd = allUsers.length > 0 ? Math.min(offset + pageSize, allUsers.length) : 0;
+    var pageCount = Math.max(1, Math.ceil(Math.max(allUsers.length, 1) / pageSize));
+    var currentPageNumber = Math.floor(offset / pageSize) + 1;
+
+?>
+<style>
+.userlist-page {
+    --userlist-bg: #000000;
+    --userlist-border: #5555ff;
+    --userlist-border-soft: #5555ff;
+    --userlist-blue: #5555ff;
+    --userlist-red: #ff5555;
+    --userlist-yellow: #ffff55;
+    --userlist-gray: #aaaaaa;
+    --userlist-gray-soft: #777777;
+    --userlist-white: #ffffff;
+}
+.userlist-page .userlist-shell .card-body {
+    background: #050505;
+}
+.userlist-page .userlist-total {
+    color: var(--userlist-white);
+}
+.userlist-page .userlist-status {
+    color: var(--userlist-gray);
+}
+.userlist-page .userlist-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+}
+.userlist-page .userlist-sort {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+.userlist-page .userlist-sort-label {
+    color: var(--userlist-yellow);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.userlist-page .userlist-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--userlist-border-soft);
+    border-radius: 999px;
+    background: #000000;
+    color: var(--userlist-border);
+    font-size: 0.82rem;
+    line-height: 1;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.userlist-page .userlist-chip:hover,
+.userlist-page .userlist-chip:focus {
+    background: var(--userlist-border);
+    color: #000000;
+    text-shadow: none;
+}
+.userlist-page .userlist-chip.is-active {
+    border-color: var(--userlist-border);
+    background: rgba(85, 85, 255, 0.22);
+    color: var(--userlist-white);
+}
+.userlist-page .userlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.95rem;
+}
+.userlist-page .userlist-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-height: 100%;
+    padding: 0.95rem;
+    border: 1px solid var(--userlist-border);
+    border-radius: 0.85rem;
+    background:
+        linear-gradient(180deg, rgba(12, 18, 34, 0.36), transparent 48%),
+        linear-gradient(180deg, #040404, #000000 58%, #06070d);
+    box-shadow:
+        inset 0 0 0 1px rgba(85, 85, 255, 0.12),
+        0 10px 20px rgba(0, 0, 0, 0.24);
+}
+.userlist-page .userlist-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        linear-gradient(135deg, rgba(85, 85, 255, 0.18), transparent 28%, transparent 72%, rgba(85, 85, 255, 0.1));
+}
+.userlist-page .userlist-card:hover {
+    border-color: var(--userlist-white);
+}
+.userlist-page .userlist-name,
+.userlist-page .userlist-avatar-shell,
+.userlist-page .userlist-location,
+.userlist-page .userlist-laston {
+    position: relative;
+    z-index: 1;
+}
+.userlist-page .userlist-name {
+    color: var(--userlist-red);
+    font-size: 1rem;
+    line-height: 1.2;
+    word-break: break-word;
+    min-height: 2.4em;
+}
+.userlist-page .userlist-avatar-shell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 74px;
+    padding: 0.55rem 0.4rem;
+    border: 1px solid rgba(85, 85, 255, 0.72);
+    border-radius: 0.6rem;
+    background: rgba(255, 255, 255, 0.02);
+}
+.userlist-page .userlist-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    min-height: 48px;
+}
+.userlist-page .userlist-avatar img {
+    display: block;
+    image-rendering: pixelated;
+}
+.userlist-page .userlist-location {
+    color: var(--userlist-yellow);
+    line-height: 1.25;
+    word-break: break-word;
+}
+.userlist-page .userlist-location.is-empty {
+    color: var(--userlist-gray-soft);
+}
+.userlist-page .userlist-laston {
+    margin-top: auto;
+    color: var(--userlist-gray);
+    font-size: 0.88rem;
+    line-height: 1.2;
+}
+.userlist-page .userlist-empty {
+    padding: 2rem 1.25rem;
+    border: 1px dashed var(--userlist-border-soft);
+    border-radius: 0.85rem;
+    background: #000000;
+    color: var(--userlist-gray);
+    text-align: center;
+}
+.userlist-page .userlist-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+.userlist-page .userlist-pager-links {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+.userlist-page .userlist-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7rem;
+    min-height: 2.25rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--userlist-border-soft);
+    border-radius: 999px;
+    background: #000000;
+    color: var(--userlist-border);
+    text-decoration: none;
+}
+.userlist-page .userlist-nav:hover,
+.userlist-page .userlist-nav:focus {
+    background: var(--userlist-border);
+    color: #000000;
+    text-shadow: none;
+}
+@media (max-width: 767px) {
+    .userlist-page .userlist-toolbar,
+    .userlist-page .userlist-pager {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+@media (max-width: 479px) {
+    .userlist-page .userlist-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+    .userlist-page .userlist-nav {
+        min-width: 0;
+    }
+}
+</style>
+
+<div class="userlist-page">
+    <div class="card mb-3 userlist-shell">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span><span class="bin-icon" data-icon="userlist"></span>User List</span>
+            <span class="userlist-total"><?xjs write(format('%u visible user%s', allUsers.length, allUsers.length === 1 ? '' : 's')); ?></span>
+        </div>
+        <div class="card-body">
+            <div class="userlist-toolbar">
+                <div class="userlist-sort">
+                    <span class="userlist-sort-label">Sort</span>
+                    <?xjs writeSortLinks(); ?>
+                </div>
+                <div class="userlist-status">
+                    <?xjs
+                        if (rangeEnd > 0) {
+                            write(format('Showing %u-%u of %u', rangeStart, rangeEnd, allUsers.length));
+                        } else {
+                            write('No users to show');
+                        }
+                    ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<?xjs if (pageUsers.length > 0) { ?>
+    <section class="userlist-grid" aria-label="Registered users">
+        <?xjs writeUserTiles(pageUsers); ?>
+    </section>
+<?xjs } else { ?>
+    <div class="userlist-empty">No visible users matched the current filters.</div>
+<?xjs } ?>
+
+<?xjs if (pager.previous !== null || pager.next !== null) { ?>
+    <nav class="userlist-pager" aria-label="User list pagination">
+        <div class="userlist-status"><?xjs write(format('Page %u of %u', currentPageNumber, pageCount)); ?></div>
+        <div class="userlist-pager-links">
+            <?xjs
+                if (pager.previous !== null) {
+                    writeln('<a class="userlist-nav" href="' + escapeAttr(pager.previous) + '">Previous</a>');
+                }
+                if (pager.next !== null) {
+                    writeln('<a class="userlist-nav" href="' + escapeAttr(pager.next) + '">Next</a>');
+                }
+            ?>
+        </div>
+    </nav>
+<?xjs } ?>
+</div>
+<script>
+(function () {
+    if (typeof Avatars === 'undefined' || !Avatars.draw) return;
+    var root = document.querySelector('.userlist-page');
+    if (!root) return;
+    var users = [];
+    root.querySelectorAll('div[data-avatar]').forEach(function (el) {
+        var user = el.getAttribute('data-avatar');
+        if (user && users.indexOf(user) < 0) users.push(user);
+    });
+    if (users.length) Avatars.draw(users);
+})();
+</script>

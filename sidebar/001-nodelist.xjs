@@ -1,19 +1,37 @@
 <style>
-#sbbs-nodelist-body td { vertical-align: middle; }
-#sbbs-nodelist-body .nl-user-cell {
+.wo-panel {
+    --bs-card-border-color: #00AA00;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #55FF55;
+    border-color: #00AA00 !important;
+}
+.wo-panel > .card-header {
+    color: #55FF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #00AA00 !important;
+    font-weight: bold;
+}
+.wo-panel .table { margin: 0; --bs-table-bg: transparent; }
+.wo-panel .table td {
+    border-color: rgba(0,170,0,0.2) !important;
+    vertical-align: middle;
+}
+.wo-panel .table thead th {
+    background: #00AA00 !important;
+    color: #000 !important;
+    border-color: #00AA00 !important;
+    font-weight: bold;
+}
+.wo-panel .nl-user-cell {
     white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 4px;
 }
-#sbbs-nodelist-body .nl-user-cell .avatar-inline {
-    flex-shrink: 0;
-}
-#sbbs-nodelist-body .nl-user-cell .nl-username {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-#sbbs-nodelist-body .nl-activity {
+.wo-panel .nl-user-cell .avatar-inline { flex-shrink: 0; }
+.wo-panel .nl-username { color: #55FF55; overflow: hidden; text-overflow: ellipsis; }
+.wo-panel .nl-activity {
     font-size: 0.8em;
     white-space: nowrap;
     overflow: hidden;
@@ -22,19 +40,14 @@
 }
 </style>
 
-<div class="card mb-3">
+<div class="card wo-panel">
     <div class="card-header">Who's Online</div>
     <div class="card-body p-0" id="sbbs-nodelist">
-        <table class="table table-sm mb-0" style="table-layout:fixed;">
-            <colgroup>
-                <col style="width:50%;">
-                <col style="width:50%;">
-            </colgroup>
-            <thead>
-                <tr><th>User</th><th>Activity</th></tr>
-            </thead>
+        <table class="table table-sm" style="table-layout:fixed;">
+            <colgroup><col style="width:50%;"><col style="width:50%;"></colgroup>
+            <thead><tr><th>User</th><th>Activity</th></tr></thead>
             <tbody id="sbbs-nodelist-body">
-                <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+                <tr><td colspan="2" style="color:#55FF55;">Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -44,6 +57,20 @@
 
     var nll = <? write(system.node_list.length); ?>;
     var niu = 0;
+
+    function _activityColor(str) {
+        var pool = [
+            '#00AA00','#55FF55','#00AAAA','#55FFFF',
+            '#0000AA','#5555FF','#AA00AA','#FF55FF',
+            '#AA5500','#FFFF55','#FFFFFF','#AAAAAA'
+        ];
+        var h = 0;
+        var s = (str || '').toLowerCase().replace(/\s*\(.*\)\s*$/, '').replace(/\[.*\]$/, '').trim();
+        for (var i = 0; i < s.length; i++) {
+            h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        }
+        return pool[Math.abs(h) % pool.length];
+    }
 
     function _sb_nodelist(evt) {
         var data = JSON.parse(evt.data);
@@ -59,7 +86,6 @@
             if (!c.user) return;
             var tr = document.createElement('tr');
 
-            // User cell: flex container with avatar + name, no wrap
             var tdUser = document.createElement('td');
             var userWrap = document.createElement('div');
             userWrap.className = 'nl-user-cell';
@@ -85,11 +111,12 @@
             }
             tdUser.appendChild(userWrap);
 
-            // Activity cell: clamp to fit
             var tdActivity = document.createElement('td');
             tdActivity.className = 'nl-activity';
-            tdActivity.textContent = c.action || c.status || '';
-            tdActivity.title = c.action || c.status || '';
+            var actText = c.action || c.status || '';
+            tdActivity.textContent = actText;
+            tdActivity.title = actText;
+            tdActivity.style.color = _activityColor(actText);
 
             tr.appendChild(tdUser);
             tr.appendChild(tdActivity);
@@ -102,7 +129,7 @@
             var tr = document.createElement('tr');
             var td = document.createElement('td');
             td.setAttribute('colspan', '2');
-            td.className = 'text-muted';
+            td.style.color = '#00AA00';
             td.textContent = 'No users online';
             tr.appendChild(td);
             tbody.appendChild(tr);
@@ -114,10 +141,8 @@
 
         var sidebarEl = document.getElementById('sidebar');
         if (sidebarEl) {
-            var inUseEls = sidebarEl.querySelectorAll('.sb-nodes-in-use');
-            var availEls = sidebarEl.querySelectorAll('.sb-nodes-available');
-            inUseEls.forEach(function (el) { el.textContent = niu; });
-            availEls.forEach(function (el) { el.textContent = nll - niu; });
+            sidebarEl.querySelectorAll('.sb-nodes-in-use').forEach(function (el) { el.textContent = niu; });
+            sidebarEl.querySelectorAll('.sb-nodes-available').forEach(function (el) { el.textContent = nll - niu; });
         }
     }
 

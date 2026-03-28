@@ -15,7 +15,7 @@
  */
 
 [data-theme="cga"] {
-    --bs-body-bg: #000000;
+    --bs-body-bg: #555555;
     --bs-body-color: #AAAAAA;
     --bs-primary: #55FFFF;
     --bs-secondary: #AA00AA;
@@ -34,7 +34,7 @@
 
 [data-theme="cga"] html,
 [data-theme="cga"] body {
-    background: #000000 !important;
+    background: #555555 !important;
     background-image: none !important;
 }
 
@@ -69,19 +69,59 @@
 }
 
 [data-theme="cga"] .navbar {
-    background: #0000AA !important;
+    background: #000000 !important;
     border-bottom: 2px solid #55FFFF;
     backdrop-filter: none;
+    padding-top: 0.15rem;
+    padding-bottom: 0.15rem;
+    min-height: 0;
 }
 
-[data-theme="cga"] .navbar-brand,
+[data-theme="cga"] .navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    margin-right: 1rem;
+    min-height: 48px;
+}
+
+[data-theme="cga"] .brand-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    image-rendering: pixelated;
+}
+
+[data-theme="cga"] .brand-label {
+    white-space: pre-line;
+    line-height: 1.15;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
 [data-theme="cga"] .navbar-nav .nav-link {
-    color: #FFFFFF !important;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    font-size: 0.85rem;
 }
 
-[data-theme="cga"] .navbar-brand:hover,
+[data-theme="cga"] .navbar-brand {
+    color: #FF55FF !important;
+}
+[data-theme="cga"] .navbar-nav .nav-link {
+    color: #55FFFF !important;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+[data-theme="cga"] .navbar-brand:hover {
+    color: #FF55FF !important;
+}
 [data-theme="cga"] .navbar-nav .nav-link:hover {
-    color: #FFFF55 !important;
+    color: #55FF55 !important;
+    border-bottom: 2px solid #AA00AA;
     text-shadow: none;
 }
 
@@ -236,12 +276,21 @@
 
 [data-theme="cga"] #sidebar {
     opacity: 1;
+    background: transparent !important;
 }
 
 [data-theme="cga"] #sidebar .list-group-item.sidebar {
-    background: #000000;
-    border-color: #555555;
+    background: transparent !important;
+    border: none !important;
     color: #AAAAAA;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+[data-theme="cga"] #sidebar .list-group-item.sidebar + .list-group-item.sidebar {
+    margin-top: 10px !important;
+}
+[data-theme="cga"] #sidebar .card {
+    margin: 0 !important;
 }
 
 [data-theme="cga"] .dropdown-menu {
