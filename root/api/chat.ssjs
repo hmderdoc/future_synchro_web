@@ -4,6 +4,8 @@
  *   GET  ?action=history&channel=main             - public room history
  *   GET  ?action=who&channel=main                 - current public room subscribers
  *   GET  ?action=channels[&since=timestamp]       - public room summaries
+ *   GET  ?action=motd[&channel=motd]               - latest MOTD message
+ *   GET  ?action=motd[&channel=motd]               - latest MOTD message
  *   POST ?action=createChannel                    - initialize/register a public room
  *   POST ?action=send                             - send a public room message
  *   GET  ?action=private[&since=timestamp]        - private thread summaries (auth required)
@@ -628,6 +630,62 @@ switch (action) {
 
             return {
                 channels: summaries,
+                serverTime: Date.now()
+            };
+        });
+        break;
+
+    case 'motd':
+        var motdChannel = hasRequestParam('channel') ? sanitizeChannel(getRequestValue('channel', 'motd'), 'motd') : 'motd';
+
+        reply = withClient(function (client) {
+            var history = getRecentHistory(client, 'channels.' + motdChannel + '.history', 10);
+            var latest = null;
+            var index = 0;
+
+            for (index = history.length - 1; index >= 0; index -= 1) {
+                if (!isPrivateMessage(history[index])) {
+                    latest = history[index];
+                    break;
+                }
+            }
+
+            var ownAlias = user.number > 0 ? user.alias : '';
+            var formatted = latest ? formatChatMessage(latest, ownAlias) : null;
+
+            return {
+                channel: motdChannel,
+                message: formatted,
+                previewText: formatted ? trimText(formatted.text) : '',
+                timestamp: formatted && formatted.timestamp ? formatted.timestamp : 0,
+                serverTime: Date.now()
+            };
+        });
+        break;
+
+    case 'motd':
+        var motdChannel = hasRequestParam('channel') ? sanitizeChannel(getRequestValue('channel', 'motd'), 'motd') : 'motd';
+
+        reply = withClient(function (client) {
+            var history = getRecentHistory(client, 'channels.' + motdChannel + '.history', 10);
+            var latest = null;
+            var index = 0;
+
+            for (index = history.length - 1; index >= 0; index -= 1) {
+                if (!isPrivateMessage(history[index])) {
+                    latest = history[index];
+                    break;
+                }
+            }
+
+            var ownAlias = user.number > 0 ? user.alias : '';
+            var formatted = latest ? formatChatMessage(latest, ownAlias) : null;
+
+            return {
+                channel: motdChannel,
+                message: formatted,
+                previewText: formatted ? trimText(formatted.text) : '',
+                timestamp: formatted && formatted.timestamp ? formatted.timestamp : 0,
                 serverTime: Date.now()
             };
         });

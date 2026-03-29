@@ -76,7 +76,7 @@ CDN_ASSETS.forEach(function (url) {
     combined += url + ':cdn-pinned\n';
 });
 
-var revision = md5_calc(combined, true).substr(0, 12);
+var revision = md5_calc(combined + 'salt-20260328m-chat-cga-restyle', true).substr(0, 12);
 var workerSource = [
     '// Dynamic service worker for webv4_custom.',
     '// Revision: ' + revision,

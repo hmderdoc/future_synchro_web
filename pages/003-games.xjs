@@ -71,7 +71,8 @@ _vu = undefined;
 
 <div id="games-page">
 
-    <div class="d-flex flex-wrap align-items-center mb-3 gap-2" id="games-controls">
+    <div id="games-controls" class="games-toolbar">
+        <div class="games-toolbar-card games-toolbar-sort">
         <div class="btn-group btn-group-sm" role="group" id="games-sort">
             <button class="btn btn-outline-success active" data-sort="time">Time</button>
             <button class="btn btn-outline-success" data-sort="launches">Launches</button>
@@ -79,21 +80,26 @@ _vu = undefined;
             <button class="btn btn-outline-success" data-sort="name">Name</button>
             <button class="btn btn-outline-success" data-sort="unique">Players</button>
         </div>
+        </div>
+        <div class="games-toolbar-card games-toolbar-month">
         <div class="btn-group btn-group-sm" role="group" id="games-month-nav">
             <button class="btn btn-outline-info" id="games-month-prev" title="Previous month">&laquo;</button>
             <button class="btn btn-outline-info disabled" id="games-month-label">All Time</button>
             <button class="btn btn-outline-info" id="games-month-next" title="Next month">&raquo;</button>
         </div>
-        <div class="position-relative d-inline-block">
+        </div>
+        <div class="games-toolbar-card games-toolbar-filter position-relative">
             <button class="btn btn-outline-warning btn-sm" id="games-user-filter">
-                <span class="glyphicon glyphicon-user"></span> All Users
+                All Users
             </button>
         </div>
     </div>
 
-    <div id="games-stats" class="d-flex flex-wrap gap-3 mb-3 small text-muted"></div>
+    <div class="games-stats-card">
+        <div id="games-stats" class="small text-muted"></div>
+    </div>
 
-    <div id="games-grid"></div>
+    <div id="games-grid" class="games-card-list"></div>
 
 </div>
 

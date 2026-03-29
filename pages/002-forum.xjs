@@ -38,6 +38,8 @@
 <?xjs } ?>
 <script type="text/javascript" src="./js/ansi-editor.js"></script>
 <script type="text/javascript" src="./js/ansi-editor-forum.js"></script>
+<script type="text/javascript" src="./js/ansi-editor-modal.js"></script>
+<link rel="stylesheet" href="./css/ansi-editor-modal.css">
 
 <?xjs
     var _searchScope = 'forum';
@@ -46,6 +48,7 @@
     var _searchQuery = request.has_param('q') ? request.get_param('q') : '';
     var _searchSort = request.has_param('sort') ? request.get_param('sort') : '';
     var _searchDir = request.has_param('dir') ? request.get_param('dir') : '';
+    var _forumCrumbTitle = 'Forums';
     if (request.has_param('sub') && msg_area.sub[request.get_param('sub')] !== undefined) {
         if (!request.has_param('thread')) {
             _searchScope = 'sub';
@@ -58,19 +61,513 @@
     }
 ?>
 
+<style>
+    :root {
+        --forum-stack-gap: 0.4rem;
+    }
+    .forum-breadcrumb {
+        margin: 0 0 var(--forum-stack-gap);
+        padding: 0.65rem 1rem !important;
+        border-radius: 8px !important;
+    }
+    .forum-breadcrumb li,
+    .forum-breadcrumb li a {
+        display: inline-flex;
+        align-items: center;
+    }
+    #forum-search-bar {
+        margin-bottom: var(--forum-stack-gap);
+    }
+    #forum-search-bar .input-group {
+        width: 100%;
+        display: flex;
+        align-items: stretch;
+        margin-bottom: 0 !important;
+    }
+    #forum-search-bar .input-group > .form-control {
+        float: none;
+        display: block;
+        flex: 1 1 auto;
+        width: auto;
+    }
+    #forum-search-bar .input-group-btn {
+        display: flex;
+        align-items: stretch;
+        width: auto;
+        white-space: nowrap;
+    }
+    #forum-search-bar .input-group-btn > .btn {
+        margin: 0 !important;
+        flex: 0 0 auto;
+    }
+    #forum-search-input,
+    #forum-search-scope-btn {
+        height: 40px;
+        min-height: 0;
+        box-sizing: border-box;
+    }
+    #forum-search-scope-btn {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+    #forum-search-btn,
+    #forum-search-clear {
+        width: 38px;
+        height: 40px;
+        min-height: 0;
+        box-sizing: border-box;
+        padding: 1px 2px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 !important;
+        background: #000000 !important;
+    }
+    #forum-search-btn:hover,
+    #forum-search-btn:focus,
+    #forum-search-clear:hover,
+    #forum-search-clear:focus {
+        background: #000000 !important;
+    }
+    #forum-search-btn .bin-icon,
+    #forum-search-clear .bin-icon {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #forum-search-btn .bin-icon-img,
+    #forum-search-clear .bin-icon-img {
+        height: 28px;
+    }
+    .forum-directory-card {
+        margin-bottom: 0.85rem !important;
+        padding: 0.95rem 1rem !important;
+        border: 1px solid #5555FF !important;
+        border-radius: 10px !important;
+        background: #000000 !important;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .forum-directory-card:hover,
+    .forum-directory-card:focus {
+        border-color: #55FFFF !important;
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+    .forum-directory-card.forum-item-with-icon {
+        align-items: center !important;
+    }
+    .forum-directory-card .forum-item-content {
+        min-width: 0;
+        padding-top: 0.15rem;
+    }
+    .forum-directory-card .forum-item-content h3,
+    .forum-directory-card .forum-item-content h4,
+    .forum-directory-card .forum-item-content p {
+        margin: 0;
+    }
+    .forum-directory-card .forum-item-content h3,
+    .forum-directory-card .forum-item-content h4 {
+        margin-bottom: 0.35rem;
+    }
+    .forum-group-heading {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.45rem;
+        margin-bottom: 0.35rem;
+        flex-wrap: wrap;
+    }
+    .forum-group-heading h3 {
+        margin: 0 !important;
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    .forum-group-badges {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        margin-left: 0.15rem;
+    }
+    .forum-sub-heading {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.45rem;
+        margin-bottom: 0.3rem;
+        flex-wrap: wrap;
+    }
+    .forum-sub-heading h3 {
+        margin: 0 !important;
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    .forum-sub-badges,
+    .forum-sub-meta-badges {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
+    .forum-sub-badges {
+        margin-left: 0.15rem;
+    }
+    .forum-sub-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+    }
+    .forum-sub-description {
+        color: #FFFFFF !important;
+        margin: 0 !important;
+    }
+    .forum-group-badges .badge,
+    .forum-sub-badges .badge,
+    .forum-sub-meta-badges .badge {
+        margin: 0 !important;
+    }
+    .forum-directory-card .forum-unread-pill,
+    .forum-directory-card .forum-count-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px !important;
+        background: #000000 !important;
+        color: #FFFFFF !important;
+        font-size: 0.82em;
+        font-weight: normal !important;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+        white-space: nowrap;
+        box-shadow: none;
+    }
+    .forum-directory-card .forum-unread-pill {
+        border: 1px solid #FF5555 !important;
+    }
+    .forum-directory-card .forum-count-pill {
+        border: 1px solid #55FFFF !important;
+    }
+    .forum-directory-card .forum-icon {
+        border: none !important;
+    }
+    .forum-directory-card [data-group-name] {
+        color: #FFFF55 !important;
+    }
+    .forum-directory-card [data-group-sub-count] {
+        color: #FFFFFF;
+    }
+    .forum-directory-card [data-sub-name] {
+        color: #FFFF55 !important;
+    }
+    .forum-directory-card [data-newest-message-container] {
+        display: block;
+        margin-top: 0.15rem;
+        line-height: 1.45;
+    }
+    .forum-directory-card .badge {
+        margin-right: 0.35rem;
+        margin-bottom: 0.35rem;
+    }
+    .forum-thread-card {
+        margin-bottom: 0.85rem !important;
+        padding: 0.95rem 1rem !important;
+        border: 1px solid #5555FF !important;
+        border-radius: 10px !important;
+        background: #000000 !important;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .forum-thread-card:hover,
+    .forum-thread-card:focus {
+        border-color: #55FFFF !important;
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+    .forum-thread-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .forum-thread-title-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .forum-thread-title-wrap h3 {
+        margin: 0 !important;
+        min-width: 0;
+        font-size: 1.05rem;
+        line-height: 1.15;
+    }
+    .forum-thread-card [data-thread-subject] {
+        color: #55FFFF !important;
+        font-weight: normal !important;
+    }
+    .forum-thread-stats {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        flex: 0 0 auto;
+    }
+    .forum-thread-stats .badge,
+    .forum-thread-title-wrap .badge {
+        margin: 0 !important;
+    }
+    .forum-thread-card .forum-unread-pill,
+    .forum-thread-card .forum-count-pill,
+    .forum-thread-card .forum-search-sub-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px !important;
+        background: #000000 !important;
+        color: #FFFFFF !important;
+        font-size: 0.82em;
+        font-weight: normal !important;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+        white-space: nowrap;
+        box-shadow: none;
+    }
+    .forum-thread-card .forum-unread-pill {
+        border: 1px solid #FF5555 !important;
+    }
+    .forum-thread-card .forum-count-pill,
+    .forum-thread-card .forum-search-sub-pill {
+        border: 1px solid #55FFFF !important;
+    }
+    .forum-thread-body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.1rem;
+    }
+    .forum-thread-origin,
+    .forum-thread-latest,
+    .forum-thread-latest-empty {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+    .forum-thread-origin {
+        gap: 0.85rem;
+        flex: 1 1 auto;
+    }
+    .forum-thread-latest,
+    .forum-thread-latest-empty {
+        justify-content: flex-end;
+        gap: 0.7rem;
+        text-align: right;
+        flex: 0 1 44%;
+        margin-left: auto;
+    }
+    .forum-thread-origin-copy,
+    .forum-thread-latest-copy {
+        min-width: 0;
+    }
+    .forum-thread-label,
+    .forum-thread-replies-line {
+        display: block;
+        color: #AAAAAA;
+        font-size: 0.82em;
+        letter-spacing: 0.04em;
+        line-height: 1.2;
+    }
+    .forum-thread-label {
+        margin-bottom: 0.2rem;
+        text-transform: uppercase;
+    }
+    .forum-thread-origin-copy strong,
+    .forum-thread-latest-copy strong {
+        color: #FFFFFF;
+    }
+    .forum-thread-date-line {
+        color: #AAAAAA;
+        line-height: 1.35;
+        margin-top: 0.12rem;
+    }
+    .forum-thread-avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #000000;
+        flex: 0 0 auto;
+    }
+    .forum-thread-avatar img,
+    .forum-thread-avatar canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: pixelated;
+    }
+    .forum-thread-avatar-lg {
+        width: 72px;
+        height: 72px;
+    }
+    .forum-thread-avatar-sm {
+        width: 40px;
+        height: 40px;
+    }
+    .forum-message-card {
+        margin-bottom: 0.85rem !important;
+        padding: 0.95rem 1rem !important;
+        border: 1px solid #5555FF !important;
+        border-radius: 10px !important;
+        background: #000000 !important;
+    }
+    .forum-message-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .forum-message-title-row h5 {
+        margin: 0 !important;
+        font-size: 1.05rem;
+        line-height: 1.15;
+    }
+    .forum-message-card [data-message-subject] {
+        color: #55FFFF !important;
+        font-weight: normal !important;
+    }
+    .forum-message-meta {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.85rem;
+        margin-bottom: 0.9rem;
+    }
+    .forum-message-avatar {
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #000000;
+        flex: 0 0 auto;
+    }
+    .forum-message-avatar img,
+    .forum-message-avatar canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: pixelated;
+    }
+    .forum-message-meta-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .forum-message-meta-line {
+        color: #FFFFFF;
+        line-height: 1.35;
+        margin-bottom: 0.15rem;
+        word-break: break-word;
+    }
+    .forum-message-meta-label {
+        color: #AAAAAA;
+        display: inline-block;
+        min-width: 3.5rem;
+        margin-right: 0.35rem;
+        text-transform: uppercase;
+        font-size: 0.82em;
+        letter-spacing: 0.04em;
+    }
+    .forum-message-card .forum-unread-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px !important;
+        background: #000000 !important;
+        color: #FFFFFF !important;
+        font-size: 0.82em;
+        font-weight: normal !important;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+        white-space: nowrap;
+        border: 1px solid #FF5555 !important;
+        box-shadow: none;
+    }
+    .forum-message-card [data-message-body] {
+        color: #FFFFFF;
+        margin-top: 0.1rem;
+    }
+    .forum-message-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        margin-top: 0.9rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(85, 255, 255, 0.25);
+    }
+    .forum-message-actions .btn {
+        margin: 0 !important;
+    }
+    @media (max-width: 576px) {
+        .forum-breadcrumb {
+            padding: 0.55rem 0.75rem;
+        }
+        .forum-directory-card {
+            padding: 0.75rem !important;
+        }
+        .forum-thread-card {
+            padding: 0.75rem !important;
+        }
+        .forum-thread-title-row,
+        .forum-thread-body {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .forum-thread-latest,
+        .forum-thread-latest-empty {
+            justify-content: flex-start;
+            text-align: left;
+            margin-left: 0;
+            flex: 1 1 auto;
+        }
+        .forum-message-card {
+            padding: 0.75rem !important;
+        }
+        .forum-message-meta {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+</style>
 <? if (!request.has_param('thread')) { ?>
 <div id="forum-search-bar" data-scope="<? write(_searchScope); ?>" data-group="<? write(_searchGroup); ?>" data-sub="<? write(_searchSub); ?>">
-    <div class="input-group" style="margin-bottom:0.75em;">
+    <div class="input-group">
+        <button id="forum-search-btn" class="btn btn-default icon" type="button" onclick="searchForum()">
+            <span class="bin-icon" data-icon="search"></span>
+        </button>
         <input type="text" id="forum-search-input" class="form-control" placeholder="Search forums..." value="<? write(_searchQuery.replace(/"/g, '&quot;')); ?>" />
         <span class="input-group-btn">
             <button id="forum-search-scope-btn" class="btn btn-default dropdown-toggle" data-toggle="dropdown" type="button">
                 <span id="forum-search-scope-label"></span> <span class="caret"></span>
             </button>
             <ul id="forum-search-scope-menu" class="dropdown-menu dropdown-menu-right"></ul>
-            <button id="forum-search-btn" class="btn btn-default" type="button" onclick="searchForum()">
-                <span class="bin-icon" data-icon="search"></span>
-            </button>
-            <button id="forum-search-clear" class="btn btn-default" type="button" onclick="clearSearch()" hidden>
+            <button id="forum-search-clear" class="btn btn-default icon" type="button" onclick="clearSearch()" hidden>
                 <span class="bin-icon" data-icon="stop"></span>
             </button>
         </span>
@@ -125,34 +622,55 @@
 
 <!-- Search result template (available at all view levels) -->
 <div hidden>
-    <a id="forum-search-result-template" href="#" class="list-group-item striped" data-thread>
-        <div class="row">
-            <div class="col-sm-9">
-                <strong data-thread-subject></strong>
-                <span data-search-sub-badge class="badge" style="margin-left:0.5em;background:#5bc0de;" hidden></span>
-                <p>
-                    From <strong data-thread-from></strong>
-                    on <span data-thread-date-start></span>
-                </p>
-                <div data-replies hidden>
-                    <strong data-message-count></strong>
-                    <span data-suffix-reply hidden> reply.</span>
-                    <span data-suffix-replies hidden> replies.</span>
-                    Latest reply by <strong data-last-from></strong>
-                    on <span data-last-time></span>
+    <a id="forum-search-result-template" href="#" class="list-group-item striped forum-thread-card" data-thread>
+        <div class="forum-thread-title-row">
+            <div class="forum-thread-title-wrap">
+                <h3><strong data-thread-subject></strong></h3>
+                <span data-search-sub-badge class="badge forum-search-sub-pill" hidden></span>
+            </div>
+            <div class="forum-thread-stats" data-stats hidden>
+                <? if (is_user()) { ?>
+                    <span data-unread-messages title="Unread messages" class="badge forum-unread-pill" hidden></span>
+                <? } ?>
+                <span data-upvotes-badge title="Upvotes" class="badge upvote-bg" style="display:none;">
+                    <span class="bin-icon" data-icon="thumbs_up"></span>
+                    <span data-upvotes></span>
+                </span>
+                <span data-downvotes-badge title="Downvotes" class="badge downvote-bg" style="display:none;">
+                    <span class="bin-icon" data-icon="thumbs_down"></span>
+                    <span data-downvotes></span>
+                </span>
+            </div>
+        </div>
+        <div class="forum-thread-body">
+            <div class="forum-thread-origin">
+                <div class="forum-thread-avatar forum-thread-avatar-lg" data-thread-origin-avatar></div>
+                <div class="forum-thread-origin-copy">
+                    <span class="forum-thread-label">Started By</span>
+                    <strong data-thread-from></strong>
+                    <div class="forum-thread-date-line">
+                        <span data-thread-date-start></span>
+                    </div>
                 </div>
             </div>
-            <div class="col-sm-3">
-                <div class="pull-right" data-stats hidden>
-                    <span data-unread-messages title="Unread messages" class="badge" hidden></span>
-                    <span data-upvotes-badge title="Upvotes" class="badge upvote-bg" style="display:none;">
-                        <span class="bin-icon" data-icon="thumbs_up"></span>
-                        <span data-upvotes></span>
+            <div class="forum-thread-latest" data-replies hidden>
+                <div class="forum-thread-latest-copy">
+                    <span class="forum-thread-replies-line">
+                        <strong data-message-count></strong>
+                        <span data-suffix-reply hidden> reply</span>
+                        <span data-suffix-replies hidden> replies</span>
                     </span>
-                    <span data-downvotes-badge title="Downvotes" class="badge downvote-bg" style="display:none;">
-                        <span class="bin-icon" data-icon="thumbs_down"></span>
-                        <span data-downvotes></span>
-                    </span>
+                    <span class="forum-thread-label">Latest Reply</span>
+                    <strong data-last-from></strong>
+                    <div class="forum-thread-date-line">
+                        <span data-last-time></span>
+                    </div>
+                </div>
+                <div class="forum-thread-avatar forum-thread-avatar-sm" data-thread-latest-avatar></div>
+            </div>
+            <div class="forum-thread-latest-empty" data-no-replies>
+                <div class="forum-thread-latest-copy">
+                    <span class="forum-thread-replies-line">No replies yet</span>
                 </div>
             </div>
         </div>
@@ -176,31 +694,37 @@
 
 	
 	<div hidden>
-		<li id="forum-message-template" class="list-group-item striped" data-message>
+		<li id="forum-message-template" class="list-group-item striped forum-message-card" data-message>
 			<a data-message-anchor></a>
-			<h4>
-				<strong data-message-subject></strong>
-			</h4>
-			<div class="clearfix">
-				<div class="pull-left" style="margin-right:1em;" data-avatar></div>
-				<div>
-					<div data-badge-unread hidden>
-						<span class="badge unread">
-							<? locale.write('label_new_message'); ?>
-						</span>
+			<div class="forum-message-title-row" data-message-title-row hidden>
+				<h5>
+					<strong data-message-subject></strong>
+				</h5>
+				<div data-badge-unread hidden>
+					<span class="badge forum-unread-pill">
+						<? locale.write('label_new_message'); ?>
+					</span>
+				</div>
+			</div>
+			<div class="forum-message-meta">
+				<div class="forum-message-avatar" data-message-avatar data-avatar></div>
+				<div class="forum-message-meta-copy">
+					<div class="forum-message-meta-line">
+						<span class="forum-message-meta-label"><? locale.write('label_message_from'); ?></span>
+						<strong data-message-from></strong><span data-message-from-address></span>
 					</div>
-					<? locale.write('label_message_from'); ?> 
-					<strong data-message-from></strong><span data-message-from-address></span>
-					<br />
-					<? locale.write('label_message_to'); ?> 
-					<strong data-message-to></strong>
-					<br />
-					<? locale.write('label_message_date'); ?> 
-					<strong data-message-date></strong>
+					<div class="forum-message-meta-line">
+						<span class="forum-message-meta-label"><? locale.write('label_message_to'); ?></span>
+						<strong data-message-to></strong>
+					</div>
+					<div class="forum-message-meta-line">
+						<span class="forum-message-meta-label"><? locale.write('label_message_date'); ?></span>
+						<strong data-message-date></strong>
+					</div>
 				</div>
 			</div>
 			<div class="message" data-message-body></div>
-			<div class="clearfix">
+			<div class="forum-message-actions">
 				<button class="btn btn-default icon" data-button-delete title="<? locale.write('label_delete'); ?>" aria-label="<? locale.write('label_delete'); ?>">
 					<span class="bin-icon" data-icon="trash"></span>
 				</button>
@@ -222,11 +746,11 @@
 		</li>
 	</div>
 
-    <ol class="breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
-                <? locale.write('title'); ?>
+                <? write(_forumCrumbTitle); ?>
             </a>
         </li>
         <li>
@@ -282,39 +806,54 @@
 
 	<!-- Template for a link to a thread -->
 	<div hidden>
-		<a id="forum-thread-link-template" href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>" class="list-group-item striped" data-thread>
-			<div class="row">
-				<div class="col-sm-9">
-					<strong data-thread-subject></strong>
-					<p>
-						<? locale.write('label_thread_from'); ?> 
-						<strong data-thread-from></strong> 
-						<? locale.write('label_message_date'); ?> 
-						<span data-thread-date-start></span>
-					</p>
-					<div data-replies hidden>
-						<strong data-message-count></strong>
-						<span data-suffix-reply hidden><? locale.write('suffix_reply_count'); ?>.</span>
-						<span data-suffix-replies hidden><? locale.write('suffix_replies_count'); ?>.</span>
-						<? locale.write('label_thread_latest_reply'); ?>
-						<strong data-last-from></strong>
-						<? locale.write('label_message_date'); ?> 
-						<span data-last-time></span>
+		<a id="forum-thread-link-template" href="./?page=<? request.write_param('page'); ?>&sub=<? request.write_param('sub'); ?>" class="list-group-item striped forum-thread-card" data-thread>
+			<div class="forum-thread-title-row">
+				<div class="forum-thread-title-wrap">
+					<h3><strong data-thread-subject></strong></h3>
+				</div>
+				<div class="forum-thread-stats" data-stats hidden>
+					<? if (is_user()) { ?>
+						<span data-unread-messages title="<? locale.write('badge_unread_messages'); ?>" class="badge forum-unread-pill" hidden></span>
+					<? } ?>
+					<span data-upvotes-badge title="<? locale.write('badge_upvotes'); ?>" class="badge upvote-bg" style="display:none;">
+						<span class="bin-icon" data-icon="thumbs_up"></span>
+						<span data-upvotes></span>
+					</span>
+					<span data-downvotes-badge title="<? locale.write('badge_downvotes'); ?>" class="badge downvote-bg" style="display:none;">
+						<span class="bin-icon" data-icon="thumbs_down"></span>
+						<span data-downvotes></span>
+					</span>
+				</div>
+			</div>
+			<div class="forum-thread-body">
+				<div class="forum-thread-origin">
+					<div class="forum-thread-avatar forum-thread-avatar-lg" data-thread-origin-avatar></div>
+					<div class="forum-thread-origin-copy">
+						<span class="forum-thread-label">Started By</span>
+						<strong data-thread-from></strong>
+						<div class="forum-thread-date-line">
+							<span data-thread-date-start></span>
+						</div>
 					</div>
 				</div>
-				<div class="col-sm-3">
-					<div class="pull-right" data-stats hidden>
-						<? if (is_user()) { ?>
-							<span data-unread-messages title="<? locale.write('badge_unread_messages'); ?>" class="badge" hidden></span>
-						<? } ?>
-						<span data-upvotes-badge title="<? locale.write('badge_upvotes'); ?>" class="badge upvote-bg" style="display:none;">
-							<span class="bin-icon" data-icon="thumbs_up"></span>
-							<span data-upvotes></span>
+				<div class="forum-thread-latest" data-replies hidden>
+					<div class="forum-thread-latest-copy">
+						<span class="forum-thread-replies-line">
+							<strong data-message-count></strong>
+							<span data-suffix-reply hidden> reply</span>
+							<span data-suffix-replies hidden> replies</span>
 						</span>
-						<span data-downvotes-badge title="<? locale.write('badge_downvotes'); ?>" class="badge downvote-bg" style="display:none;">
-							<span class="bin-icon" data-icon="thumbs_down"></span>
-							<span data-downvotes></span>
-						</span>
+						<span class="forum-thread-label">Latest Reply</span>
+						<strong data-last-from></strong>
+						<div class="forum-thread-date-line">
+							<span data-last-time></span>
+						</div>
+					</div>
+					<div class="forum-thread-avatar forum-thread-avatar-sm" data-thread-latest-avatar></div>
+				</div>
+				<div class="forum-thread-latest-empty" data-no-replies>
+					<div class="forum-thread-latest-copy">
+						<span class="forum-thread-replies-line">No replies yet</span>
 					</div>
 				</div>
 			</div>
@@ -437,11 +976,11 @@
     </div>
 
 
-	<ol class="breadcrumb">
+	<ol class="breadcrumb forum-breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
-                <? locale.write('title'); ?>
+                <? write(_forumCrumbTitle); ?>
             </a>
         </li>
         <li>
@@ -541,20 +1080,28 @@
 <!-- Viewing a group (list of subs) -->
 <? } else if (request.has_param('group') && msg_area.grp_list[request.get_param('group')] !== undefined) { ?>
 
-	<div hidden>
-		<a id="forum-sub-link-template" href="./?page=<? request.write_param('page'); ?>" class="list-group-item striped forum-item-with-icon">
-			<div class="forum-icon" data-forum-icon></div>
-			<div class="forum-item-content">
-				<h4>
-					<strong data-sub-name></strong>
-				</h4>
-				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge ignored" data-unread-unscanned></span>
-				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge scanned" data-unread-scanned></span>
-				<span title="Total messages" class="badge" data-total-msgs style="background:#555" hidden></span>
-				<p data-sub-description></p>
-				<span data-newest-message-container hidden>
-				<? locale.write('label_sub_newest_message'); ?>:
-				<strong data-newest-message-subject></strong>
+		<div hidden>
+			<a id="forum-sub-link-template" href="./?page=<? request.write_param('page'); ?>" class="list-group-item striped forum-item-with-icon forum-directory-card">
+				<div class="forum-icon" data-forum-icon></div>
+				<div class="forum-item-content">
+					<div class="forum-sub-heading">
+						<h3>
+							<strong data-sub-name></strong>
+						</h3>
+						<div class="forum-sub-badges">
+							<span title="<? locale.write('badge_unread_messages'); ?>" class="badge forum-unread-pill" data-unread-unscanned hidden></span>
+							<span title="<? locale.write('badge_unread_messages'); ?>" class="badge forum-unread-pill" data-unread-scanned hidden aria-hidden="true"></span>
+						</div>
+					</div>
+					<div class="forum-sub-meta">
+						<p class="forum-sub-description" data-sub-description></p>
+						<div class="forum-sub-meta-badges">
+							<span title="Total messages" class="badge forum-count-pill" data-total-msgs hidden></span>
+						</div>
+					</div>
+					<span data-newest-message-container hidden>
+						Latest:
+					<strong data-newest-message-subject></strong>
 				<? locale.write('label_thread_from'); ?>
 				<span data-newest-message-from></span>
 				<? locale.write('label_message_date'); ?>
@@ -564,11 +1111,11 @@
 		</a>
 	</div>
 
-    <ol class="breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
-                <? locale.write('title'); ?>
+                <? write(_forumCrumbTitle); ?>
             </a>
         </li>
         <li>
@@ -601,26 +1148,30 @@
 <!-- Viewing the group list -->
 <? } else { ?>
 
-	<div hidden>
-		<a id="forum-group-link-template" href="./?page=<? request.write_param('page'); ?>" class="list-group-item striped forum-item-with-icon">
-			<div class="forum-icon" data-forum-icon></div>
-			<div class="forum-item-content">
-				<h3>
-					<strong data-group-name></strong>
-				</h3>
-				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge ignored" data-unread-unscanned></span>
-				<span title="<? locale.write('badge_unread_messages'); ?>" class="badge scanned" data-unread-scanned></span>
-				<span data-group-description></span>:
-				<span data-group-sub-count></span> <? locale.write('sub_boards'); ?>
+			<div hidden>
+				<a id="forum-group-link-template" href="./?page=<? request.write_param('page'); ?>" class="list-group-item striped forum-item-with-icon forum-directory-card">
+					<div class="forum-icon" data-forum-icon></div>
+					<div class="forum-item-content">
+						<div class="forum-group-heading">
+							<h3>
+								<strong data-group-name></strong>
+							</h3>
+							<div class="forum-group-badges">
+								<span title="<? locale.write('badge_unread_messages'); ?>" class="badge forum-unread-pill" data-unread-unscanned hidden></span>
+								<span title="<? locale.write('badge_unread_messages'); ?>" class="badge forum-unread-pill" data-unread-scanned hidden aria-hidden="true"></span>
+							</div>
+						</div>
+						<span data-group-description hidden aria-hidden="true"></span>
+						<span data-group-sub-count></span> <? locale.write('sub_boards'); ?>
+					</div>
+				</a>
 			</div>
-		</a>
-	</div>
 
-    <ol class="breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
-                <? locale.write('title'); ?>
+                <? write(_forumCrumbTitle); ?>
             </a>
         </li>
     </ol>
@@ -628,17 +1179,20 @@
 	<div id="forum-list-container" class="list-group"></div>
 	<div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
 
-        <script type="text/javascript">
-			(async () => await listGroups())();
+	        <script type="text/javascript">
+				(async () => {
+					await listGroups();
 			<? if (is_user()) { ?>
-				registerEventListener('forum', e => {
-					const data = JSON.parse(e.data);
-					if (data.type != 'groups_unread') return;
-					onGroupUnreadCount(data.data);
-				}, {
-					groups_unread: null,
-				});
+					await getGroupUnreadCounts();
+					registerEventListener('forum', e => {
+						const data = JSON.parse(e.data);
+						if (data.type != 'groups_unread') return;
+						onGroupUnreadCount(data.data);
+					}, {
+						groups_unread: null,
+					});
 			<? } ?>
-        </script>
+				})();
+	        </script>
 
 <? } ?>

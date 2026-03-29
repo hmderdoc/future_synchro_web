@@ -32,13 +32,19 @@
     --fx-card-bg: #000000;
 }
 
-[data-theme="cga"] html,
-[data-theme="cga"] body {
+html[data-theme="cga"] {
+    min-height: 100vh;
     background: #555555 !important;
     background-image: none !important;
 }
 
-[data-theme="cga"] body {
+html[data-theme="cga"] body {
+    min-height: 100vh;
+    background: #555555 !important;
+    background-image: none !important;
+}
+
+html[data-theme="cga"] body {
     color: #AAAAAA;
 }
 
@@ -187,6 +193,36 @@
     border: 1px solid #00AAAA;
 }
 
+[data-theme="cga"] .form-control::placeholder,
+[data-theme="cga"] .form-select::placeholder,
+[data-theme="cga"] input::placeholder,
+[data-theme="cga"] textarea::placeholder {
+    color: #AAAAAA;
+    opacity: 1;
+}
+
+[data-theme="cga"] .form-control::-webkit-input-placeholder,
+[data-theme="cga"] .form-select::-webkit-input-placeholder,
+[data-theme="cga"] input::-webkit-input-placeholder,
+[data-theme="cga"] textarea::-webkit-input-placeholder {
+    color: #AAAAAA;
+}
+
+[data-theme="cga"] .form-control::-moz-placeholder,
+[data-theme="cga"] .form-select::-moz-placeholder,
+[data-theme="cga"] input::-moz-placeholder,
+[data-theme="cga"] textarea::-moz-placeholder {
+    color: #AAAAAA;
+    opacity: 1;
+}
+
+[data-theme="cga"] .form-control:-ms-input-placeholder,
+[data-theme="cga"] .form-select:-ms-input-placeholder,
+[data-theme="cga"] input:-ms-input-placeholder,
+[data-theme="cga"] textarea:-ms-input-placeholder {
+    color: #AAAAAA;
+}
+
 [data-theme="cga"] .form-control:focus,
 [data-theme="cga"] .form-select:focus {
     border-color: #55FFFF;
@@ -307,6 +343,48 @@
     background: #0000AA;
 }
 
+[data-theme="cga"] .login-panel-menu {
+    min-width: 280px;
+}
+
+[data-theme="cga"] .login-signup-panel {
+    margin-top: 0.85rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #00AAAA;
+}
+
+[data-theme="cga"] .login-signup-copy {
+    color: #FFFF55;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    margin-bottom: 0.55rem;
+}
+
+[data-theme="cga"] .login-signup-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    color: #000000 !important;
+    text-decoration: none;
+}
+
+[data-theme="cga"] .login-signup-btn:hover,
+[data-theme="cga"] .login-signup-btn:focus {
+    color: #000000 !important;
+    text-decoration: none;
+}
+
+[data-theme="cga"] .login-signup-btn .bin-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 [data-theme="cga"] .modal-content {
     background: #000000;
     border: 2px solid #55FFFF;
@@ -318,17 +396,22 @@
     color: #FFFFFF;
 }
 
+[data-theme="cga"] * {
+    scrollbar-color: #AA00AA #000000;
+    scrollbar-width: thin;
+}
+
 [data-theme="cga"] ::-webkit-scrollbar {
     width: 8px;
     background: #000000;
 }
 
 [data-theme="cga"] ::-webkit-scrollbar-thumb {
-    background: #555555;
+    background: #AA00AA;
 }
 
 [data-theme="cga"] ::-webkit-scrollbar-thumb:hover {
-    background: #AAAAAA;
+    background: #FF55FF;
 }
 
 [data-theme="cga"] ::selection {

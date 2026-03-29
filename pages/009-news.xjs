@@ -1,0 +1,41 @@
+<!--News-->
+<?xjs
+    /* 009-news.xjs — SPA page shell for the News Reader */
+    var cacheBust = time();
+?>
+<link rel="stylesheet" href="./css/news.css?_v=<?xjs write(cacheBust); ?>">
+
+<div id="news-app">
+
+    <!-- Search -->
+    <div id="news-search-bar" class="mb-3">
+        <div class="input-group">
+            <button class="btn btn-default icon" type="button"
+                    id="news-search-btn" title="Search feeds">
+                <span class="bin-icon" data-icon="search"></span>
+            </button>
+            <input type="text" id="news-search-input" class="form-control"
+                   placeholder="Search feeds&hellip;" autocomplete="off">
+            <button class="btn btn-outline-secondary" type="button"
+                    id="news-search-clear" title="Clear search">&times;</button>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <nav id="news-breadcrumb" aria-label="breadcrumb" style="display:none">
+        <ol class="breadcrumb mb-2"></ol>
+    </nav>
+
+    <!-- Main content area (rendered by news.js) -->
+    <div id="news-content">
+        <div class="news-loading">Loading&hellip;</div>
+    </div>
+
+    <!-- Pagination -->
+    <nav id="news-pagination" style="display:none" aria-label="Feed pagination">
+        <ul class="pagination pagination-sm justify-content-center mt-3"></ul>
+    </nav>
+
+</div>
+
+<script src="./js/news.js?_v=<?xjs write(cacheBust); ?>"></script>

@@ -101,21 +101,243 @@ body.terminal-open {
     vertical-align: super;
 }
 
+/* Terminal button positioning in navbar */
+.navbar-terminal-btn {
+    flex-shrink: 0;
+    margin-left: 6px;
+    margin-right: 4px;
+}
+
+
+
 /* Terminal button — must not inflate navbar height */
+/* =========================================================
+ *  Terminal "CRT + Modem" button — no button chrome
+ *
+ *  3 visual states driven by JS classes on #btn-terminal:
+ *    (default)                -> "ENTER"   amber text, LEDs all dim red
+ *    .crt-visible             -> "CRT ON"  amber text, LEDs dim pulse
+ *    .crt-visible.modem-active-> "ONLINE"  green text, LEDs bright + fast
+ * ========================================================= */
 #btn-terminal {
-    display: inline-flex;
+    background: none;
+    border: none;
+    outline: none;
+    padding: 2px 4px;
+    margin: 0 2px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-    max-height: 38px;
-    padding: 2px 8px;
+    gap: 1px;
+    position: relative;
     vertical-align: middle;
 }
-#btn-terminal .bin-icon-img {
+
+/* Mini CRT screen */
+.crt-screen {
+    width: 64px;
     height: 24px;
+    background: #0a0a0a;
+    border-radius: 3px;
+    border: 1.5px solid #333;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
+    transition: box-shadow 0.4s, border-color 0.4s;
 }
-#btn-terminal .badge {
-    vertical-align: middle;
+.crt-scanline {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+        0deg, transparent, transparent 1px,
+        rgba(0,0,0,0.15) 1px, rgba(0,0,0,0.15) 2px
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Default CRT text — amber "ENTER", subtle flicker */
+.crt-text {
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: #AA5500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    z-index: 2;
+    position: relative;
+    text-shadow: 0 0 4px rgba(170, 85, 0, 0.4);
+    animation: crt-flicker 4s ease-in-out infinite;
+    transition: color 0.4s, text-shadow 0.4s;
+}
+@keyframes crt-flicker {
+    0%, 100% { opacity: 0.9; }
+    3%       { opacity: 0.6; }
+    6%       { opacity: 0.95; }
+    50%      { opacity: 1; }
+    92%      { opacity: 0.85; }
+    95%      { opacity: 0.5; }
+    97%      { opacity: 1; }
+}
+
+/* Hover: brighten the CRT glow */
+#btn-terminal:hover .crt-screen {
+    box-shadow: inset 0 0 10px rgba(170, 85, 0, 0.2), 0 0 8px rgba(170, 85, 0, 0.25);
+    border-color: #553300;
+}
+#btn-terminal:hover .crt-text {
+    color: #FF8800;
+    text-shadow: 0 0 8px rgba(255, 136, 0, 0.6);
+}
+
+/* Horizontal modem faceplate */
+.modem-strip {
+    display: flex;
+    gap: 6px;
+    padding: 0 2px;
+}
+.mled {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+.mled-light {
+    width: 6px;
+    height: 3px;
+    border-radius: 1px;
+    display: block;
+    transition: background 0.3s, box-shadow 0.3s;
+}
+.mled-label {
+    font-family: 'VT323', monospace;
+    font-size: 7px;
+    color: #555;
+    line-height: 1;
+    letter-spacing: 0.5px;
+}
+
+/* === DEFAULT STATE: disconnected + hidden ===
+   All LEDs dim red / off — modem is idle */
+.mled-cd {
+    background: #551111;
+    box-shadow: none;
+    opacity: 0.4;
+    animation: none;
+}
+.mled-rx {
+    background: #551111;
+    box-shadow: none;
+    opacity: 0.4;
+    animation: none;
+}
+.mled-tx {
+    background: #551111;
+    box-shadow: none;
+    opacity: 0.4;
+    animation: none;
+}
+
+/* === VISIBLE STATE: CRT on, not yet connected ===
+   "CRT ON" amber, LEDs start slow pulse  */
+#btn-terminal.crt-visible .crt-text {
+    color: #FFAA00;
+    text-shadow: 0 0 5px rgba(255, 170, 0, 0.5);
+}
+#btn-terminal.crt-visible .crt-screen {
+    box-shadow:
+        inset 0 0 8px rgba(255, 170, 0, 0.12),
+        0 0 5px rgba(255, 170, 0, 0.12);
+    border-color: #553300;
+}
+#btn-terminal.crt-visible .mled-cd {
+    background: #AA5500;
+    box-shadow: 0 0 2px #AA5500;
+    opacity: 1;
+    animation: mled-cd-wait 2.5s ease-in-out infinite;
+}
+#btn-terminal.crt-visible .mled-rx {
+    background: #FF5555;
+    box-shadow: 0 0 2px #FF5555;
+    opacity: 1;
+    animation: mled-idle-pulse 1.8s step-end infinite;
+}
+#btn-terminal.crt-visible .mled-tx {
+    background: #55FF55;
+    box-shadow: 0 0 2px #55FF55;
+    opacity: 1;
+    animation: mled-idle-pulse 1.4s step-end infinite 0.3s;
+}
+@keyframes mled-cd-wait {
+    0%, 100% { opacity: 0.25; }
+    50%      { opacity: 0.7; }
+}
+@keyframes mled-idle-pulse {
+    0%   { opacity: 0.1; }
+    20%  { opacity: 0.45; }
+    35%  { opacity: 0.1; }
+    60%  { opacity: 0.35; }
+    75%  { opacity: 0.1; }
+}
+
+/* Hover when visible */
+#btn-terminal.crt-visible:hover .crt-screen {
+    box-shadow:
+        inset 0 0 10px rgba(255, 170, 0, 0.2),
+        0 0 10px rgba(255, 170, 0, 0.3);
+}
+
+/* === CONNECTED STATE: online ===
+   "ONLINE" green, LEDs bright and fast, CD solid */
+#btn-terminal.modem-active .crt-text {
+    color: #55FF55;
+    text-shadow: 0 0 6px rgba(85, 255, 85, 0.7);
+}
+#btn-terminal.modem-active .crt-screen {
+    box-shadow:
+        inset 0 0 10px rgba(85, 255, 85, 0.15),
+        0 0 8px rgba(85, 255, 85, 0.2);
+    border-color: #224422;
+}
+#btn-terminal.modem-active .mled-cd {
+    background: #FFFF55;
+    box-shadow: 0 0 5px #FFFF55;
+    opacity: 1;
+    animation: none;
+}
+#btn-terminal.modem-active .mled-rx {
+    background: #FF5555;
+    box-shadow: 0 0 4px #FF5555;
+    opacity: 1;
+    animation: mled-rx-active 0.4s step-end infinite;
+}
+#btn-terminal.modem-active .mled-tx {
+    background: #55FF55;
+    box-shadow: 0 0 4px #55FF55;
+    opacity: 1;
+    animation: mled-tx-active 0.3s step-end infinite;
+}
+@keyframes mled-rx-active {
+    0%   { opacity: 0.15; }
+    25%  { opacity: 1; }
+    50%  { opacity: 0.15; }
+    75%  { opacity: 0.85; }
+}
+@keyframes mled-tx-active {
+    0%   { opacity: 1; }
+    30%  { opacity: 0.15; }
+    55%  { opacity: 0.95; }
+    80%  { opacity: 0.15; }
+}
+
+/* Hover when connected */
+#btn-terminal.modem-active:hover .crt-screen {
+    box-shadow:
+        inset 0 0 12px rgba(85, 255, 85, 0.25),
+        0 0 14px rgba(85, 255, 85, 0.35);
 }
 
 /* Dark mode support */
@@ -194,18 +416,116 @@ body.terminal-open {
 
 /* ---------- Games page ---------- */
 
-.game-row {
-    border: 1px solid rgba(128, 128, 128, 0.2);
-    transition: background-color 0.15s;
+#games-page {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
 }
+
+#games-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.6rem;
+    margin-bottom: 0 !important;
+}
+
+.games-toolbar-card,
+.games-stats-card,
+.game-row,
+.games-empty-card {
+    background: #000000;
+    border: 1px solid #5555FF;
+    border-radius: 10px;
+}
+
+.games-toolbar-card {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.55rem;
+    min-height: 54px;
+}
+
+.games-toolbar-card .btn-group {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+#games-sort .btn,
+#games-month-nav .btn,
+#games-user-filter {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#games-user-filter {
+    white-space: nowrap;
+}
+
+.games-stats-card {
+    padding: 0.7rem 1rem;
+}
+
+#games-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.games-summary-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.games-summary-value {
+    color: #FFFFFF;
+    margin: 0;
+}
+
+.games-summary-label {
+    color: #AAAAAA;
+}
+
+.games-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.games-empty-card {
+    padding: 1rem;
+    color: #AAAAAA;
+}
+
+.game-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.95rem 1rem;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
 .game-row:hover {
-    background-color: rgba(128, 128, 128, 0.1);
+    border-color: #55FFFF;
+    transform: translateY(-1px);
+}
+
+.game-card-media {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .game-rank {
-    font-size: 0.85rem;
+    color: #FFFF55;
+    font-size: 1.55rem;
     font-weight: bold;
-    min-width: 2.2em;
+    line-height: 1;
+    min-width: 2.8em;
     text-align: right;
 }
 
@@ -213,27 +533,59 @@ body.terminal-open {
     width: 96px;
     height: 96px;
     overflow: hidden;
-    background: #000;
-    border: 1px solid rgba(128, 128, 128, 0.3);
+    background: #000000;
+    border: 1px solid #555555;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
+
 .game-icon-img {
     width: 96px;
     height: 96px;
     image-rendering: pixelated;
     display: block;
 }
+
 .game-icon-placeholder {
     width: 96px;
     height: 96px;
-    background: #111;
+    background: #111111;
     opacity: 0.5;
 }
 
+.game-info {
+    min-width: 0;
+}
+
+.game-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.34rem;
+}
+
 .game-title {
+    font-size: 1.32rem;
+    color: #AAAAAA;
+    line-height: 1.05;
+}
+
+.game-section {
+    color: #AAAAAA;
     font-size: 1rem;
+    line-height: 1.05;
+}
+
+.game-stats-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    font-size: 1.04rem;
+    line-height: 1.22;
 }
 
 .game-stat-label {
@@ -243,23 +595,53 @@ body.terminal-open {
     margin-right: 0.2em;
 }
 
-.game-stat-time  { color: var(--bs-success, #198754); }
-.game-stat-launches { color: var(--bs-info, #0dcaf0); }
-.game-stat-recent { color: var(--bs-warning, #ffc107); }
-.game-stat-players { color: var(--bs-primary, #0d6efd); }
+.game-stat-time  { color: #55FF55; }
+.game-stat-launches { color: #55FFFF; }
+.game-stat-recent { color: #FFFF55; }
+.game-stat-players { color: #FF55FF; }
 
 .game-top-players {
-    font-size: 0.8rem;
+    font-size: 0.98rem;
+    color: #AAAAAA;
+    margin-top: 0.34rem;
+    line-height: 1.28;
+}
+
+.game-top-players .text-muted {
+    color: #AAAAAA !important;
+}
+
+.game-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .game-launch-btn {
     align-self: center;
+    min-width: 5rem;
+    white-space: nowrap;
+    font-size: 1rem;
+    line-height: 1.1;
+    padding: 0.48rem 1rem;
+}
+
+.game-launch-btn.is-login-cta,
+.game-launch-btn.is-login-cta:disabled {
+    color: #FF5555;
+    border-color: #FF5555;
+    font-weight: bold;
+    opacity: 1;
 }
 
 .game-user-dropdown {
     max-height: 300px;
     overflow-y: auto;
     z-index: 1050;
+    background: #000000;
+    border: 1px solid #00AAAA;
+    border-radius: 8px;
+    padding: 0.3rem 0;
 }
 
 .game-user-dropdown .avatar-inline {
@@ -267,33 +649,19 @@ body.terminal-open {
     height: 24px;
 }
 
-#games-stats strong {
-    margin-right: 0.15em;
-}
-
-/* CGA theme overrides for games */
-[data-theme="cga"] .game-row {
-    border-color: #545454;
-}
-[data-theme="cga"] .game-row:hover {
-    background-color: rgba(84, 84, 84, 0.3);
-}
-[data-theme="cga"] .game-stat-time { color: #54FC54; }
-[data-theme="cga"] .game-stat-launches { color: #54FCFC; }
-[data-theme="cga"] .game-stat-recent { color: #FCFC54; }
-[data-theme="cga"] .game-stat-players { color: #5454FC; }
-[data-theme="cga"] .game-title { color: #A8A8A8; }
-[data-theme="cga"] .game-launch-btn {
-    color: #54FC54;
-    border-color: #54FC54;
-}
-[data-theme="cga"] .game-launch-btn:hover {
-    background-color: #54FC54;
-    color: #000;
-}
-
 /* Small screen adjustments */
 @media (max-width: 576px) {
+    .games-toolbar-card {
+        width: 100%;
+        justify-content: center;
+    }
+    .game-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+    .game-card-media {
+        align-self: flex-start;
+    }
     .game-icon {
         width: 64px;
         height: 64px;
@@ -306,8 +674,11 @@ body.terminal-open {
         width: 64px;
         height: 64px;
     }
-    .game-rank {
-        display: none;
+    .game-action {
+        justify-content: stretch;
+    }
+    .game-launch-btn {
+        width: 100%;
     }
 }
 
@@ -471,21 +842,21 @@ body.terminal-open {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;
     background: var(--bs-body-bg, #fff);
     border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 8px 8px 0 0;
+    border-radius: 0;
 }
 
 /* Message groups */
 .chat-msg-group {
     display: flex;
-    gap: 10px;
-    max-width: 85%;
-    margin-bottom: 4px;
+    gap: 8px;
+    max-width: 90%;
+    margin-bottom: 6px;
 }
 .chat-msg-group-other {
     align-self: flex-start;
@@ -539,8 +910,8 @@ body.terminal-open {
 
 /* Bubbles */
 .chat-bubble {
-    padding: 8px 12px;
-    border-radius: 12px;
+    padding: 6px 10px;
+    border-radius: 0;
     word-break: break-word;
     position: relative;
 }
@@ -702,18 +1073,21 @@ body.terminal-open {
 .cga .chat-messages {
     background: var(--cga-black);
     border-color: var(--cga-dark-gray);
+    border-radius: 0;
 }
 [data-theme="cga"] .chat-bubble-other,
 .cga .chat-bubble-other {
-    background: var(--cga-cyan);
+    background: transparent;
     color: var(--cga-white);
     border: 1px solid var(--cga-bright-cyan);
+    border-radius: 0;
 }
 [data-theme="cga"] .chat-bubble-self,
 .cga .chat-bubble-self {
-    background: var(--cga-blue);
-    color: var(--cga-white);
+    background: transparent;
+    color: var(--cga-light-gray);
     border: 1px solid var(--cga-bright-blue);
+    border-radius: 0;
 }
 [data-theme="cga"] .chat-input-area,
 .cga .chat-input-area {
@@ -756,7 +1130,7 @@ body.terminal-open {
 /* ---- Chat Users Panel ---- */
 .chat-users-panel {
     border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: .375rem;
+    border-radius: 0;
     margin-bottom: .75rem;
     max-height: 320px;
     overflow-y: auto;
@@ -1061,45 +1435,223 @@ div.message .ansi-canvas-img {
 }
 
 /* ── Oneliners page ── */
-.ol-list {
-    max-height: 600px;
-    overflow-y: auto;
-    background: #111;
-    font-family: 'IBM VGA', 'Perfect DOS VGA 437', 'Fixedsys', 'Consolas', monospace;
-    font-size: 14px;
-    line-height: 1.4;
+.ol-page,
+.ol-post-card,
+.ol-feed-viewport,
+.ol-feed,
+.ol-preview-box,
+#ol-input,
+.ol-send-btn {
+    font-family: "Spleen", "VT323", monospace;
 }
+.ol-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+.ol-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 1.08rem;
+}
+.ol-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    background: #000;
+    border-color: #55ffff;
+    color: #55ffff;
+}
+.ol-refresh-btn:hover,
+.ol-refresh-btn:focus {
+    background: rgba(85, 255, 255, 0.12);
+    border-color: #ffffff;
+    color: #ffffff;
+}
+.ol-post-card {
+    border: 1px solid #55ffff;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    margin-bottom: 0.8rem !important;
+}
+.ol-post-card .card-body {
+    background: #000;
+}
+.ol-post-form {
+    align-items: stretch;
+}
+#ol-input {
+    min-height: 42px;
+    background: #000;
+    border: 1px solid #55ffff;
+    color: #ffffff;
+    font-size: 1.05rem;
+    line-height: 1.1;
+}
+#ol-input::placeholder {
+    color: #aaaaaa;
+    opacity: 1;
+}
+#ol-input:focus {
+    background: #000;
+    color: #ffffff;
+    border-color: #ffffff;
+    box-shadow: 0 0 0 0.1rem rgba(85, 255, 255, 0.2);
+}
+.ol-send-btn {
+    min-width: 86px;
+    font-size: 1rem;
+}
+.ol-post-note {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.45rem;
+}
+.ol-char-count {
+    color: #55ffff;
+    white-space: nowrap;
+}
+.ol-char-count.is-over {
+    color: #ff5555;
+}
+#ol-input.is-invalid,
+#ol-input.is-invalid:focus {
+    border-color: #ff5555;
+    box-shadow: 0 0 0 0.1rem rgba(255, 85, 85, 0.18);
+}
+.ol-guest-note {
+    color: #55ffff;
+    font-size: 1.02rem;
+}
+.ol-feed-viewport {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.1rem;
+    padding-bottom: 0.25rem;
+}
+.ol-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+.ol-card,
 .ol-row {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    padding: 6px 10px;
-    border-bottom: 1px solid #222;
+    gap: 0.9rem;
+    padding: 0.9rem 1rem;
+    background: #000;
+    border: 1px solid #5555ff;
+    border-radius: 0.7rem;
+    box-shadow: 0 0 0 1px rgba(85, 85, 255, 0.08);
 }
-.ol-row:last-child { border-bottom: none; }
-.ol-row:hover { background: #1a1a1a; }
+.ol-card:hover,
+.ol-row:hover {
+    border-color: #55ffff;
+    box-shadow: 0 0 0 1px rgba(85, 255, 255, 0.12);
+}
+.ol-row:last-child {
+    margin-bottom: 0;
+}
+.ol-card-status {
+    justify-content: center;
+    padding: 1rem;
+}
+.ol-status-text {
+    color: #aaaaaa;
+    font-size: 1rem;
+    text-align: center;
+}
+.ol-card-status-error .ol-status-text {
+    color: #ff5555;
+}
+.ol-card-status-loading .ol-status-text {
+    color: #55ffff;
+}
+.ol-card-status-empty .ol-status-text {
+    color: #ffffff;
+}
+.ol-feed-status {
+    min-height: 1.25rem;
+    padding: 0 0.2rem 0.45rem;
+    color: #aaaaaa;
+    font-size: 0.92rem;
+}
+.ol-feed-status.is-loading { color: #55ffff; }
+.ol-feed-status.is-error { color: #ff5555; }
+.ol-feed-status.is-end { color: #ff55ff; }
+.ol-feed-sentinel {
+    width: 100%;
+    height: 1px;
+}
+.ol-avatar-wrap {
+    flex: 0 0 48px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 0.15rem;
+}
 .ol-avatar {
     flex-shrink: 0;
-    width: 40px;
+    width: 48px;
+    min-height: 48px;
     overflow: hidden;
+    background: #000;
 }
 .ol-avatar img {
-    width: 40px;
+    width: 48px;
     height: auto;
     image-rendering: pixelated;
+    display: block;
 }
 .ol-body { flex: 1; min-width: 0; }
 .ol-meta {
     display: flex;
-    align-items: baseline;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 2px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.35rem;
 }
-.ol-alias { color: #55ffff; font-size: 13px; }
-.ol-system { color: #555; font-size: 12px; }
-.ol-time { color: #555; font-size: 11px; margin-left: auto; white-space: nowrap; }
-.ol-text { color: #aaa; word-break: break-word; }
+.ol-byline {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    min-width: 0;
+}
+.ol-alias {
+    color: #55ffff !important;
+    font-size: 1.08rem;
+    font-weight: normal !important;
+}
+.ol-system {
+    color: #ffff55;
+    font-size: 0.98rem;
+}
+.ol-time {
+    color: #ff55ff;
+    font-size: 0.94rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.ol-text {
+    color: #ffffff;
+    word-break: break-word;
+    font-size: 1.16rem;
+    line-height: 1.28;
+}
+.ol-text span {
+    line-height: inherit;
+}
 
 /* Color toolbar */
 #ol-color-bar {
@@ -1134,9 +1686,48 @@ div.message .ansi-canvas-img {
     background: #111;
     border: 1px solid #333;
     border-radius: 4px;
-    font-family: 'IBM VGA', 'Perfect DOS VGA 437', 'Fixedsys', 'Consolas', monospace;
-    font-size: 14px;
+    font-size: 1rem;
     color: #aaa;
+}
+
+@media (max-width: 767px) {
+    .ol-card {
+        padding: 0.8rem 0.85rem;
+        gap: 0.75rem;
+    }
+    .ol-meta {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .ol-time {
+        white-space: normal;
+    }
+    .ol-post-form {
+        flex-direction: column;
+    }
+    .ol-send-btn {
+        width: 100%;
+    }
+}
+
+@media (min-width: 768px) {
+    .spa-container > .row:has(> #content > .ol-page) {
+        height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+    }
+    .spa-container > .row:has(> #content > .ol-page) > #content {
+        height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .spa-container > .row:has(> #content > .ol-page) > #sidebar {
+        position: sticky;
+        top: calc(var(--navbar-h, 56px) + 0.75rem);
+        align-self: flex-start;
+        max-height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+        overflow: hidden;
+    }
 }
 
 /* ============================================================
@@ -1230,13 +1821,16 @@ div.message .ansi-canvas-img {
 }
 
 /* --- Radio container --- */
+/* Radio container — always visible, pushed right in navbar */
 #radio-container {
     position: relative;
     display: flex !important;
-    align-items: stretch;          /* children fill full navbar height */
+    align-items: stretch;
     gap: 1px;
-    margin-right: 2px;
+    margin-right: 4px;
+    margin-right: 4px;
     flex-shrink: 0;
+
 }
 
 /* Vertical stack: LCD on top, transport below */
@@ -1533,46 +2127,75 @@ div.message .ansi-canvas-img {
     }
 }
 
-/* Level 2 (< 992px / below lg): all remaining labels hide, radio compacts */
+/* Level 2 (< 992px / below lg): remaining labels hide, radio compacts */
 @media (max-width: 991.98px) {
     .nav-label {
         display: none;
     }
     .radio-track-name {
-        width: 100px !important;
+        width: 90px !important;
     }
     #radio-viz {
-        width: 48px;
-    }
-    .radio-volume {
-        width: 36px;
+        width: 44px;
     }
 }
 
 /* Level 3 (< 768px / below md): Bootstrap hamburger kicks in.
-   Radio compacts further. */
+   Terminal + radio stay visible outside collapse.
+   Radio shows compact controls. */
 @media (max-width: 767.98px) {
-    #radio-container {
-        margin-right: 0.25rem;
-    }
-    #radio-viz {
-        width: 40px;
-        height: 28px;
-    }
+    /* Radio: hide LCD, keep viz + transport */
     .radio-track-name {
-        display: none;
+        display: none !important;
     }
     .radio-volume {
-        display: none;
+        display: none !important;
+    }
+    #radio-viz {
+        width: 36px;
+        height: 26px;
+    }
+    .radio-btn {
+        font-size: 14px;
+        padding: 0 3px;
+    }
+    .radio-btn-play {
+        font-size: 16px;
+        min-width: 20px;
+    }
+    #radio-container {
+        margin-right: 4px;
+        gap: 0;
     }
     .radio-playlist-panel {
         min-width: 240px;
         right: -40px;
     }
 
-    /* --- Hamburger menu mobile fixes --- */
+    /* Terminal button: shrink CRT screen for mobile */
+    .navbar-terminal-btn {
+        margin-left: 4px;
+        margin-right: 2px;
+    }
+    #btn-terminal .crt-screen {
+        width: 48px;
+        height: 18px;
+    }
+    #btn-terminal .crt-text {
+        font-size: 11px;
+    }
+    #btn-terminal .modem-strip {
+        gap: 4px;
+    }
+    #btn-terminal .mled-light {
+        width: 5px;
+        height: 2px;
+    }
+    #btn-terminal .mled-label {
+        font-size: 6px;
+    }
 
-    /* 1. Show text labels next to icons in collapsed menu */
+    /* Hamburger menu: show text labels next to icons */
     #navbarMain .nav-label {
         display: inline !important;
         margin-left: 0.4rem;
@@ -1582,8 +2205,7 @@ div.message .ansi-canvas-img {
         display: inline !important;
     }
 
-    /* 2. Flatten dropdown submenus — render as block items, no caret, no popup */
-    /* Only flatten the left-side "More" dropdown, not the user menu */
+    /* Flatten dropdown submenus in mobile menu */
     #navbarMain .navbar-nav.me-auto .dropdown-menu {
         position: static !important;
         float: none;
@@ -1595,10 +2217,10 @@ div.message .ansi-canvas-img {
         display: block !important;
     }
     #navbarMain .navbar-nav.me-auto .dropdown-toggle::after {
-        display: none;  /* hide caret/chevron */
+        display: none;
     }
     #navbarMain .navbar-nav.me-auto .dropdown-toggle {
-        pointer-events: none;  /* not clickable — children are already visible */
+        pointer-events: none;
         opacity: 0.6;
         font-size: 0.8rem;
         text-transform: uppercase;
@@ -1617,16 +2239,56 @@ div.message .ansi-canvas-img {
         color: #fff;
         background: rgba(255, 255, 255, 0.1);
     }
+}
 
-    /* 3. Hide radio controls & terminal in hamburger (already in mobile bar) */
-    #navbarMain #radio-container {
-        display: none !important;
+/* Level 2.5 (768px-991px / md only): tablet — show full radio controls */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    /* Radio: show LCD but narrower */
+    .radio-track-name {
+        width: 80px !important;
     }
-    #navbarMain #btn-terminal,
-    #navbarMain li:has(#btn-terminal) {
-        display: none !important;
+    #radio-viz {
+        width: 44px;
+        height: 32px;
+    }
+    /* Terminal: slightly compact */
+    #btn-terminal .crt-screen {
+        width: 56px;
+        height: 20px;
+    }
+    #btn-terminal .crt-text {
+        font-size: 12px;
     }
 }
+
+/* Level 4 (< 480px / very small phones): extra compact */
+@media (max-width: 479.98px) {
+    #btn-terminal .crt-screen {
+        width: 40px;
+        height: 16px;
+    }
+    #btn-terminal .crt-text {
+        font-size: 10px;
+        letter-spacing: 0.5px;
+    }
+    #btn-terminal .modem-strip {
+        display: none;   /* hide modem LEDs on very small screens */
+    }
+    #radio-viz {
+        width: 28px;
+        height: 22px;
+    }
+    .radio-btn {
+        font-size: 12px;
+        padding: 0 2px;
+    }
+    .radio-btn-play {
+        font-size: 14px;
+        min-width: 16px;
+    }
+}
+
+
 
 /* =========================================================
    Visualizer Panel

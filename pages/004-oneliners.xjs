@@ -1,56 +1,68 @@
 <!--One Liners-->
+<?xjs
+    var _ol_guest_alias = (typeof settings !== 'undefined' && settings.guest) ? settings.guest : 'Guest';
+    var _ol_logged_in = user.number > 0 && user.alias !== _ol_guest_alias;
+    var _ol_visible_limit = Math.max(1, 80 - user.alias.length - system.qwk_id.length - 3);
+?>
 
-<div class="card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><span class="bin-icon" data-icon="chat"></span>Oneliners</span>
-        <button class="btn btn-sm btn-outline-secondary" id="ol-refresh-btn" title="Refresh">&#x21bb;</button>
-    </div>
-    <div class="card-body p-0">
-        <div id="ol-list" class="ol-list">
-            <div class="text-muted p-3">Loading...</div>
+<div class="ol-page">
+    <div class="card mb-3 ol-post-card" id="ol-post-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="ol-title"><span class="bin-icon" data-icon="chat"></span>Oneliners</span>
+            <button class="btn btn-sm btn-outline-secondary ol-refresh-btn" id="ol-refresh-btn" title="Refresh">&#x21bb;</button>
+        </div>
+        <div class="card-body">
+            <?xjs if (_ol_logged_in) { ?>
+            <div class="mb-2" id="ol-color-bar">
+                <small class="text-muted me-1">Colors:</small>
+                <button type="button" class="ol-color-btn" data-code="K" style="background:#000;color:#555;" title="Black">K</button>
+                <button type="button" class="ol-color-btn" data-code="R" style="background:#aa0000;" title="Red">R</button>
+                <button type="button" class="ol-color-btn" data-code="G" style="background:#00aa00;" title="Green">G</button>
+                <button type="button" class="ol-color-btn" data-code="Y" style="background:#aa5500;" title="Brown">Y</button>
+                <button type="button" class="ol-color-btn" data-code="B" style="background:#0000aa;" title="Blue">B</button>
+                <button type="button" class="ol-color-btn" data-code="M" style="background:#aa00aa;" title="Magenta">M</button>
+                <button type="button" class="ol-color-btn" data-code="C" style="background:#00aaaa;" title="Cyan">C</button>
+                <button type="button" class="ol-color-btn" data-code="W" style="background:#aaaaaa;color:#333;" title="Light Gray">W</button>
+                <span class="mx-1">|</span>
+                <button type="button" class="ol-color-btn" data-code="HK" style="background:#555555;" title="Dark Gray">hK</button>
+                <button type="button" class="ol-color-btn" data-code="HR" style="background:#ff5555;" title="Light Red">hR</button>
+                <button type="button" class="ol-color-btn" data-code="HG" style="background:#55ff55;color:#333;" title="Light Green">hG</button>
+                <button type="button" class="ol-color-btn" data-code="HY" style="background:#ffff55;color:#333;" title="Yellow">hY</button>
+                <button type="button" class="ol-color-btn" data-code="HB" style="background:#5555ff;" title="Light Blue">hB</button>
+                <button type="button" class="ol-color-btn" data-code="HM" style="background:#ff55ff;" title="Light Magenta">hM</button>
+                <button type="button" class="ol-color-btn" data-code="HC" style="background:#55ffff;color:#333;" title="Light Cyan">hC</button>
+                <button type="button" class="ol-color-btn" data-code="HW" style="background:#ffffff;color:#333;" title="White">hW</button>
+                <span class="mx-1">|</span>
+                <button type="button" class="ol-color-btn ol-color-reset" data-code="N" title="Reset">&#x23CE;</button>
+            </div>
+            <div class="mb-2 p-2 ol-preview-box" id="ol-preview" style="display:none;">
+                <small class="text-muted">Preview:</small>
+                <span id="ol-preview-text"></span>
+            </div>
+            <form id="ol-post-form" class="ol-post-form d-flex gap-2">
+                <input type="text" id="ol-input" class="form-control form-control-sm"
+                       maxlength="512" data-visible-limit="<?xjs write(_ol_visible_limit); ?>"
+                       placeholder="Type your one-liner..." autocomplete="off">
+                <button type="submit" class="btn btn-primary btn-sm text-nowrap ol-send-btn">Send</button>
+            </form>
+            <div class="text-muted ol-post-note">
+                <span>Use the color buttons above to insert color codes. Max <?xjs write(_ol_visible_limit); ?> visible chars. Color codes do not count.</span>
+                <span id="ol-char-count" class="ol-char-count" aria-live="polite"></span>
+            </div>
+            <?xjs } else { ?>
+            <div class="ol-guest-note">Log in to post a one-liner.</div>
+            <?xjs } ?>
         </div>
     </div>
-</div>
 
-<!-- Post form (shown only for logged-in users) -->
-<div class="card mb-3" id="ol-post-card" style="display:none;">
-    <div class="card-header">Post a One-Liner</div>
-    <div class="card-body">
-        <!-- Color toolbar -->
-        <div class="mb-2" id="ol-color-bar">
-            <small class="text-muted me-1">Colors:</small>
-            <button type="button" class="ol-color-btn" data-code="K" style="background:#000;color:#555;" title="Black">K</button>
-            <button type="button" class="ol-color-btn" data-code="R" style="background:#aa0000;" title="Red">R</button>
-            <button type="button" class="ol-color-btn" data-code="G" style="background:#00aa00;" title="Green">G</button>
-            <button type="button" class="ol-color-btn" data-code="Y" style="background:#aa5500;" title="Brown">Y</button>
-            <button type="button" class="ol-color-btn" data-code="B" style="background:#0000aa;" title="Blue">B</button>
-            <button type="button" class="ol-color-btn" data-code="M" style="background:#aa00aa;" title="Magenta">M</button>
-            <button type="button" class="ol-color-btn" data-code="C" style="background:#00aaaa;" title="Cyan">C</button>
-            <button type="button" class="ol-color-btn" data-code="W" style="background:#aaaaaa;color:#333;" title="Light Gray">W</button>
-            <span class="mx-1">|</span>
-            <button type="button" class="ol-color-btn" data-code="HK" style="background:#555555;" title="Dark Gray">hK</button>
-            <button type="button" class="ol-color-btn" data-code="HR" style="background:#ff5555;" title="Light Red">hR</button>
-            <button type="button" class="ol-color-btn" data-code="HG" style="background:#55ff55;color:#333;" title="Light Green">hG</button>
-            <button type="button" class="ol-color-btn" data-code="HY" style="background:#ffff55;color:#333;" title="Yellow">hY</button>
-            <button type="button" class="ol-color-btn" data-code="HB" style="background:#5555ff;" title="Light Blue">hB</button>
-            <button type="button" class="ol-color-btn" data-code="HM" style="background:#ff55ff;" title="Light Magenta">hM</button>
-            <button type="button" class="ol-color-btn" data-code="HC" style="background:#55ffff;color:#333;" title="Light Cyan">hC</button>
-            <button type="button" class="ol-color-btn" data-code="HW" style="background:#ffffff;color:#333;" title="White">hW</button>
-            <span class="mx-1">|</span>
-            <button type="button" class="ol-color-btn ol-color-reset" data-code="N" title="Reset">&#x23CE;</button>
+    <div id="ol-feed-viewport" class="ol-feed-viewport">
+        <div id="ol-list" class="ol-feed">
+            <article class="ol-card ol-card-status">
+                <div class="ol-status-text">Loading...</div>
+            </article>
         </div>
-        <!-- Preview -->
-        <div class="mb-2 p-2 ol-preview-box" id="ol-preview" style="display:none;">
-            <small class="text-muted">Preview:</small>
-            <span id="ol-preview-text"></span>
-        </div>
-        <!-- Input -->
-        <form id="ol-post-form" class="d-flex gap-2">
-            <input type="text" id="ol-input" class="form-control form-control-sm font-monospace"
-                   maxlength="200" placeholder="Type your one-liner..." autocomplete="off">
-            <button type="submit" class="btn btn-primary btn-sm text-nowrap">Send</button>
-        </form>
-        <small class="text-muted">Use the color buttons above to insert color codes. Max 200 chars.</small>
+        <div id="ol-list-status" class="ol-feed-status" aria-live="polite"></div>
+        <div id="ol-feed-sentinel" class="ol-feed-sentinel" aria-hidden="true"></div>
     </div>
 </div>
 

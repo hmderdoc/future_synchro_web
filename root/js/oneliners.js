@@ -130,51 +130,183 @@
         return out.trim();
     }
 
-    /* Render a single oneliner row */
+    function visibleLength(text) {
+        var i = 0, length = 0;
+        while (i < text.length) {
+            var ch = text.charCodeAt(i);
+            if (ch === 1 && i + 1 < text.length) { i += 2; continue; }
+            if (text.charAt(i) === '|' && i + 2 < text.length &&
+                text.charAt(i+1) >= '0' && text.charAt(i+1) <= '9' &&
+                text.charAt(i+2) >= '0' && text.charAt(i+2) <= '9') { i += 3; continue; }
+            if (ch >= 32) length++;
+            i++;
+        }
+        return length;
+    }
+
+    function getVisibleLimit() {
+        var input = document.getElementById('ol-input');
+        if (!input) return 70;
+        var limit = parseInt(input.getAttribute('data-visible-limit'), 10);
+        return isNaN(limit) || limit < 1 ? 70 : limit;
+    }
+
+    /* Render a single oneliner card */
     function renderOneliner(ol, localQwk) {
         var avatarKey = avatarLookupKey(ol, localQwk);
 
-        var html = '<div class="ol-row">';
-        html += '<div class="ol-avatar" data-avatar="' + esc(avatarKey) + '"></div>';
+        var html = '<article class="ol-card">';
+        html += '<div class="ol-avatar-wrap"><div class="ol-avatar" data-avatar="' + esc(avatarKey) + '"></div></div>';
         html += '<div class="ol-body">';
         html += '<div class="ol-meta">';
+        html += '<div class="ol-byline">';
         html += '<strong class="ol-alias">' + esc(ol.alias) + '</strong>';
-        html += '<span class="ol-system">@' + esc(ol.qwkid) + '</span>';
-        html += '<span class="ol-time">' + fmtTime(ol.time) + '</span>';
+        if (ol.qwkid) html += '<span class="ol-system">@' + esc(ol.qwkid) + '</span>';
+        html += '</div>';
+        html += '<time class="ol-time">' + esc(fmtTime(ol.time)) + '</time>';
         html += '</div>';
         html += '<div class="ol-text">' + colorize(ol.oneliner) + '</div>';
-        html += '</div></div>';
+        html += '</div></article>';
         return html;
     }
 
-    /* Load and render all oneliners */
     var _localQwk = '';
+    var _feedState = {
+        offset: 0,
+        batchSize: 20,
+        hasMore: true,
+        loading: false
+    };
+    var _scrollBound = false;
 
-    function loadOneliners() {
-        v4_get('./api/oneliners.ssjs?call=get-oneliners&count=50').then(function (data) {
+    function renderStatusCard(text, tone) {
+        var toneClass = tone ? (' ol-card-status-' + tone) : '';
+        return '<article class="ol-card ol-card-status' + toneClass + '"><div class="ol-status-text">' + esc(text) + '</div></article>';
+    }
+
+    function setFeedStatus(text, tone) {
+        var status = document.getElementById('ol-list-status');
+        if (!status) return;
+        if (!text) {
+            status.className = 'ol-feed-status';
+            status.textContent = '';
+            return;
+        }
+        status.className = 'ol-feed-status' + (tone ? (' is-' + tone) : '');
+        status.textContent = text;
+    }
+
+    function getFeedViewport() {
+        return document.getElementById('ol-feed-viewport');
+    }
+
+    function maybeLoadMoreOneliners() {
+        if (_feedState.loading || !_feedState.hasMore) return;
+        var viewport = getFeedViewport();
+        var sentinel = document.getElementById('ol-feed-sentinel');
+        if (!viewport || !sentinel) return;
+        var viewportRect = viewport.getBoundingClientRect();
+        var sentinelRect = sentinel.getBoundingClientRect();
+        if (sentinelRect.top <= viewportRect.bottom + 180) {
+            loadOneliners(false);
+        }
+    }
+
+    function bindInfiniteScroll() {
+        if (_scrollBound) return;
+        _scrollBound = true;
+        var viewport = getFeedViewport();
+        if (viewport) {
+            viewport.addEventListener('scroll', maybeLoadMoreOneliners, { passive: true });
+        }
+        window.addEventListener('resize', maybeLoadMoreOneliners);
+    }
+
+    /* Load and render batched oneliners */
+    function loadOneliners(reset) {
+        if (typeof reset === 'undefined') reset = false;
+        if (_feedState.loading) return;
+        if (!reset && !_feedState.hasMore) return;
+
+        var el = document.getElementById('ol-list');
+        if (!el) return;
+
+        if (reset) {
+            _feedState.offset = 0;
+            _feedState.hasMore = true;
+            var viewport = getFeedViewport();
+            if (viewport) viewport.scrollTop = 0;
+            el.innerHTML = renderStatusCard('Loading one-liners...', 'loading');
+            setFeedStatus('', '');
+        } else {
+            setFeedStatus('Loading more one-liners...', 'loading');
+        }
+
+        _feedState.loading = true;
+
+        v4_get('./api/oneliners.ssjs?call=get-oneliners&count=' + _feedState.batchSize + '&offset=' + _feedState.offset).then(function (data) {
             if (!data || data.error) {
-                var el = document.getElementById('ol-list');
-                if (el) el.innerHTML = '<div class="text-danger p-3">Error loading oneliners: ' + (data && data.error || 'unknown') + '</div>';
+                if (reset) {
+                    el.innerHTML = renderStatusCard('Error loading oneliners: ' + ((data && data.error) || 'unknown'), 'error');
+                }
+                setFeedStatus('Error loading oneliners.', 'error');
                 return;
             }
+
             _localQwk = data.qwkid || '';
-            var list = data.oneliners || [];
-            var el = document.getElementById('ol-list');
-            if (!el) return;
+            var rawList = data.oneliners || [];
+            var list = [];
+            var html = '';
+            var requestOffset = _feedState.offset;
 
-            if (!list.length) {
-                el.innerHTML = '<div class="text-muted p-3">No oneliners yet. Be the first!</div>';
+            for (var i = rawList.length - 1; i >= 0; i--) {
+                if (!visibleText(rawList[i].oneliner || '')) continue;
+                list.push(rawList[i]);
+                html += renderOneliner(rawList[i], _localQwk);
+            }
+
+            if (reset) {
+                el.innerHTML = '';
+            }
+
+            if (html) {
+                el.insertAdjacentHTML('beforeend', html);
+                drawAvatars(el, list);
+            }
+
+            var advancedOffset = (typeof data.nextOffset === 'number') ? data.nextOffset : (requestOffset + rawList.length);
+            if (advancedOffset <= requestOffset) {
+                advancedOffset = requestOffset;
+                _feedState.hasMore = false;
+            } else {
+                _feedState.hasMore = !!data.hasMore;
+            }
+            _feedState.offset = advancedOffset;
+
+            if (!el.children.length) {
+                if (_feedState.hasMore) {
+                    setFeedStatus('Loading more one-liners...', 'loading');
+                    setTimeout(function () {
+                        loadOneliners(false);
+                    }, 0);
+                    return;
+                }
+                el.innerHTML = renderStatusCard('No oneliners yet. Be the first!', 'empty');
+                setFeedStatus('', '');
                 return;
             }
 
-            var html = '';
-            for (var i = list.length - 1; i >= 0; i--) {
-                if (!visibleText(list[i].oneliner || '')) continue;
-                html += renderOneliner(list[i], _localQwk);
+            if (_feedState.hasMore) setFeedStatus('', '');
+            else setFeedStatus('You have reached the oldest one-liners.', 'end');
+
+            setTimeout(maybeLoadMoreOneliners, 0);
+        }).catch(function () {
+            if (reset) {
+                el.innerHTML = renderStatusCard('Error loading oneliners.', 'error');
             }
-            el.innerHTML = html;
-            el.scrollTop = 0;
-            drawAvatars(el, list);
+            setFeedStatus('Error loading oneliners.', 'error');
+        }).finally(function () {
+            _feedState.loading = false;
         });
     }
 
@@ -206,6 +338,44 @@
         preview.style.display = '';
     }
 
+    function updateComposerState() {
+        var input = document.getElementById('ol-input');
+        var counter = document.getElementById('ol-char-count');
+        var limit = getVisibleLimit();
+        var visible = 0;
+        var hasVisibleText = false;
+        var isOver = false;
+
+        updatePreview();
+
+        if (!input) {
+            return {
+                limit: limit,
+                visible: visible,
+                hasVisibleText: hasVisibleText,
+                isOver: isOver
+            };
+        }
+
+        visible = visibleLength(input.value || '');
+        hasVisibleText = visibleText(input.value || '').length > 0;
+        isOver = visible > limit;
+
+        if (counter) {
+            counter.textContent = visible + '/' + limit + ' visible';
+            counter.classList.toggle('is-over', isOver);
+        }
+
+        input.classList.toggle('is-invalid', isOver);
+
+        return {
+            limit: limit,
+            visible: visible,
+            hasVisibleText: hasVisibleText,
+            isOver: isOver
+        };
+    }
+
     /* Insert color code at cursor in the input */
     function insertColorCode(code) {
         var input = document.getElementById('ol-input');
@@ -217,25 +387,18 @@
         input.value = val.substring(0, start) + insert + val.substring(end);
         input.selectionStart = input.selectionEnd = start + insert.length;
         input.focus();
-        updatePreview();
+        updateComposerState();
     }
 
     /* Init */
     window.initOneliners = function () {
-        var cfg = window.sbbsConfig || {};
-        var postCard = document.getElementById('ol-post-card');
-        if (postCard && cfg.isLoggedIn) {
-            postCard.style.display = '';
-        }
-
-        loadOneliners();
+        bindInfiniteScroll();
+        loadOneliners(true);
 
         var refreshBtn = document.getElementById('ol-refresh-btn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function () {
-                var el = document.getElementById('ol-list');
-                if (el) el.innerHTML = '<div class="text-muted p-3">Loading...</div>';
-                loadOneliners();
+                loadOneliners(true);
             });
         }
 
@@ -255,29 +418,44 @@
         }
 
         var input = document.getElementById('ol-input');
-        if (input) input.addEventListener('input', updatePreview);
+        if (input) {
+            input.addEventListener('input', updateComposerState);
+            updateComposerState();
+        }
 
         var form = document.getElementById('ol-post-form');
         if (form) {
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
                 var inp = document.getElementById('ol-input');
-                if (!inp || !inp.value.trim()) return;
+                var sendBtn = form.querySelector('button[type="submit"]');
+                var state = updateComposerState();
+                if (!inp || !state.hasVisibleText) return;
+                if (state.isOver) {
+                    alert('One-liners are limited to ' + state.limit + ' visible characters. Color codes do not count.');
+                    return;
+                }
                 var text = inp.value;
                 inp.disabled = true;
+                if (sendBtn) sendBtn.disabled = true;
                 postOneliner(text).then(function (res) {
                     inp.disabled = false;
+                    if (sendBtn) sendBtn.disabled = false;
                     if (res && res.ok) {
                         inp.value = '';
-                        updatePreview();
-                        loadOneliners();
+                        updateComposerState();
+                        loadOneliners(true);
                     } else {
+                        updateComposerState();
                         alert('Error posting: ' + (res && res.error || 'unknown'));
                     }
+                }).catch(function () {
+                    inp.disabled = false;
+                    if (sendBtn) sendBtn.disabled = false;
+                    updateComposerState();
+                    alert('Error posting: unknown');
                 });
             });
         }
-
-
     };
 })();

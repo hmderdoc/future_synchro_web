@@ -310,9 +310,18 @@
         var statsEl = document.getElementById('games-stats');
         if (statsEl) {
             statsEl.innerHTML =
-                '<span><strong>' + programs.length + '</strong> Programs</span>' +
-                '<span><strong>' + displayCount + '</strong> Launches</span>' +
-                '<span><strong>' + formatDuration(displaySeconds) + '</strong> Play Time</span>';
+                '<span class="games-summary-item">' +
+                    '<strong class="games-summary-value">' + programs.length + '</strong>' +
+                    '<span class="games-summary-label">Programs</span>' +
+                '</span>' +
+                '<span class="games-summary-item">' +
+                    '<strong class="games-summary-value">' + displayCount + '</strong>' +
+                    '<span class="games-summary-label">Launches</span>' +
+                '</span>' +
+                '<span class="games-summary-item">' +
+                    '<strong class="games-summary-value">' + formatDuration(displaySeconds) + '</strong>' +
+                    '<span class="games-summary-label">Play Time</span>' +
+                '</span>';
         }
 
         document.querySelectorAll('#games-sort .btn').forEach(function (btn) {
@@ -321,8 +330,7 @@
 
         var filterBtn = document.getElementById('games-user-filter');
         if (filterBtn) {
-            filterBtn.innerHTML = '<span class="glyphicon glyphicon-user"></span> ' +
-                escapeHtml(userFilterAlias || 'All Users');
+            filterBtn.textContent = userFilterAlias || 'All Users';
         }
 
         var grid = document.getElementById('games-grid');
@@ -330,44 +338,48 @@
         grid.innerHTML = '';
 
         if (!programs.length) {
-            grid.innerHTML = '<div class="text-muted p-3">No programs found.</div>';
+            grid.innerHTML = '<div class="games-empty-card">No programs found.</div>';
             return;
         }
 
         programs.forEach(function (prog, idx) {
             var topPlayers = getTopPlayers(current, prog.id);
 
-            var row = document.createElement('div');
-            row.className = 'game-row d-flex align-items-start mb-2 p-2 rounded';
+            var row = document.createElement('article');
+            row.className = 'game-row';
             row.setAttribute('data-code', prog.code);
 
+            var media = document.createElement('div');
+            media.className = 'game-card-media';
+
             var rank = document.createElement('div');
-            rank.className = 'game-rank me-2 text-muted';
+            rank.className = 'game-rank';
             rank.textContent = '#' + (idx + 1);
-            row.appendChild(rank);
+            media.appendChild(rank);
 
             var iconDiv = document.createElement('div');
-            iconDiv.className = 'game-icon me-3 flex-shrink-0';
+            iconDiv.className = 'game-icon';
             renderIcon(prog.id, iconDiv);
-            row.appendChild(iconDiv);
+            media.appendChild(iconDiv);
+            row.appendChild(media);
 
             var infoDiv = document.createElement('div');
-            infoDiv.className = 'game-info flex-grow-1 min-width-0';
+            infoDiv.className = 'game-info';
 
             var titleRow = document.createElement('div');
-            titleRow.className = 'd-flex align-items-baseline flex-wrap gap-2 mb-1';
+            titleRow.className = 'game-title-row';
             var title = document.createElement('strong');
             title.className = 'game-title';
             title.textContent = formatProgramName(prog.name);
             titleRow.appendChild(title);
-            var section = document.createElement('small');
-            section.className = 'text-muted';
+            var section = document.createElement('span');
+            section.className = 'game-section';
             section.textContent = prog.section;
             titleRow.appendChild(section);
             infoDiv.appendChild(titleRow);
 
             var statsLine = document.createElement('div');
-            statsLine.className = 'game-stats-line small d-flex flex-wrap gap-3';
+            statsLine.className = 'game-stats-line';
             statsLine.innerHTML =
                 '<span class="game-stat-time" title="Play Time"><span class="game-stat-label">Time</span> ' + formatDuration(prog.seconds) + '</span>' +
                 '<span class="game-stat-launches" title="Launches"><span class="game-stat-label">Launches</span> ' + prog.count + '</span>' +
@@ -377,7 +389,7 @@
 
             if (topPlayers.length > 0) {
                 var playersLine = document.createElement('div');
-                playersLine.className = 'game-top-players small text-muted mt-1';
+                playersLine.className = 'game-top-players';
                 playersLine.innerHTML = '<span class="game-stat-label">Top</span> ' +
                     topPlayers.map(function (p) {
                         return escapeHtml(p.alias) + ' <span class="text-muted">(' + p.count + ')</span>';
@@ -387,19 +399,24 @@
 
             row.appendChild(infoDiv);
 
+            var actionDiv = document.createElement('div');
+            actionDiv.className = 'game-action';
             var launchBtn = document.createElement('button');
-            launchBtn.className = 'btn btn-sm btn-outline-success ms-2 flex-shrink-0 game-launch-btn';
+            launchBtn.className = 'btn btn-sm btn-outline-success game-launch-btn';
             launchBtn.textContent = 'Play';
             launchBtn.title = 'Launch ' + formatProgramName(prog.name);
             if (data.isGuest) {
+                launchBtn.classList.add('is-login-cta');
                 launchBtn.disabled = true;
                 launchBtn.title = 'Log in to play';
+                launchBtn.textContent = 'Login to Play';
             } else {
                 launchBtn.addEventListener('click', function () {
                     launchGame(prog.code);
                 });
             }
-            row.appendChild(launchBtn);
+            actionDiv.appendChild(launchBtn);
+            row.appendChild(actionDiv);
 
             grid.appendChild(row);
         });

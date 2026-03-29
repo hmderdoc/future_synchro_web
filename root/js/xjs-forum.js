@@ -148,23 +148,7 @@ async function refreshMessageList(sub, thread) {
         var elem = document.getElementById('forum-message-template').cloneNode(true);
         elem.id = elemId;
         elem.setAttribute('data-message', e.number);
-        elem.querySelector('a[data-message-anchor]').id = e.number;
-        elem.querySelector('strong[data-message-from]').innerHTML = e.from;
-        var akey;
-        if (e.from_net_addr) {
-            akey = e.from + '@' + e.from_net_addr;
-            elem.querySelector('span[data-message-from-address]').innerHTML = '@' + e.from_net_addr;
-            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', e.from + '@' + e.from_net_addr);
-        } else {
-            akey = e.from;
-            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', e.from);
-        }
-        elem.querySelector('strong[data-message-to]').innerHTML = e.to;
-        elem.querySelector('strong[data-message-date]').innerHTML = formatMessageDate(e.when_written_time);
-        elem.querySelector('span[data-upvote-count]').innerHTML = e.votes ? e.votes.up : 0;
-        elem.querySelector('span[data-downvote-count]').innerHTML = e.votes ? e.votes.down : 0;
-        elem.querySelector('div[data-message-body]').innerHTML = e.body;
-        elem.querySelector('a[data-direct-link]').setAttribute('href', '#' + e.number);
+        var akey = populateMessageCard(elem, e);
         var deleteBtn = elem.querySelector('button[data-button-delete]');
         if (deleteBtn) deleteBtn.onclick = function () { deleteMessage(sub, e.number); };
         var replyBtn = elem.querySelector('button[data-button-reply]');
@@ -210,8 +194,54 @@ async function postNew(sub) {
         li.parentNode.removeChild(li);
 		showInlineNotice('Your message has been posted.');
 		await refreshThreadList(sub);
-	}
+    }
 
+}
+
+function populateMessageCard(elem, e) {
+    var avatarSlot = elem.querySelector('[data-message-avatar]') || elem.querySelector('div[data-avatar]');
+    var titleRow = elem.querySelector('[data-message-title-row]');
+    var subjectEl = elem.querySelector('strong[data-message-subject]');
+    var fromAddressEl = elem.querySelector('span[data-message-from-address]');
+    var unreadBadge = elem.querySelector('[data-badge-unread]');
+    var akey;
+
+    elem.querySelector('a[data-message-anchor]').id = e.number;
+
+    if (e.subject) {
+        if (titleRow) titleRow.removeAttribute('hidden');
+        if (subjectEl) subjectEl.textContent = e.subject;
+    } else {
+        if (titleRow) titleRow.setAttribute('hidden', true);
+        if (subjectEl) subjectEl.textContent = '';
+    }
+
+    elem.querySelector('strong[data-message-from]').textContent = e.from || '';
+    if (e.from_net_addr) {
+        akey = `${e.from}@${e.from_net_addr}`;
+        if (fromAddressEl) fromAddressEl.textContent = `@${e.from_net_addr}`;
+        if (avatarSlot) avatarSlot.setAttribute('data-avatar', akey);
+    } else {
+        akey = e.from;
+        if (fromAddressEl) fromAddressEl.textContent = '';
+        if (avatarSlot) avatarSlot.setAttribute('data-avatar', `${e.from}`);
+    }
+    elem.querySelector('strong[data-message-to]').textContent = e.to || '';
+    elem.querySelector('strong[data-message-date]').textContent = formatMessageDate(e.when_written_time);
+    elem.querySelector('span[data-upvote-count]').textContent = e.votes ? e.votes.up : 0;
+    elem.querySelector('span[data-downvote-count]').textContent = e.votes ? e.votes.down : 0;
+    elem.querySelector('div[data-message-body]').innerHTML = e.body;
+    elem.querySelector('a[data-direct-link]').setAttribute('href', `#${e.number}`);
+
+    if (unreadBadge) {
+        if (e.unread) {
+            unreadBadge.removeAttribute('hidden');
+        } else {
+            unreadBadge.setAttribute('hidden', true);
+        }
+    }
+
+    return akey;
 }
 
 async function addReply(sub, id) {
@@ -465,23 +495,7 @@ async function listMessages(sub, thread, count, after) {
             elem.setAttribute('data-message', e.number);
             append = true;
         }
-        elem.querySelector('a[data-message-anchor]').id = e.number;
-        if (i == 0 && !after && e.subject !== undefined) elem.querySelector('strong[data-message-subject]').innerHTML = e.subject;
-        elem.querySelector('strong[data-message-from]').innerHTML = e.from;
-        if (e.from_net_addr) {
-            akey = `${e.from}@${e.from_net_addr}`;
-            elem.querySelector('span[data-message-from-address]').innerHTML = `@${e.from_net_addr}`;
-            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', `${e.from}@${e.from_net_addr}`);
-        } else {
-            akey = e.from;
-            elem.querySelector('div[data-avatar]').setAttribute('data-avatar', `${e.from}`);
-        }
-        elem.querySelector('strong[data-message-to]').innerHTML = e.to;
-        elem.querySelector('strong[data-message-date]').innerHTML = formatMessageDate(e.when_written_time);
-        elem.querySelector('span[data-upvote-count]').innerHTML = e.votes ? e.votes.up : 0;
-        elem.querySelector('span[data-downvote-count]').innerHTML = e.votes ? e.votes.down : 0;
-        elem.querySelector('div[data-message-body]').innerHTML = e.body;
-        elem.querySelector('a[data-direct-link]').setAttribute('href', `#${e.number}`);
+        akey = populateMessageCard(elem, e);
         // Wire button handlers
         var deleteBtn = elem.querySelector('button[data-button-delete]');
         if (deleteBtn) deleteBtn.onclick = function () { deleteMessage(sub, e.number); };
@@ -537,6 +551,132 @@ async function initMessageInfiniteScroll(sub, thread, count) {
 
 // Thread list
 
+function threadAvatarKey(msg) {
+    if (!msg || !msg.from) return null;
+    return msg.from_net_addr ? `${msg.from}@${msg.from_net_addr}` : `${msg.from}`;
+}
+
+function setThreadAvatar(slot, msg) {
+    if (!slot) return null;
+    var key = threadAvatarKey(msg);
+    slot.innerHTML = '';
+    if (!key) {
+        slot.removeAttribute('data-avatar');
+        slot.setAttribute('hidden', true);
+        return null;
+    }
+    slot.setAttribute('data-avatar', key);
+    slot.removeAttribute('hidden');
+    return key;
+}
+
+function setThreadReplyState(elem, threadData) {
+    var replies = elem.querySelector('div[data-replies]');
+    var noReplies = elem.querySelector('[data-no-replies]');
+    var singular = replies ? replies.querySelector('span[data-suffix-reply]') : null;
+    var plural = replies ? replies.querySelector('span[data-suffix-replies]') : null;
+    var latestAvatar = elem.querySelector('[data-thread-latest-avatar]');
+    var avatarKeys = [];
+    var replyCount = Math.max(0, ((threadData && threadData.messages) || 0) - 1);
+
+    if (singular) singular.setAttribute('hidden', true);
+    if (plural) plural.setAttribute('hidden', true);
+
+    if (replyCount > 0 && replies && threadData && threadData.last) {
+        replies.querySelector('strong[data-message-count]').textContent = replyCount;
+        if (replyCount === 1) {
+            if (singular) singular.removeAttribute('hidden');
+        } else {
+            if (plural) plural.removeAttribute('hidden');
+        }
+        replies.querySelector('strong[data-last-from]').textContent = threadData.last.from || '';
+        replies.querySelector('span[data-last-time]').textContent = formatMessageDate(threadData.last.when_written_time);
+        replies.removeAttribute('hidden');
+        if (noReplies) noReplies.setAttribute('hidden', true);
+        var latestKey = setThreadAvatar(latestAvatar, threadData.last);
+        if (latestKey) avatarKeys.push(latestKey);
+    } else {
+        if (replies) replies.setAttribute('hidden', true);
+        if (noReplies) noReplies.removeAttribute('hidden');
+        setThreadAvatar(latestAvatar, null);
+    }
+
+    return avatarKeys;
+}
+
+function setThreadUnreadState(elem, unread) {
+    var stats = elem.querySelector('div[data-stats]');
+    var unreadBadge = stats ? stats.querySelector('span[data-unread-messages]') : null;
+    if (!unreadBadge) return false;
+    unreadBadge.textContent = `${typeof unread === 'number' ? unread : 0} UNREAD`;
+    unreadBadge.removeAttribute('hidden');
+    if (stats) stats.removeAttribute('hidden');
+    return true;
+}
+
+function setThreadVoteState(elem, votes) {
+    var stats = elem.querySelector('div[data-stats]');
+    var upBadge = stats ? stats.querySelector('span[data-upvotes-badge]') : null;
+    var downBadge = stats ? stats.querySelector('span[data-downvotes-badge]') : null;
+    var shown = false;
+
+    if (upBadge) {
+        upBadge.style.setProperty('display', 'none');
+    }
+    if (downBadge) {
+        downBadge.style.setProperty('display', 'none');
+    }
+
+    if (votes && votes.total) {
+        if (upBadge && votes.up && votes.up.t) {
+            stats.querySelector('span[data-upvotes]').textContent = `${votes.up.p}/${votes.up.t}`;
+            upBadge.style.setProperty('display', '');
+            shown = true;
+        }
+        if (downBadge && votes.down && votes.down.t) {
+            stats.querySelector('span[data-downvotes]').textContent = `${votes.down.p}/${votes.down.t}`;
+            downBadge.style.setProperty('display', '');
+            shown = true;
+        }
+    }
+
+    if (shown && stats) stats.removeAttribute('hidden');
+    return shown;
+}
+
+function populateThreadCard(elem, e) {
+    var stats = elem.querySelector('div[data-stats]');
+    var subBadge = elem.querySelector('[data-search-sub-badge]');
+    var avatarKeys = [];
+
+    elem.querySelector('strong[data-thread-subject]').textContent = e.subject || '';
+    elem.querySelector('strong[data-thread-from]').textContent = (e.first && e.first.from) ? e.first.from : '';
+    elem.querySelector('span[data-thread-date-start]').textContent = formatMessageDate(e.first.when_written_time);
+
+    if (subBadge) {
+        if (e.sub_name) {
+            subBadge.textContent = e.sub_name;
+            subBadge.removeAttribute('hidden');
+        } else {
+            subBadge.textContent = '';
+            subBadge.setAttribute('hidden', true);
+        }
+    }
+
+    if (stats) stats.setAttribute('hidden', true);
+    var originKey = setThreadAvatar(elem.querySelector('[data-thread-origin-avatar]'), e.first);
+    if (originKey) avatarKeys.push(originKey);
+    avatarKeys = avatarKeys.concat(setThreadReplyState(elem, e));
+
+    var hasUnread = setThreadUnreadState(elem, typeof e.unread === 'number' ? e.unread : 0);
+    var hasVotes = setThreadVoteState(elem, e.votes);
+    if (!hasUnread && !hasVotes && stats) stats.setAttribute('hidden', true);
+
+    return avatarKeys.filter(function (key, index, array) {
+        return array.indexOf(key) === index;
+    });
+}
+
 function onThreadStats(data) {
 
     Object.entries(data).forEach(([k, v]) => {
@@ -560,45 +700,16 @@ function onThreadStats(data) {
         const elem = document.getElementById(`forum-thread-link-${k}`);
         if (elem === null) return;
 
-        const replies = elem.querySelector('div[data-replies]');
-        if (v.total > 1) {
-            replies.querySelector('strong[data-message-count]').innerHTML = v.messages - 1;
-            if (v.messages == 2) {
-                replies.querySelector('span[data-suffix-reply]').removeAttribute('hidden');
-            } else {
-                replies.querySelector('span[data-suffix-replies]').removeAttribute('hidden');
-            }
-            replies.querySelector('strong[data-last-from]').innerHTML = v.last.from;
-            replies.querySelector('span[data-last-time]').innerHTML = formatMessageDate(v.last.when_written_time);
-            replies.removeAttribute('hidden');
+        const avatarKeys = setThreadReplyState(elem, v);
+        const hasUnread = setThreadUnreadState(elem, typeof v.unread === 'number' ? v.unread : 0);
+        const hasVotes = setThreadVoteState(elem, v.votes);
+        if (!hasUnread && !hasVotes) {
+            const stats = elem.querySelector('div[data-stats]');
+            if (stats) stats.setAttribute('hidden', true);
         }
-
-        const stats = elem.querySelector('div[data-stats]');
-        if (v.unread) {
-			const urm = stats.querySelector('span[data-unread-messages]');
-			if (urm !== null) { // If user is guest, this element will not exist
-                urm.innerHTML = v.unread;
-                if (data.scan_cfg&(1<<1) || data.scan_cfg&5 || data.scan_cfg&(1<<8)) {
-                    urm.classList.add('scanned');
-                } else {
-                    urm.classList.remove('scanned');
-                }
-				urm.removeAttribute('hidden');
-				stats.removeAttribute('hidden');
-			}
+        if (avatarKeys.length && typeof Avatars !== 'undefined' && Avatars.draw) {
+            Avatars.draw(avatarKeys);
         }
-
-		if (v.votes.total) {
-			if (v.votes.up.t) {
-				stats.querySelector('span[data-upvotes]').innerHTML = `${v.votes.up.p}/${v.votes.up.t}`;
-				stats.querySelector('span[data-upvotes-badge]').style.setProperty('display', '');
-			}
-			if (v.votes.down.t) {
-				stats.querySelector('span[data-downvotes]').innerHTML = `${v.votes.down.p}/${v.votes.down.t}`;
-				stats.querySelector('span[data-downvotes-badge]').style.setProperty('display', '');
-			}
-			stats.removeAttribute('hidden');
-		}
 
     });
 
@@ -625,53 +736,13 @@ async function listThread(e) {
         append = true;
     }
 
-    elem.querySelector('strong[data-thread-subject]').innerHTML = e.subject;
-    elem.querySelector('strong[data-thread-from]').innerHTML = e.first.from;
-    elem.querySelector('span[data-thread-date-start]').innerHTML = formatMessageDate(e.first.when_written_time);
-
-    if (e.messages > 1) {
-        elem.querySelector('strong[data-message-count]').innerHTML = e.messages - 1;
-        if (e.messages == 2) {
-            elem.querySelector('span[data-suffix-reply]').removeAttribute('hidden');
-        } else {
-            elem.querySelector('span[data-suffix-replies]').removeAttribute('hidden');
-        }
-        elem.querySelector('strong[data-last-from]').innerHTML = e.last.from;
-        elem.querySelector('span[data-last-time]').innerHTML = formatMessageDate(e.last.when_written_time);
-        elem.querySelector('div[data-replies]').removeAttribute('hidden');
-    }
-
-    const stats = elem.querySelector('div[data-stats]');
-    if (e.unread) {
-        const sub = await sbbs.forum.getSub(e.sub);
-        const urm = stats.querySelector('span[data-unread-messages]');
-        if (urm !== null) { // If user is guest, this element will not exist
-            urm.innerHTML = e.unread;
-            if (sub && (sub.scan_cfg&(1<<1) || sub.scan_cfg&5 || sub.scan_cfg&(1<<8))) {
-                urm.classList.add('scanned');
-            } else {
-                urm.classList.remove('scanned');
-            }
-            urm.removeAttribute('hidden');
-            stats.removeAttribute('hidden');
-        }
-    }
-    if (e.votes.total) {
-        if (e.votes.up.t) {
-            stats.querySelector('span[data-upvotes]').innerHTML = `${e.votes.up.p}/${e.votes.up.t}`;
-            stats.querySelector('span[data-upvotes-badge]').style.setProperty('display', '');
-        }
-        if (e.votes.down.t) {
-            stats.querySelector('span[data-downvotes]').innerHTML = `${e.votes.down.p}/${e.votes.down.t}`;
-            stats.querySelector('span[data-downvotes-badge]').style.setProperty('display', '');
-        }
-        stats.removeAttribute('hidden');
-    }
+    const avatarKeys = populateThreadCard(elem, e);
 
     elem.removeAttribute('hidden');
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
     renderAnsiCanvases(elem);
     if (append) document.getElementById('forum-list-container').appendChild(elem);
+    if (avatarKeys.length && typeof Avatars !== 'undefined' && Avatars.draw) Avatars.draw(avatarKeys);
 }
 
 var _threadScrollLoading = false;
@@ -876,64 +947,15 @@ function listSearchResult(e) {
     elem.id = 'forum-search-result-' + e.sub + '-' + e.id;
     elem.setAttribute('data-thread', e.id);
 
-    var page = new URLSearchParams(window.location.search).get('page') || '001-forum.xjs';
+    var page = new URLSearchParams(window.location.search).get('page') || '002-forum.xjs';
     elem.setAttribute('href', './?page=' + page + '&sub=' + e.sub + '&thread=' + e.id);
-
-    elem.querySelector('strong[data-thread-subject]').innerHTML = e.subject;
-    elem.querySelector('strong[data-thread-from]').innerHTML = e.first.from;
-    elem.querySelector('span[data-thread-date-start]').innerHTML = formatMessageDate(e.first.when_written_time);
-
-    // Sub name badge for cross-sub results
-    var badgeEl = elem.querySelector('[data-search-sub-badge]');
-    if (badgeEl && e.sub_name) {
-        badgeEl.textContent = e.sub_name;
-        badgeEl.removeAttribute('hidden');
-    } else if (e.sub_name) {
-        var badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.style.cssText = 'margin-left:0.5em;background:#5bc0de;';
-        badge.textContent = e.sub_name;
-        var subjectEl = elem.querySelector('strong[data-thread-subject]');
-        if (subjectEl) subjectEl.parentNode.insertBefore(badge, subjectEl.nextSibling);
-    }
-
-    if (e.messages > 1) {
-        elem.querySelector('strong[data-message-count]').innerHTML = e.messages - 1;
-        if (e.messages == 2) {
-            elem.querySelector('span[data-suffix-reply]').removeAttribute('hidden');
-        } else {
-            elem.querySelector('span[data-suffix-replies]').removeAttribute('hidden');
-        }
-        elem.querySelector('strong[data-last-from]').innerHTML = e.last.from;
-        elem.querySelector('span[data-last-time]').innerHTML = formatMessageDate(e.last.when_written_time);
-        elem.querySelector('div[data-replies]').removeAttribute('hidden');
-    }
-
-    var stats = elem.querySelector('div[data-stats]');
-    if (e.unread) {
-        var urm = stats ? stats.querySelector('span[data-unread-messages]') : null;
-        if (urm) {
-            urm.innerHTML = e.unread;
-            urm.removeAttribute('hidden');
-            stats.removeAttribute('hidden');
-        }
-    }
-    if (e.votes && e.votes.total) {
-        if (stats && e.votes.up && e.votes.up.t) {
-            stats.querySelector('span[data-upvotes]').innerHTML = e.votes.up.p + '/' + e.votes.up.t;
-            stats.querySelector('span[data-upvotes-badge]').style.setProperty('display', '');
-        }
-        if (stats && e.votes.down && e.votes.down.t) {
-            stats.querySelector('span[data-downvotes]').innerHTML = e.votes.down.p + '/' + e.votes.down.t;
-            stats.querySelector('span[data-downvotes-badge]').style.setProperty('display', '');
-        }
-        if (stats) stats.removeAttribute('hidden');
-    }
+    var avatarKeys = populateThreadCard(elem, e);
 
     elem.removeAttribute('hidden');
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(elem);
     renderAnsiCanvases(elem);
     document.getElementById('forum-list-container').appendChild(elem);
+    if (avatarKeys.length && typeof Avatars !== 'undefined' && Avatars.draw) Avatars.draw(avatarKeys);
 }
 
 function clearSearch() {
@@ -1040,8 +1062,17 @@ async function getNewestMessagePerSub(group) {
 }
 
 function showSubUnreadCount(elem, s, u) { // sub link element, sub code, { total, scanned, newest }
-    if (u.total - u.scanned > 0) elem.querySelector('span[data-unread-unscanned]').innerHTML = u.total - u.scanned;
-    if (u.scanned > 0) elem.querySelector('span[data-unread-scanned]').innerHTML = u.scanned;
+    var unreadBadge = elem.querySelector('span[data-unread-unscanned]');
+    var scannedBadge = elem.querySelector('span[data-unread-scanned]');
+    var total = u && typeof u.total === 'number' ? u.total : 0;
+    if (unreadBadge) {
+        unreadBadge.textContent = total + ' UNREAD';
+        unreadBadge.hidden = false;
+    }
+    if (scannedBadge) {
+        scannedBadge.textContent = '';
+        scannedBadge.hidden = true;
+    }
 }
 
 function onSubUnreadCount(data) {
@@ -1096,13 +1127,32 @@ function onSubList(data) {
             append = true;
         }
         renderForumIcon(elem.querySelector('[data-forum-icon]'), e.icon);
+        var unreadBadge = elem.querySelector('span[data-unread-unscanned]');
+        var scannedBadge = elem.querySelector('span[data-unread-scanned]');
+        var totalMsgsBadge = elem.querySelector('span[data-total-msgs]');
+        var newestContainer = elem.querySelector('span[data-newest-message-container]');
         elem.querySelector('strong[data-sub-name]').innerHTML = e.name;
-        elem.querySelector('p[data-sub-description]').innerHTML = e.description;
+        elem.querySelector('p[data-sub-description]').innerHTML = e.description || '';
+        if (unreadBadge) {
+            unreadBadge.textContent = '0 UNREAD';
+            unreadBadge.hidden = false;
+        }
+        if (scannedBadge) {
+            scannedBadge.textContent = '';
+            scannedBadge.hidden = true;
+        }
+        if (totalMsgsBadge) {
+            totalMsgsBadge.textContent = '';
+            totalMsgsBadge.hidden = true;
+        }
+        if (newestContainer) newestContainer.setAttribute('hidden', 'hidden');
         if (e.newest) showNewestMessage(elem, e.newest);
         if (e.unread != null) showSubUnreadCount(elem, e.code, e.unread);
         if (e.total_msgs != null) {
-            var tm = elem.querySelector('span[data-total-msgs]');
-            if (tm) { tm.innerHTML = e.total_msgs + ' msgs'; tm.hidden = false; }
+            if (totalMsgsBadge) {
+                totalMsgsBadge.textContent = e.total_msgs + ' MSGS';
+                totalMsgsBadge.hidden = false;
+            }
         }
         if (append) document.getElementById('forum-list-container').appendChild(elem);
     });
@@ -1130,8 +1180,17 @@ async function listSubs(group) {
 // Group list
 
 function showGroupUnreadCount(elem, u) {
-    if (u.total - u.scanned > 0) elem.querySelector('span[data-unread-unscanned]').innerHTML = u.total - u.scanned;
-    if (u.scanned > 0) elem.querySelector('span[data-unread-scanned]').innerHTML = u.scanned;
+    var unreadBadge = elem.querySelector('span[data-unread-unscanned]');
+    var scannedBadge = elem.querySelector('span[data-unread-scanned]');
+    var total = u && typeof u.total === 'number' ? u.total : 0;
+    if (unreadBadge) {
+        unreadBadge.textContent = total + ' UNREAD';
+        unreadBadge.hidden = false;
+    }
+    if (scannedBadge) {
+        scannedBadge.textContent = '';
+        scannedBadge.hidden = true;
+    }
 }
 
 function onGroupUnreadCount(data) {
@@ -1159,9 +1218,12 @@ function onGroupList(data) {
         }
         renderForumIcon(elem.querySelector('[data-forum-icon]'), e.icon);
         elem.querySelector('strong[data-group-name]').innerHTML = e.name;
-        elem.querySelector('span[data-unread-unscanned]').innerHTML = '';
+        elem.querySelector('span[data-unread-unscanned]').innerHTML = '0 UNREAD';
+        elem.querySelector('span[data-unread-unscanned]').hidden = false;
         elem.querySelector('span[data-unread-scanned]').innerHTML = '';
-        elem.querySelector('span[data-group-description]').innerHTML = e.description;
+        elem.querySelector('span[data-unread-scanned]').hidden = true;
+        var desc = elem.querySelector('span[data-group-description]');
+        if (desc) desc.innerHTML = e.description || '';
         elem.querySelector('span[data-group-sub-count]').innerHTML = e.sub_count;
         if (e.unread != null) showGroupUnreadCount(elem, e.unread);
         if (append) document.getElementById('forum-list-container').appendChild(elem);
@@ -1431,10 +1493,15 @@ function _replaceAnsiWithImg(el, dataURL, w, h) {
 }
 
 /* ---- Render breadcrumb icons on page load ---- */
-(function initBreadcrumbIcons() {
+function _renderBreadcrumbIcons() {
     document.querySelectorAll('span.bc-icon[data-bc-icon]').forEach(function (span) {
+        if (span.querySelector('.forum-icon-img')) return; // already rendered
         var b64 = span.getAttribute('data-bc-icon');
         if (!b64) { span.remove(); return; }
         renderForumIcon(span, b64);
     });
-})();
+}
+// Run immediately, and retry after a short delay in case
+// GraphicsConverter spritesheet hasn't loaded yet.
+_renderBreadcrumbIcons();
+setTimeout(_renderBreadcrumbIcons, 150);

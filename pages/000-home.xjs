@@ -2,10 +2,33 @@
 
 <?xjs
     require('sbbsdefs.js', 'SYS_CLOSED');
+    var ansi_viewer = load({}, settings.web_lib + 'ansi-viewer.js');
 
     var _bltn_subcode = 'LOCAL-NOTICES';
     var _bltn_max = 10;
     var _bltn_body_maxlen = 600;
+    var _ansi_state = ansi_viewer.build_state({ mode: 'random' });
+    var _ansi_state_client = {
+        ok: _ansi_state.ok,
+        galleries: _ansi_state.galleries,
+        gallery: _ansi_state.gallery,
+        directories: _ansi_state.directories,
+        current_dir: _ansi_state.current_dir,
+        current_dir_label: _ansi_state.current_dir_label,
+        files: _ansi_state.files,
+        current_file: _ansi_state.current_file,
+        current_file_label: _ansi_state.current_file_label,
+        current_index: _ansi_state.current_index,
+        current_count: _ansi_state.current_count,
+        render_html: '',
+        error: _ansi_state.error,
+        status_text: _ansi_state.status_text
+    };
+    var _ansi_state_json = JSON.stringify(_ansi_state_client).replace(/<\//g, '<\\/');
+
+    function _homeEsc(value) {
+        return ansi_viewer.escape_html(value);
+    }
 
     var _bltn_msgs = [];
     var _bltn_mb = new MsgBase(_bltn_subcode);
@@ -31,9 +54,29 @@
 ?>
 
 <!-- Welcome Banner -->
-<div class="card mb-3 overflow-hidden" style="border: 1px solid #AA00AA;">
+<div id="home-terminal-launch" class="card mb-3 overflow-hidden" style="border: 1px solid #AA00AA; cursor: pointer;" role="button" tabindex="0" aria-controls="terminal-panel" aria-label="Open terminal">
     <img src="./images/vektrax_banner.png" alt="<? write(system.name); ?>" class="img-fluid w-100" style="display:block;">
 </div>
+
+<script>
+(function () {
+    var launch = document.getElementById('home-terminal-launch');
+    if (!launch) return;
+
+    function toggleTerminal() {
+        var btn = document.getElementById('btn-terminal');
+        if (!btn) return;
+        btn.click();
+    }
+
+    launch.addEventListener('click', toggleTerminal);
+    launch.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleTerminal();
+    });
+})();
+</script>
 
 <!-- Bulletins Carousel -->
 <style>
@@ -148,3 +191,396 @@
 })();
 </script>
 <?xjs } ?>
+
+<style>
+.ahv-panel {
+    --bs-card-border-color: #AAAAAA;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #AAAAAA;
+    border-color: #AAAAAA !important;
+    background: #000 !important;
+}
+.ahv-panel > .card-header {
+    color: #FFFF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AAAAAA !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.ahv-header-copy {
+    min-width: 0;
+    flex: 1 1 280px;
+}
+.ahv-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+.ahv-title {
+    color: #FFFF55;
+    font-weight: bold;
+}
+.ahv-count {
+    color: #55FFFF;
+    font-size: 0.8em;
+    white-space: nowrap;
+}
+.ahv-file {
+    color: #FF55FF;
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ahv-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ahv-nav button {
+    background: transparent;
+    border: 1px solid #AAAAAA;
+    color: #FFFF55;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.ahv-nav button:hover:not(:disabled) {
+    background: #AAAAAA;
+    color: #000;
+}
+.ahv-nav button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.ahv-panel .card-body {
+    background: #000;
+    padding: 14px;
+}
+.ahv-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.ahv-control {
+    display: block;
+}
+.ahv-control span {
+    display: block;
+    color: #AAAAAA;
+    font-size: 0.72em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+.ahv-control select {
+    width: 100%;
+    background: #050505;
+    color: #FFFFFF;
+    border: 1px solid #5555FF;
+    padding: 7px 10px;
+    border-radius: 2px;
+    font-family: inherit;
+}
+.ahv-stage-wrap {
+    border: 1px solid #333333;
+    background:
+        radial-gradient(circle at top, rgba(85, 85, 255, 0.16), transparent 56%),
+        #000;
+    padding: 10px;
+    overflow: hidden;
+    min-height: 280px;
+}
+.ahv-stage {
+    min-width: fit-content;
+    transform-origin: top left;
+}
+.ahv-stage pre.ahv-ansi-pre {
+    margin: 0;
+    background: transparent;
+    color: #A8A8A8;
+    display: inline-block;
+    white-space: pre;
+}
+.ahv-empty {
+    color: #AAAAAA;
+    padding: 32px 12px;
+    text-align: center;
+}
+.ahv-status {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 0.8em;
+}
+.ahv-status-text {
+    color: #55FFFF;
+}
+.ahv-error {
+    color: #FF5555;
+}
+.ahv-loading .ahv-stage {
+    opacity: 0.55;
+}
+@media (max-width: 900px) {
+    .ahv-controls {
+        grid-template-columns: 1fr;
+    }
+    .ahv-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+</style>
+
+<div class="card mb-3 ahv-panel" id="ahv-panel">
+    <div class="card-header">
+        <div class="ahv-header-copy">
+            <div class="ahv-title-row">
+                <div class="ahv-title">ANSI Viewer</div>
+                <div class="ahv-count" id="ahv-count">
+<?xjs
+    if (_ansi_state.current_count > 0) {
+        write(format('%u ANSI files', _ansi_state.current_count));
+    } else {
+        write('No ANSI files');
+    }
+?>
+                </div>
+            </div>
+            <div class="ahv-file" id="ahv-file"><?xjs write(_homeEsc(_ansi_state.current_file_label || 'No ANSI selected')); ?></div>
+        </div>
+        <div class="ahv-nav">
+            <button type="button" id="ahv-prev" title="Previous ANSI">&laquo;</button>
+            <button type="button" id="ahv-random" title="Random ANSI">Random</button>
+            <button type="button" id="ahv-next" title="Next ANSI">&raquo;</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="ahv-controls">
+            <label class="ahv-control" for="ahv-gallery">
+                <span>Gallery</span>
+                <select id="ahv-gallery"></select>
+            </label>
+            <label class="ahv-control" for="ahv-dir">
+                <span>Directory</span>
+                <select id="ahv-dir"></select>
+            </label>
+            <label class="ahv-control" for="ahv-file-select">
+                <span>File</span>
+                <select id="ahv-file-select"></select>
+            </label>
+        </div>
+        <div class="ahv-stage-wrap">
+            <div class="ahv-stage" id="ahv-stage"><?xjs write(_ansi_state.render_html); ?></div>
+        </div>
+        <div class="ahv-status">
+            <span class="ahv-status-text" id="ahv-status"><?xjs write(_homeEsc(_ansi_state.status_text || '')); ?></span>
+            <span class="ahv-error" id="ahv-error"><?xjs if (_ansi_state.error) write(_homeEsc(_ansi_state.error)); ?></span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var root = document.getElementById('ahv-panel');
+    if (!root || root.dataset.bound === '1') return;
+    root.dataset.bound = '1';
+
+    var state = <?xjs write(_ansi_state_json); ?>;
+    var stage = document.getElementById('ahv-stage');
+    var gallerySelect = document.getElementById('ahv-gallery');
+    var dirSelect = document.getElementById('ahv-dir');
+    var fileSelect = document.getElementById('ahv-file-select');
+    var fileLabel = document.getElementById('ahv-file');
+    var countLabel = document.getElementById('ahv-count');
+    var statusLabel = document.getElementById('ahv-status');
+    var errorLabel = document.getElementById('ahv-error');
+    var prevButton = document.getElementById('ahv-prev');
+    var nextButton = document.getElementById('ahv-next');
+    var randomButton = document.getElementById('ahv-random');
+
+    function fillSelect(select, items, valueKey, labelKey, currentValue, emptyLabel) {
+        select.innerHTML = '';
+        if (!items || !items.length) {
+            var emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = emptyLabel;
+            select.appendChild(emptyOption);
+            select.disabled = true;
+            return;
+        }
+
+        select.disabled = false;
+        items.forEach(function (item) {
+            var option = document.createElement('option');
+            option.value = item[valueKey];
+            option.textContent = item[labelKey];
+            if (option.value === currentValue) option.selected = true;
+            select.appendChild(option);
+        });
+    }
+
+    function setLoading(loading) {
+        root.classList.toggle('ahv-loading', loading);
+        [gallerySelect, dirSelect, fileSelect, prevButton, nextButton, randomButton].forEach(function (el) {
+            if (!el) return;
+            if (loading) {
+                el.setAttribute('disabled', 'disabled');
+            } else {
+                el.removeAttribute('disabled');
+            }
+        });
+    }
+
+    function updateControls(payload) {
+        var hasFiles = payload.current_count > 0;
+        fillSelect(
+            gallerySelect,
+            payload.galleries || [],
+            'id',
+            'description',
+            payload.gallery ? payload.gallery.id : '',
+            'No galleries'
+        );
+        fillSelect(
+            dirSelect,
+            payload.directories || [],
+            'path',
+            'label',
+            payload.current_dir || '',
+            'No directories'
+        );
+        fillSelect(
+            fileSelect,
+            payload.files || [],
+            'name',
+            'label',
+            payload.current_file || '',
+            'No ANSI files'
+        );
+        prevButton.disabled = !hasFiles;
+        nextButton.disabled = !hasFiles;
+        randomButton.disabled = !hasFiles;
+    }
+
+    function scaleAnsi() {
+        var wrap = document.querySelector('.ahv-stage-wrap');
+        if (!wrap || !stage) return;
+        stage.style.transform = 'none';
+        wrap.style.height = '';
+        var pre = stage.querySelector('pre.ahv-ansi-pre');
+        if (!pre) return;
+        var wrapW = wrap.clientWidth - 20;
+        var preW = pre.scrollWidth;
+        if (preW > wrapW && preW > 0) {
+            var s = wrapW / preW;
+            stage.style.transform = 'scale(' + s + ')';
+            wrap.style.height = (pre.scrollHeight * s + 20) + 'px';
+        }
+    }
+
+    var _ahvResizeTimer;
+    window.addEventListener('resize', function () {
+        clearTimeout(_ahvResizeTimer);
+        _ahvResizeTimer = setTimeout(scaleAnsi, 150);
+    });
+
+    function render(payload) {
+        state = payload;
+        if (payload.render_html) {
+            stage.innerHTML = payload.render_html;
+        } else if (!stage.innerHTML.length) {
+            stage.innerHTML = '<div class="ahv-empty">No ANSI available.</div>';
+        }
+        fileLabel.textContent = payload.current_file_label || 'No ANSI selected';
+        countLabel.textContent = payload.current_count > 0
+            ? ((payload.current_index + 1) + ' / ' + payload.current_count + ' in ' + ((payload.gallery && payload.gallery.description) || 'gallery'))
+            : 'No ANSI files';
+        statusLabel.textContent = payload.status_text || '';
+        errorLabel.textContent = payload.error || '';
+        updateControls(payload);
+        setTimeout(scaleAnsi, 0);
+    }
+
+    function fetchState(mode, overrides) {
+        var params = new URLSearchParams();
+        overrides = overrides || {};
+
+        params.set('mode', mode || 'select');
+        params.set('gallery', overrides.gallery !== undefined
+            ? overrides.gallery
+            : ((state.gallery && state.gallery.id) || '')
+        );
+        params.set('dir', overrides.dir !== undefined ? overrides.dir : (state.current_dir || ''));
+        if ((overrides.file !== undefined ? overrides.file : state.current_file || '').length) {
+            params.set('file', overrides.file !== undefined ? overrides.file : state.current_file);
+        }
+
+        setLoading(true);
+        fetch('./api/ansi-viewer.ssjs?' + params.toString(), {
+            credentials: 'same-origin'
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (payload) {
+                setLoading(false);
+                render(payload);
+            })
+            .catch(function (error) {
+                errorLabel.textContent = 'ANSI viewer request failed: ' + error;
+                setLoading(false);
+                updateControls(state);
+            });
+    }
+
+    gallerySelect.addEventListener('change', function () {
+        fetchState('random', {
+            gallery: gallerySelect.value,
+            dir: '',
+            file: ''
+        });
+    });
+
+    dirSelect.addEventListener('change', function () {
+        fetchState('first', {
+            gallery: gallerySelect.value,
+            dir: dirSelect.value,
+            file: ''
+        });
+    });
+
+    fileSelect.addEventListener('change', function () {
+        fetchState('select', {
+            gallery: gallerySelect.value,
+            dir: dirSelect.value,
+            file: fileSelect.value
+        });
+    });
+
+    prevButton.addEventListener('click', function () {
+        fetchState('prev');
+    });
+
+    randomButton.addEventListener('click', function () {
+        fetchState('random');
+    });
+
+    nextButton.addEventListener('click', function () {
+        fetchState('next');
+    });
+
+    render(state);
+})();
+</script>

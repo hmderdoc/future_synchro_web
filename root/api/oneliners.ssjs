@@ -6,6 +6,74 @@ load('json-client.js');
 
 var reply = {};
 var olSettings;
+var OL_TERMINAL_COLUMNS = 80;
+var OL_TERMINAL_PADDING = 3;
+var OL_MAX_RAW_LENGTH = 512;
+
+function getVisibleOnelinerText(text) {
+    var i = 0;
+    var out = '';
+
+    while (i < text.length) {
+        var ch = text.charCodeAt(i);
+        if (ch === 1 && i + 1 < text.length) {
+            i += 2;
+            continue;
+        }
+        if (text.charAt(i) === '|' && i + 2 < text.length &&
+            text.charAt(i + 1) >= '0' && text.charAt(i + 1) <= '9' &&
+            text.charAt(i + 2) >= '0' && text.charAt(i + 2) <= '9') {
+            i += 3;
+            continue;
+        }
+        if (ch >= 32) {
+            out += text.charAt(i);
+        }
+        i++;
+    }
+
+    return out;
+}
+
+function getVisibleOnelinerLength(text) {
+    return getVisibleOnelinerText(text).length;
+}
+
+function truncateOnelinerToVisibleLength(text, maxVisible) {
+    var i = 0;
+    var visible = 0;
+    var out = '';
+
+    while (i < text.length) {
+        var ch = text.charCodeAt(i);
+        if (ch === 1 && i + 1 < text.length) {
+            out += text.substring(i, i + 2);
+            i += 2;
+            continue;
+        }
+        if (text.charAt(i) === '|' && i + 2 < text.length &&
+            text.charAt(i + 1) >= '0' && text.charAt(i + 1) <= '9' &&
+            text.charAt(i + 2) >= '0' && text.charAt(i + 2) <= '9') {
+            out += text.substring(i, i + 3);
+            i += 3;
+            continue;
+        }
+        if (ch >= 32) {
+            if (visible >= maxVisible) {
+                break;
+            }
+            visible++;
+        }
+        out += text.charAt(i);
+        i++;
+    }
+
+    return out;
+}
+
+function getPostVisibleLimit() {
+    return Math.max(1, OL_TERMINAL_COLUMNS - user.alias.length - system.qwk_id.length - OL_TERMINAL_PADDING);
+}
 
 // Load oneliners settings (server/port for JSON DB)
 try {
@@ -28,14 +96,22 @@ if (typeof http_request.query.call === 'undefined') {
 
         case 'get-oneliners': {
             var count = 50;
+            var offset = 0;
             if (typeof http_request.query.count !== 'undefined') {
-                count = Math.min(parseInt(http_request.query.count[0], 10) || 50, 200);
+                count = Math.min(parseInt(http_request.query.count[0], 10) || 50, 100);
+            }
+            if (typeof http_request.query.offset !== 'undefined') {
+                offset = Math.max(parseInt(http_request.query.offset[0], 10) || 0, 0);
             }
             try {
                 var jc = new JSONClient(olSettings.server, olSettings.port);
                 var total = jc.read('ONELINERS', 'ONELINERS.length', 1) || 0;
-                var start = Math.max(0, total - count);
-                var lines = jc.slice('ONELINERS', 'ONELINERS', start, undefined, 1) || [];
+                var end = Math.max(0, total - offset);
+                var start = Math.max(0, end - count);
+                var lines = [];
+                if (end > start) {
+                    lines = jc.slice('ONELINERS', 'ONELINERS', start, end, 1) || [];
+                }
                 jc.disconnect();
 
                 var result = [];
@@ -51,7 +127,13 @@ if (typeof http_request.query.call === 'undefined') {
                         oneliner: ln.oneliner
                     });
                 }
-                reply = { oneliners: result, qwkid: system.qwk_id.toLowerCase() };
+                reply = {
+                    oneliners: result,
+                    qwkid: system.qwk_id.toLowerCase(),
+                    total: total,
+                    hasMore: start > 0,
+                    nextOffset: offset + (end - start)
+                };
             } catch (e) {
                 log(LOG_ERR, 'oneliners API get error: ' + e);
                 reply = { error: String(e) };
@@ -64,6 +146,7 @@ if (typeof http_request.query.call === 'undefined') {
                 reply = { error: 'not authenticated' };
                 break;
             }
+            var visibleLimit = getPostVisibleLimit();
             var text = '';
             if (http_request.method === 'POST' && typeof http_request.body !== 'undefined') {
                 var params = http_request.body.split('&');
@@ -81,9 +164,18 @@ if (typeof http_request.query.call === 'undefined') {
                 reply = { error: 'empty oneliner' };
                 break;
             }
-            if (text.length > 200) {
-                text = text.substring(0, 200);
+            if (text.length > OL_MAX_RAW_LENGTH) {
+                text = text.substring(0, OL_MAX_RAW_LENGTH);
             }
+            if (!getVisibleOnelinerText(text).trim().length) {
+                reply = { error: 'empty oneliner' };
+                break;
+            }
+            if (getVisibleOnelinerLength(text) > visibleLimit) {
+                reply = { error: 'one-liner exceeds ' + visibleLimit + ' visible characters' };
+                break;
+            }
+            text = truncateOnelinerToVisibleLength(text, visibleLimit);
             try {
                 var jc = new JSONClient(olSettings.server, olSettings.port);
                 var obj = {

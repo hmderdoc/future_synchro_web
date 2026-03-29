@@ -161,7 +161,7 @@
     _binIconDir += 'future_shell/assets/';
     var _binIconMap = {
         home: 'home2', forum: 'forum_lda', files: 'floppy_disk_icon_final',
-        games: 'games', chat: 'json_chat_lda', terminal: 'sysop',
+        games: 'games', chat: 'json_chat_lda', terminal: 'monitor',
         register: 'edit', mail: 'mailbox', logout: 'exit',
         bar_chart: 'bar_chart', calendar: 'calendar',
         doc_edit: 'doc_edit', chat_new: 'chat_new', users: 'smiley',
@@ -172,7 +172,8 @@
         oneliners: 'oneliner', nodespy: 'sbbslist', webmonitor: 'bar_chart',
         fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
         heart: 'heart_normal',
-        at_symbol: 'at_symbol'
+        at_symbol: 'at_symbol',
+        news: 'newsitems'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -202,17 +203,40 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container<? if (settings.layout_full_width) write('-fluid'); ?>">
         <a class="navbar-brand" href="<? write(settings.brand_link || './'); ?>"><img src="./images/icon-192.png" alt="<? write(settings.brand || system.name); ?>" class="brand-icon"><span class="nav-label brand-label"><? var _bn = (settings.brand || system.name); var _dot = _bn.lastIndexOf("."); if (_dot > 0) { write(_bn.substring(0, _dot + 1) + "\n" + _bn.substring(_dot + 1)); } else { write(_bn); } ?></span></a>
-        <!-- Mobile toolbar: music player toggle at start, terminal at end -->
-        <div class="navbar-mobile-controls d-md-none justify-content-between">
-            <button class="btn btn-link p-0" id="btn-viz-mobile" type="button" title="Open Player">
-                <span class="mobile-player-icon" id="mobile-player-icon">♫</span>
-                <canvas id="mobile-mini-eq" class="mobile-mini-eq" width="28" height="28" style="display:none;"></canvas>
-            </button>
+
 <?xjs if (settings.ftelnet) { ?>
-            <button class="btn btn-link p-1" id="btn-terminal-mobile" type="button" title="Terminal">
-                <span class="bin-icon" data-icon="terminal"></span>
-            </button>
+        <!-- Terminal button: always visible, next to brand -->
+        <button id="btn-terminal" type="button" title="Enter the BBS terminal" class="navbar-terminal-btn">
+            <span class="crt-screen">
+                <span class="crt-scanline"></span>
+                <span class="crt-text" id="crt-label">ENTER</span>
+            </span>
+            <span class="modem-strip">
+                <span class="mled"><span class="mled-light mled-cd"></span><span class="mled-label">CD</span></span>
+                <span class="mled"><span class="mled-light mled-rx"></span><span class="mled-label">RX</span></span>
+                <span class="mled"><span class="mled-light mled-tx"></span><span class="mled-label">TX</span></span>
+            </span>
+        </button>
 <?xjs } ?>
+
+        <!-- Radio: always visible, pushed right -->
+        <div id="radio-container" class="navbar-radio-always">
+            <canvas id="radio-viz" width="60" height="32" title="BBS Radio"></canvas>
+            <div class="radio-stack">
+                <span class="radio-track-name" id="radio-track">INSERT DISC</span>
+                <div class="radio-controls">
+                    <button class="radio-btn" id="radio-prev" title="Previous">&#x23EE;</button>
+                    <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">&#x25B6;</button>
+                    <button class="radio-btn" id="radio-next" title="Next">&#x23ED;</button>
+                    <div class="radio-vol-wrap">
+                        <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                    </div>
+                </div>
+            </div>
+            <div class="radio-playlist-panel" id="radio-playlist-panel">
+                <input type="text" class="form-control form-control-sm mb-1" id="radio-search" placeholder="Search tracks...">
+                <div id="radio-tracklist" class="radio-tracklist"></div>
+            </div>
         </div>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
@@ -223,34 +247,6 @@
 <?xjs nav_pages.forEach(function(e) { navItem(e, ''); }); ?>
             </ul>
             <ul class="navbar-nav ms-auto align-items-center">
-
-                <!-- BBS Radio -->
-                <li class="nav-item" id="radio-container">
-                    <canvas id="radio-viz" width="60" height="32" title="BBS Radio"></canvas>
-                    <div class="radio-stack">
-                        <span class="radio-track-name" id="radio-track">INSERT DISC</span>
-                        <div class="radio-controls">
-                            <button class="radio-btn" id="radio-prev" title="Previous">⏮</button>
-                            <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">▶</button>
-                            <button class="radio-btn" id="radio-next" title="Next">⏭</button>
-                            <div class="radio-vol-wrap">
-                                <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="radio-playlist-panel" id="radio-playlist-panel">
-                        <input type="text" class="form-control form-control-sm mb-1" id="radio-search" placeholder="Search tracks...">
-                        <div id="radio-tracklist" class="radio-tracklist"></div>
-                    </div>
-                </li>
-<?xjs if (settings.ftelnet) { ?>
-                <li class="nav-item">
-                    <button class="btn btn-outline-light btn-sm me-2" id="btn-terminal" type="button" title="Toggle Terminal">
-                        <span id="terminal-status" class="badge rounded-pill bg-secondary" style="width:8px;height:8px;display:inline-block;"></span>
-                        <span class="bin-icon" data-icon="terminal"></span><span class="nav-label">Terminal</span>
-                    </button>
-                </li>
-<?xjs } ?>
 <?xjs if (user.alias === settings.guest || user.number < 1) { ?>
 <?xjs   if (settings.user_registration) { ?>
                 <li class="nav-item">

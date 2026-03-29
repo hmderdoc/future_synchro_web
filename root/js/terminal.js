@@ -13,7 +13,8 @@
     var panel = document.getElementById('terminal-panel');
     var iframeContainer = document.getElementById('terminal-iframe-container');
     var btnToggle = document.getElementById('btn-terminal');
-    var statusDot = document.getElementById('terminal-status');
+    var statusDot = document.getElementById('terminal-status'); // may be null now
+    var btnTerminal = document.getElementById('btn-terminal');
 
     var iframe = null;
     var iframeReady = false;
@@ -208,12 +209,27 @@
      * ============================================================ */
 
     function updateStatus() {
-        if (statusDot) {
-            statusDot.className = 'badge rounded-pill ' +
-                (isConnected ? 'bg-success' : 'bg-secondary');
-            statusDot.style.width = '8px';
-            statusDot.style.height = '8px';
-            statusDot.style.display = 'inline-block';
+        if (!btnTerminal) return;
+        var crtLabel = document.getElementById('crt-label');
+
+        // Three visual states tracked via classes on the button:
+        //   .crt-visible  = terminal panel is showing
+        //   .modem-active = WebSocket/telnet connection is live
+        btnTerminal.classList.toggle('crt-visible', isVisible);
+        btnTerminal.classList.toggle('modem-active', isConnected);
+
+        // CRT label text:
+        //   connected  -> "ONLINE"  (green)
+        //   visible but not connected -> "CRT ON" (amber)
+        //   hidden     -> "ENTER"   (amber, dimmer)
+        if (crtLabel) {
+            if (isConnected) {
+                crtLabel.textContent = 'ONLINE';
+            } else if (isVisible) {
+                crtLabel.textContent = 'CRT ON';
+            } else {
+                crtLabel.textContent = 'ENTER';
+            }
         }
     }
 
@@ -298,6 +314,7 @@
         function afterShow() {
             setPanelHidden(false);
             isVisible = true;
+            updateStatus();
             if (!initialized) {
                 createIframe();
             } else {
@@ -327,6 +344,7 @@
             sendToIframe({ cmd: 'blur' });
             isVisible = false;
             isAnimating = false;
+            updateStatus();
         });
     }
 
@@ -355,9 +373,6 @@
 
     if (btnToggle) btnToggle.addEventListener('click', togglePanel);
 
-    // Mobile terminal toggle button
-    var btnTerminalMobile = document.getElementById('btn-terminal-mobile');
-    if (btnTerminalMobile) btnTerminalMobile.addEventListener('click', togglePanel);
 
     window.addEventListener('spa:beforeNavigate', function () {
         if (isVisible) hidePanel();
