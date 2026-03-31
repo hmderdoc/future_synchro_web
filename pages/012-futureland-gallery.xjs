@@ -1,0 +1,1208 @@
+<!--Futureland Gallery-->
+<?xjs
+    var ansi_viewer = load({}, settings.web_lib + 'ansi-viewer.js');
+
+    function _galleryQueryValue(name) {
+        return (
+            typeof http_request.query[name] !== 'undefined' &&
+            http_request.query[name].length
+        ) ? String(http_request.query[name][0]) : '';
+    }
+
+    function _galleryEsc(value) {
+        return ansi_viewer.escape_html(value);
+    }
+
+    var _gallery_id = _galleryQueryValue('gallery');
+    var _gallery_dir = _galleryQueryValue('dir');
+    var _gallery_file = _galleryQueryValue('file');
+    var _gallery_look = _galleryQueryValue('look');
+    var _gallery_slide_scope = _galleryQueryValue('slide_scope');
+    var _gallery_slide_order = _galleryQueryValue('slide_order');
+    var _gallery_slide_action = _galleryQueryValue('slide_action');
+    var _gallery_slideshow = _galleryQueryValue('slideshow') === '1';
+    var _gallery_mode = 'random';
+    var _gallery_initial_look = _gallery_look;
+    var _gallery_state;
+    var _gallery_state_client;
+    var _gallery_state_json;
+
+    if (!_gallery_initial_look.length) {
+        if (_gallery_slide_scope === 'all') {
+            _gallery_initial_look = 'all';
+        } else if (_gallery_slide_scope === 'gallery') {
+            _gallery_initial_look = 'gallery';
+        } else if (_gallery_file.length) {
+            _gallery_initial_look = 'file';
+        } else if (_gallery_dir.length) {
+            _gallery_initial_look = 'directory';
+        } else {
+            _gallery_initial_look = 'all';
+        }
+    }
+
+    if ((_gallery_initial_look === 'all' || _gallery_initial_look === 'directory') && !_gallery_dir.length) {
+        if (
+            !_gallery_slide_scope.length ||
+            _gallery_slide_scope === 'directory' ||
+            _gallery_slide_scope === 'gallery'
+        ) {
+            _gallery_slide_scope = 'all';
+        }
+        if (
+            !_gallery_slide_action.length &&
+            !_gallery_file.length &&
+            !_gallery_dir.length
+        ) {
+            _gallery_slide_action = 'random';
+        }
+    }
+
+    if (_gallery_file.length) {
+        _gallery_mode = 'select';
+    } else if (_gallery_id.length || _gallery_dir.length) {
+        _gallery_mode = 'first';
+    }
+
+    _gallery_state = ansi_viewer.build_state({
+        gallery_id: _gallery_id,
+        relative_dir: _gallery_dir,
+        file_name: _gallery_file,
+        mode: _gallery_mode,
+        slide_scope: _gallery_slide_scope,
+        slide_order: _gallery_slide_order,
+        slide_action: _gallery_slide_action,
+        slideshow_active: _gallery_slideshow
+    });
+
+    _gallery_state_client = {
+        ok: _gallery_state.ok,
+        galleries: _gallery_state.galleries,
+        gallery: _gallery_state.gallery,
+        directories: _gallery_state.directories,
+        current_dir: _gallery_state.current_dir,
+        current_dir_label: _gallery_state.current_dir_label,
+        files: _gallery_state.files,
+        current_file: _gallery_state.current_file,
+        current_file_label: _gallery_state.current_file_label,
+        current_index: _gallery_state.current_index,
+        current_count: _gallery_state.current_count,
+        slide_scope: _gallery_state.slide_scope,
+        slide_order: _gallery_state.slide_order,
+        slide_index: _gallery_state.slide_index,
+        slide_count: _gallery_state.slide_count,
+        slide_scope_label: _gallery_state.slide_scope_label,
+        slideshow_active: _gallery_state.slideshow_active,
+        slide_status_text: _gallery_state.slide_status_text,
+        render_html: '',
+        error: _gallery_state.error,
+        status_text: _gallery_state.status_text
+    };
+
+    _gallery_state_json = JSON.stringify(_gallery_state_client).replace(/<\//g, '<\\/');
+?>
+
+<style>
+.flg-shell {
+    max-width: min(1720px, 96vw);
+    margin: 0 auto;
+    display: grid;
+    gap: 18px;
+}
+.ahv-panel {
+    --bs-card-border-color: #AAAAAA;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #AAAAAA;
+    border-color: #AAAAAA !important;
+    background: #000 !important;
+}
+.ahv-panel > .card-header {
+    color: #FFFF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AAAAAA !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.ahv-header-copy {
+    min-width: 0;
+    flex: 1 1 320px;
+}
+.ahv-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+.ahv-title {
+    color: #FFFF55;
+    font-weight: bold;
+}
+.ahv-count {
+    color: #55FFFF;
+    font-size: 0.8em;
+    white-space: nowrap;
+}
+.ahv-file {
+    color: #FF55FF;
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ahv-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1 1 460px;
+}
+.ahv-toolbar-field {
+    flex: 1 1 260px;
+    min-width: min(100%, 240px);
+}
+.ahv-toolbar select,
+.ahv-toolbar button,
+.ahv-nav button {
+    background: transparent;
+    border: 1px solid #AAAAAA;
+    color: #FFFF55;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.1;
+    padding: 4px 10px;
+    border-radius: 2px;
+}
+.ahv-toolbar select {
+    width: 100%;
+    background: #050505;
+    color: #FFFFFF;
+    border-color: #5555FF;
+    padding-right: 28px;
+}
+.ahv-toolbar button,
+.ahv-nav button {
+    cursor: pointer;
+}
+.ahv-toolbar select:focus,
+.ahv-toolbar button:focus,
+.ahv-nav button:focus {
+    outline: none;
+    box-shadow: 0 0 0 1px #55FFFF;
+}
+.ahv-toolbar button:hover:not(:disabled),
+.ahv-nav button:hover:not(:disabled) {
+    background: #AAAAAA;
+    color: #000;
+}
+.ahv-toolbar select:disabled,
+.ahv-toolbar button:disabled,
+.ahv-nav button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.ahv-toolbar button.is-active,
+.ahv-nav button.is-active {
+    border-color: #00AA00;
+    color: #55FF55;
+}
+.ahv-toolbar button.is-active:hover:not(:disabled),
+.ahv-nav button.is-active:hover:not(:disabled) {
+    background: #00AA00;
+    color: #000;
+}
+.ahv-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.ahv-share {
+    border-color: #55FFFF !important;
+    color: #55FFFF !important;
+}
+.ahv-share:hover:not(:disabled) {
+    background: #55FFFF !important;
+    color: #000 !important;
+}
+.ahv-panel .card-body {
+    background: #000;
+    padding: clamp(16px, 2.2vw, 24px);
+}
+.ahv-stage-wrap {
+    border: 1px solid #333333;
+    background: #000;
+    padding: 0;
+    overflow: auto;
+    scrollbar-width: none;
+    min-height: clamp(360px, 62vh, 980px);
+}
+.ahv-stage-wrap::-webkit-scrollbar {
+    display: none;
+}
+.ahv-stage-wrap.is-slideshow {
+    cursor: pointer;
+}
+.ahv-stage {
+    position: relative;
+    margin: 0 auto;
+    width: fit-content;
+}
+.ahv-stage-inner {
+    display: inline-block;
+    transform-origin: top left;
+}
+.ahv-stage pre.ahv-ansi-pre {
+    margin: 0;
+    background: transparent;
+    color: #A8A8A8;
+    display: inline-block;
+    white-space: pre;
+}
+.ahv-slide-note {
+    color: #AAAAAA;
+}
+.ahv-empty {
+    color: #AAAAAA;
+    padding: 32px 12px;
+    text-align: center;
+}
+.ahv-status {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 0.8em;
+}
+.ahv-status-text {
+    color: #55FFFF;
+}
+.ahv-error {
+    color: #FF5555;
+}
+@media (max-width: 980px) {
+    .ahv-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .ahv-toolbar {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .ahv-toolbar-field {
+        flex-basis: 100%;
+    }
+}
+</style>
+
+<div class="flg-shell">
+    <div class="card mb-3 ahv-panel" id="ahv-panel">
+        <div class="card-header">
+            <div class="ahv-header-copy">
+                <div class="ahv-title-row">
+                    <div class="ahv-title">Futureland Gallery</div>
+                    <div class="ahv-count" id="ahv-count">
+<?xjs
+    if (_gallery_state.current_count > 0) {
+        write(format('%u ANSI files', _gallery_state.current_count));
+    } else {
+        write('No ANSI files');
+    }
+?>
+                    </div>
+                </div>
+                <div class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></div>
+            </div>
+            <div class="ahv-toolbar">
+                <label class="ahv-toolbar-field" for="ahv-look" title="Choose a file, folder, gallery, or all galleries">
+                    <select id="ahv-look" aria-label="Choose where to look"></select>
+                </label>
+                <button type="button" id="ahv-order-toggle" title="Toggle between random and ordered behavior"><?xjs write(_gallery_state.slide_order === 'ordered' ? 'Ordered' : 'Random'); ?></button>
+                <button type="button" id="ahv-slideshow-toggle" title="Start or stop the slideshow"><?xjs write(_gallery_slideshow ? 'Stop' : 'Play'); ?></button>
+                <div class="ahv-nav">
+                    <button type="button" id="ahv-prev" title="Previous ANSI">&laquo;</button>
+                    <button type="button" id="ahv-random" title="Random ANSI">Random</button>
+                    <button type="button" id="ahv-next" title="Next ANSI">&raquo;</button>
+                    <button type="button" id="ahv-share" class="ahv-share" title="Share this ANSI">Share</button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="ahv-stage-wrap" id="ahv-stage-wrap">
+                <div class="ahv-stage" id="ahv-stage">
+                    <div class="ahv-stage-inner" id="ahv-stage-inner"><?xjs write(_gallery_state.render_html); ?></div>
+                </div>
+            </div>
+            <div class="ahv-status">
+                <span class="ahv-status-text" id="ahv-status"><?xjs write(_galleryEsc(_gallery_state.status_text || '')); ?></span>
+                <span class="ahv-error" id="ahv-error"><?xjs if (_gallery_state.error) write(_galleryEsc(_gallery_state.error)); ?></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var PAGE_FILE = '012-futureland-gallery.xjs';
+    var root = document.getElementById('ahv-panel');
+    if (!root || root.dataset.bound === '1') return;
+    root.dataset.bound = '1';
+
+    var state = <?xjs write(_gallery_state_json); ?>;
+    var initialLookKind = <?xjs write(JSON.stringify(_gallery_initial_look)); ?>;
+    var stage = document.getElementById('ahv-stage');
+    var stageInner = document.getElementById('ahv-stage-inner');
+    var stageWrap = document.getElementById('ahv-stage-wrap');
+    var lookSelect = document.getElementById('ahv-look');
+    var orderToggle = document.getElementById('ahv-order-toggle');
+    var slideshowToggle = document.getElementById('ahv-slideshow-toggle');
+    var fileLabel = document.getElementById('ahv-file');
+    var countLabel = document.getElementById('ahv-count');
+    var statusLabel = document.getElementById('ahv-status');
+    var errorLabel = document.getElementById('ahv-error');
+    var prevButton = document.getElementById('ahv-prev');
+    var nextButton = document.getElementById('ahv-next');
+    var randomButton = document.getElementById('ahv-random');
+    var shareButton = document.getElementById('ahv-share');
+    var slideshow = {
+        active: !!state.slideshow_active
+    };
+    var shareResetTimer = 0;
+    var resizeTimer = 0;
+    var resizeObserver;
+    var observedWidth = 0;
+    var layoutToken = 0;
+    var slideshowAdvanceTimer = 0;
+    var slideshowAnimationFrame = 0;
+    var slideshowCycleToken = 0;
+    var lookKind = resolveLookKind(state, initialLookKind);
+    var lookDir = resolveLookDirectory(state, lookKind);
+
+    function normalizeLookKind(value) {
+        value = String(value || '').toLowerCase();
+        if (value === 'file' || value === 'directory' || value === 'gallery' || value === 'all') {
+            return value;
+        }
+        return '';
+    }
+
+    function resolveInitialLookKind(payload, requestedKind) {
+        requestedKind = normalizeLookKind(requestedKind);
+        if (requestedKind === 'directory' && !String(payload.current_dir || '').length) {
+            return payload.slide_scope === 'gallery' ? 'gallery' : 'all';
+        }
+        if (requestedKind) return requestedKind;
+        if (payload.slide_scope === 'all') return 'all';
+        if (payload.slide_scope === 'gallery') return 'gallery';
+        if (payload.current_file) return 'file';
+        return 'directory';
+    }
+
+    function resolveLookKind(payload, requestedKind) {
+        requestedKind = resolveInitialLookKind(payload, requestedKind);
+        if (payload.slideshow_active) {
+            if (payload.slide_scope === 'all') return 'all';
+            if (payload.slide_scope === 'gallery') return 'gallery';
+            return 'directory';
+        }
+        if (requestedKind === 'file' && !payload.current_file) return 'directory';
+        return requestedKind;
+    }
+
+    function resolveLookDirectory(payload, requestedKind) {
+        requestedKind = normalizeLookKind(requestedKind);
+        if (requestedKind !== 'directory') {
+            return payload.current_dir || '';
+        }
+        if (payload.slide_scope === 'gallery') {
+            return '';
+        }
+        return payload.current_dir || '';
+    }
+
+    function isScopedLook() {
+        return lookKind === 'directory' || lookKind === 'gallery' || lookKind === 'all';
+    }
+
+    function getScopeForLook(kind, relativeDir) {
+        if (kind === 'all') return 'all';
+        if (kind === 'gallery') return 'gallery';
+        if (kind === 'directory' && !String(relativeDir || '').length) return 'all';
+        return 'directory';
+    }
+
+    function getScopedLookMode() {
+        return getScopeForLook(lookKind, lookDir || '');
+    }
+
+    function encodeLookValue(kind, galleryId, relativeDir, fileName) {
+        return [
+            normalizeLookKind(kind) || 'file',
+            encodeURIComponent(galleryId || ''),
+            encodeURIComponent(relativeDir || ''),
+            encodeURIComponent(fileName || '')
+        ].join('|');
+    }
+
+    function parseLookValue(value) {
+        var parts = String(value || '').split('|');
+        return {
+            kind: normalizeLookKind(parts[0]) || 'file',
+            gallery: decodeURIComponent(parts[1] || ''),
+            dir: decodeURIComponent(parts[2] || ''),
+            file: decodeURIComponent(parts[3] || '')
+        };
+    }
+
+    function getSelectedLookValue(payload) {
+        if (lookKind === 'all') {
+            return encodeLookValue('all', '', '', '');
+        }
+        if (lookKind === 'gallery' && payload.gallery && payload.gallery.id) {
+            return encodeLookValue('gallery', payload.gallery.id, '', '');
+        }
+        if (lookKind === 'directory' && payload.gallery && payload.gallery.id) {
+            return encodeLookValue('directory', payload.gallery.id, lookDir || '', '');
+        }
+        if (payload.gallery && payload.gallery.id && payload.current_file) {
+            return encodeLookValue('file', payload.gallery.id, payload.current_dir || '', payload.current_file);
+        }
+        if (payload.gallery && payload.gallery.id) {
+            return encodeLookValue('directory', payload.gallery.id, payload.current_dir || '', '');
+        }
+        return '';
+    }
+
+    function appendLookOption(parent, value, label, selectedValue) {
+        var option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        if (value === selectedValue) option.selected = true;
+        parent.appendChild(option);
+    }
+
+    function buildLookSelect(payload) {
+        var selectedValue = getSelectedLookValue(payload);
+        var galleryId = payload.gallery ? payload.gallery.id : '';
+        var hasOptions = false;
+
+        lookSelect.innerHTML = '';
+
+        if (payload.files && payload.files.length) {
+            var fileGroup = document.createElement('optgroup');
+            fileGroup.label = 'Files';
+            payload.files.forEach(function (file) {
+                appendLookOption(
+                    fileGroup,
+                    encodeLookValue('file', galleryId, payload.current_dir || '', file.name),
+                    file.label,
+                    selectedValue
+                );
+            });
+            lookSelect.appendChild(fileGroup);
+            hasOptions = true;
+        }
+
+        if (payload.directories && payload.directories.length) {
+            var dirGroup = document.createElement('optgroup');
+            dirGroup.label = 'Folders';
+            payload.directories.forEach(function (entry) {
+                appendLookOption(
+                    dirGroup,
+                    entry.path ? encodeLookValue('directory', galleryId, entry.path || '', '') : encodeLookValue('all', '', '', ''),
+                    entry.path ? ('Folder: ' + entry.label) : 'Root: Entire Archive',
+                    selectedValue
+                );
+            });
+            lookSelect.appendChild(dirGroup);
+            hasOptions = true;
+        }
+
+        if (payload.galleries && payload.galleries.length) {
+            var galleryGroup = document.createElement('optgroup');
+            galleryGroup.label = 'Galleries';
+            payload.galleries.forEach(function (entry) {
+                appendLookOption(
+                    galleryGroup,
+                    encodeLookValue('gallery', entry.id, '', ''),
+                    'Gallery: ' + entry.description,
+                    selectedValue
+                );
+            });
+            lookSelect.appendChild(galleryGroup);
+            hasOptions = true;
+        }
+
+        if (!hasOptions) {
+            appendLookOption(lookSelect, '', 'Nothing to show', '');
+            lookSelect.disabled = true;
+            return;
+        }
+
+        lookSelect.disabled = false;
+        if (lookSelect.selectedIndex < 0) lookSelect.selectedIndex = 0;
+    }
+
+    function resetSlideshowCycle() {
+        slideshowCycleToken += 1;
+        clearTimeout(slideshowAdvanceTimer);
+        slideshowAdvanceTimer = 0;
+        if (slideshowAnimationFrame) {
+            cancelAnimationFrame(slideshowAnimationFrame);
+            slideshowAnimationFrame = 0;
+        }
+    }
+
+    function queueSlideshowDelay(delayMs, callback) {
+        var token = slideshowCycleToken;
+
+        clearTimeout(slideshowAdvanceTimer);
+        slideshowAdvanceTimer = setTimeout(function () {
+            slideshowAdvanceTimer = 0;
+            if (!slideshow.active || token !== slideshowCycleToken) return;
+            callback();
+        }, delayMs);
+    }
+
+    function animateScrollTo(target, durationMs, callback) {
+        var token = slideshowCycleToken;
+        var startTop = stageWrap.scrollTop;
+        var delta = target - startTop;
+        var startedAt = 0;
+
+        if (!durationMs || Math.abs(delta) < 1) {
+            stageWrap.scrollTop = target;
+            callback();
+            return;
+        }
+
+        function step(timestamp) {
+            var progress;
+            var eased;
+
+            if (!slideshow.active || token !== slideshowCycleToken) return;
+            if (!startedAt) startedAt = timestamp;
+            progress = Math.min(1, (timestamp - startedAt) / durationMs);
+            eased = progress < 0.5
+                ? 2 * progress * progress
+                : 1 - (Math.pow(-2 * progress + 2, 2) / 2);
+            stageWrap.scrollTop = startTop + (delta * eased);
+
+            if (progress < 1) {
+                slideshowAnimationFrame = requestAnimationFrame(step);
+            } else {
+                slideshowAnimationFrame = 0;
+                callback();
+            }
+        }
+
+        slideshowAnimationFrame = requestAnimationFrame(step);
+    }
+
+    function getViewportHeightForSlideshow(scaledHeight) {
+        var rect = stageWrap.getBoundingClientRect();
+        var available = Math.floor(window.innerHeight - rect.top - 24);
+
+        if (!available || available < 280) {
+            available = Math.max(320, Math.floor(window.innerHeight * 0.58));
+        }
+
+        return Math.min(scaledHeight, Math.max(280, available));
+    }
+
+    function setLoading(loading) {
+        root.classList.toggle('ahv-loading', loading);
+        [
+            lookSelect,
+            orderToggle,
+            slideshowToggle,
+            prevButton,
+            nextButton,
+            randomButton,
+            shareButton
+        ].forEach(function (el) {
+            if (!el) return;
+            if (loading) {
+                el.setAttribute('disabled', 'disabled');
+            } else {
+                el.removeAttribute('disabled');
+            }
+        });
+    }
+
+    function updateControls(payload) {
+        var hasFiles = payload.current_count > 0;
+        var hasSlides = payload.slide_count > 0;
+
+        buildLookSelect(payload);
+        prevButton.disabled = !(hasSlides || hasFiles);
+        nextButton.disabled = !(hasSlides || hasFiles);
+        randomButton.disabled = !(hasSlides || hasFiles);
+        orderToggle.disabled = !isScopedLook() || !hasSlides;
+        orderToggle.textContent = payload.slide_order === 'ordered' ? 'Ordered' : 'Random';
+        slideshowToggle.disabled = !isScopedLook() || (!hasSlides && !slideshow.active);
+        slideshowToggle.classList.toggle('is-active', slideshow.active);
+        slideshowToggle.textContent = slideshow.active ? 'Stop' : 'Play';
+        lookSelect.title = 'Choose a file, folder, gallery, or all galleries';
+        orderToggle.title = isScopedLook()
+            ? 'Toggle between random and ordered behavior for the current scope'
+            : 'Order matters when looking at a folder or gallery';
+        slideshowToggle.title = isScopedLook()
+            ? 'Start or stop the slideshow for the current scope'
+            : 'Choose a folder or gallery to play a slideshow';
+        stageWrap.classList.toggle('is-slideshow', slideshow.active && hasSlides);
+    }
+
+    function scaleAnsi() {
+        var pre;
+        var wrapW;
+        var preW;
+        var preH;
+        var scale;
+        var scaledW;
+        var scaledH;
+        var viewportH;
+        var rawText;
+        var rowCount;
+
+        if (!stageWrap || !stage || !stageInner) {
+            return { hasAnsi: false, scrollDistance: 0, scaledHeight: 0, viewportHeight: 0, rowCount: 1 };
+        }
+
+        stageWrap.scrollTop = 0;
+        stage.style.width = '';
+        stage.style.height = '';
+        stageInner.style.transform = 'none';
+        stageWrap.style.height = 'auto';
+
+        pre = stageInner.querySelector('pre.ahv-ansi-pre');
+        if (!pre) {
+            return { hasAnsi: false, scrollDistance: 0, scaledHeight: 0, viewportHeight: 0, rowCount: 1 };
+        }
+
+        wrapW = Math.max(0, stageWrap.clientWidth);
+        preW = Math.max(1, pre.scrollWidth);
+        preH = Math.max(1, pre.scrollHeight);
+        scale = wrapW && preW ? (wrapW / preW) : 1;
+
+        if (!isFinite(scale) || scale <= 0) scale = 1;
+
+        scaledW = Math.max(1, Math.ceil(preW * scale));
+        scaledH = Math.max(1, Math.ceil(preH * scale));
+        viewportH = slideshow.active ? getViewportHeightForSlideshow(scaledH) : scaledH;
+
+        if (Math.abs(scale - 1) > 0.02) {
+            stageInner.style.transform = 'scale(' + scale + ')';
+        }
+        stage.style.width = scaledW + 'px';
+        stage.style.height = scaledH + 'px';
+        stageWrap.style.height = (viewportH + 2) + 'px';
+
+        rawText = String(pre.textContent || '').replace(/\s+$/, '');
+        rowCount = rawText.length ? rawText.split('\n').length : 1;
+
+        return {
+            hasAnsi: true,
+            scrollDistance: Math.max(0, scaledH - viewportH),
+            scaledHeight: scaledH,
+            viewportHeight: viewportH,
+            rowCount: Math.max(1, rowCount)
+        };
+    }
+
+    function scheduleScale(callback) {
+        var token = ++layoutToken;
+
+        function run() {
+            requestAnimationFrame(function () {
+                if (token !== layoutToken) return;
+                callback(scaleAnsi());
+            });
+        }
+
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(run, run);
+        } else {
+            requestAnimationFrame(function () {
+                setTimeout(run, 50);
+            });
+        }
+    }
+
+    function buildUrl(payload) {
+        var next = new URL(window.location.href);
+        var slideScope = payload.slide_scope || 'directory';
+        var slideOrder = payload.slide_order || 'random';
+        var currentLook = normalizeLookKind(lookKind);
+
+        next.searchParams.set('page', PAGE_FILE);
+        next.searchParams.delete('track');
+        next.searchParams.delete('slide_action');
+
+        if (payload.gallery && payload.gallery.id) {
+            next.searchParams.set('gallery', payload.gallery.id);
+        } else {
+            next.searchParams.delete('gallery');
+        }
+
+        if (payload.current_dir) {
+            next.searchParams.set('dir', payload.current_dir);
+        } else {
+            next.searchParams.delete('dir');
+        }
+
+        if (payload.current_file) {
+            next.searchParams.set('file', payload.current_file);
+        } else {
+            next.searchParams.delete('file');
+        }
+
+        if (slideScope !== 'directory') {
+            next.searchParams.set('slide_scope', slideScope);
+        } else {
+            next.searchParams.delete('slide_scope');
+        }
+
+        if (slideOrder !== 'random') {
+            next.searchParams.set('slide_order', slideOrder);
+        } else {
+            next.searchParams.delete('slide_order');
+        }
+
+        if (slideshow.active) {
+            next.searchParams.set('slideshow', '1');
+        } else {
+            next.searchParams.delete('slideshow');
+        }
+
+        if (currentLook && currentLook !== 'file') {
+            next.searchParams.set('look', currentLook);
+        } else {
+            next.searchParams.delete('look');
+        }
+
+        return next;
+    }
+
+    function syncUrl(payload) {
+        var next;
+
+        if (!window.history || !window.history.replaceState) return;
+        next = buildUrl(payload);
+        window.history.replaceState({
+            gallery: payload.gallery ? payload.gallery.id : '',
+            dir: payload.current_dir || '',
+            file: payload.current_file || '',
+            slide_scope: payload.slide_scope || 'directory',
+            slide_order: payload.slide_order || 'random',
+            look: normalizeLookKind(lookKind) || 'file',
+            slideshow: slideshow.active
+        }, '', next.toString());
+    }
+
+    function flashShareState(label) {
+        clearTimeout(shareResetTimer);
+        shareButton.textContent = label;
+        shareResetTimer = setTimeout(function () {
+            shareButton.textContent = 'Share';
+        }, 1600);
+    }
+
+    function getCountText(payload) {
+        if ((slideshow.active || isScopedLook()) && payload.slide_count > 0) {
+            if (payload.slide_index >= 0) {
+                return (payload.slide_index + 1) + ' / ' + payload.slide_count + ' in ' + (payload.slide_scope_label || 'slideshow');
+            }
+            return payload.slide_count + ' ANSI slides in ' + (payload.slide_scope_label || 'slideshow');
+        }
+
+        return payload.current_count > 0
+            ? ((payload.current_index + 1) + ' / ' + payload.current_count + ' in ' + ((payload.gallery && payload.gallery.description) || 'gallery'))
+            : 'No ANSI files';
+    }
+
+    function getStatusText(payload) {
+        if ((slideshow.active || isScopedLook()) && payload.slide_status_text) {
+            return (payload.status_text ? payload.status_text + ' | ' : '') + payload.slide_status_text;
+        }
+        return payload.status_text || '';
+    }
+
+    function advanceSlideshow(forceAction) {
+        var action = forceAction;
+
+        if (!slideshow.active) return;
+        if (!state.slide_count) {
+            slideshow.active = false;
+            updateControls(state);
+            syncUrl(state);
+            return;
+        }
+
+        if (!action) {
+            action = state.slide_index >= 0
+                ? (state.slide_order === 'ordered' ? 'next' : 'random')
+                : (state.slide_order === 'ordered' ? 'first' : 'random');
+        }
+
+        fetchState('select', {
+            slideAction: action,
+            slideshow: true
+        });
+    }
+
+    function startSlideshowCycle(metrics) {
+        var rowHeight;
+        var scrollSpeed;
+        var travelDuration;
+
+        if (!slideshow.active) return;
+        resetSlideshowCycle();
+
+        if (!state.slide_count) return;
+        if (state.slide_index < 0) {
+            queueSlideshowDelay(120, function () {
+                advanceSlideshow(state.slide_order === 'ordered' ? 'first' : 'random');
+            });
+            return;
+        }
+        if (!metrics || !metrics.hasAnsi) {
+            queueSlideshowDelay(1200, function () {
+                advanceSlideshow();
+            });
+            return;
+        }
+        if (metrics.scrollDistance <= 4) {
+            queueSlideshowDelay(4200, function () {
+                advanceSlideshow();
+            });
+            return;
+        }
+
+        rowHeight = metrics.scaledHeight / Math.max(1, metrics.rowCount);
+        scrollSpeed = Math.max(28, rowHeight * 12);
+        travelDuration = Math.max(1400, Math.round((metrics.scrollDistance / scrollSpeed) * 1000));
+        stageWrap.scrollTop = 0;
+
+        queueSlideshowDelay(600, function () {
+            animateScrollTo(metrics.scrollDistance, travelDuration, function () {
+                queueSlideshowDelay(750, function () {
+                    animateScrollTo(0, travelDuration, function () {
+                        queueSlideshowDelay(550, function () {
+                            animateScrollTo(metrics.scrollDistance, travelDuration, function () {
+                                queueSlideshowDelay(1000, function () {
+                                    advanceSlideshow();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    function setSlideshowActive(active) {
+        slideshow.active = !!active;
+        updateControls(state);
+        syncUrl(state);
+        scheduleScale(function (metrics) {
+            if (slideshow.active) {
+                startSlideshowCycle(metrics);
+            } else {
+                resetSlideshowCycle();
+            }
+        });
+    }
+
+    function render(payload) {
+        slideshow.active = !!payload.slideshow_active;
+        state = payload;
+        lookKind = resolveLookKind(payload, lookKind);
+        lookDir = resolveLookDirectory(payload, lookKind);
+
+        if (payload.render_html) {
+            stageInner.innerHTML = payload.render_html;
+        } else if (!stageInner.innerHTML.length) {
+            stageInner.innerHTML = '<div class="ahv-empty">No ANSI available.</div>';
+        }
+
+        fileLabel.textContent = payload.current_file_label || 'No ANSI selected';
+        countLabel.textContent = getCountText(payload);
+        statusLabel.textContent = getStatusText(payload);
+        errorLabel.textContent = payload.error || '';
+        updateControls(payload);
+        syncUrl(payload);
+        document.title = (payload.current_file_label || 'Futureland Gallery') + ' | Futureland Gallery';
+        scheduleScale(function (metrics) {
+            if (slideshow.active) {
+                startSlideshowCycle(metrics);
+            }
+        });
+    }
+
+    function fetchState(mode, overrides) {
+        var params = new URLSearchParams();
+        var requestedFile;
+        var requestedScope;
+
+        overrides = overrides || {};
+        requestedFile = overrides.file !== undefined ? overrides.file : (state.current_file || '');
+        requestedScope = overrides.slideScope !== undefined
+            ? overrides.slideScope
+            : (isScopedLook() ? getScopedLookMode() : (state.slide_scope || 'directory'));
+
+        resetSlideshowCycle();
+        params.set('mode', mode || 'select');
+        params.set('gallery', overrides.gallery !== undefined
+            ? overrides.gallery
+            : ((state.gallery && state.gallery.id) || '')
+        );
+        params.set('dir', overrides.dir !== undefined ? overrides.dir : (state.current_dir || ''));
+        params.set('slide_scope', requestedScope);
+        params.set('slide_order', overrides.slideOrder !== undefined
+            ? overrides.slideOrder
+            : (state.slide_order || 'random')
+        );
+        params.set('slideshow', overrides.slideshow !== undefined
+            ? (overrides.slideshow ? '1' : '0')
+            : (slideshow.active ? '1' : '0')
+        );
+
+        if (requestedFile.length) {
+            params.set('file', requestedFile);
+        }
+        if (overrides.slideAction) {
+            params.set('slide_action', overrides.slideAction);
+        }
+
+        setLoading(true);
+        fetch('./api/ansi-viewer.ssjs?' + params.toString(), {
+            credentials: 'same-origin'
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (payload) {
+                setLoading(false);
+                render(payload);
+            })
+            .catch(function (error) {
+                errorLabel.textContent = 'ANSI viewer request failed: ' + error;
+                setLoading(false);
+                updateControls(state);
+            });
+    }
+
+    function fetchScopedSelection(target, overrides) {
+        var scope = getScopeForLook(target.kind, target.dir || '');
+        var nextOrder = (overrides && overrides.slideOrder) || state.slide_order || 'random';
+        var targetGallery = target.gallery || ((state.gallery && state.gallery.id) || '');
+        var targetDir = target.kind === 'directory' ? (target.dir || '') : '';
+
+        fetchState('select', {
+            gallery: targetGallery,
+            dir: targetDir,
+            file: overrides && overrides.file !== undefined ? overrides.file : '',
+            slideScope: scope,
+            slideOrder: nextOrder,
+            slideAction: (overrides && overrides.slideAction) || (nextOrder === 'ordered' ? 'first' : 'random'),
+            slideshow: overrides && overrides.slideshow !== undefined ? overrides.slideshow : slideshow.active
+        });
+    }
+
+    function applyLookSelection(target) {
+        lookKind = normalizeLookKind(target.kind) || 'file';
+        if (lookKind === 'directory') {
+            lookDir = target.dir || '';
+        } else if (lookKind === 'file') {
+            lookDir = target.dir || '';
+        }
+
+        if (lookKind === 'file') {
+            fetchState('select', {
+                gallery: target.gallery || ((state.gallery && state.gallery.id) || ''),
+                dir: target.dir || '',
+                file: target.file || '',
+                slideScope: 'directory',
+                slideOrder: state.slide_order || 'random',
+                slideshow: false
+            });
+            return;
+        }
+
+        fetchScopedSelection(target);
+    }
+
+    function navigateCurrentView(action) {
+        if (isScopedLook() && state.slide_count > 0) {
+            fetchState('select', {
+                gallery: (state.gallery && state.gallery.id) || '',
+                dir: lookKind === 'directory' ? (lookDir || '') : '',
+                file: state.current_file || '',
+                slideScope: getScopedLookMode(),
+                slideOrder: state.slide_order || 'random',
+                slideAction: action,
+                slideshow: slideshow.active
+            });
+            return;
+        }
+
+        fetchState(action, {
+            gallery: (state.gallery && state.gallery.id) || '',
+            dir: state.current_dir || '',
+            file: state.current_file || '',
+            slideScope: 'directory',
+            slideOrder: state.slide_order || 'random',
+            slideshow: false
+        });
+    }
+
+    function shareCurrent() {
+        var url = buildUrl(state).toString();
+
+        if (navigator.share) {
+            navigator.share({
+                title: document.title || 'Futureland Gallery',
+                url: url
+            })
+                .then(function () {
+                    flashShareState('Shared');
+                })
+                .catch(function (error) {
+                    if (error && error.name === 'AbortError') return;
+                    console.error('[gallery] share failed:', error);
+                    flashShareState('Error');
+                });
+            return;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url)
+                .then(function () {
+                    flashShareState('Copied');
+                })
+                .catch(function (error) {
+                    console.error('[gallery] clipboard failed:', error);
+                    window.prompt('Copy this link:', url);
+                    flashShareState('Ready');
+                });
+            return;
+        }
+
+        window.prompt('Copy this link:', url);
+        flashShareState('Ready');
+    }
+
+    lookSelect.addEventListener('change', function () {
+        var target = parseLookValue(lookSelect.value);
+        if (!target.kind) return;
+        applyLookSelection(target);
+    });
+
+    orderToggle.addEventListener('click', function () {
+        var nextOrder = state.slide_order === 'ordered' ? 'random' : 'ordered';
+
+        if (isScopedLook()) {
+            fetchScopedSelection({
+                kind: getScopedLookMode(),
+                gallery: (state.gallery && state.gallery.id) || '',
+                dir: lookDir || ''
+            }, {
+                file: state.current_file || '',
+                slideOrder: nextOrder,
+                slideAction: 'current',
+                slideshow: slideshow.active
+            });
+            return;
+        }
+
+        fetchState('select', {
+            gallery: (state.gallery && state.gallery.id) || '',
+            dir: state.current_dir || '',
+            file: state.current_file || '',
+            slideScope: 'directory',
+            slideOrder: nextOrder,
+            slideshow: false
+        });
+    });
+
+    slideshowToggle.addEventListener('click', function () {
+        var startAction;
+
+        if (!isScopedLook()) return;
+        if (slideshow.active) {
+            setSlideshowActive(false);
+            return;
+        }
+
+        startAction = (
+            state.slide_scope === getScopedLookMode() &&
+            state.slide_index >= 0
+        ) ? 'current' : (state.slide_order === 'ordered' ? 'first' : 'random');
+
+        fetchState('select', {
+            gallery: (state.gallery && state.gallery.id) || '',
+            dir: lookKind === 'directory' ? (lookDir || '') : '',
+            file: state.current_file || '',
+            slideScope: getScopedLookMode(),
+            slideOrder: state.slide_order || 'random',
+            slideAction: startAction,
+            slideshow: true
+        });
+    });
+
+    prevButton.addEventListener('click', function () {
+        navigateCurrentView('prev');
+    });
+
+    randomButton.addEventListener('click', function () {
+        navigateCurrentView('random');
+    });
+
+    nextButton.addEventListener('click', function () {
+        navigateCurrentView('next');
+    });
+
+    shareButton.addEventListener('click', shareCurrent);
+
+    stageWrap.addEventListener('click', function () {
+        if (!slideshow.active) return;
+        advanceSlideshow();
+    });
+
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            scheduleScale(function (metrics) {
+                if (slideshow.active) {
+                    startSlideshowCycle(metrics);
+                }
+            });
+        }, 120);
+    });
+
+    if (window.ResizeObserver && root) {
+        resizeObserver = new ResizeObserver(function () {
+            var nextWidth = Math.round(stageWrap.clientWidth || 0);
+            if (nextWidth === observedWidth) return;
+            observedWidth = nextWidth;
+            scheduleScale(function (metrics) {
+                if (slideshow.active) {
+                    startSlideshowCycle(metrics);
+                }
+            });
+        });
+        observedWidth = Math.round(stageWrap.clientWidth || 0);
+        resizeObserver.observe(root);
+    }
+
+    render(state);
+})();
+</script>

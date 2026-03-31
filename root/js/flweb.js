@@ -116,6 +116,44 @@
         return true;
     }
 
+    function openUrl(payload, ctx) {
+        var url;
+        var target;
+        var popup;
+
+        payload = payload || {};
+        url = payload.url || payload.href || '';
+        if (!url) return false;
+
+        try {
+            url = new URL(String(url), window.location.href).toString();
+        } catch (_) {
+            url = String(url);
+        }
+
+        target = String(payload.target || '_blank');
+
+        if (target === '_self') {
+            window.location.assign(url);
+            return true;
+        }
+
+        try {
+            popup = window.open(url, target, 'noopener,noreferrer');
+            if (popup) {
+                try { popup.opener = null; } catch (_) {}
+                return true;
+            }
+        } catch (_) {}
+
+        return showToast({
+            title: payload.title || 'Open Link',
+            text: (payload.text || 'Popup blocked. Open this URL manually:') + ' ' + url,
+            duration: clampNumber(payload.duration, 3000, 60000, 9000),
+            hiddenOnly: false
+        }, ctx);
+    }
+
     function cleanupAudioHandle(id) {
         if (!id || !audioHandles[id]) return;
         delete audioHandles[id];
@@ -458,6 +496,33 @@
         return false;
     }
 
+    function handleRadioPlay(payload) {
+        var file = payload && (payload.file || payload.filename);
+        if (!file) {
+            console.warn('[flweb] radio.play: no file specified');
+            return false;
+        }
+        if (!window.sbbsRadio) {
+            console.warn('[flweb] radio.play: sbbsRadio not available');
+            showToast({ title: 'Radio', text: 'Radio player not loaded yet. Open the radio first.' });
+            return false;
+        }
+        if (typeof window.sbbsRadio.playByFile === 'function') {
+            window.sbbsRadio.playByFile(file);
+            return true;
+        }
+        console.warn('[flweb] radio.play: playByFile not available on sbbsRadio');
+        return false;
+    }
+
+    function handleRadioStop() {
+        if (window.sbbsRadio && typeof window.sbbsRadio.togglePlay === 'function' && window.sbbsRadio.isPlaying) {
+            window.sbbsRadio.togglePlay();
+            return true;
+        }
+        return false;
+    }
+
     function handleTerminalUi(msg, ctx) {
         var action = msg && msg.action;
         var payload = msg && msg.payload ? msg.payload : msg;
@@ -474,10 +539,21 @@
                 return stopAudio(payload);
             case 'speech.say':
                 return say(payload);
+            case 'url.open':
+                return openUrl(payload, ctx);
             case 'controller.mode':
             case 'controller.mapping':
             case 'controller.profile':
                 return handleController(action, payload, ctx);
+            case 'radio.play':
+                return handleRadioPlay(payload);
+            case 'radio.stop':
+                return handleRadioStop();
+            case 'bridge.probe':
+                /* Handled in terminal-iframe.html via WebSocket I/O.
+                   The parent gets a copy of the postMessage for logging only. */
+                console.log('[flweb] bridge.probe received (handled by iframe)');
+                return true;
             default:
                 console.warn('[flweb] unhandled terminal-ui action:', action, payload);
                 return false;
@@ -490,6 +566,7 @@
         unlockAudio: unlockAudio,
         playAudio: playAudio,
         stopAudio: stopAudio,
+        openUrl: openUrl,
         showToast: showToast,
         say: say
     };

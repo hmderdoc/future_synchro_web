@@ -27,6 +27,7 @@
     var editorInstance = null;
     var _onDone = null;
     var _onCancel = null;
+    var _onReady = null;
 
     /* ── Geometry defaults ── */
     var DEFAULT_WIDTH  = 980;
@@ -52,6 +53,7 @@
         opts = opts || {};
         _onDone = opts.onDone || null;
         _onCancel = opts.onCancel || null;
+        _onReady = opts.onReady || null;
 
         /* ── Backdrop ── */
         overlay = document.createElement('div');
@@ -66,13 +68,21 @@
         });
 
         /* ── Modal window ── */
+        var minWidth = typeof opts.minWidth === 'number' ? opts.minWidth : MIN_WIDTH;
+        var minHeight = typeof opts.minHeight === 'number' ? opts.minHeight : MIN_HEIGHT;
+        var width = typeof opts.width === 'number' ? Math.max(minWidth, opts.width) : DEFAULT_WIDTH;
+        var height = typeof opts.height === 'number' ? Math.max(minHeight, opts.height) : DEFAULT_HEIGHT;
+
         modal = document.createElement('div');
         modal.className = 'ae-modal-window';
-        modal.style.width  = DEFAULT_WIDTH + 'px';
-        modal.style.height = DEFAULT_HEIGHT + 'px';
+        if (opts.className) modal.className += ' ' + opts.className;
+        modal.style.width = width + 'px';
+        modal.style.height = height + 'px';
+        modal.style.minWidth = minWidth + 'px';
+        modal.style.minHeight = minHeight + 'px';
 
-        var left = Math.max(0, (window.innerWidth  - DEFAULT_WIDTH)  / 2);
-        var top  = Math.max(0, (window.innerHeight - DEFAULT_HEIGHT) / 2);
+        var left = Math.max(0, (window.innerWidth - width) / 2);
+        var top  = Math.max(0, (window.innerHeight - height) / 2);
         modal.style.left = left + 'px';
         modal.style.top  = top  + 'px';
 
@@ -111,7 +121,7 @@
         initDrag(titleBar, modal);
 
         /* ── Resizing ── */
-        initResize(resizeHandle, modal);
+        initResize(resizeHandle, modal, minWidth, minHeight);
 
         /* ── Create the ANSI editor inside ── */
         AnsiEditor.create({
@@ -123,6 +133,13 @@
             onCancel: function () { doCancel(); }
         }).then(function (editor) {
             editorInstance = editor;
+            if (_onReady) {
+                try {
+                    _onReady(editor);
+                } catch (err) {
+                    console.error('ANSI Editor modal onReady error:', err);
+                }
+            }
         }).catch(function (err) {
             console.error('ANSI Editor modal error:', err);
             close();
@@ -149,6 +166,7 @@
         }
         _onDone = null;
         _onCancel = null;
+        _onReady = null;
         teardown();
     }
 
@@ -160,6 +178,7 @@
         editorInstance = null;
         _onDone = null;
         _onCancel = null;
+        _onReady = null;
         teardown();
         // Now call back — editor is not yet destroyed, caller can read .doc
         if (cb) cb(ed);
@@ -207,7 +226,7 @@
     }
 
     /* ── Resize logic ── */
-    function initResize(handle, win) {
+    function initResize(handle, win, minWidth, minHeight) {
         var startX, startY, origW, origH;
 
         function onMouseDown(e) {
@@ -221,8 +240,8 @@
             document.addEventListener('mouseup', onMouseUp);
         }
         function onMouseMove(e) {
-            var w = Math.max(MIN_WIDTH,  origW + (e.clientX - startX));
-            var h = Math.max(MIN_HEIGHT, origH + (e.clientY - startY));
+            var w = Math.max(minWidth,  origW + (e.clientX - startX));
+            var h = Math.max(minHeight, origH + (e.clientY - startY));
             win.style.width  = w + 'px';
             win.style.height = h + 'px';
         }

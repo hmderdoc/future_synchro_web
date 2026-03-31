@@ -72,8 +72,7 @@
         return pool[Math.abs(h) % pool.length];
     }
 
-    function _sb_nodelist(evt) {
-        var data = JSON.parse(evt.data);
+    function _render_nodelist(data) {
         var tbody = document.getElementById('sbbs-nodelist-body');
         if (!tbody) return;
         tbody.innerHTML = '';
@@ -146,6 +145,21 @@
         }
     }
 
+    function _sb_nodelist(evt) {
+        _render_nodelist(JSON.parse(evt.data));
+    }
+
+    function _load_nodelist_snapshot() {
+        if (typeof v4_get !== 'function') return;
+        v4_get('./api/system.ssjs?call=node-list').then(function (data) {
+            if (!Array.isArray(data)) return;
+            _render_nodelist(data);
+        }).catch(function (err) {
+            console.error("Who's Online snapshot error:", err);
+        });
+    }
+
     registerEventListener('nodelist', _sb_nodelist);
+    _load_nodelist_snapshot();
 
 </script>

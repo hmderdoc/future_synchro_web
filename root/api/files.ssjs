@@ -102,6 +102,83 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				reply = false;
 			}
 			break;
+		                case 'view-file':
+                        var vdir = request.get_param('dir');
+                        var vfn  = request.has_param('file') ? request.get_param('file').toLowerCase() : '';
+                        if (vdir !== undefined
+                                && file_area.dir[vdir] !== undefined
+                                && file_area.dir[vdir].can_download
+                                && user.compare_ars(file_area.dir[vdir].download_ars)
+                                && vfn
+                        ) {
+                                var vfileBase = new OldFileBase(vdir);
+                                var vfile = null;
+                                vfileBase.some(function (e) {
+                                        if (e.name.toLowerCase() !== vfn) return false;
+                                        if (e.path !== undefined) { vfile = e; return true; }
+                                });
+                                vfileBase = undefined;
+                                if (vfile === null) { reply.error = 'File not found'; break; }
+                                /* OldFileBase does not map .ext; derive from filename */
+                                if (!vfile.ext) {
+                                        var _em = String(vfile.name || '').match(/\.([^.]+)$/);
+                                        if (_em) vfile.ext = _em[1].toLowerCase();
+                                }
+                                var vext = (vfile.ext || '').toLowerCase();
+                                if (vext === 'ans') {
+                                        /* Render ANSI to HTML server-side using graphic.js */
+                                        load('graphic.js');
+                                        var vSauce = load({}, 'sauce_lib.js');
+                                        var vGraphic;
+                                        try {
+                                                var sauce = vSauce.read(vfile.path);
+                                                if (sauce && sauce.cols && sauce.rows) {
+                                                        vGraphic = new Graphic(sauce.cols, sauce.rows);
+                                                } else {
+                                                        vGraphic = new Graphic();
+                                                }
+                                                if (!vGraphic.load(vfile.path)) {
+                                                        reply.error = 'Could not load ANSI file';
+                                                        break;
+                                                }
+                                                var vhtml = vGraphic.HTML;
+                                                vhtml = vhtml.replace(/background-color: black;/g, '');
+                                                vhtml = vhtml.replace(/"color: #a8a8a8;/g, '"');
+                                                vhtml = vhtml.replace(/ style=" "/g, '');
+                                                vhtml = vhtml.replace(/<span>([^<]*)<\/span>/g, '$1');
+                                                http_reply.header['Content-Type'] = 'text/html; charset=utf-8';
+                                                http_reply.header['Content-Length'] = vhtml.length;
+                                                write(vhtml);
+                                                reply = false;
+                                        } catch (err) {
+                                                reply.error = 'ANSI render error: ' + String(err);
+                                        }
+                                } else {
+                                        /* Serve file inline with proper MIME type */
+                                        var vmt = getMimeType(vfile);
+                                        http_reply.header['Content-Type'] = vmt;
+                                        http_reply.header['Content-Disposition'] = 'inline';
+                                        http_reply.header['Content-Length'] = file_size(vfile.path);
+                                        http_reply.header['Cache-Control'] = 'public, max-age=3600';
+                                        if (vmt.indexOf('audio/') === 0) {
+                                                http_reply.header['Accept-Ranges'] = 'bytes';
+                                        }
+                                        var vf = new File(vfile.path);
+                                        vf.open('rb');
+                                        for (var vn = 0; vn < vf.length; vn += CHUNK_SIZE) {
+                                                var vr = vf.length - vf.position;
+                                                write(vf.read(vr > CHUNK_SIZE ? CHUNK_SIZE : vr));
+                                                yield(false);
+                                        }
+                                        vf.close();
+                                        vf = undefined;
+                                        reply = false;
+                                }
+                        } else {
+                                reply.error = 'Invalid directory or access denied';
+                        }
+                        break;
+
 		case 'list-files':
 			var ldir = request.get_param('dir');
 			if (ldir !== undefined

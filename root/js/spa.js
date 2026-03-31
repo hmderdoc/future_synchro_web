@@ -10,6 +10,7 @@
     var contentEl = document.getElementById('content');
     var sidebarEl = document.getElementById('sidebar');
     var isNavigating = false;
+    var sidebarRefreshMs = 60000;
 
     /* ---------- helpers ---------- */
 
@@ -89,6 +90,36 @@
         window.dispatchEvent(new CustomEvent(name, { detail: detail }));
     }
 
+    function drawAvatars(container) {
+        if (typeof Avatars === 'undefined' || !Avatars.draw || !container) return;
+        var avatarEls = container.querySelectorAll('div[data-avatar]');
+        if (!avatarEls.length) return;
+        var users = [];
+        avatarEls.forEach(function (el) {
+            var u = el.getAttribute('data-avatar');
+            if (u && users.indexOf(u) < 0) users.push(u);
+        });
+        if (users.length) Avatars.draw(users);
+    }
+
+    function refreshSidebar() {
+        if (!sidebarEl || sidebarEl.style.display === 'none') return Promise.resolve();
+        return fetch('./api/sidebar.ssjs', {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'SPA' }
+        }).then(function (res) {
+            return res.text();
+        }).then(function (html) {
+            if (!sidebarEl) return;
+            sidebarEl.innerHTML = html;
+            executeScripts(sidebarEl);
+            drawAvatars(sidebarEl);
+            dispatch('spa:sidebarRefreshed', {});
+        }).catch(function (err) {
+            console.error('Sidebar refresh error:', err);
+        });
+    }
+
     /* ---------- navigation ---------- */
 
     /** Navigate via SPA. href is a full or relative URL like "./?page=X&group=0" */
@@ -132,22 +163,20 @@
                 }
 
                 window.scrollTo(0, 0);
+                drawAvatars(contentEl);
 
-                if (typeof Avatars !== 'undefined' && Avatars.draw) {
-                    var avatarEls = contentEl.querySelectorAll('div[data-avatar]');
-                    if (avatarEls.length) {
-                        var users = [];
-                        avatarEls.forEach(function (el) {
-                            var u = el.getAttribute('data-avatar');
-                            if (u && users.indexOf(u) < 0) users.push(u);
-                        });
-                        if (users.length) Avatars.draw(users);
-                    }
+                var finishNavigate = function () {
+                    window.sbbsConfig.currentPage = page;
+                    dispatch('spa:afterNavigate', { page: page, title: title });
+                    isNavigating = false;
+                };
+
+                if (noSidebar) {
+                    finishNavigate();
+                    return;
                 }
 
-                window.sbbsConfig.currentPage = page;
-                dispatch('spa:afterNavigate', { page: page, title: title });
-                isNavigating = false;
+                refreshSidebar().then(finishNavigate);
             });
         }).catch(function (err) {
             console.error('SPA navigation error:', err);
@@ -201,15 +230,7 @@
     );
 
     // On first load, draw avatars in SSR content
-    if (typeof Avatars !== 'undefined' && Avatars.draw) {
-        var avatarEls = contentEl.querySelectorAll('div[data-avatar]');
-        if (avatarEls.length) {
-            var users = [];
-            avatarEls.forEach(function (el) {
-                var u = el.getAttribute('data-avatar');
-                if (u && users.indexOf(u) < 0) users.push(u);
-            });
-            if (users.length) Avatars.draw(users);
-        }
-    }
+    drawAvatars(contentEl);
+    refreshSidebar();
+    window.setInterval(refreshSidebar, sidebarRefreshMs);
 })();

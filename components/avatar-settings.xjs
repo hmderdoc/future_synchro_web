@@ -1,0 +1,76 @@
+<?xjs
+var avatarSettingsMode = (typeof avatar_settings_mode === 'string' && avatar_settings_mode.length)
+    ? avatar_settings_mode : 'account';
+var avatarSettingsTitle = (typeof avatar_settings_title === 'string' && avatar_settings_title.length)
+    ? avatar_settings_title : 'Avatar';
+var avatarSettingsFieldName = (typeof avatar_settings_field_name === 'string' && avatar_settings_field_name.length)
+    ? avatar_settings_field_name : '';
+var avatarSettingsEmptyText = (typeof avatar_settings_empty_text === 'string' && avatar_settings_empty_text.length)
+    ? avatar_settings_empty_text : 'Loading avatar...';
+var avatarSettingsRequired = (typeof avatar_settings_required !== 'undefined' && !!avatar_settings_required)
+    || avatarSettingsFieldName.length > 0;
+?>
+<div class="avatar-settings-widget card"
+     data-avatar-settings
+     data-avatar-settings-mode="<?xjs write(avatarSettingsMode); ?>"
+     data-avatar-settings-empty-label="<?xjs write(avatarSettingsEmptyText); ?>"
+     data-avatar-user-number="<?xjs write(user.number); ?>"
+     data-avatar-user-alias="<?xjs write(user.alias); ?>">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="avatar-settings-title">
+            <span class="bin-icon" data-icon="users"></span><?xjs write(avatarSettingsTitle); ?>
+<?xjs if (avatarSettingsRequired) { ?>
+            <span title="Required" class="avatar-settings-required">*</span>
+<?xjs } ?>
+        </span>
+        <span class="avatar-settings-size-note">10 x 6 ANSI</span>
+    </div>
+    <div class="card-body">
+        <div class="avatar-settings-default">
+            <div class="avatar-settings-main">
+                <div class="avatar-settings-current-preview" data-avatar-settings-current-preview>
+                    <div class="avatar-settings-placeholder"><?xjs write(avatarSettingsEmptyText); ?></div>
+                </div>
+                <div class="avatar-settings-actions">
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-avatar-settings-library>
+                        Choose from Library
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-avatar-settings-draw>
+                        Draw / Edit in ANSI
+                    </button>
+                </div>
+            </div>
+<?xjs if (avatarSettingsFieldName.length) { ?>
+            <input type="hidden" name="<?xjs write(avatarSettingsFieldName); ?>" value="" data-avatar-settings-input>
+<?xjs } ?>
+            <div class="avatar-settings-status" data-avatar-settings-status aria-live="polite" hidden></div>
+        </div>
+    </div>
+
+    <div class="avatar-settings-modal" data-avatar-settings-modal hidden>
+        <div class="avatar-settings-modal-backdrop" data-avatar-settings-modal-close></div>
+        <div class="avatar-settings-modal-dialog" role="dialog" aria-modal="true" aria-label="Avatar Library">
+            <div class="avatar-settings-modal-header">
+                <h3 class="avatar-settings-heading">Shared Collections</h3>
+            </div>
+            <div class="avatar-settings-modal-body">
+                <div class="avatar-settings-modal-toolbar">
+                    <label class="avatar-settings-field">
+                        <span class="avatar-settings-label">Collection</span>
+                        <select class="form-select form-select-sm" data-avatar-settings-collection></select>
+                    </label>
+                    <div class="avatar-settings-collection-meta" data-avatar-settings-collection-meta></div>
+                </div>
+                <div class="avatar-settings-grid" data-avatar-settings-grid>
+                    <div class="avatar-settings-placeholder">Loading shared avatars...</div>
+                </div>
+            </div>
+            <div class="avatar-settings-modal-footer">
+                <button type="button" class="btn btn-default btn-sm" data-avatar-settings-modal-close>Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" data-avatar-settings-apply disabled>
+                    Use Selected Avatar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

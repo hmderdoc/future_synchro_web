@@ -1,0 +1,23 @@
+<!--HIDDEN:Settings-->
+<?xjs
+    if (user.number < 1 || user.alias === settings.guest) exit();
+?>
+
+<link rel="stylesheet" href="./css/ansi-editor-modal.css">
+<script type="text/javascript" src="./js/ansi-editor.js"></script>
+<script type="text/javascript" src="./js/ansi-editor-modal.js"></script>
+<script type="text/javascript" src="./js/avatar-settings.js?_v=<?xjs write(time()); ?>"></script>
+
+<div class="settings-page">
+    <div class="card settings-page-hero">
+        <div class="card-header">
+            <span class="bin-icon" data-icon="doc_edit"></span>Settings
+        </div>
+    </div>
+
+    <? load(xjs_compile(settings.web_components + 'avatar-settings.xjs')); ?>
+</div>
+
+<script>
+    if (typeof initAvatarSettingsWidgets === 'function') initAvatarSettingsWidgets(document);
+</script>

@@ -112,11 +112,13 @@
     background: #313244;
     border-radius: 4px;
     cursor: pointer;
-    font-weight: bold;
-    font-size: 13px;
     color: #bac2de;
     margin-bottom: 3px;
     transition: background 0.15s;
+}
+.me-tool-btn svg {
+    width: 16px;
+    height: 16px;
 }
 .me-tool-btn:hover {
     background: #45475a;

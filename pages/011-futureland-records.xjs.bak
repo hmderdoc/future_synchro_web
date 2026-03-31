@@ -1,0 +1,1914 @@
+<!--Futureland Records-->
+<?xjs
+    function _recordsQueryValue(name) {
+        return (
+            typeof http_request.query[name] !== 'undefined' &&
+            http_request.query[name].length
+        ) ? String(http_request.query[name][0]) : '';
+    }
+
+    var _records_track = _recordsQueryValue('track');
+    var _records_track_json = JSON.stringify(_records_track).replace(/<\//g, '<\\/');
+?>
+
+<style>
+.flrd-shell {
+    max-width: min(1720px, 96vw);
+    margin: 0 auto;
+    display: grid;
+    gap: 18px;
+}
+.flrd-page-art {
+    display: flex;
+    justify-content: center;
+    border: 1px solid #55FFFF;
+    background: #000;
+    padding: clamp(14px, 2vw, 24px);
+    box-shadow: 0 0 0 1px rgba(85, 255, 255, 0.08) inset;
+}
+.flrd-page-art img {
+    display: block;
+    width: min(100%, 980px);
+    height: auto;
+    object-fit: contain;
+}
+.flrd-panel {
+    --bs-card-border-color: #5555FF;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #5555FF;
+    border-color: #5555FF !important;
+    background: #000 !important;
+    container-type: inline-size;
+}
+.flrd-panel > .card-header {
+    color: #5555FF !important;
+    background: #000 !important;
+    border-bottom: 2px solid #5555FF !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.flrd-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    color: #5555FF;
+}
+.flrd-brand-head {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    display: block;
+    object-fit: contain;
+    background: transparent;
+    image-rendering: auto;
+    filter: drop-shadow(0 0 10px rgba(85, 255, 85, 0.6));
+}
+.flrd-brand-label {
+    display: inline-block;
+    color: #5555FF;
+    border-bottom: 2px solid #55FFFF;
+    padding-bottom: 2px;
+    line-height: 1;
+}
+.flrd-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.flrd-nav button {
+    background: transparent;
+    border: 1px solid #5555FF;
+    color: #55FFFF;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.flrd-nav button:hover:not(:disabled) {
+    background: rgba(85, 255, 255, 0.12);
+    border-color: #55FFFF;
+    color: #55FFFF;
+}
+.flrd-nav button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.flrd-share {
+    border-color: #55FFFF !important;
+}
+.flrd-counter {
+    color: #AAAAAA;
+    font-size: 0.78em;
+    font-weight: normal;
+}
+.flrd-body {
+    padding: clamp(18px, 2.4vw, 30px);
+}
+.flrd-loading,
+.flrd-empty {
+    color: #AAAAAA;
+    padding: 36px 16px;
+    text-align: center;
+}
+.flrd-empty {
+    color: #AA5500;
+}
+.flrd-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+        "art"
+        "meta";
+    gap: clamp(18px, 2.8vw, 28px);
+    align-items: center;
+    justify-items: center;
+}
+.flrd-layout.is-hidden {
+    display: none;
+}
+.flrd-art-wrap {
+    grid-area: art;
+    width: min(100%, 640px);
+    aspect-ratio: 1 / 1;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: box-shadow 0.3s;
+    padding: 0;
+}
+.flrd-art-wrap:hover {
+    box-shadow: 0 0 22px rgba(255, 85, 255, 0.4);
+}
+.flrd-art-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.flrd-no-art {
+    color: #555;
+    font-size: clamp(3rem, 9vw, 5.5rem);
+}
+.flrd-play-badge {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.74);
+    color: #55FF55;
+    font-size: 1.55em;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+.flrd-art-wrap:hover .flrd-play-badge {
+    opacity: 1;
+}
+.flrd-meta {
+    grid-area: meta;
+    min-width: 0;
+    width: min(100%, 720px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    justify-content: center;
+}
+.flrd-title {
+    color: #55FFFF;
+    font-weight: bold;
+    font-size: clamp(1.32rem, 3.1cqi, 2.65rem);
+    line-height: 1.08;
+}
+.flrd-credits {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.36em;
+    font-size: clamp(1rem, 1.95cqi, 1.34rem);
+    line-height: 1.25;
+}
+.flrd-artist-name,
+.flrd-composer-name {
+    color: #55FF55;
+}
+.flrd-credit-sep {
+    color: #AAAAAA;
+}
+.flrd-albumline {
+    color: #AAAAAA;
+    font-size: clamp(0.94rem, 1.45cqi, 1.12rem);
+    line-height: 1.3;
+}
+.flrd-album-name {
+    font-style: italic;
+}
+.flrd-album-year {
+    color: #FF5555;
+}
+.flrd-genre-line {
+    color: #AAAAAA;
+    font-size: clamp(0.92rem, 1.34cqi, 1.05rem);
+}
+.flrd-genre {
+    color: #FFFF55;
+}
+.flrd-fileline {
+    color: #AAAAAA;
+    font-size: 0.84rem;
+    word-break: break-word;
+}
+.flrd-status {
+    color: #55FFFF;
+    font-size: 0.84rem;
+    min-height: 1.2em;
+}
+.flrd-control-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 10px;
+}
+.flrd-control {
+    display: block;
+    width: 100%;
+}
+.flrd-control span {
+    display: block;
+    color: #AAAAAA;
+    font-size: 0.72em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+.flrd-control select {
+    width: 100%;
+    background: #050505;
+    color: #FFFFFF;
+    border: 1px solid #5555FF;
+    padding: 8px 10px;
+    border-radius: 2px;
+    font-family: inherit;
+}
+.flrd-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+.flrd-play-button {
+    background: transparent;
+    border: 1px solid #00AA00;
+    color: #55FF55;
+    font-family: monospace;
+    font-size: 0.92rem;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.flrd-play-button:hover:not(:disabled) {
+    background: #00AA00;
+    color: #000;
+}
+.flrd-play-button:disabled {
+    cursor: default;
+}
+.flrd-play-button.is-playing {
+    border-color: #FF55FF;
+    color: #FF55FF;
+}
+.flrd-play-button.is-playing:hover {
+    background: transparent;
+    color: #FF55FF;
+}
+.flrd-play-icon {
+    color: #55FFFF;
+}
+.flrsb-panel {
+    --bs-card-border-color: #00AA00;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #55FF55;
+    border-color: #00AA00 !important;
+    background: #000 !important;
+    container-type: inline-size;
+}
+.flrsb-panel > .card-header {
+    color: #55FF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #00AA00 !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.flrsb-brand {
+    display: grid;
+    gap: 6px;
+}
+.flrsb-brand-kicker {
+    color: #55FF55;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.flrsb-head-copy {
+    color: #AAAAAA;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    max-width: 74ch;
+}
+.flrsb-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.flrsb-head-status {
+    color: #55FFFF;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+.flrsb-preview-toggle {
+    background: transparent;
+    border: 1px solid #55FFFF;
+    color: #55FFFF;
+    font-family: monospace;
+    font-size: 0.78rem;
+    line-height: 1;
+    padding: 5px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.flrsb-preview-toggle:hover {
+    background: rgba(85, 255, 255, 0.12);
+}
+.flrsb-preview-toggle.is-active {
+    border-color: #00AA00;
+    color: #55FF55;
+}
+.flrsb-body {
+    padding: clamp(18px, 2.3vw, 30px);
+}
+.flrsb-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(18px, 2.5vw, 28px);
+}
+.flrsb-form-grid {
+    display: grid;
+    gap: 18px;
+}
+.flrsb-group {
+    border: 1px solid #333333;
+    background: #040404;
+    padding: clamp(14px, 1.8vw, 20px);
+    display: grid;
+    gap: 14px;
+}
+.flrsb-group-head {
+    display: grid;
+    gap: 4px;
+}
+.flrsb-group-head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.flrsb-group-title {
+    margin: 0;
+    color: #55FFFF;
+    font-size: 1rem;
+}
+.flrsb-group-copy {
+    color: #AAAAAA;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.flrsb-field-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+.flrsb-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+.flrsb-field > span {
+    color: #AAAAAA;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+}
+.flrsb-field input,
+.flrsb-field select,
+.flrsb-field textarea,
+.flrsb-preview {
+    width: 100%;
+    background: #050505;
+    color: #FFFFFF;
+    border: 1px solid #00AA00;
+    border-radius: 2px;
+    padding: 9px 10px;
+    font-family: inherit;
+    line-height: 1.35;
+}
+.flrsb-field textarea {
+    min-height: 124px;
+    resize: vertical;
+}
+.flrsb-field input::placeholder,
+.flrsb-field textarea::placeholder {
+    color: #777777;
+}
+.flrsb-help {
+    color: #888888;
+    font-size: 0.72rem;
+}
+.flrsb-preset-stack {
+    display: grid;
+    gap: 6px;
+}
+.flrsb-preset-stack input[hidden] {
+    display: none !important;
+}
+.flrsb-mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.flrsb-mode-button,
+.flrsb-copy-button,
+.flrsb-utility-button {
+    background: transparent;
+    border: 1px solid #55FFFF;
+    color: #55FFFF;
+    font-family: monospace;
+    font-size: 0.88rem;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.flrsb-mode-button:hover,
+.flrsb-copy-button:hover,
+.flrsb-utility-button:hover {
+    background: rgba(85, 255, 255, 0.12);
+}
+.flrsb-utility-button {
+    font-size: 0.76rem;
+    padding: 5px 8px;
+    line-height: 1;
+    white-space: nowrap;
+}
+.flrsb-mode-button.is-active {
+    border-color: #00AA00;
+    color: #55FF55;
+    background: rgba(0, 170, 0, 0.14);
+}
+.flrsb-mode-panel[hidden] {
+    display: none !important;
+}
+.flrsb-section-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+.flrsb-section-card {
+    border: 1px solid #222222;
+    background: #000000;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+}
+.flrsb-section-label {
+    color: #FFFF55;
+    font-size: 0.8rem;
+}
+.flrsb-preview-group {
+    height: 100%;
+}
+.flrsb-preview-col[hidden] {
+    display: none !important;
+}
+.flrsb-preview-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.flrsb-preview {
+    min-height: 580px;
+    resize: vertical;
+    white-space: pre-wrap;
+}
+.flrsb-copy-status {
+    color: #AAAAAA;
+    font-size: 0.76rem;
+    min-height: 1.2em;
+}
+@container (min-width: 760px) {
+    .flrsb-field-grid.is-two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .flrsb-section-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .flrsb-field.is-span-2,
+    .flrsb-section-card.is-span-2 {
+        grid-column: 1 / -1;
+    }
+}
+@container (min-width: 1220px) {
+    .flrsb-layout.is-preview-open {
+        grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
+        align-items: start;
+    }
+    .flrsb-preview-col {
+        position: sticky;
+        top: 92px;
+    }
+}
+@container (min-width: 980px) {
+    .flrd-layout {
+        grid-template-columns: minmax(340px, 1fr) minmax(420px, 560px);
+        grid-template-areas: "meta art";
+        gap: clamp(26px, 4.2cqi, 58px);
+        justify-content: center;
+    }
+    .flrd-art-wrap {
+        width: min(44cqi, 560px);
+    }
+    .flrd-meta {
+        width: min(100%, 560px);
+    }
+}
+@media (max-width: 760px) {
+    .flrd-art-wrap {
+        width: min(88vw, 520px);
+    }
+}
+</style>
+
+<div class="flrd-shell">
+    <div class="flrd-page-art">
+        <img src="./images/vektrax_music.png?v=1774848270" alt="Futureland Records">
+    </div>
+
+    <div class="card mb-3 flrd-panel" id="flrd-panel">
+        <div class="card-header">
+            <div class="flrd-brand">
+                <img src="./images/vektrax-head-anim.png" alt="" class="flrd-brand-head">
+                <span class="flrd-brand-label">Futureland Records</span>
+            </div>
+            <div class="flrd-nav">
+                <button type="button" id="flrd-prev" title="Previous track">&laquo;</button>
+                <span class="flrd-counter" id="flrd-counter">&mdash;</span>
+                <button type="button" id="flrd-next" title="Next track">&raquo;</button>
+                <button type="button" id="flrd-share" class="flrd-share" title="Share this track">Share</button>
+            </div>
+        </div>
+        <div class="card-body flrd-body">
+            <div class="flrd-loading" id="flrd-loading">Loading tracks&hellip;</div>
+            <div class="flrd-empty" id="flrd-empty" hidden></div>
+            <div class="flrd-layout is-hidden" id="flrd-layout">
+                <div class="flrd-meta">
+                    <div class="flrd-title" id="flrd-title"></div>
+                    <div class="flrd-credits" id="flrd-credits"></div>
+                    <div class="flrd-albumline" id="flrd-albumline"></div>
+                    <div class="flrd-genre-line" id="flrd-genre-line"></div>
+                    <div class="flrd-fileline" id="flrd-fileline"></div>
+                    <div class="flrd-status" id="flrd-status"></div>
+                    <div class="flrd-control-grid">
+                        <label class="flrd-control" for="flrd-track-select">
+                            <span>Track</span>
+                            <select id="flrd-track-select"></select>
+                        </label>
+                    </div>
+                    <div class="flrd-actions">
+                        <button type="button" class="flrd-play-button" id="flrd-play-button">
+                            <span class="flrd-play-icon">▶</span> Play This Track
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="flrd-art-wrap" id="flrd-art-wrap" aria-label="Play selected track">
+                    <img id="flrd-art" alt="" hidden>
+                    <div class="flrd-no-art" id="flrd-no-art">♫</div>
+                    <div class="flrd-play-badge">▶</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <?xjs if (user.number > 0) { ?>
+    <div class="card mb-3 flrsb-panel" id="flrsb-panel">
+        <div class="card-header">
+            <div class="flrsb-brand">
+                <span class="flrsb-brand-kicker">Vektrax Song Builder</span>
+                <div class="flrsb-head-copy">Preset-heavy song DNA, lyric modes, and a live preview so you can shape a Vektrax-ready prompt before we wire execution into the page.</div>
+            </div>
+            <div class="flrsb-head-actions">
+                <div class="flrsb-head-status" id="flrsb-head-status">Preview hidden</div>
+                <button type="button" class="flrsb-preview-toggle" id="flrsb-preview-toggle" aria-controls="flrsb-preview-col" aria-expanded="false">Preview ▸</button>
+            </div>
+        </div>
+        <div class="card-body flrsb-body">
+            <div class="flrsb-layout">
+                <div class="flrsb-form-col">
+                    <div class="flrsb-form-grid">
+                        <section class="flrsb-group">
+                            <div class="flrsb-group-head">
+                                <div class="flrsb-group-head-row">
+                                    <h3 class="flrsb-group-title">Song DNA</h3>
+                                    <button type="button" class="flrsb-utility-button" id="flrsb-shuffle-button">Shuffle DNA</button>
+                                </div>
+                                <div class="flrsb-group-copy">Use presets to break a mental block, then override any field with custom language when you want a more specific steer.</div>
+                            </div>
+                            <div class="flrsb-field-grid is-two">
+                                <label class="flrsb-field is-span-2" for="flrsb-song-title">
+                                    <span>Working Title</span>
+                                    <input type="text" id="flrsb-song-title" placeholder="Futureland After Midnight">
+                                </label>
+                                <label class="flrsb-field" for="flrsb-genre-select">
+                                    <span>Genre</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-genre-select"></select>
+                                        <input type="text" id="flrsb-genre-custom" placeholder="Custom genre" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-feel-select">
+                                    <span>Feel</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-feel-select"></select>
+                                        <input type="text" id="flrsb-feel-custom" placeholder="Custom feel" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-tone-select">
+                                    <span>Tone</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-tone-select"></select>
+                                        <input type="text" id="flrsb-tone-custom" placeholder="Custom tone" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-arrangement-select">
+                                    <span>Arrangement Style</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-arrangement-select"></select>
+                                        <input type="text" id="flrsb-arrangement-custom" placeholder="Custom arrangement style" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-instrumentation-select">
+                                    <span>Instrumentation</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-instrumentation-select"></select>
+                                        <input type="text" id="flrsb-instrumentation-custom" placeholder="Custom instrumentation" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-groove-select">
+                                    <span>Groove</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-groove-select"></select>
+                                        <input type="text" id="flrsb-groove-custom" placeholder="Custom groove" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-band-select">
+                                    <span>Band / Player Style</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-band-select"></select>
+                                        <input type="text" id="flrsb-band-custom" placeholder="Custom player style" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-leadvocal-select">
+                                    <span>Lead Singer Type</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-leadvocal-select"></select>
+                                        <input type="text" id="flrsb-leadvocal-custom" placeholder="Custom lead singer type" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-backingvocal-select">
+                                    <span>Background Singer(s) Type</span>
+                                    <div class="flrsb-preset-stack">
+                                        <select id="flrsb-backingvocal-select"></select>
+                                        <input type="text" id="flrsb-backingvocal-custom" placeholder="Custom background singer type" hidden>
+                                    </div>
+                                </label>
+                                <label class="flrsb-field is-span-2" for="flrsb-brief">
+                                    <span>Core Idea / Story Seed</span>
+                                    <textarea id="flrsb-brief" placeholder="A late-night city pulse, a sense of momentum, and a chorus that feels like headlights cutting through rain."></textarea>
+                                </label>
+                                <label class="flrsb-field is-span-2" for="flrsb-notes">
+                                    <span>Production Cues / Extra Direction</span>
+                                    <textarea id="flrsb-notes" placeholder="Reference transitions, must-have sonic details, call-and-response hooks, or things Vektrax should avoid."></textarea>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="flrsb-group">
+                            <div class="flrsb-group-head">
+                                <h3 class="flrsb-group-title">Explicit Settings</h3>
+                                <div class="flrsb-group-copy">These map to the more literal controls we may pass through later, including tempo logic, key, and language.</div>
+                            </div>
+                            <div class="flrsb-field-grid is-two">
+                                <label class="flrsb-field" for="flrsb-language-select">
+                                    <span>Language</span>
+                                    <select id="flrsb-language-select"></select>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-key-select">
+                                    <span>Key Signature</span>
+                                    <select id="flrsb-key-select"></select>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-timesig-select">
+                                    <span>Time Signature</span>
+                                    <select id="flrsb-timesig-select"></select>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-bpm-mode">
+                                    <span>BPM Strategy</span>
+                                    <select id="flrsb-bpm-mode"></select>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-bpm-value">
+                                    <span>Custom BPM</span>
+                                    <input type="number" id="flrsb-bpm-value" min="40" max="260" step="1" placeholder="128">
+                                    <div class="flrsb-help">Only used when BPM Strategy is set to Custom numeric.</div>
+                                </label>
+                                <label class="flrsb-field" for="flrsb-duration-value">
+                                    <span>Duration (Seconds)</span>
+                                    <input type="number" id="flrsb-duration-value" min="15" max="1200" step="1" placeholder="142">
+                                    <div class="flrsb-help">Optional explicit target duration for the generated song.</div>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="flrsb-group">
+                            <div class="flrsb-group-head">
+                                <h3 class="flrsb-group-title">Lyric Prompt</h3>
+                                <div class="flrsb-group-copy">Stay in a single freeform prompt by default, or switch to guided sections when you want more structure and per-section instrumentation notes.</div>
+                            </div>
+                            <div class="flrsb-mode-row" role="tablist" aria-label="Lyric builder mode">
+                                <button type="button" class="flrsb-mode-button is-active" data-lyric-mode="freeform">Freeform Prompt</button>
+                                <button type="button" class="flrsb-mode-button" data-lyric-mode="guided">Guided Sections</button>
+                            </div>
+                            <div class="flrsb-mode-panel" id="flrsb-freeform-panel">
+                                <label class="flrsb-field" for="flrsb-lyrics-freeform">
+                                    <span>Full Lyric / Song Layout Prompt</span>
+                                    <textarea id="flrsb-lyrics-freeform" placeholder="[Intro - Guitar Riff & Drums]&#10;Set the scene...&#10;&#10;[Verse 1]&#10;..."></textarea>
+                                </label>
+                            </div>
+                            <div class="flrsb-mode-panel" id="flrsb-guided-panel" hidden>
+                                <div class="flrsb-section-grid">
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Intro</div>
+                                        <label class="flrsb-field" for="flrsb-section-intro-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-intro-notes" placeholder="Filtered pads, guitar motif, distant ad-libs">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-intro-text">
+                                            <span>Intro Text</span>
+                                            <textarea id="flrsb-section-intro-text" placeholder="Open the world of the song."></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Verse 1</div>
+                                        <label class="flrsb-field" for="flrsb-section-verse1-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-verse1-notes" placeholder="Tight drums, bass pocket, restrained synth stabs">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-verse1-text">
+                                            <span>Verse 1 Text</span>
+                                            <textarea id="flrsb-section-verse1-text" placeholder="Start the story."></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Chorus</div>
+                                        <label class="flrsb-field" for="flrsb-section-chorus-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-chorus-notes" placeholder="Wider drums, stacked harmonies, hook doubles">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-chorus-text">
+                                            <span>Chorus Text</span>
+                                            <textarea id="flrsb-section-chorus-text" placeholder="Write the main hook."></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Verse 2</div>
+                                        <label class="flrsb-field" for="flrsb-section-verse2-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-verse2-notes" placeholder="More movement, secondary counter-melody">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-verse2-text">
+                                            <span>Verse 2 Text</span>
+                                            <textarea id="flrsb-section-verse2-text" placeholder="Push the story forward."></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Bridge</div>
+                                        <label class="flrsb-field" for="flrsb-section-bridge-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-bridge-notes" placeholder="Drop drums, shift harmony, spotlight one instrument">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-bridge-text">
+                                            <span>Bridge Text</span>
+                                            <textarea id="flrsb-section-bridge-text" placeholder="Optional contrast section."></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="flrsb-section-card">
+                                        <div class="flrsb-section-label">Outro</div>
+                                        <label class="flrsb-field" for="flrsb-section-outro-notes">
+                                            <span>Instrumentation / Section Note</span>
+                                            <input type="text" id="flrsb-section-outro-notes" placeholder="Strip back to motif, long reverb tail, final ad-lib">
+                                        </label>
+                                        <label class="flrsb-field" for="flrsb-section-outro-text">
+                                            <span>Outro Text</span>
+                                            <textarea id="flrsb-section-outro-text" placeholder="How the song lands and leaves."></textarea>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <aside class="flrsb-preview-col" id="flrsb-preview-col" hidden>
+                    <section class="flrsb-group flrsb-preview-group">
+                        <div class="flrsb-preview-head">
+                            <div class="flrsb-group-head">
+                                <h3 class="flrsb-group-title">Vektrax Payload Preview</h3>
+                                <div class="flrsb-group-copy">This mirrors the two-prompt flow: style / arrangement first, lyric prompt second, with explicit settings called out underneath.</div>
+                            </div>
+                            <button type="button" class="flrsb-copy-button" id="flrsb-copy-button">Copy Preview</button>
+                        </div>
+                        <textarea readonly class="flrsb-preview" id="flrsb-preview"></textarea>
+                        <div class="flrsb-copy-status" id="flrsb-copy-status">Preview updates as you type.</div>
+                    </section>
+                </aside>
+            </div>
+        </div>
+    </div>
+    <?xjs } ?>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var PAGE_FILE = '011-futureland-records.xjs';
+    var API_URL = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s';
+    var STREAM_URL = './radio-stream/';
+    var RANGE_BYTES = 262144;
+    var REQUESTED_TRACK = <?xjs write(_records_track_json); ?>;
+
+    var panel = document.getElementById('flrd-panel');
+    if (!panel || panel.dataset.bound === '1') return;
+    panel.dataset.bound = '1';
+
+    var loadingEl = document.getElementById('flrd-loading');
+    var emptyEl = document.getElementById('flrd-empty');
+    var layoutEl = document.getElementById('flrd-layout');
+    var titleEl = document.getElementById('flrd-title');
+    var creditsEl = document.getElementById('flrd-credits');
+    var albumlineEl = document.getElementById('flrd-albumline');
+    var genreLineEl = document.getElementById('flrd-genre-line');
+    var filelineEl = document.getElementById('flrd-fileline');
+    var statusEl = document.getElementById('flrd-status');
+    var counterEl = document.getElementById('flrd-counter');
+    var prevButton = document.getElementById('flrd-prev');
+    var nextButton = document.getElementById('flrd-next');
+    var shareButton = document.getElementById('flrd-share');
+    var trackSelect = document.getElementById('flrd-track-select');
+    var playButton = document.getElementById('flrd-play-button');
+    var artWrap = document.getElementById('flrd-art-wrap');
+    var artImg = document.getElementById('flrd-art');
+    var noArtEl = document.getElementById('flrd-no-art');
+    var shareResetTimer = 0;
+    var tracks = [];
+    var cur = 0;
+    var nowPlaying = (window.sbbsRadio && window.sbbsRadio.currentTrackFile) || '';
+
+    function esc(value) {
+        return String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function filenameTitle(name) {
+        return String(name || '')
+            .replace(/\.mp3$/i, '')
+            .replace(/_/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function trackTitle(track) {
+        return String((track.tags && track.tags.title) || filenameTitle(track.name) || 'Unknown Track');
+    }
+
+    function trackArtist(track) {
+        return String((track.tags && track.tags.artist) || '');
+    }
+
+    function trackComposer(track) {
+        return String((track.tags && track.tags.composer) || '');
+    }
+
+    function trackAlbum(track) {
+        return String((track.tags && track.tags.album) || '');
+    }
+
+    function trackYear(track) {
+        return String((track.tags && track.tags.year) || '');
+    }
+
+    function trackGenre(track) {
+        return String((track.tags && track.tags.genre) || '');
+    }
+
+    function optionLabel(track) {
+        var artist = trackArtist(track);
+        return artist.length ? (trackTitle(track) + ' - ' + artist) : trackTitle(track);
+    }
+
+    function setLoading(loading) {
+        if (loading) {
+            loadingEl.hidden = false;
+            emptyEl.hidden = true;
+            layoutEl.classList.add('is-hidden');
+        } else {
+            loadingEl.hidden = true;
+        }
+
+        [prevButton, nextButton, shareButton, trackSelect, playButton, artWrap].forEach(function (el) {
+            if (!el) return;
+            if (loading) {
+                el.setAttribute('disabled', 'disabled');
+            } else {
+                el.removeAttribute('disabled');
+            }
+        });
+    }
+
+    function setEmpty(message) {
+        loadingEl.hidden = true;
+        layoutEl.classList.add('is-hidden');
+        emptyEl.hidden = false;
+        emptyEl.textContent = message;
+        counterEl.textContent = '0 / 0';
+        statusEl.textContent = '';
+        document.title = 'Futureland Records';
+        [prevButton, nextButton, shareButton, trackSelect, playButton, artWrap].forEach(function (el) {
+            if (!el) return;
+            el.setAttribute('disabled', 'disabled');
+        });
+    }
+
+    function parseTrackList(list) {
+        return Promise.all(list.map(function (item) {
+            var url = STREAM_URL + encodeURIComponent(item.name);
+            return fetch(url, {
+                headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
+            })
+                .then(function (response) { return response.arrayBuffer(); })
+                .then(function (buf) {
+                    var tags = {};
+                    var artURL = '';
+
+                    if (typeof window.parseID3v2 === 'function') {
+                        try {
+                            tags = window.parseID3v2(buf) || {};
+                        } catch (_) {
+                            tags = {};
+                        }
+                    }
+
+                    if (tags.picture && tags.picture.blob) {
+                        artURL = URL.createObjectURL(tags.picture.blob);
+                    }
+
+                    return {
+                        name: item.name,
+                        desc: item.desc || '',
+                        added: item.added || 0,
+                        tags: tags,
+                        artURL: artURL
+                    };
+                })
+                .catch(function () {
+                    return {
+                        name: item.name,
+                        desc: item.desc || '',
+                        added: item.added || 0,
+                        tags: {},
+                        artURL: ''
+                    };
+                });
+        }));
+    }
+
+    function findTrackIndex(name) {
+        var lower = String(name || '').toLowerCase();
+        var idx = -1;
+
+        tracks.forEach(function (track, index) {
+            if (String(track.name).toLowerCase() === lower) idx = index;
+        });
+
+        return idx;
+    }
+
+    function chooseInitialTrack() {
+        var idx = -1;
+
+        if (REQUESTED_TRACK) {
+            idx = findTrackIndex(REQUESTED_TRACK);
+        }
+
+        if (idx < 0 && nowPlaying) {
+            idx = findTrackIndex(nowPlaying);
+        }
+
+        cur = idx >= 0 ? idx : 0;
+    }
+
+    function fillTrackSelect() {
+        trackSelect.innerHTML = '';
+
+        tracks.forEach(function (track) {
+            var option = document.createElement('option');
+            option.value = track.name;
+            option.textContent = optionLabel(track);
+            if (track.name === tracks[cur].name) option.selected = true;
+            trackSelect.appendChild(option);
+        });
+    }
+
+    function buildUrl(track) {
+        var next = new URL(window.location.href);
+        next.searchParams.set('page', PAGE_FILE);
+        next.searchParams.delete('gallery');
+        next.searchParams.delete('dir');
+        next.searchParams.delete('file');
+
+        if (track && track.name) {
+            next.searchParams.set('track', track.name);
+        } else {
+            next.searchParams.delete('track');
+        }
+
+        return next;
+    }
+
+    function syncUrl(track) {
+        var next;
+
+        if (!window.history || !window.history.replaceState) return;
+        next = buildUrl(track);
+        window.history.replaceState({ track: track && track.name ? track.name : '' }, '', next.toString());
+    }
+
+    function flashShareState(label) {
+        clearTimeout(shareResetTimer);
+        shareButton.textContent = label;
+        shareResetTimer = setTimeout(function () {
+            shareButton.textContent = 'Share';
+        }, 1600);
+    }
+
+    function renderCredits(track) {
+        var artist = trackArtist(track);
+        var composer = trackComposer(track);
+        var html = '';
+
+        if (artist) {
+            html += '<span class="flrd-artist-name">' + esc(artist) + '</span>';
+        }
+        if (artist && composer) {
+            html += '<span class="flrd-credit-sep">and</span>';
+        }
+        if (composer) {
+            html += '<span class="flrd-composer-name">' + esc(composer) + '</span>';
+        }
+
+        creditsEl.innerHTML = html || '<span class="flrd-credit-sep">Unknown artist</span>';
+    }
+
+    function renderAlbumline(track) {
+        var album = trackAlbum(track);
+        var year = trackYear(track);
+        var html = '';
+
+        if (album) {
+            html += '<span class="flrd-album-name">' + esc(album) + '</span>';
+            if (year) html += '<span class="flrd-album-year"> (' + esc(year) + ')</span>';
+        } else if (year) {
+            html += '<span class="flrd-album-year">' + esc(year) + '</span>';
+        }
+
+        albumlineEl.innerHTML = html || '<span class="flrd-credit-sep">No album metadata</span>';
+    }
+
+    function renderGenreline(track) {
+        var genre = trackGenre(track);
+        genreLineEl.innerHTML = genre.length
+            ? ('<span class="flrd-genre">' + esc(genre) + '</span>')
+            : '<span class="flrd-credit-sep">No genre metadata</span>';
+    }
+
+    function renderArt(track) {
+        if (track.artURL) {
+            artImg.src = track.artURL;
+            artImg.alt = trackTitle(track) + ' album art';
+            artImg.hidden = false;
+            noArtEl.hidden = true;
+            return;
+        }
+
+        artImg.removeAttribute('src');
+        artImg.alt = '';
+        artImg.hidden = true;
+        noArtEl.hidden = false;
+    }
+
+    function renderPlayState(track) {
+        var isPlaying = nowPlaying === track.name;
+        playButton.disabled = isPlaying;
+        playButton.classList.toggle('is-playing', isPlaying);
+        playButton.innerHTML = isPlaying
+            ? '♫ Now Playing'
+            : '<span class="flrd-play-icon">▶</span> Play This Track';
+    }
+
+    function render() {
+        var track;
+
+        if (!tracks.length) return;
+
+        track = tracks[cur];
+        loadingEl.hidden = true;
+        emptyEl.hidden = true;
+        layoutEl.classList.remove('is-hidden');
+        counterEl.textContent = (cur + 1) + ' / ' + tracks.length;
+        titleEl.textContent = trackTitle(track);
+        renderCredits(track);
+        renderAlbumline(track);
+        renderGenreline(track);
+        filelineEl.textContent = track.name;
+        statusEl.textContent = 'Track ' + (cur + 1) + ' of ' + tracks.length;
+        fillTrackSelect();
+        renderArt(track);
+        syncUrl(track);
+        document.title = trackTitle(track) + ' | Futureland Records';
+        [prevButton, nextButton, shareButton, trackSelect, artWrap].forEach(function (el) {
+            if (!el) return;
+            el.removeAttribute('disabled');
+        });
+        renderPlayState(track);
+    }
+
+    function playSelectedTrack() {
+        var track = tracks[cur];
+        if (!track || track.name === nowPlaying) return;
+
+        document.dispatchEvent(new CustomEvent('viz:picktrack', {
+            detail: { name: track.name }
+        }));
+        document.dispatchEvent(new CustomEvent('viz:open'));
+        nowPlaying = track.name;
+        render();
+    }
+
+    function go(dir) {
+        if (!tracks.length) return;
+        cur = ((cur + dir) % tracks.length + tracks.length) % tracks.length;
+        render();
+    }
+
+    function shareCurrent() {
+        var url;
+        var track;
+
+        if (!tracks.length) return;
+        track = tracks[cur];
+        url = buildUrl(track).toString();
+
+        if (navigator.share) {
+            navigator.share({
+                title: document.title || 'Futureland Records',
+                url: url
+            })
+                .then(function () {
+                    flashShareState('Shared');
+                })
+                .catch(function (error) {
+                    if (error && error.name === 'AbortError') return;
+                    console.error('[records] share failed:', error);
+                    flashShareState('Error');
+                });
+            return;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url)
+                .then(function () {
+                    flashShareState('Copied');
+                })
+                .catch(function (error) {
+                    console.error('[records] clipboard failed:', error);
+                    window.prompt('Copy this link:', url);
+                    flashShareState('Ready');
+                });
+            return;
+        }
+
+        window.prompt('Copy this link:', url);
+        flashShareState('Ready');
+    }
+
+    prevButton.addEventListener('click', function () {
+        go(-1);
+    });
+
+    nextButton.addEventListener('click', function () {
+        go(1);
+    });
+
+    shareButton.addEventListener('click', shareCurrent);
+    playButton.addEventListener('click', playSelectedTrack);
+    artWrap.addEventListener('click', playSelectedTrack);
+
+    trackSelect.addEventListener('change', function () {
+        var nextIndex = findTrackIndex(trackSelect.value);
+        if (nextIndex < 0) return;
+        cur = nextIndex;
+        render();
+    });
+
+    document.addEventListener('radio:trackchange', function (event) {
+        if (event.detail && event.detail.filename) {
+            nowPlaying = event.detail.filename;
+            render();
+        }
+    });
+
+    setLoading(true);
+    fetch(API_URL, { credentials: 'same-origin' })
+        .then(function (response) { return response.json(); })
+        .then(function (list) {
+            if (!list || !list.length) {
+                setEmpty('No tracks available.');
+                return null;
+            }
+            return parseTrackList(list);
+        })
+        .then(function (parsed) {
+            if (!parsed) return;
+
+            tracks = parsed.filter(function (track) {
+                return !!track && !!track.name;
+            });
+
+            if (!tracks.length) {
+                setEmpty('No tracks available.');
+                return;
+            }
+
+            setLoading(false);
+            chooseInitialTrack();
+            render();
+        })
+        .catch(function (error) {
+            console.error('[records] init failed:', error);
+            setEmpty('Unable to load tracks.');
+        });
+})();
+
+(function () {
+    'use strict';
+
+    var panel = document.getElementById('flrsb-panel');
+    if (!panel || panel.dataset.bound === '1') return;
+    panel.dataset.bound = '1';
+
+    var copyButton = document.getElementById('flrsb-copy-button');
+    var previewEl = document.getElementById('flrsb-preview');
+    var copyStatusEl = document.getElementById('flrsb-copy-status');
+    var headStatusEl = document.getElementById('flrsb-head-status');
+    var previewToggle = document.getElementById('flrsb-preview-toggle');
+    var shuffleButton = document.getElementById('flrsb-shuffle-button');
+    var previewCol = document.getElementById('flrsb-preview-col');
+    var bpmModeEl = document.getElementById('flrsb-bpm-mode');
+    var bpmValueEl = document.getElementById('flrsb-bpm-value');
+    var freeformPanel = document.getElementById('flrsb-freeform-panel');
+    var guidedPanel = document.getElementById('flrsb-guided-panel');
+    var layoutEl = panel.querySelector('.flrsb-layout');
+    var modeButtons = Array.prototype.slice.call(panel.querySelectorAll('[data-lyric-mode]'));
+    var hybridPresetFields = ['genre', 'feel', 'tone', 'arrangement', 'instrumentation', 'groove', 'band', 'leadvocal', 'backingvocal'];
+    var CUSTOM_OPTION_VALUE = '__custom__';
+    var UNSPECIFIED_OPTION_VALUE = '';
+    var lyricMode = 'freeform';
+    var previewOpen = false;
+    var copyTimer = 0;
+    var sectionDefs = [
+        { key: 'intro', label: 'Intro' },
+        { key: 'verse1', label: 'Verse 1' },
+        { key: 'chorus', label: 'Chorus' },
+        { key: 'verse2', label: 'Verse 2' },
+        { key: 'bridge', label: 'Bridge' },
+        { key: 'outro', label: 'Outro' }
+    ];
+    var presetOptions = {
+        genre: [
+            'Futurepop / Synthpop',
+            'Neo-Soul',
+            'Italo Disco',
+            'Synthwave',
+            'Electrofunk',
+            'House / Disco Hybrid',
+            'Detroit Electro',
+            'Acid House',
+            'Techno',
+            'Breakbeat',
+            'Jungle',
+            'Drum & Bass',
+            'Trip-Hop',
+            'Downtempo',
+            'Dream Pop',
+            'Darkwave',
+            'Industrial Pop',
+            'Industrial Metal',
+            'Post-Punk',
+            'Punkfuture',
+            'Metal Future',
+            'Ska',
+            'Funk',
+            'Boogie',
+            'Jazz Fusion',
+            'Ambient Techno',
+            'Chiptune',
+            'Eurodance',
+            'Experimental Pop',
+            'K-Pop Futurism'
+        ],
+        feel: [
+            'euphoric and driving',
+            'warm and intimate',
+            'swaggering and playful',
+            'melancholy but resilient',
+            'hypnotic and nocturnal',
+            'tense and cinematic',
+            'romantic and weightless',
+            'aggressive and kinetic',
+            'loose and human',
+            'glossy and triumphant',
+            'dreamy and dissociative',
+            'brooding and stormy',
+            'hopeful and wide-open',
+            'shuffling and body-moving'
+        ],
+        tone: [
+            'neon-lit and glossy',
+            'gritty and raw',
+            'organic and lived-in',
+            'chrome-plated and futuristic',
+            'dusty and tape-worn',
+            'dark and haunted',
+            'sun-bleached and nostalgic',
+            'expensive and cinematic',
+            'intimate and close-mic',
+            'cold and mechanical',
+            'lush and romantic',
+            'playful and hyper-saturated'
+        ],
+        arrangement: [
+            'hook-first verse / chorus with a breakdown and final lift',
+            'slow-burn intro into a hard chorus lift',
+            'DJ-friendly extended mix with long transitions',
+            'verse / pre-chorus / chorus / bridge pop structure',
+            'chant-driven loop that grows in layers',
+            'minimal opening that blooms into a maximal finish',
+            'instrumental showcase between choruses',
+            'call-and-response vocal arrangement',
+            'cinematic rise with a final payoff chorus',
+            'club tool structure with frequent drops and builds'
+        ],
+        instrumentation: [
+            'analog synth stack, live bass, and tight drum programming',
+            'electric piano, dry drum kit, and rubbery bass',
+            'FM synths, drum machines, and bright octave leads',
+            'guitars, live drums, bass, and layered vocal doubles',
+            'modular synth textures, sub bass, and restrained percussion',
+            'horn section, clavinet, rhythm guitar, and live drums',
+            'string pads, piano, arpeggiators, and gated drums',
+            'breakbeat chops, samplers, bass guitar, and effect throws',
+            'distorted guitars, synth bass, and machine percussion',
+            'ska upstrokes, live brass, bass pocket, and snare-forward drums',
+            'chiptune leads, crunchy drums, and wide supporting pads'
+        ],
+        groove: [
+            'four-on-the-floor pulse with syncopated percussion',
+            'laid-back pocket just behind the beat',
+            'tight disco strut with open-hat lift',
+            'swung breakbeat with ghost-note movement',
+            'motorik pulse that never lets up',
+            'half-time head-nod with low-end drag',
+            'rolling jungle momentum',
+            'ska upstroke bounce',
+            'shuffling pocket with human push-pull',
+            'locked electro snap',
+            'dubwise lurch and spacious echoes'
+        ],
+        band: [
+            'hybrid electronic band with expressive lead vocal',
+            'tight five-piece live session band',
+            'machine-precise producer duo and featured vocalist',
+            'loose late-night bar band with real human imperfection',
+            'virtuoso trio with rhythm-section chemistry',
+            'club producer with hype vocal chops and stacked harmonies',
+            'punk rhythm section with synth operator support',
+            'dubwise studio crew with live overdubs',
+            'orchestral-electronic ensemble with cinematic players'
+        ],
+        leadvocal: [
+            'breathy femme lead',
+            'soulful tenor lead',
+            'androgynous synthpop lead',
+            'gritty baritone lead',
+            'sweet high-register pop lead',
+            'detached coldwave lead',
+            'animated punk lead',
+            'silky neo-soul lead',
+            'robotic vocoder lead',
+            'spoken-word / half-sung lead',
+            'theatrical glam lead',
+            'rap-sung crossover lead'
+        ],
+        backingvocal: [
+            'no background singers',
+            'tight unison doubles',
+            'airy female harmonies',
+            'stacked mixed-gender chorus',
+            'call-and-response hype voices',
+            'gospel-style backing stack',
+            'robotic vocoder choir',
+            'whispered doubles and ghost harmonies',
+            'punk gang vocals',
+            'lush R&B harmony stack',
+            'distant choir pad vocals',
+            'octave doubles only'
+        ],
+        language: [
+            'English',
+            'Instrumental / non-vocal',
+            'Bilingual / code-switching',
+            'English with Japanese hooks',
+            'English with Korean hooks',
+            'Spanish',
+            'Japanese',
+            'Korean'
+        ],
+        key: [
+            'C major',
+            'C minor',
+            'Db major',
+            'Db minor',
+            'D major',
+            'D minor',
+            'Eb major',
+            'Eb minor',
+            'E major',
+            'E minor',
+            'F major',
+            'F minor',
+            'F# major',
+            'F# minor',
+            'G major',
+            'G minor',
+            'Ab major',
+            'Ab minor',
+            'A major',
+            'A minor',
+            'Bb major',
+            'Bb minor',
+            'B major',
+            'B minor'
+        ],
+        timesig: [
+            '4/4',
+            '3/4',
+            '6/8',
+            '12/8',
+            '5/4',
+            '7/8'
+        ],
+        bpmMode: [
+            { value: 'genre_default', label: 'Match genre default' },
+            { value: 'slow_genre', label: 'Slow for genre' },
+            { value: 'mid_genre', label: 'Midtempo for genre' },
+            { value: 'fast_genre', label: 'Fast for genre' },
+            { value: 'half_time', label: 'Half-time feel' },
+            { value: 'double_time', label: 'Double-time feel' },
+            { value: 'custom_numeric', label: 'Custom numeric' }
+        ]
+    };
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function trimValue(value) {
+        return String(value || '').replace(/\r/g, '').trim();
+    }
+
+    function sentence(text) {
+        var value = trimValue(text);
+        if (!value) return '';
+        return /[.!?]$/.test(value) ? value : (value + '.');
+    }
+
+    function populateSelect(select, options, includeCustom, includeBlank, blankLabel) {
+        var defaultValue;
+
+        if (!select) return;
+        defaultValue = select.getAttribute('data-default') || '';
+        select.innerHTML = '';
+
+        if (includeBlank) {
+            var blankOption = document.createElement('option');
+            blankOption.value = UNSPECIFIED_OPTION_VALUE;
+            blankOption.textContent = blankLabel || 'Unspecified';
+            select.appendChild(blankOption);
+        }
+
+        options.forEach(function (entry) {
+            var option = document.createElement('option');
+            if (typeof entry === 'string') {
+                option.value = entry;
+                option.textContent = entry;
+            } else {
+                option.value = entry.value;
+                option.textContent = entry.label;
+            }
+            if (defaultValue && option.value === defaultValue) option.selected = true;
+            select.appendChild(option);
+        });
+
+        if (includeCustom) {
+            var customOption = document.createElement('option');
+            customOption.value = CUSTOM_OPTION_VALUE;
+            customOption.textContent = 'Custom...';
+            select.appendChild(customOption);
+        }
+
+        if (!select.value && select.options.length) {
+            select.selectedIndex = 0;
+        }
+    }
+
+    function getPresetControls(name) {
+        return {
+            select: byId('flrsb-' + name + '-select'),
+            custom: byId('flrsb-' + name + '-custom')
+        };
+    }
+
+    function customOptionFor(select) {
+        return select ? select.querySelector('option[value="' + CUSTOM_OPTION_VALUE + '"]') : null;
+    }
+
+    function syncPresetField(name, focusCustom) {
+        var controls = getPresetControls(name);
+        var select = controls.select;
+        var custom = controls.custom;
+        var customOption = customOptionFor(select);
+        var customValue = custom ? trimValue(custom.value) : '';
+        var showCustom = select && select.value === CUSTOM_OPTION_VALUE;
+
+        if (!select || !custom || !customOption) return;
+
+        customOption.textContent = customValue ? ('Custom: ' + customValue) : 'Custom...';
+        custom.hidden = !showCustom;
+        custom.disabled = !showCustom;
+
+        if (showCustom && focusCustom) {
+            custom.focus();
+            custom.select();
+        }
+    }
+
+    function getPresetValue(name) {
+        var controls = getPresetControls(name);
+        var select = controls.select;
+        var custom = controls.custom;
+        var customValue = custom ? trimValue(custom.value) : '';
+        if (select && select.value === CUSTOM_OPTION_VALUE) return customValue;
+        return select ? trimValue(select.value) : '';
+    }
+
+    function getTempoLabel() {
+        var mode = trimValue(bpmModeEl.value);
+        var customBpm = trimValue(bpmValueEl.value);
+
+        if (!mode) return '';
+        if (mode === 'custom_numeric') {
+            return customBpm ? (customBpm + ' BPM') : '';
+        }
+        if (mode === 'slow_genre') return 'Slow for the chosen genre';
+        if (mode === 'mid_genre') return 'Midtempo for the chosen genre';
+        if (mode === 'fast_genre') return 'Fast for the chosen genre';
+        if (mode === 'half_time') return 'Half-time feel';
+        if (mode === 'double_time') return 'Double-time feel';
+        return 'Match the genre default';
+    }
+
+    function buildStylePrompt() {
+        var genre = getPresetValue('genre');
+        var feel = getPresetValue('feel');
+        var tone = getPresetValue('tone');
+        var arrangement = getPresetValue('arrangement');
+        var instrumentation = getPresetValue('instrumentation');
+        var groove = getPresetValue('groove');
+        var band = getPresetValue('band');
+        var leadvocal = getPresetValue('leadvocal');
+        var backingvocal = getPresetValue('backingvocal');
+        var brief = trimValue(byId('flrsb-brief').value);
+        var notes = trimValue(byId('flrsb-notes').value);
+        var phrases = [];
+        var prefix = genre ? (genre + ': ') : '';
+
+        if (brief) phrases.push(sentence(brief));
+        if (feel || tone) {
+            phrases.push(sentence('Mood and feel: ' + [feel, tone].filter(Boolean).join(', ')));
+        }
+        if (instrumentation) phrases.push(sentence('Built around ' + instrumentation));
+        if (groove) phrases.push(sentence('Groove: ' + groove));
+        if (band) phrases.push(sentence('Players: ' + band));
+        if (leadvocal) phrases.push(sentence('Lead singer type: ' + leadvocal));
+        if (backingvocal) phrases.push(sentence('Background singer type: ' + backingvocal));
+        if (arrangement) phrases.push(sentence('Arrangement: ' + arrangement));
+        if (notes) phrases.push(sentence('Extra direction: ' + notes));
+
+        if (!phrases.length) return genre;
+        return prefix + phrases.join(' ');
+    }
+
+    function buildGuidedLyrics() {
+        var blocks = [];
+
+        sectionDefs.forEach(function (section) {
+            var notes = trimValue(byId('flrsb-section-' + section.key + '-notes').value);
+            var text = trimValue(byId('flrsb-section-' + section.key + '-text').value);
+            var heading;
+
+            if (!notes && !text) return;
+
+            heading = '[' + section.label;
+            if (notes) heading += ' - ' + notes;
+            heading += ']';
+            blocks.push(heading);
+            if (text) blocks.push(text);
+            blocks.push('');
+        });
+
+        while (blocks.length && !trimValue(blocks[blocks.length - 1])) {
+            blocks.pop();
+        }
+
+        return blocks.length ? blocks.join('\n') : '';
+    }
+
+    function buildLyricsPrompt() {
+        var freeform = trimValue(byId('flrsb-lyrics-freeform').value);
+        if (lyricMode === 'guided') return buildGuidedLyrics();
+        return freeform;
+    }
+
+    function buildPreview() {
+        var workingTitle = trimValue(byId('flrsb-song-title').value);
+        var stylePrompt = buildStylePrompt();
+        var lyricsPrompt = buildLyricsPrompt();
+        var language = trimValue(byId('flrsb-language-select').value);
+        var tempo = getTempoLabel();
+        var key = trimValue(byId('flrsb-key-select').value);
+        var timeSig = trimValue(byId('flrsb-timesig-select').value);
+        var duration = trimValue(byId('flrsb-duration-value').value);
+        var lines = [];
+        var explicitLines = [];
+
+        if (workingTitle) {
+            lines.push('Title: ' + workingTitle);
+            lines.push('');
+        }
+
+        if (stylePrompt) {
+            lines.push('[Style Prompt]');
+            lines.push(stylePrompt);
+            lines.push('');
+        }
+
+        if (lyricsPrompt) {
+            lines.push('[Lyric Prompt]');
+            lines.push(lyricsPrompt);
+            lines.push('');
+        }
+
+        if (language) explicitLines.push('Language: ' + language);
+        if (tempo) explicitLines.push('BPM: ' + tempo);
+        if (timeSig) explicitLines.push('Time Signature: ' + timeSig);
+        if (key) explicitLines.push('Key Signature: ' + key);
+        if (duration) explicitLines.push('Duration: ' + duration + ' seconds');
+
+        if (explicitLines.length) {
+            lines.push('[Explicit Settings]');
+            explicitLines.forEach(function (line) {
+                lines.push(line);
+            });
+        }
+
+        while (lines.length && !trimValue(lines[lines.length - 1])) {
+            lines.pop();
+        }
+
+        if (!lines.length) {
+            lines.push('Add a story seed, lyrics, notes, or use Shuffle DNA to build a minimal Vektrax prompt.');
+        }
+
+        return lines.join('\n');
+    }
+
+    function setLyricMode(nextMode) {
+        lyricMode = nextMode === 'guided' ? 'guided' : 'freeform';
+        freeformPanel.hidden = lyricMode !== 'freeform';
+        guidedPanel.hidden = lyricMode !== 'guided';
+        modeButtons.forEach(function (button) {
+            button.classList.toggle('is-active', button.getAttribute('data-lyric-mode') === lyricMode);
+        });
+        renderPreview();
+    }
+
+    function syncTempoState() {
+        var usesCustom = trimValue(bpmModeEl.value) === 'custom_numeric';
+        bpmValueEl.disabled = !usesCustom;
+        if (!usesCustom) bpmValueEl.removeAttribute('aria-invalid');
+    }
+
+    function pickRandom(items) {
+        if (!items || !items.length) return '';
+        return items[Math.floor(Math.random() * items.length)];
+    }
+
+    function setHybridPresetValue(name, value) {
+        var controls = getPresetControls(name);
+        if (!controls.select || !controls.custom) return;
+        controls.custom.value = '';
+        controls.select.value = value || UNSPECIFIED_OPTION_VALUE;
+        syncPresetField(name, false);
+    }
+
+    function shuffleSongDNA() {
+        hybridPresetFields.forEach(function (name) {
+            if (!presetOptions[name] || !presetOptions[name].length) return;
+            setHybridPresetValue(name, pickRandom(presetOptions[name]));
+        });
+        renderPreview();
+    }
+
+    function setPreviewOpen(nextOpen) {
+        previewOpen = !!nextOpen;
+        if (previewCol) previewCol.hidden = !previewOpen;
+        if (layoutEl) layoutEl.classList.toggle('is-preview-open', previewOpen);
+        if (headStatusEl) {
+            headStatusEl.textContent = previewOpen ? 'Preview visible' : 'Preview hidden';
+        }
+        if (previewToggle) {
+            previewToggle.classList.toggle('is-active', previewOpen);
+            previewToggle.setAttribute('aria-expanded', previewOpen ? 'true' : 'false');
+            previewToggle.textContent = previewOpen ? 'Preview ▾' : 'Preview ▸';
+        }
+    }
+
+    function renderPreview() {
+        previewEl.value = buildPreview();
+        copyStatusEl.textContent = 'Preview updates as you type.';
+    }
+
+    function copyPreview() {
+        var value = previewEl.value;
+
+        clearTimeout(copyTimer);
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value)
+                .then(function () {
+                    copyStatusEl.textContent = 'Preview copied.';
+                    copyTimer = setTimeout(function () {
+                        copyStatusEl.textContent = 'Preview updates as you type.';
+                    }, 1800);
+                })
+                .catch(function (error) {
+                    console.error('[records-builder] clipboard failed:', error);
+                    window.prompt('Copy this preview:', value);
+                    copyStatusEl.textContent = 'Preview ready to copy.';
+                });
+            return;
+        }
+
+        window.prompt('Copy this preview:', value);
+        copyStatusEl.textContent = 'Preview ready to copy.';
+    }
+
+    populateSelect(byId('flrsb-genre-select'), presetOptions.genre, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-feel-select'), presetOptions.feel, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-tone-select'), presetOptions.tone, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-arrangement-select'), presetOptions.arrangement, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-instrumentation-select'), presetOptions.instrumentation, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-groove-select'), presetOptions.groove, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-band-select'), presetOptions.band, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-leadvocal-select'), presetOptions.leadvocal, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-backingvocal-select'), presetOptions.backingvocal, true, true, 'Unspecified / let Vektrax decide');
+    populateSelect(byId('flrsb-language-select'), presetOptions.language, false, true, 'Unspecified / auto');
+    populateSelect(byId('flrsb-key-select'), presetOptions.key, false, true, 'Unspecified / auto');
+    populateSelect(byId('flrsb-timesig-select'), presetOptions.timesig, false, true, 'Unspecified / auto');
+    populateSelect(byId('flrsb-bpm-mode'), presetOptions.bpmMode, false, true, 'Unspecified / auto');
+
+    hybridPresetFields.forEach(function (name) {
+        var controls = getPresetControls(name);
+        if (!controls.select || !controls.custom) return;
+
+        controls.select.addEventListener('change', function () {
+            syncPresetField(name, controls.select.value === CUSTOM_OPTION_VALUE);
+            renderPreview();
+        });
+
+        controls.custom.addEventListener('input', function () {
+            if (controls.select.value !== CUSTOM_OPTION_VALUE) {
+                controls.select.value = CUSTOM_OPTION_VALUE;
+            }
+            syncPresetField(name, false);
+            renderPreview();
+        });
+
+        controls.custom.addEventListener('change', function () {
+            syncPresetField(name, false);
+            renderPreview();
+        });
+
+        syncPresetField(name, false);
+    });
+
+    Array.prototype.slice.call(panel.querySelectorAll('input, select, textarea')).forEach(function (el) {
+        if (el.id === 'flrsb-preview') return;
+        el.addEventListener('input', function () {
+            syncTempoState();
+            renderPreview();
+        });
+        el.addEventListener('change', function () {
+            syncTempoState();
+            renderPreview();
+        });
+    });
+
+    modeButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            setLyricMode(button.getAttribute('data-lyric-mode'));
+        });
+    });
+
+    if (previewToggle) {
+        previewToggle.addEventListener('click', function () {
+            setPreviewOpen(!previewOpen);
+        });
+    }
+
+    if (shuffleButton) {
+        shuffleButton.addEventListener('click', shuffleSongDNA);
+    }
+
+    if (copyButton) {
+        copyButton.addEventListener('click', copyPreview);
+    }
+
+    syncTempoState();
+    setPreviewOpen(false);
+    setLyricMode('freeform');
+})();
+</script>

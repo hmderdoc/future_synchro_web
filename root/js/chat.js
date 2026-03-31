@@ -343,6 +343,36 @@
         });
     }
 
+    function buildMessageIdentity(message) {
+        return [
+            String(message && (message.timestamp || 0)),
+            String(message && (message.sender || '')),
+            String(message && (message.system || '')),
+            String(message && (message.channel || '')),
+            String(message && (message.userNumber || 0)),
+            String(message && (message.avatar || '')),
+            String(getMessageText(message)),
+            String(message && (message.kind || '')),
+            String(message && (message.bitmapKey || ''))
+        ].join('\u001f');
+    }
+
+    function messagesMatch(currentMessages, nextMessages) {
+        var index = 0;
+
+        if ((currentMessages || []).length !== (nextMessages || []).length) {
+            return false;
+        }
+
+        for (index = 0; index < currentMessages.length; index += 1) {
+            if (buildMessageIdentity(currentMessages[index]) !== buildMessageIdentity(nextMessages[index])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     function hexToBytes(hex) {
         var bytes = [];
         var index = 0;
@@ -1158,7 +1188,7 @@
         for (index = 0; index < _privateThreads.length; index += 1) {
             if (buildThreadKey(_privateThreads[index].name, _privateThreads[index].system || '') === key) {
                 _privateThreads[index].system = summary.system || _privateThreads[index].system || '';
-                _privateThreads[index].avatar = summary.avatar || _privateThreads[index].avatar;
+                if (summary.avatar) _privateThreads[index].avatar = summary.avatar;
                 _privateThreads[index].lastTimestamp = Math.max(_privateThreads[index].lastTimestamp || 0, summary.lastTimestamp || 0);
                 if (summary.preview) {
                     _privateThreads[index].preview = summary.preview;
@@ -1387,13 +1417,22 @@
 
     function loadPublicHistory(silent) {
         return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)).then(function (response) {
+            var nextMessages;
+            var messagesChanged;
+
             if (response && response.error) throw new Error(String(response.error));
 
-            _messages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
+            nextMessages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
+            messagesChanged = !messagesMatch(_messages, nextMessages);
+            if (messagesChanged) {
+                _messages = nextMessages;
+            }
             _unreadChannels[normalizeUpper(_currentChannel)] = 0;
             _serviceHealthy = true;
             if (!silent) refreshStatus();
-            dispatchMessages();
+            if (messagesChanged) {
+                dispatchMessages();
+            }
             dispatchRooms();
             return true;
         }).catch(function () {
@@ -1410,20 +1449,39 @@
         }
 
         return fetchJSON(url).then(function (response) {
+            var nextMessages;
+            var messagesChanged;
+            var peerChanged = false;
+            var nextSystem = '';
+            var nextAvatar = '';
+
             if (response && response.error) throw new Error(String(response.error));
 
-            _messages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
+            nextMessages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
+            messagesChanged = !messagesMatch(_messages, nextMessages);
+            if (messagesChanged) {
+                _messages = nextMessages;
+            }
             if (response && response.peer) {
-                _activeView.system = response.peer.system || _activeView.system || '';
-                _activeView.avatar = response.peer.avatar || _activeView.avatar || '';
+                nextSystem = response.peer.system || _activeView.system || '';
+                nextAvatar = response.peer.avatar || '';
+                peerChanged =
+                    trimText(_activeView.system || '') !== trimText(nextSystem) ||
+                    trimText(_activeView.avatar || '') !== trimText(nextAvatar);
+                _activeView.system = nextSystem;
+                _activeView.avatar = nextAvatar;
                 upsertPrivateThread(response.peer);
             }
             _unreadPrivate[getCurrentPrivateKey()] = 0;
             _serviceHealthy = true;
             if (!silent) refreshStatus();
-            dispatchMessages();
+            if (messagesChanged) {
+                dispatchMessages();
+            }
             dispatchPrivateThreads();
-            dispatchView();
+            if (peerChanged) {
+                dispatchView();
+            }
             return true;
         }).catch(function () {
             _serviceHealthy = false;

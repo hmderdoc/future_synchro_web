@@ -20,6 +20,11 @@
     var presetTimer   = null;
     var presetMap     = null;   // cached preset map from getPresets()
     var resizeObserver = null; // stored to disconnect on close
+    var observedResizeBox = null;
+    var resizeRAF     = 0;
+    var resizeSettleTimer = null;
+    var lastCanvasW   = 0;
+    var lastCanvasH   = 0;
 
     // Canvas refs
     var milkCanvas    = null;   // Butterchurn WebGL
@@ -30,6 +35,12 @@
     var lrcLines      = [];     // [{time: seconds, text: ''}, ...]
     var lrcIndex      = -1;
     var trackFile     = '';
+    var trackMeta     = null;  // parsed ID3 tags or null
+    var metaArtUrl    = '';    // object URL for album art (revoked on change)
+    var metaIsMinimized = false;
+    var metaAltTimer  = null;  // alternation timer for mini bar text
+    var metaAltState  = 0;     // 0 = artist, 1 = title
+    var metaToggleAt  = 0;
 
     // Karaoke system state
     var karaokeCanvas = null;
@@ -63,6 +74,22 @@
     var mouthOpen     = 0;      // 0-1 smoothed
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
+    var headWaveform  = [];     // normalized analyser time-domain samples
+    var headProjectionState = null;
+    var eyeScreenPoints = { left: null, right: null, mouth: null };
+    var vizTime       = 0;
+
+    // Experimental FX toggles
+    var laserEyesEnabled = true;
+    var waveHeadEnabled  = true;
+    var eyeLasers        = [];  // [{originX, originY, target, spawnTime, duration}]
+    var wordExplosions   = [];  // explosion fragments and flashes
+    var spitParticleSeq  = 0;
+    var laserEyeTurn     = 'left';
+    var eyeBlinkState    = {
+        left:  { start: -1, fire: -1, end: -1 },
+        right: { start: -1, fire: -1, end: -1 }
+    };
 
     // Lyric display modes
     var LYRIC_MODE_BOUNCING = 0;
@@ -76,6 +103,9 @@
 
     // DOM refs
     var elPanel, elLyrics, elClose;
+    var elFxLyrics, elFxLasers, elFxWave;
+    var elMetaHud, elMetaArt, elMetaTitle;
+    var elMetaArtist, elMetaComposer, elMetaAlbum, elMetaYear, elMetaGenre;
 
     // --- Head geometry ------------------------------------------------
     // Skull profile: [radius, y] (unit scale, y+ = up)
@@ -103,6 +133,103 @@
     var AMBER     = '#FFAA00';
     var GREEN_RGB = '51,255,51';
     var AMBER_RGB = '255,170,0';
+    var LASER_RED = '#FF5555';
+
+    function isEditableTarget(target) {
+        return !!(target && target.closest && target.closest('input, textarea, select, [contenteditable="true"]'));
+    }
+
+    function setFxValue(el, text, modeClass) {
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'viz-fx-value' + (modeClass ? ' ' + modeClass : '');
+    }
+
+    function updateFxHud() {
+        setFxValue(
+            elFxLyrics,
+            lyricMode === LYRIC_MODE_SPITTING ? 'Spitting' : 'Ball',
+            'is-on'
+        );
+        setFxValue(
+            elFxLasers,
+            laserEyesEnabled ? 'On' : 'Off',
+            laserEyesEnabled ? 'is-on is-laser' : ''
+        );
+        setFxValue(
+            elFxWave,
+            waveHeadEnabled ? 'On' : 'Off',
+            waveHeadEnabled ? 'is-on is-wave' : ''
+        );
+    }
+
+    function resetLyricFxState() {
+        spitParticles = [];
+        lastSpitWord = -1;
+        spitLineIdx = -1;
+        wordPositions = [];
+        ballTrail = [];
+        eyeLasers = [];
+        wordExplosions = [];
+        laserEyeTurn = 'left';
+        eyeBlinkState.left.start = eyeBlinkState.left.fire = eyeBlinkState.left.end = -1;
+        eyeBlinkState.right.start = eyeBlinkState.right.fire = eyeBlinkState.right.end = -1;
+    }
+
+    function getEyeBlinkAmount(name) {
+        var state = eyeBlinkState[name];
+        if (!state || state.start < 0 || state.end <= state.start) return 0;
+        if (vizTime < state.start || vizTime > state.end) return 0;
+        if (vizTime <= state.fire) {
+            return Math.min(1, (vizTime - state.start) / Math.max(0.0001, state.fire - state.start));
+        }
+        return Math.max(0, 1 - ((vizTime - state.fire) / Math.max(0.0001, state.end - state.fire)));
+    }
+
+    function buildProjectionState(w, h) {
+        var scale = Math.min(w, h) * 0.3;
+        if (window.innerWidth < 768) scale *= 1.5;
+        return {
+            cx: w / 2,
+            cy: h * 0.42,
+            scale: scale,
+            cosY: Math.cos(headRotY),
+            sinY: Math.sin(headRotY),
+            cosX: Math.cos(headRotX),
+            sinX: Math.sin(headRotX),
+            fl: 4.0,
+            pulse: 1
+        };
+    }
+
+    function projectHeadPoint(state, x, y, z, scaleMultiplier) {
+        if (!state) return { x: 0, y: 0, d: 1 };
+        var rx  = x * state.cosY - z * state.sinY;
+        var rz  = x * state.sinY + z * state.cosY;
+        var ry2 = y * state.cosX - rz * state.sinX;
+        var rz2 = y * state.sinX + rz * state.cosX;
+        var d   = state.fl / (state.fl + rz2);
+        var S   = state.scale * (typeof scaleMultiplier === 'number' ? scaleMultiplier : state.pulse || 1);
+        return { x: state.cx + rx * S * d, y: state.cy - ry2 * S * d, d: d };
+    }
+
+    function updateWaveformSamples(timeData) {
+        headWaveform = [];
+        if (!timeData || !timeData.length) return;
+        var sampleCount = Math.max(32, RING_N * 2);
+        var step = timeData.length / sampleCount;
+        for (var i = 0; i < sampleCount; i++) {
+            var idx = Math.min(timeData.length - 1, Math.floor(i * step));
+            headWaveform.push((timeData[idx] - 128) / 128);
+        }
+    }
+
+    function getWaveformSample(index) {
+        if (!headWaveform.length) return 0;
+        var len = headWaveform.length;
+        var idx = ((index % len) + len) % len;
+        return headWaveform[idx];
+    }
 
     // =========================================================
     //  Init
@@ -120,6 +247,26 @@
         }
 
         elLyrics = elPanel.querySelector('.viz-lyrics');
+        elFxLyrics = document.getElementById('viz-fx-lyrics');
+
+        // Metadata HUD refs
+        elMetaHud      = document.getElementById('viz-meta-hud');
+        elMetaArt      = document.getElementById('viz-meta-art');
+        elMetaTitle    = document.getElementById('viz-meta-title');
+        elMetaArtist   = document.getElementById('viz-meta-artist-val');
+        elMetaComposer = document.getElementById('viz-meta-composer-val');
+        elMetaAlbum    = document.getElementById('viz-meta-album-val');
+        elMetaYear     = document.getElementById('viz-meta-year-val');
+        elMetaGenre    = document.getElementById('viz-meta-genre-val');
+
+        // Click/tap HUD to toggle minimize/expand
+        if (elMetaHud) {
+            elMetaHud.addEventListener('pointerup', onMetaHudActivate);
+            elMetaHud.addEventListener('click', onMetaHudActivate);
+        }
+        elFxLasers = document.getElementById('viz-fx-lasers');
+        elFxWave = document.getElementById('viz-fx-wave');
+        updateFxHud();
 
         // Tap/click canvas area to toggle lyric mode (spit <-> bouncing ball)
         var vizBox = elPanel.querySelector('.viz-canvas-container');
@@ -156,13 +303,22 @@
         // Listen for track changes from radio.js
         document.addEventListener('radio:trackchange', onTrackChange);
 
-        // Keyboard shortcut: 'L' to toggle lyric mode when viz is open
+        // Allow external components to request opening the visualizer
+        document.addEventListener('viz:open', function () { show(); });
+
+        // Keyboard shortcuts for visualizer FX when open
         document.addEventListener('keydown', function(e) {
             if (!isOpen) return;
+            if (isEditableTarget(e.target)) return;
             if (e.key === 'l' || e.key === 'L') {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 e.preventDefault();
                 toggleLyricMode();
+            } else if (e.key === 'e' || e.key === 'E') {
+                e.preventDefault();
+                toggleLaserEyes();
+            } else if (e.key === 'w' || e.key === 'W') {
+                e.preventDefault();
+                toggleWaveHead();
             }
         });
 
@@ -193,11 +349,15 @@
         elPanel.setAttribute('aria-hidden', 'false');
         document.body.classList.add('viz-open');
 
+        bindViewportResize();
         setupCanvases();
+        handleViewportResize();
         // Retry Butterchurn init if audioCtx not ready yet
         if (!initButterchurn()) { scheduleButterchurnRetry(); }
+        resetLyricFxState();
+        updateFxHud();
         startAnim();
-        fetchLyrics();
+        fetchMetadata();
 
         // Auto-play radio if not already playing
         var radio = window.sbbsRadio;
@@ -214,6 +374,7 @@
         isOpen = false;
 
         stopAnim();
+        resetLyricFxState();
         elPanel.classList.add('is-hidden');
         elPanel.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('viz-open');
@@ -230,8 +391,21 @@
             resizeObserver.disconnect();
             resizeObserver = null;
         }
+        observedResizeBox = null;
+        unbindViewportResize();
+        if (resizeRAF) {
+            cancelAnimationFrame(resizeRAF);
+            resizeRAF = 0;
+        }
+        if (resizeSettleTimer) {
+            clearTimeout(resizeSettleTimer);
+            resizeSettleTimer = null;
+        }
+        lastCanvasW = 0;
+        lastCanvasH = 0;
         if (presetTimer) { clearInterval(presetTimer); presetTimer = null; }
 
+        hideMetaHud();
         console.log('[viz] closed');
     }
 
@@ -317,24 +491,76 @@
         box.appendChild(karaokeCanvas);
         karaokeCtx = karaokeCanvas.getContext('2d');
 
-
-        sizeCanvases();
+        lastCanvasW = 0;
+        lastCanvasH = 0;
+        scheduleCanvasResize();
 
         // Only create ResizeObserver once, store reference for cleanup
-        if (window.ResizeObserver && !resizeObserver) {
-            resizeObserver = new ResizeObserver(sizeCanvases);
+        if (window.ResizeObserver) {
+            if (!resizeObserver) {
+                resizeObserver = new ResizeObserver(scheduleCanvasResize);
+            }
+            if (observedResizeBox && observedResizeBox !== box) {
+                resizeObserver.unobserve(observedResizeBox);
+            }
+            observedResizeBox = box;
             resizeObserver.observe(box);
+        }
+    }
+
+    function scheduleCanvasResize() {
+        if (resizeRAF) return;
+        resizeRAF = requestAnimationFrame(function () {
+            resizeRAF = 0;
+            sizeCanvases();
+        });
+    }
+
+    function handleViewportResize() {
+        if (!isOpen || !elPanel) return;
+        elPanel.style.paddingTop = getNavH() + 'px';
+        scheduleCanvasResize();
+        if (resizeSettleTimer) clearTimeout(resizeSettleTimer);
+        resizeSettleTimer = setTimeout(function () {
+            resizeSettleTimer = null;
+            scheduleCanvasResize();
+        }, 140);
+    }
+
+    function bindViewportResize() {
+        window.addEventListener('resize', handleViewportResize, { passive: true });
+        window.addEventListener('orientationchange', handleViewportResize, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize, { passive: true });
+        }
+    }
+
+    function unbindViewportResize() {
+        window.removeEventListener('resize', handleViewportResize, { passive: true });
+        window.removeEventListener('orientationchange', handleViewportResize, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', handleViewportResize, { passive: true });
         }
     }
 
     function sizeCanvases() {
         var box = elPanel.querySelector('.viz-canvas-container');
         if (!box) return;
-        var w = box.clientWidth, h = box.clientHeight;
+        var rect = box.getBoundingClientRect();
+        var w = Math.round(rect.width || box.clientWidth);
+        var h = Math.round(rect.height || box.clientHeight);
         if (w < 1 || h < 1) return;
+        if (w === lastCanvasW && h === lastCanvasH) return;
+        lastCanvasW = w;
+        lastCanvasH = h;
 
         [milkCanvas, wireCanvas, karaokeCanvas].forEach(function (c) {
-            if (c) { c.width = w; c.height = h; }
+            if (c) {
+                c.width = w;
+                c.height = h;
+                c.style.width = w + 'px';
+                c.style.height = h + 'px';
+            }
         });
 
         if (bcViz) bcViz.setRendererSize(w, h);
@@ -437,7 +663,8 @@
         animRAF = requestAnimationFrame(tick);
 
         var radio = window.sbbsRadio;
-        var amp = 0, bass = 0;
+        var amp = 0, bass = 0, vocalPresence = 0;
+        vizTime = performance.now() / 1000;
 
         if (radio && radio.analyserNode) {
             var bins = radio.analyserNode.frequencyBinCount;
@@ -452,11 +679,27 @@
             var bs = 0;
             for (var j = 0; j < bc; j++) bs += data[j];
             bass = bs / (bc * 255);
+
+            var midStart = Math.max(1, bins >> 3);
+            var midEnd = Math.max(midStart + 1, bins >> 1);
+            var ms = 0;
+            for (var m = midStart; m < midEnd; m++) ms += data[m];
+            var mids = ms / ((midEnd - midStart) * 255);
+            vocalPresence = Math.max(0, Math.min(1, mids * 1.35 - bass * 0.35));
+
+            var timeData = new Uint8Array(bins);
+            radio.analyserNode.getByteTimeDomainData(timeData);
+            updateWaveformSamples(timeData);
+            if (radio && isFinite(radio.currentTime)) {
+                vizTime = radio.currentTime;
+            }
+        } else {
+            headWaveform = [];
         }
 
         // Skip rendering when tab is hidden or panel is not visible
         if (bcViz && !document.hidden) bcViz.render();
-        drawHead(amp, bass);
+        drawHead(amp, bass, vocalPresence, getLyricMouthState(vizTime));
         if (lyricMode === LYRIC_MODE_SPITTING) {
             syncLyricsSpitting();
         } else {
@@ -467,47 +710,69 @@
     // =========================================================
     //  Wireframe Head Renderer
     // =========================================================
-    function drawHead(amp, bass) {
+    function drawHead(amp, bass, vocalPresence, lyricMouth) {
         if (!wireCtx || !wireCanvas) return;
         var W = wireCanvas.width, H = wireCanvas.height;
         wireCtx.clearRect(0, 0, W, H);
 
-        var cx = W / 2;
-        var cy = H * 0.42;                          // above center for lyrics
-        var scale = Math.min(W, H) * 0.3;
-        // Enlarge head on mobile (portrait)
-        if (window.innerWidth < 768) scale *= 1.5;
-
         headRotY += 0.007;
         breathPhase += 0.02;
 
-        // Smooth mouth & eye glow
-        mouthOpen += (Math.min(amp * 1.8, 1) - mouthOpen) * 0.25;
+        // Mouth motion should mainly respond during lyric-active windows,
+        // with audio shaping the size of the motion inside those windows.
+        lyricMouth = lyricMouth || { active: false, gate: 0, pulse: 0, wordRate: 0 };
+        var ambientMouth = Math.max(0, amp * 0.35 - bass * 0.18);
+        var vocalDriven = Math.max(0, vocalPresence || 0);
+        var idleAudio = Math.max(ambientMouth * 0.6, vocalDriven * 0.45);
+        var mouthTarget;
+        if (lyricMouth.active) {
+            var lyricFloor = lyricMouth.gate * (0.13 + Math.min(0.08, lyricMouth.wordRate * 0.018));
+            var gatedAudio = idleAudio * 0.65 + vocalDriven * (0.25 + lyricMouth.gate * 0.65);
+            var lyricBoost = lyricMouth.pulse * (0.22 + lyricMouth.gate * 0.12 + vocalDriven * 0.32);
+            mouthTarget = Math.min(1, Math.max(lyricFloor, gatedAudio * 1.05 + lyricBoost));
+        } else if (lrcLines.length) {
+            mouthTarget = Math.min(0.18, idleAudio * 0.75);
+        } else {
+            mouthTarget = Math.min(0.42, Math.max(idleAudio, vocalDriven * 1.05));
+        }
+        var mouthLerp = mouthTarget > mouthOpen
+            ? (lyricMouth.active ? 0.38 : 0.24)
+            : (lyricMouth.active ? 0.18 : 0.10);
+        mouthOpen += (mouthTarget - mouthOpen) * mouthLerp;
         eyeGlow   += (Math.min(bass * 2, 1) - eyeGlow) * 0.2;
 
         var pulse = 1 + bass * 0.06 + Math.sin(breathPhase) * 0.01;
-        var S = scale * pulse;
-
-        var cosY = Math.cos(headRotY), sinY = Math.sin(headRotY);
-        var cosX = Math.cos(headRotX), sinX = Math.sin(headRotX);
-        var FL   = 4.0;
+        var projState = buildProjectionState(W, H);
+        projState.pulse = pulse;
+        headProjectionState = projState;
 
         function proj(x, y, z) {
-            var rx  = x * cosY - z * sinY;
-            var rz  = x * sinY + z * cosY;
-            var ry2 = y * cosX - rz * sinX;
-            var rz2 = y * sinX + rz * cosX;
-            var d   = FL / (FL + rz2);
-            return { x: cx + rx * S * d, y: cy - ry2 * S * d, d: d };
+            return projectHeadPoint(projState, x, y, z, pulse);
         }
+
+        eyeScreenPoints.left = projectHeadPoint(projState, L_EYE.x, L_EYE.y, L_EYE.z, pulse);
+        eyeScreenPoints.right = projectHeadPoint(projState, R_EYE.x, R_EYE.y, R_EYE.z, pulse);
+        eyeScreenPoints.mouth = projectHeadPoint(projState, 0, MOUTH_Y, MOUTH_Z, pulse);
 
         // Generate rings
         var rings = [];
+        var waveformTime = performance.now() * 0.0065;
+        var waveStrength = waveHeadEnabled ? (0.016 + amp * 0.055 + bass * 0.035) : 0;
         for (var p = 0; p < PROFILE.length; p++) {
             var ring = [];
-            var rad = PROFILE[p][0], yy = PROFILE[p][1];
+            var baseRad = PROFILE[p][0];
+            var baseY = PROFILE[p][1];
             for (var s = 0; s < RING_N; s++) {
                 var a = (s / RING_N) * Math.PI * 2;
+                var rad = baseRad;
+                var yy = baseY;
+                if (waveHeadEnabled && headWaveform.length) {
+                    var sample = getWaveformSample((s * 2) + p);
+                    var shimmer = Math.sin(waveformTime + p * 0.55 + s * 0.42);
+                    var wave = sample * 0.78 + shimmer * 0.22;
+                    rad += wave * waveStrength * (0.55 + baseRad);
+                    yy += wave * waveStrength * 0.38;
+                }
                 ring.push(proj(rad * Math.cos(a), yy, rad * Math.sin(a)));
             }
             rings.push(ring);
@@ -516,10 +781,10 @@
         wireCtx.lineCap = wireCtx.lineJoin = 'round';
 
         // --- Horizontal rings ---
-        wireCtx.shadowBlur  = 8 + bass * 14;
+        wireCtx.shadowBlur  = 8 + bass * 14 + (waveHeadEnabled ? 8 : 0);
         wireCtx.shadowColor = GREEN;
         wireCtx.strokeStyle = 'rgba(' + GREEN_RGB + ',0.55)';
-        wireCtx.lineWidth   = 1.2;
+        wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
 
         for (var r = 0; r < rings.length; r++) {
             wireCtx.beginPath();
@@ -533,7 +798,7 @@
 
         // --- Vertical ribs ---
         wireCtx.strokeStyle = 'rgba(' + GREEN_RGB + ',0.30)';
-        wireCtx.lineWidth   = 0.8;
+        wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
         for (var s = 0; s < RING_N; s += 2) {
             wireCtx.beginPath();
             for (var r = 0; r < rings.length; r++) {
@@ -544,8 +809,8 @@
         }
 
         // --- Eyes ---
-        drawEye(L_EYE, proj);
-        drawEye(R_EYE, proj);
+        drawEye(L_EYE, proj, 'left');
+        drawEye(R_EYE, proj, 'right');
 
         // --- Nose ---
         drawNose(proj);
@@ -554,13 +819,15 @@
         drawMouth(proj);
     }
 
-    function drawEye(eye, proj) {
+    function drawEye(eye, proj, eyeName) {
         var segs = 12, pts = [];
+        var blinkAmount = getEyeBlinkAmount(eyeName);
+        var eyeScaleY = Math.max(0.08, 0.7 - blinkAmount * 0.62);
         for (var i = 0; i <= segs; i++) {
             var a  = (i / segs) * Math.PI * 2;
             pts.push(proj(
                 eye.x + eye.r * Math.cos(a),
-                eye.y + eye.r * Math.sin(a) * 0.7,
+                eye.y + eye.r * Math.sin(a) * eyeScaleY,
                 eye.z
             ));
         }
@@ -579,10 +846,19 @@
 
         // Pupil dot
         var c = proj(eye.x, eye.y, eye.z);
-        wireCtx.beginPath();
-        wireCtx.arc(c.x, c.y, 2 + eyeGlow * 3, 0, Math.PI * 2);
-        wireCtx.fillStyle = 'rgba(' + gl + ',255,' + gl + ',' + (0.5 + eyeGlow * 0.5) + ')';
-        wireCtx.fill();
+        if (blinkAmount < 0.72) {
+            wireCtx.beginPath();
+            wireCtx.arc(c.x, c.y, 2 + eyeGlow * 3, 0, Math.PI * 2);
+            wireCtx.fillStyle = 'rgba(' + gl + ',255,' + gl + ',' + (0.5 + eyeGlow * 0.5) + ')';
+            wireCtx.fill();
+        } else {
+            wireCtx.beginPath();
+            wireCtx.moveTo(c.x - eye.r * 30 * c.d * 0.22, c.y);
+            wireCtx.lineTo(c.x + eye.r * 30 * c.d * 0.22, c.y);
+            wireCtx.strokeStyle = 'rgba(' + gl + ',255,' + gl + ',0.85)';
+            wireCtx.lineWidth = 1.1 + eyeGlow * 0.5;
+            wireCtx.stroke();
+        }
     }
 
     function drawNose(proj) {
@@ -655,8 +931,197 @@
         trackFile = d.filename || '';
         lrcLines  = [];
         lrcIndex  = -1;
+        trackMeta = null;
+        resetLyricFxState();
         if (elLyrics) elLyrics.textContent = '';
-        if (isOpen) fetchLyrics();
+        hideMetaHud(true);
+        if (isOpen) fetchMetadata();
+    }
+
+    // =========================================================
+    //  ID3 Metadata + SYLT synchronized lyrics
+    // =========================================================
+    var META_FETCH_BYTES = 256 * 1024; // read first 256KB for ID3 header
+
+    function fetchMetadata() {
+        if (!trackFile) {
+            var r = window.sbbsRadio;
+            if (r && r.currentTrackFile) trackFile = r.currentTrackFile;
+        }
+        if (!trackFile || typeof window.parseID3v2 !== 'function') {
+            // No parser available or no track — fall back to LRC
+            fetchLyrics();
+            return;
+        }
+
+        var url = './radio-stream/' + encodeURIComponent(trackFile);
+        console.log('[viz] fetching ID3 metadata from', trackFile);
+
+        // Range request: only need the first chunk for ID3 header
+        fetch(url, { headers: { 'Range': 'bytes=0-' + (META_FETCH_BYTES - 1) } })
+            .then(function (r) {
+                if (!r.ok && r.status !== 206) throw new Error('HTTP ' + r.status);
+                return r.arrayBuffer();
+            })
+            .then(function (buf) {
+                var tags = window.parseID3v2(buf);
+                trackMeta = tags;
+                console.log('[viz] ID3 parsed:', tags.artist || '(none)',
+                            '| genre:', tags.genre || '(none)',
+                            '| SYLT lines:', tags.sylt.length,
+                            '| art:', tags.picture ? 'yes' : 'no');
+
+                // Use SYLT synced lyrics if present, otherwise fall back to LRC
+                if (tags.sylt && tags.sylt.length > 0) {
+                    lrcLines = tags.sylt;
+                    lrcIndex = -1;
+                    console.log('[viz] using SYLT lyrics (' + lrcLines.length + ' lines)');
+                } else {
+                    // No embedded lyrics — try external .lrc file
+                    fetchLyrics();
+                }
+
+                // Show metadata HUD if we have any useful data
+                var hasData = tags.artist || tags.composer || tags.genre || tags.year || tags.picture;
+                if (hasData && isOpen) {
+                    updateMetaHud(tags);
+                }
+            })
+            .catch(function (err) {
+                console.warn('[viz] ID3 fetch failed:', err);
+                trackMeta = null;
+                // Fallback to LRC lyrics
+                fetchLyrics();
+            });
+    }
+
+    function updateMetaHud(tags) {
+        if (!elMetaHud) return;
+
+        // Revoke previous art blob URL
+        if (metaArtUrl) {
+            URL.revokeObjectURL(metaArtUrl);
+            metaArtUrl = '';
+        }
+
+        // Album art
+        if (tags.picture && tags.picture.blob) {
+            metaArtUrl = URL.createObjectURL(tags.picture.blob);
+            elMetaArt.src = metaArtUrl;
+            elMetaArt.parentElement.style.display = '';
+        } else {
+            elMetaArt.src = '';
+            elMetaArt.parentElement.style.display = 'none';
+        }
+
+        // Title (use ID3 title or fall back to display name from radio)
+        var title = tags.title || '';
+        if (!title) {
+            var radio = window.sbbsRadio;
+            if (radio && radio.currentTrackFile) {
+                title = radio.currentTrackFile.replace(/\.mp3$/i, '');
+            }
+        }
+        if (elMetaTitle) elMetaTitle.textContent = title;
+
+        // Populate or hide each row
+        setMetaRow(elMetaArtist,   tags.artist);
+        setMetaRow(elMetaComposer, tags.composer);
+        setMetaRow(elMetaAlbum,    tags.album);
+        setMetaRow(elMetaYear,     tags.year);
+        setMetaRow(elMetaGenre,    tags.genre);
+
+        // Restore the current expanded/minimized state
+        elMetaHud.classList.toggle('is-mini', metaIsMinimized);
+        var miniEl = document.getElementById('viz-meta-mini');
+        if (miniEl) miniEl.hidden = !metaIsMinimized;
+        elMetaHud.hidden = false;
+
+        // Start alternation timer for the mini bar text
+        startMetaAltTimer(tags);
+        if (metaIsMinimized) updateMiniText();
+    }
+
+    function setMetaRow(valEl, text) {
+        if (!valEl) return;
+        var row = valEl.closest('.viz-meta-row');
+        if (text) {
+            valEl.textContent = text;
+            if (row) row.hidden = false;
+        } else {
+            valEl.textContent = '';
+            if (row) row.hidden = true;
+        }
+    }
+
+    /* Toggle between expanded card and minimized single-line bar */
+    function onMetaHudActivate(e) {
+        if (!elMetaHud || elMetaHud.hidden) return;
+        if (e.target.closest('button, a, input, select, label')) return;
+
+        if (e.type === 'pointerup') {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+        } else if (e.type === 'click') {
+            // Touch/pointer activation often emits a follow-up click; ignore the duplicate.
+            if (Date.now() - metaToggleAt < 400) return;
+        }
+
+        metaToggleAt = Date.now();
+        toggleMetaMini();
+    }
+
+    function toggleMetaMini() {
+        if (!elMetaHud || elMetaHud.hidden) return;
+        metaIsMinimized = !metaIsMinimized;
+        var miniEl = document.getElementById('viz-meta-mini');
+        if (metaIsMinimized) {
+            elMetaHud.classList.add('is-mini');
+            if (miniEl) miniEl.hidden = false;
+            // Immediately set mini text
+            updateMiniText();
+        } else {
+            elMetaHud.classList.remove('is-mini');
+            if (miniEl) miniEl.hidden = true;
+        }
+    }
+
+    /* Alternating mini-bar text: cycles artist / title every 4s */
+    function startMetaAltTimer(tags) {
+        if (metaAltTimer) clearInterval(metaAltTimer);
+        metaAltState = 0;
+        metaAltTimer = setInterval(function () {
+            metaAltState = (metaAltState + 1) % 2;
+            updateMiniText();
+        }, 4000);
+    }
+
+    function updateMiniText() {
+        var miniText = document.getElementById('viz-meta-mini-text');
+        if (!miniText || !trackMeta) return;
+        var artist = trackMeta.artist || '';
+        var title  = trackMeta.title || '';
+        if (!title) {
+            var radio = window.sbbsRadio;
+            if (radio && radio.currentTrackFile) {
+                title = radio.currentTrackFile.replace(/\.mp3$/i, '');
+            }
+        }
+        if (metaAltState === 0 && artist) {
+            miniText.textContent = '\u266B ' + artist;  // ♫ Artist
+        } else {
+            miniText.textContent = '\u266A ' + title;   // ♪ Title
+        }
+    }
+
+    function hideMetaHud(preserveMiniState) {
+        if (!elMetaHud) return;
+        elMetaHud.hidden = true;
+        if (!preserveMiniState) metaIsMinimized = false;
+        elMetaHud.classList.remove('is-mini');
+        var miniEl = document.getElementById('viz-meta-mini');
+        if (miniEl) miniEl.hidden = true;
+        if (metaAltTimer) { clearInterval(metaAltTimer); metaAltTimer = null; }
+        if (metaArtUrl) { URL.revokeObjectURL(metaArtUrl); metaArtUrl = ''; }
     }
 
     function fetchLyrics() {
@@ -696,15 +1161,83 @@
         return result.sort(function (a, b) { return a.time - b.time; });
     }
 
+    function getLyricMouthState(now) {
+        if (!lrcLines.length) {
+            return {
+                active: false,
+                gate: 0,
+                pulse: 0,
+                wordRate: 0
+            };
+        }
+
+        var ni = -1;
+        var nextLineTime = Infinity;
+        for (var i = lrcLines.length - 1; i >= 0; i--) {
+            if (now >= lrcLines[i].time) {
+                ni = i;
+                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
+                break;
+            }
+        }
+
+        if (ni < 0) {
+            return {
+                active: false,
+                gate: 0,
+                pulse: 0,
+                wordRate: 0
+            };
+        }
+
+        var line = lrcLines[ni];
+        var words = line.text.split(/\s+/).filter(Boolean);
+        var rawDuration = nextLineTime - line.time;
+        if (!isFinite(rawDuration) || rawDuration <= 0) {
+            rawDuration = Math.max(1.2, words.length * 0.42);
+        }
+
+        var activeDuration = Math.min(rawDuration, Math.max(1.15, words.length * 0.58));
+        var elapsed = now - line.time;
+        var release = 0.24;
+
+        if (elapsed < -0.04 || elapsed > activeDuration + release) {
+            return {
+                active: false,
+                gate: 0,
+                pulse: 0,
+                wordRate: 0
+            };
+        }
+
+        var gate = 1;
+        if (elapsed < 0.08) {
+            gate = Math.max(0, elapsed / 0.08);
+        } else if (elapsed > activeDuration - 0.18) {
+            gate = Math.max(0, (activeDuration + release - elapsed) / (0.18 + release));
+        }
+
+        var wordRate = words.length ? (words.length / Math.max(0.45, activeDuration)) : 0;
+        var wordPhase = Math.max(0, elapsed) * Math.max(1, wordRate);
+        var pulse = Math.pow(Math.max(0, Math.sin(wordPhase * Math.PI)), 0.9);
+
+        return {
+            active: gate > 0,
+            gate: Math.min(1, gate),
+            pulse: pulse,
+            wordRate: wordRate
+        };
+    }
+
     function syncLyrics() {
         // Bouncing ball karaoke system
         if (!karaokeCtx || !karaokeCanvas) return;
         var r = window.sbbsRadio;
-        if (!r || !r.audioEl) return;
+        if (!r) return;
 
         var w = karaokeCanvas.width;
         var h = karaokeCanvas.height;
-        var now = r.audioEl.currentTime;
+        var now = r.currentTime;
 
         // Clear with transparency
         karaokeCtx.clearRect(0, 0, w, h);
@@ -854,11 +1387,11 @@
     function syncLyricsSpitting() {
         if (!karaokeCtx || !karaokeCanvas) return;
         var r = window.sbbsRadio;
-        if (!r || !r.audioEl) return;
+        if (!r) return;
 
         var w = karaokeCanvas.width;
         var h = karaokeCanvas.height;
-        var now = r.audioEl.currentTime;
+        var now = r.currentTime;
 
         karaokeCtx.clearRect(0, 0, w, h);
 
@@ -899,6 +1432,7 @@
         var lineDuration = nextLineTime - lineStart;
         if (lineDuration > 30) lineDuration = 4;
         var progress = Math.min(1, (now - lineStart) / lineDuration);
+        var secondsPerWord = words.length ? (lineDuration / words.length) : lineDuration;
 
         // Which word should be spawned?
         var wordIdx = Math.floor(progress * words.length);
@@ -907,35 +1441,20 @@
         // Spawn new words when we reach them
         while (lastSpitWord < wordIdx && lastSpitWord < words.length - 1) {
             lastSpitWord++;
-            spawnSpitWord(words[lastSpitWord], scheme, fontFamily, now, w, h);
+            spawnSpitWord(words[lastSpitWord], scheme, fontFamily, now, w, h, secondsPerWord);
         }
 
         // Render all particles
         renderSpitParticles(now, w, h, fontFamily, scheme);
+        renderEyeLasers(now);
+        renderWordExplosions(now);
     }
 
-    function spawnSpitWord(text, scheme, fontFamily, time, w, h) {
-        // Calculate mouth position in screen space
-        var cx = w / 2;
-        var cy = h * 0.42;
-        var scale = Math.min(w, h) * 0.3;
-
-        var cosY = Math.cos(headRotY), sinY = Math.sin(headRotY);
-        var cosX = Math.cos(headRotX), sinX = Math.sin(headRotX);
-        var FL = 4.0;
-
-        // Mouth center in 3D
-        var mx = 0, my = MOUTH_Y, mz = MOUTH_Z;
-        
-        // Transform to screen space for spawn position
-        var rx  = mx * cosY - mz * sinY;
-        var rz  = mx * sinY + mz * cosY;
-        var ry2 = my * cosX - rz * sinX;
-        var rz2 = my * sinX + rz * cosX;
-        var d   = FL / (FL + rz2);
-        
-        var spawnX = cx + rx * scale * d;
-        var spawnY = cy - ry2 * scale * d;
+    function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
+        var projState = headProjectionState || buildProjectionState(w, h);
+        var mouthPoint = eyeScreenPoints.mouth || projectHeadPoint(projState, 0, MOUTH_Y, MOUTH_Z, projState.pulse || 1);
+        var spawnX = mouthPoint.x;
+        var spawnY = mouthPoint.y;
 
         // Calculate ejection direction based on head rotation
         // Words fly OUT from the face direction
@@ -949,6 +1468,7 @@
         var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
 
         spitParticles.push({
+            id: ++spitParticleSeq,
             text: text,
             x: spawnX,
             y: spawnY,
@@ -960,8 +1480,270 @@
             alpha: 1.0,
             headRotY: headRotY,  // capture rotation at spawn time
             scheme: scheme,
-            fontFamily: fontFamily
+            fontFamily: fontFamily,
+            secondsPerWord: secondsPerWord,
+            laserTriggered: false,
+            laserHitTime: 0
         });
+    }
+
+    function getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme) {
+        var PARTICLE_LIFETIME = 3.0;
+        var age = vizTime - p.spawnTime;
+        var depthScale = 1 + p.z * 0.6;
+        depthScale = Math.max(0.4, Math.min(2.5, depthScale));
+
+        var TOLERANCE = Math.PI / 6;
+        var absRot = Math.abs(p.headRotY);
+        var horizScale = 1.0;
+        if (absRot > TOLERANCE) {
+            horizScale = Math.cos(absRot - TOLERANCE);
+        }
+        horizScale = Math.max(0.15, horizScale);
+
+        var alpha = 1 - (age / PARTICLE_LIFETIME);
+        alpha = Math.pow(Math.max(0, alpha), 0.7);
+        var baseSize = Math.min(56, Math.max(28, h * 0.07));
+        return {
+            scheme: p.scheme || defaultScheme,
+            fontFamily: p.fontFamily || defaultFontFamily,
+            depthScale: depthScale,
+            horizScale: horizScale,
+            fontSize: baseSize * depthScale,
+            alpha: alpha
+        };
+    }
+
+    function spawnEyeLaser(target, now) {
+        if (!laserEyesEnabled || !target || target.laserTriggered) return;
+
+        var origins = [];
+        var blinkLead = 0.05;
+        var beamDuration = 0.12;
+        var blinkTail = 0.09;
+        var slowCadence = (target.secondsPerWord || 0) >= 0.42;
+
+        if (slowCadence) {
+            origins = ['left', 'right'];
+        } else {
+            origins = [laserEyeTurn];
+            laserEyeTurn = laserEyeTurn === 'left' ? 'right' : 'left';
+        }
+
+        for (var i = 0; i < origins.length; i++) {
+            var eyeName = origins[i];
+            var origin = eyeScreenPoints[eyeName];
+            if (!origin) continue;
+
+            eyeBlinkState[eyeName].start = now;
+            eyeBlinkState[eyeName].fire = now + blinkLead;
+            eyeBlinkState[eyeName].end = now + blinkLead + blinkTail;
+
+            eyeLasers.push({
+                eyeName: eyeName,
+                originX: origin.x,
+                originY: origin.y,
+                target: target,
+                spawnTime: now,
+                fireTime: now + blinkLead,
+                duration: beamDuration
+            });
+        }
+
+        target.laserTriggered = true;
+        target.laserHitTime = now + blinkLead + beamDuration;
+    }
+
+    function spawnWordExplosion(target, now, renderState) {
+        if (!karaokeCtx) return;
+
+        var fontSize = (renderState && renderState.fontSize) ? renderState.fontSize : 36;
+        var fontFamily = (renderState && renderState.fontFamily) ? renderState.fontFamily : LYRIC_FONTS[0];
+        var scheme = (renderState && renderState.scheme) ? renderState.scheme : LYRIC_SCHEMES[0];
+        var horizScale = (renderState && renderState.horizScale) ? renderState.horizScale : 1;
+        var text = target.text || '';
+        var chars = text.split('');
+        var metrics = [];
+        var totalWidth = 0;
+
+        karaokeCtx.save();
+        karaokeCtx.font = Math.round(fontSize) + 'px ' + fontFamily;
+        for (var i = 0; i < chars.length; i++) {
+            var char = chars[i];
+            var width = karaokeCtx.measureText(char).width;
+            metrics.push({ char: char, width: width });
+            totalWidth += width;
+        }
+        karaokeCtx.restore();
+
+        var cursor = -totalWidth / 2;
+        for (var j = 0; j < metrics.length; j++) {
+            var glyph = metrics[j];
+            var centerOffset = cursor + glyph.width / 2;
+            cursor += glyph.width;
+
+            if (!glyph.char.trim()) continue;
+
+            var spread = 0.65 + (Math.abs(centerOffset) / Math.max(20, totalWidth * 0.5));
+            var glyphX = target.x + centerOffset * horizScale;
+            var glyphY = target.y + (Math.random() - 0.5) * fontSize * 0.08;
+            wordExplosions.push({
+                kind: 'glyph',
+                char: glyph.char,
+                x: glyphX,
+                y: glyphY,
+                vx: centerOffset * 1.4 + (Math.random() - 0.5) * 110 * spread,
+                vy: -120 - Math.random() * 160,
+                rotation: (Math.random() - 0.5) * 0.5,
+                vr: (Math.random() - 0.5) * 9,
+                spawnTime: now,
+                life: 0.65 + Math.random() * 0.3,
+                fontSize: fontSize * (0.82 + Math.random() * 0.22),
+                fontFamily: fontFamily,
+                scheme: scheme
+            });
+
+            var crumbCount = 2 + Math.floor(Math.random() * 3);
+            for (var c = 0; c < crumbCount; c++) {
+                var angle = Math.random() * Math.PI * 2;
+                var speed = 70 + Math.random() * 180;
+                wordExplosions.push({
+                    kind: 'crumb',
+                    x: glyphX,
+                    y: glyphY,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 40,
+                    spawnTime: now,
+                    life: 0.32 + Math.random() * 0.22,
+                    size: 1.8 + Math.random() * 2.8,
+                    color: c % 2 === 0 ? scheme.hi : scheme.glow
+                });
+            }
+        }
+
+        wordExplosions.push({
+            kind: 'flash',
+            x: target.x,
+            y: target.y,
+            spawnTime: now,
+            life: 0.22,
+            radius: Math.max(28, fontSize * 0.9),
+            color: LASER_RED
+        });
+    }
+
+    function renderEyeLasers(now) {
+        if (!karaokeCtx || !eyeLasers.length) return;
+
+        var activeLasers = [];
+        for (var i = 0; i < eyeLasers.length; i++) {
+            var laser = eyeLasers[i];
+            if (now < laser.fireTime) {
+                activeLasers.push(laser);
+                continue;
+            }
+            var progress = (now - laser.fireTime) / laser.duration;
+            if (progress >= 1) continue;
+            progress = Math.max(0, progress);
+
+            var targetX = laser.target ? laser.target.x : laser.originX;
+            var targetY = laser.target ? laser.target.y : laser.originY;
+            var endX = laser.originX + (targetX - laser.originX) * progress;
+            var endY = laser.originY + (targetY - laser.originY) * progress;
+
+            karaokeCtx.save();
+            karaokeCtx.globalAlpha = 0.92 - progress * 0.25;
+            karaokeCtx.lineCap = 'round';
+            karaokeCtx.shadowColor = LASER_RED;
+            karaokeCtx.shadowBlur = 16;
+
+            karaokeCtx.strokeStyle = 'rgba(255,85,85,0.95)';
+            karaokeCtx.lineWidth = 3.2;
+            karaokeCtx.beginPath();
+            karaokeCtx.moveTo(laser.originX, laser.originY);
+            karaokeCtx.lineTo(endX, endY);
+            karaokeCtx.stroke();
+
+            karaokeCtx.shadowBlur = 8;
+            karaokeCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+            karaokeCtx.lineWidth = 1.1;
+            karaokeCtx.beginPath();
+            karaokeCtx.moveTo(laser.originX, laser.originY);
+            karaokeCtx.lineTo(endX, endY);
+            karaokeCtx.stroke();
+
+            karaokeCtx.beginPath();
+            karaokeCtx.fillStyle = 'rgba(255,170,170,0.8)';
+            karaokeCtx.arc(laser.originX, laser.originY, 3, 0, Math.PI * 2);
+            karaokeCtx.fill();
+            karaokeCtx.restore();
+
+            activeLasers.push(laser);
+        }
+
+        eyeLasers = activeLasers;
+    }
+
+    function renderWordExplosions(now) {
+        if (!karaokeCtx || !wordExplosions.length) return;
+
+        var activeExplosions = [];
+        for (var i = 0; i < wordExplosions.length; i++) {
+            var fragment = wordExplosions[i];
+            var age = now - fragment.spawnTime;
+            if (age >= fragment.life) continue;
+
+            var t = age / fragment.life;
+
+            if (fragment.kind === 'flash') {
+                karaokeCtx.save();
+                karaokeCtx.globalAlpha = 0.8 * (1 - t);
+                karaokeCtx.lineWidth = 2 + t * 2;
+                karaokeCtx.strokeStyle = fragment.color;
+                karaokeCtx.shadowColor = fragment.color;
+                karaokeCtx.shadowBlur = 18;
+                karaokeCtx.beginPath();
+                karaokeCtx.arc(fragment.x, fragment.y, fragment.radius * (0.3 + t), 0, Math.PI * 2);
+                karaokeCtx.stroke();
+                karaokeCtx.restore();
+                activeExplosions.push(fragment);
+                continue;
+            }
+
+            var px = fragment.x + fragment.vx * age;
+            var py = fragment.y + fragment.vy * age + 180 * t * t;
+            var alpha = 1 - t;
+
+            karaokeCtx.save();
+            karaokeCtx.globalAlpha = alpha;
+
+            if (fragment.kind === 'glyph') {
+                karaokeCtx.translate(px, py);
+                karaokeCtx.rotate(fragment.rotation + fragment.vr * age);
+                karaokeCtx.font = Math.round(fragment.fontSize * (1 - t * 0.18)) + 'px ' + fragment.fontFamily;
+                karaokeCtx.textAlign = 'center';
+                karaokeCtx.textBaseline = 'middle';
+                karaokeCtx.shadowColor = fragment.scheme.glow;
+                karaokeCtx.shadowBlur = 14;
+                karaokeCtx.fillStyle = fragment.scheme.hi;
+                karaokeCtx.fillText(fragment.char, 0, 0);
+                karaokeCtx.shadowBlur = 0;
+                karaokeCtx.fillStyle = fragment.scheme.fg;
+                karaokeCtx.globalAlpha = alpha * 0.65;
+                karaokeCtx.fillText(fragment.char, 1, 1);
+            } else {
+                var size = fragment.size * (1 - t * 0.35);
+                karaokeCtx.shadowColor = fragment.color;
+                karaokeCtx.shadowBlur = 10;
+                karaokeCtx.fillStyle = fragment.color;
+                karaokeCtx.fillRect(px - size * 0.5, py - size * 0.5, size, size);
+            }
+
+            karaokeCtx.restore();
+            activeExplosions.push(fragment);
+        }
+
+        wordExplosions = activeExplosions;
     }
 
 
@@ -976,7 +1758,15 @@
         for (var i = 0; i < spitParticles.length; i++) {
             var p = spitParticles[i];
             var age = now - p.spawnTime;
-            
+            var renderState = getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme);
+
+            if (laserEyesEnabled && !p.laserTriggered && age >= PARTICLE_LIFETIME * 0.72) {
+                spawnEyeLaser(p, now);
+            }
+            if (p.laserTriggered && now >= p.laserHitTime) {
+                spawnWordExplosion(p, now, renderState);
+                continue;
+            }
             if (age > PARTICLE_LIFETIME) continue;  // expired
 
             // Physics update
@@ -995,23 +1785,9 @@
             }
 
             // Perspective scale based on z-depth - BIGGER effect
-            var depthScale = 1 + p.z * 0.6;  // was 0.3
-            depthScale = Math.max(0.4, Math.min(2.5, depthScale));  // wider range
-
-            // Horizontal squash based on viewing angle
-            // With 30° tolerance: only squash when more than 60° from center
-            var TOLERANCE = Math.PI / 6;  // 30 degrees
-            var absRot = Math.abs(p.headRotY);
-            var horizScale = 1.0;
-            if (absRot > TOLERANCE) {
-                // Start squashing after tolerance zone
-                horizScale = Math.cos(absRot - TOLERANCE);
-            }
-            horizScale = Math.max(0.15, horizScale);
-
-            // Alpha fade over lifetime
-            p.alpha = 1 - (age / PARTICLE_LIFETIME);
-            p.alpha = Math.pow(p.alpha, 0.7);  // ease out
+            var depthScale = renderState.depthScale;
+            var horizScale = renderState.horizScale;
+            p.alpha = renderState.alpha;
 
             // Skip if off screen
             if (p.x < -100 || p.x > w + 100 || p.y < -100 || p.y > h + 100) {
@@ -1021,8 +1797,7 @@
             activeParticles.push(p);
 
             // Calculate font size with perspective - BIGGER base
-            var baseSize = Math.min(56, Math.max(28, h * 0.07));  // was 36/20/0.045
-            var fontSize = baseSize * depthScale;
+            var fontSize = renderState.fontSize;
 
             // Render the word with 3D perspective transform
             karaokeCtx.save();
@@ -1033,6 +1808,7 @@
             
             // Mirror text only when VERY far turned (> 150 degrees with tolerance)
             // This prevents most backwards rendering due to our 30° tolerance
+            var TOLERANCE = Math.PI / 6;
             var normalizedRot = ((p.headRotY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
             var isFacingAway = normalizedRot > (Math.PI * 0.5 + TOLERANCE) && 
                                normalizedRot < (Math.PI * 1.5 - TOLERANCE);
@@ -1041,8 +1817,8 @@
             }
 
             // Set up text rendering - use particle's own font
-            var scheme = p.scheme || defaultScheme;
-            var pFont = p.fontFamily || defaultFontFamily;
+            var scheme = renderState.scheme;
+            var pFont = renderState.fontFamily;
             karaokeCtx.font = Math.round(fontSize) + 'px ' + pFont;
             karaokeCtx.textAlign = 'center';
             karaokeCtx.textBaseline = 'middle';
@@ -1072,11 +1848,8 @@
     function toggleLyricMode() {
         lyricMode = (lyricMode + 1) % 2;
         // Reset state when switching
-        spitParticles = [];
-        lastSpitWord = -1;
-        spitLineIdx = -1;
-        wordPositions = [];
-        ballTrail = [];
+        resetLyricFxState();
+        updateFxHud();
         console.log('[viz] lyric mode:', lyricMode === LYRIC_MODE_BOUNCING ? 'bouncing ball' : 'spitting');
         return lyricMode;
     }
@@ -1088,12 +1861,30 @@
             lyricMode = LYRIC_MODE_SPITTING;
         }
         // Reset state
-        spitParticles = [];
-        lastSpitWord = -1;
-        spitLineIdx = -1;
-        wordPositions = [];
-        ballTrail = [];
+        resetLyricFxState();
+        updateFxHud();
         console.log('[viz] lyric mode set to:', lyricMode === LYRIC_MODE_BOUNCING ? 'bouncing ball' : 'spitting');
+    }
+
+    function toggleLaserEyes() {
+        laserEyesEnabled = !laserEyesEnabled;
+        eyeLasers = [];
+        if (!laserEyesEnabled) {
+            for (var i = 0; i < spitParticles.length; i++) {
+                spitParticles[i].laserTriggered = false;
+                spitParticles[i].laserHitTime = 0;
+            }
+        }
+        updateFxHud();
+        console.log('[viz] laser eyes:', laserEyesEnabled ? 'on' : 'off');
+        return laserEyesEnabled;
+    }
+
+    function toggleWaveHead() {
+        waveHeadEnabled = !waveHeadEnabled;
+        updateFxHud();
+        console.log('[viz] wave head:', waveHeadEnabled ? 'on' : 'off');
+        return waveHeadEnabled;
     }
 
     // =========================================================
@@ -1107,88 +1898,10 @@
     var vizPlaylistEl = null;
 
     function toggleVizPlaylist() {
-        if (vizPlaylistEl && vizPlaylistEl.parentNode) {
-            // Already open — close it
-            vizPlaylistEl.remove();
-            vizPlaylistEl = null;
-            return;
-        }
-
-        // Build a fresh panel with current playlist data
         var radio = window.sbbsRadio;
-        vizPlaylistEl = document.createElement('div');
-        vizPlaylistEl.className = 'viz-playlist-overlay';
-        vizPlaylistEl.addEventListener('click', function(e) {
-            e.stopPropagation(); // don't bubble to anything beneath
-        });
-
-        var search = document.createElement('input');
-        search.type = 'text';
-        search.className = 'form-control form-control-sm mb-2';
-        search.placeholder = 'Search tracks...';
-        search.style.cssText = 'background:#111;color:#0ff;border:1px solid #0aa;';
-        vizPlaylistEl.appendChild(search);
-
-        var list = document.createElement('div');
-        list.className = 'viz-playlist-list';
-        vizPlaylistEl.appendChild(list);
-
-        // Close button
-        var closeBtn = document.createElement('button');
-        closeBtn.className = 'viz-playlist-close';
-        closeBtn.textContent = '\u2715';
-        closeBtn.title = 'Close';
-        closeBtn.addEventListener('click', function() {
-            if (vizPlaylistEl) { vizPlaylistEl.remove(); vizPlaylistEl = null; }
-        });
-        vizPlaylistEl.appendChild(closeBtn);
-
-        // Fetch and render track list
-        function renderTracks(filter) {
-            // Ask radio.js for current playlist via the API
-            var dir = (window.sbbsRadio && window.sbbsRadio.dirCode) || 'originalcontent_mp3s';
-            fetch('./api/files.ssjs?call=list-files&dir=' + dir)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!Array.isArray(data)) { list.innerHTML = '<div style="color:#f55;padding:8px;">No tracks</div>'; return; }
-                    var html = '';
-                    var currentFile = radio ? radio.currentTrackFile : '';
-                    var f = (filter || '').toLowerCase();
-                    for (var i = 0; i < data.length; i++) {
-                        var t = data[i];
-                        var name = (t.desc || t.name || '').replace(/\.mp3$/i, '');
-                        if (f && name.toLowerCase().indexOf(f) < 0
-                                && (t.name || '').toLowerCase().indexOf(f) < 0) continue;
-                        var active = (t.name === currentFile) ? ' viz-pl-active' : '';
-                        html += '<div class="viz-pl-item' + active + '" data-name="'
-                              + (t.name || '').replace(/"/g, '&quot;') + '">'
-                              + escHtml(name) + '</div>';
-                    }
-                    list.innerHTML = html || '<div style="color:#aaa;padding:8px;">No tracks found</div>';
-
-                    // Wire click handlers
-                    var items = list.querySelectorAll('.viz-pl-item');
-                    for (var j = 0; j < items.length; j++) {
-                        items[j].addEventListener('click', function() {
-                            var fname = this.getAttribute('data-name');
-                            // Use radio-track click infrastructure
-                            pickTrackByName(fname);
-                            if (vizPlaylistEl) { vizPlaylistEl.remove(); vizPlaylistEl = null; }
-                        });
-                    }
-                })
-                .catch(function() {
-                    list.innerHTML = '<div style="color:#f55;padding:8px;">Error loading tracks</div>';
-                });
+        if (radio && typeof radio.toggleLibraryPanel === 'function') {
+            radio.toggleLibraryPanel();
         }
-
-        search.addEventListener('input', function() {
-            renderTracks(search.value.trim());
-        });
-
-        elPanel.appendChild(vizPlaylistEl);
-        renderTracks('');
-        setTimeout(function() { search.focus(); }, 100);
     }
 
     function pickTrackByName(filename) {
@@ -1261,8 +1974,8 @@
             vizPlay.textContent = (radio && radio.isPlaying) ? '❚❚' : '▶';
         }
         if (vizTrack && radio) {
-            var name = radio.currentTrackFile || 'Select Track';
-            name = name.replace(/.[^.]+$/, '').replace(/_/g, ' ').substring(0, 35);
+            var name = radio.currentTrackTitle || radio.currentTrackFile || 'Select Track';
+            name = name.substring(0, 35);
             vizTrack.textContent = '♫ ' + name;
         }
 
@@ -1283,7 +1996,9 @@
         hide: hide,
         toggle: toggle,
         toggleLyricMode: toggleLyricMode,
-        setLyricMode: setLyricMode
+        setLyricMode: setLyricMode,
+        toggleLaserEyes: toggleLaserEyes,
+        toggleWaveHead: toggleWaveHead
     };
 
     // =========================================================

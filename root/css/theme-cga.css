@@ -135,6 +135,17 @@ html[data-theme="cga"] body {
     color: #55FFFF !important;
 }
 
+[data-theme="cga"] .navbar-nav .auth-nav-link,
+[data-theme="cga"] .navbar-nav .auth-nav-link:hover,
+[data-theme="cga"] .navbar-nav .auth-nav-link:focus,
+[data-theme="cga"] .navbar-nav .auth-nav-link.show {
+    color: #FF55FF !important;
+}
+
+[data-theme="cga"] .navbar-nav .auth-nav-link.dropdown-toggle::after {
+    border-top-color: #55FF55;
+}
+
 [data-theme="cga"] .card {
     background: #000000;
     border: 1px solid #00AAAA;
@@ -367,22 +378,67 @@ html[data-theme="cga"] body {
     gap: 0.45rem;
     padding-top: 0.45rem;
     padding-bottom: 0.45rem;
+    background: #FF55FF !important;
+    border-color: #FF55FF !important;
     color: #000000 !important;
     text-decoration: none;
 }
 
 [data-theme="cga"] .login-signup-btn:hover,
 [data-theme="cga"] .login-signup-btn:focus {
+    background: #FF55FF !important;
+    border-color: #FF55FF !important;
     color: #000000 !important;
     text-decoration: none;
 }
 
-[data-theme="cga"] .login-signup-btn .bin-icon {
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+/* Forgot-password inline flow */
+[data-theme="cga"] .forgot-pw-section {
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed #555555;
+}
+
+[data-theme="cga"] .forgot-pw-link {
+    color: #55FFFF;
+    font-size: 0.78rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+[data-theme="cga"] .forgot-pw-link:hover {
+    color: #FFFF55;
+}
+
+[data-theme="cga"] .forgot-pw-result {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: #55FF55;
+}
+
+[data-theme="cga"] .forgot-pw-form .form-control {
+    background: #000000;
+    color: #55FFFF;
+    border-color: #00AAAA;
+}
+
+[data-theme="cga"] .forgot-pw-form .form-control::placeholder {
+    color: #00AAAA;
+}
+
+[data-theme="cga"] .forgot-pw-form .form-control.is-invalid {
+    border-color: #FF5555;
+}
+
+[data-theme="cga"] .forgot-pw-form .btn-outline-info {
+    color: #55FFFF;
+    border-color: #00AAAA;
+}
+
+[data-theme="cga"] .forgot-pw-form .btn-outline-info:hover {
+    background: #00AAAA;
+    color: #000000;
 }
 
 [data-theme="cga"] .modal-content {

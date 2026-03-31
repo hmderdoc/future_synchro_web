@@ -57,6 +57,64 @@
     padding: 0;
     overflow-y: auto;
 }
+.chat-web-page .chat-web-mobile-strip {
+    display: none;
+}
+.chat-web-page .chat-web-mobile-toggle,
+.chat-web-page .chat-web-mobile-create {
+    border: 1px solid var(--chat-border);
+    background: #000;
+    color: #AAAAAA;
+    border-radius: 0;
+    padding: 0.55rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.76rem;
+    line-height: 1.1;
+    min-height: 2.5rem;
+}
+.chat-web-page .chat-web-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.chat-web-page .chat-web-mobile-toggle > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chat-web-page .chat-web-mobile-toggle:hover,
+.chat-web-page .chat-web-mobile-create:hover:not(:disabled) {
+    border-color: #55FFFF;
+    color: #55FFFF;
+}
+.chat-web-page .chat-web-mobile-toggle.is-active {
+    color: #55FFFF;
+    border-color: #55FFFF;
+    background: rgba(85, 255, 255, 0.08);
+}
+.chat-web-page .chat-web-mobile-chevron {
+    width: 0.48rem;
+    height: 0.48rem;
+    flex: 0 0 auto;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translateY(-1px);
+    transform-origin: center;
+    transition: transform 0.12s ease;
+}
+.chat-web-page .chat-web-mobile-toggle.is-active .chat-web-mobile-chevron {
+    transform: rotate(-135deg) translateY(-1px);
+}
+.chat-web-page .chat-web-mobile-create {
+    color: #55FF55;
+    white-space: nowrap;
+}
+.chat-web-page .chat-web-sidebar-create-desktop {
+    display: inline-flex;
+}
 
 .chat-web-page .chat-web-main {
     min-width: 0;
@@ -255,10 +313,18 @@ textarea.chat-web-input {
     font-size: 0.85rem;
     color: #FFFFFF;
 }
+.chat-web-page .chat-web-nav-title.is-user,
+.chat-web-page .chat-web-user-name {
+    color: #55FFFF;
+}
 .chat-web-page .chat-web-nav-secondary,
-.chat-web-page .chat-web-nav-preview,
-.chat-web-page .chat-web-channel {
+.chat-web-page .chat-web-nav-preview {
     color: #555555;
+    font-size: 0.78rem;
+}
+.chat-web-page .chat-web-channel,
+.chat-web-page .chat-web-system-name {
+    color: #FF55FF;
     font-size: 0.78rem;
 }
 .chat-web-page .chat-web-nav-preview {
@@ -551,6 +617,7 @@ textarea.chat-web-input {
     border-radius: 0;
     padding: 8px 10px 6px;
     overflow-y: auto;
+    overflow-anchor: none;
     min-height: 0;
     margin: 0;
 }
@@ -605,10 +672,9 @@ textarea.chat-web-input {
 }
 
 /* ── Sender / timestamp ── */
-.chat-web-page .chat-web-system-name,
 .chat-web-page .chat-web-time,
 .chat-web-page .chat-timestamp {
-    color: #555555;
+    color: #55FF55;
     font-size: 0.72rem;
 }
 .chat-web-page .chat-sender {
@@ -617,6 +683,9 @@ textarea.chat-web-input {
     color: #FF55FF;
     padding: 0;
     margin: 0;
+}
+.chat-web-page .chat-sender-name {
+    color: #55FFFF;
 }
 
 /* ── Avatars (message bubbles) ── */
@@ -657,6 +726,7 @@ textarea.chat-web-input {
     max-width: 100%;
     word-break: break-word;
     line-height: 1.45;
+    font-weight: normal;
     background: transparent;
 }
 
@@ -724,6 +794,117 @@ textarea.chat-web-input {
     image-rendering: pixelated;
     background: #000;
 }
+.chat-web-page .chat-rich-block {
+    display: grid;
+    gap: 8px;
+}
+.chat-web-page .chat-rich-text {
+    min-width: 0;
+}
+.chat-web-page .chat-rich-image-card,
+.chat-web-page .chat-rich-audio-card {
+    border: 1px solid #333333;
+    background: #050505;
+    padding: 8px;
+    width: min(100%, 420px);
+}
+.chat-web-page .chat-rich-image-link {
+    display: block;
+    text-decoration: none;
+}
+.chat-web-page .chat-rich-image-frame {
+    display: block;
+    border: 1px solid #222222;
+    background: #000000;
+    overflow: hidden;
+}
+.chat-web-page .chat-rich-image-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 22rem;
+    object-fit: contain;
+    background: #000000;
+}
+.chat-web-page .chat-rich-image-card.is-error .chat-rich-image-frame {
+    display: none;
+}
+.chat-web-page .chat-rich-image-fallback {
+    display: none;
+    color: #AAAAAA;
+    font-size: 0.78rem;
+}
+.chat-web-page .chat-rich-image-card.is-error .chat-rich-image-fallback {
+    display: block;
+}
+.chat-web-page .chat-rich-image-caption,
+.chat-web-page .chat-rich-audio-title {
+    color: #FFFFFF;
+    margin-top: 8px;
+}
+.chat-web-page .chat-rich-image-meta,
+.chat-web-page .chat-rich-audio-meta,
+.chat-web-page .chat-rich-audio-status {
+    color: #AAAAAA;
+    font-size: 0.76rem;
+}
+.chat-web-page .chat-rich-image-meta {
+    margin-top: 4px;
+}
+.chat-web-page .chat-rich-audio-main {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+}
+.chat-web-page .chat-rich-audio-icon {
+    color: #55FFFF;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+.chat-web-page .chat-rich-audio-copy {
+    min-width: 0;
+}
+.chat-web-page .chat-rich-audio-title {
+    margin-top: 0;
+    color: #55FFFF;
+}
+.chat-web-page .chat-rich-audio-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+.chat-web-page .chat-rich-audio-link {
+    color: #FF55FF;
+    font-size: 0.78rem;
+}
+.chat-web-page .chat-rich-audio-button {
+    border: 1px solid #00AA00;
+    background: transparent;
+    color: #55FFFF;
+    font-family: inherit;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+.chat-web-page .chat-rich-audio-button:hover:not(:disabled) {
+    background: #00AA00;
+    color: #000000;
+}
+.chat-web-page .chat-rich-audio-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.chat-web-page .chat-rich-audio-card.is-ready .chat-rich-audio-status {
+    color: #55FF55;
+}
+.chat-web-page .chat-rich-audio-card.is-missing .chat-rich-audio-status {
+    color: #FF5555;
+}
 
 /* ── Composer form ── */
 .chat-web-page .chat-web-form {
@@ -746,20 +927,78 @@ textarea.chat-web-input {
 
 /* ── Responsive ── */
 @media (max-width: 980px) {
+    .chat-web-page {
+        width: calc(100% + 1rem);
+        max-width: 100vw;
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+    }
+    .chat-web-page .chat-web-shell {
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+    }
     .chat-web-page .chat-web-layout {
         grid-template-columns: 1fr;
         grid-template-rows: minmax(0, auto) minmax(0, 1fr);
         gap: 0;
     }
     .chat-web-page .chat-web-sidebar {
-        max-height: 28vh;
+        max-height: none;
         border-right: none;
         border-bottom: 1px solid var(--chat-border);
+        overflow: visible;
+    }
+    .chat-web-page .chat-web-mobile-strip {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        gap: 0;
+        border-bottom: 1px solid var(--chat-border);
+        background: rgba(85, 255, 255, 0.05);
+    }
+    .chat-web-page .chat-web-mobile-toggle,
+    .chat-web-page .chat-web-mobile-create {
+        border-top: none;
+        border-bottom: none;
+    }
+    .chat-web-page .chat-web-mobile-toggle + .chat-web-mobile-toggle,
+    .chat-web-page .chat-web-mobile-create {
+        border-left: none;
+    }
+    .chat-web-page .chat-web-sidebar-create-desktop,
+    .chat-web-page .chat-web-sidebar-section[data-panel] .chat-web-sidebar-header {
+        display: none;
+    }
+    .chat-web-page .chat-web-sidebar-section[data-panel] {
+        display: none;
+        border-top: 1px solid var(--chat-border);
+    }
+    .chat-web-page .chat-web-sidebar-section[data-panel] + .chat-web-sidebar-section[data-panel] {
+        margin-top: 0;
+        padding-top: 0;
+    }
+    .chat-web-page .chat-web-sidebar[data-mobile-panel="rooms"] .chat-web-sidebar-section[data-panel="rooms"],
+    .chat-web-page .chat-web-sidebar[data-mobile-panel="private"] .chat-web-sidebar-section[data-panel="private"] {
+        display: flex;
+    }
+    .chat-web-page .chat-web-sidebar-section[data-panel] .chat-web-nav-list {
+        max-height: min(26vh, 17rem);
+        overflow-y: auto;
     }
 }
 @media (max-width: 768px) {
     .chat-web-page {
-        padding-top: 0.3rem;
+        width: calc(100% + 1.5rem);
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .chat-web-page .chat-web-mobile-toggle,
+    .chat-web-page .chat-web-mobile-create {
+        padding: 0.5rem 0.55rem;
+        font-size: 0.72rem;
+        min-height: 2.3rem;
     }
     .chat-web-page .chat-web-shell {
         height: calc(100vh - 120px);
@@ -815,20 +1054,35 @@ textarea.chat-web-input {
 <div class="chat-web-page">
     <div class="chat-web-shell">
         <div class="chat-web-layout">
-            <aside class="chat-web-sidebar">
-                <div class="chat-web-sidebar-section">
+            <aside class="chat-web-sidebar" data-mobile-panel="">
+                <div class="chat-web-mobile-strip" aria-label="Chat navigation">
+                    <button id="chat-mobile-rooms-toggle" class="chat-web-mobile-toggle" type="button" aria-expanded="false" aria-controls="chat-rooms-panel">
+                        <span>Public Rooms</span>
+                        <span class="chat-web-mobile-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button id="chat-mobile-private-toggle" class="chat-web-mobile-toggle" type="button" aria-expanded="false" aria-controls="chat-private-panel">
+                        <span>Private Chats</span>
+                        <span class="chat-web-mobile-chevron" aria-hidden="true"></span>
+                    </button>
+<?xjs if (user.number > 0) { ?>
+                    <button id="chat-room-open-mobile" class="chat-web-mobile-create" data-chat-room-open type="button">Create Room</button>
+<?xjs } else { ?>
+                    <button id="chat-room-open-mobile" class="chat-web-mobile-create" data-chat-room-open type="button" disabled>Create Room</button>
+<?xjs } ?>
+                </div>
+                <div id="chat-rooms-panel" class="chat-web-sidebar-section" data-panel="rooms">
                     <div class="chat-web-sidebar-header">
                         <h4 class="chat-web-sidebar-heading">Public Rooms</h4>
                     </div>
 <?xjs if (user.number > 0) { ?>
-                    <button id="chat-room-open" class="chat-web-sidebar-button" type="button">Create Room</button>
+                    <button id="chat-room-open" class="chat-web-sidebar-button chat-web-sidebar-create-desktop" data-chat-room-open type="button">Create Room</button>
 <?xjs } else { ?>
-                    <button id="chat-room-open" class="chat-web-sidebar-button" type="button" disabled>Create Room</button>
+                    <button id="chat-room-open" class="chat-web-sidebar-button chat-web-sidebar-create-desktop" data-chat-room-open type="button" disabled>Create Room</button>
 <?xjs } ?>
                     <div id="chat-rooms" class="chat-web-nav-list"></div>
                 </div>
 
-                <div class="chat-web-sidebar-section">
+                <div id="chat-private-panel" class="chat-web-sidebar-section" data-panel="private">
                     <div class="chat-web-sidebar-header">
                         <h4 class="chat-web-sidebar-heading">Private Chats</h4>
                     </div>
@@ -841,16 +1095,6 @@ textarea.chat-web-input {
                     <div id="chat-status" class="chat-web-status" role="alert" aria-live="polite">
                         <div id="chat-status-text"></div>
                         <button id="chat-status-retry" class="chat-web-status-button" type="button">Retry now</button>
-                    </div>
-
-                    <div id="chat-motd" class="chat-motd-bar is-empty">
-                        <span class="chat-motd-label">MOTD</span>
-                        <div id="chat-motd-window" class="chat-motd-window">
-                            <div id="chat-motd-track" class="chat-motd-track">
-                                <span id="chat-motd-primary" class="chat-motd-item"></span>
-                                <span id="chat-motd-clone" class="chat-motd-item chat-motd-item-clone" aria-hidden="true"></span>
-                            </div>
-                        </div>
                     </div>
 
                     <div id="chat-motd" class="chat-motd-bar is-empty">
@@ -925,9 +1169,12 @@ textarea.chat-web-input {
     var userSystemName = String(sbbsConfig.systemName || '');
     var users = chatService && chatService.getUsersSnapshot ? chatService.getUsersSnapshot() : [];
 
+    var sidebar = document.querySelector('.chat-web-sidebar');
     var roomsList = document.getElementById('chat-rooms');
     var privateList = document.getElementById('chat-private');
-    var roomOpen = document.getElementById('chat-room-open');
+    var roomOpenButtons = Array.prototype.slice.call(document.querySelectorAll('[data-chat-room-open]'));
+    var mobileRoomsToggle = document.getElementById('chat-mobile-rooms-toggle');
+    var mobilePrivateToggle = document.getElementById('chat-mobile-private-toggle');
     var roomForm = document.getElementById('chat-room-form');
     var roomInput = document.getElementById('chat-room-input');
     var roomModal = document.getElementById('chat-room-modal');
@@ -949,9 +1196,126 @@ textarea.chat-web-input {
     var usersPanelRoom = getActiveView().currentChannel || 'main';
     var usersPanelUsers = Array.isArray(users) ? users.slice() : [];
     var usersPanelRequestToken = 0;
+    var forceMessageScrollToBottom = true;
+    var messageBottomLocked = true;
+    var pendingMessageScrollFrame = 0;
+    var compactSidebarMedia = window.matchMedia ? window.matchMedia('(max-width: 980px)') : null;
+    var wasCompactSidebarLayout = compactSidebarMedia ? compactSidebarMedia.matches : (window.innerWidth <= 980);
+    var onCompactSidebarMediaChanged = null;
+    var onCompactSidebarWindowResize = null;
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
+    }
+
+    function isCompactSidebarLayout() {
+        if (compactSidebarMedia && typeof compactSidebarMedia.matches === 'boolean') {
+            return compactSidebarMedia.matches;
+        }
+        return window.innerWidth <= 980;
+    }
+
+    function syncMobileSidebarButtons(activePanel) {
+        var roomsActive = activePanel === 'rooms';
+        var privateActive = activePanel === 'private';
+
+        if (mobileRoomsToggle) {
+            mobileRoomsToggle.classList.toggle('is-active', roomsActive);
+            mobileRoomsToggle.setAttribute('aria-expanded', roomsActive ? 'true' : 'false');
+        }
+        if (mobilePrivateToggle) {
+            mobilePrivateToggle.classList.toggle('is-active', privateActive);
+            mobilePrivateToggle.setAttribute('aria-expanded', privateActive ? 'true' : 'false');
+        }
+    }
+
+    function setMobileSidebarPanel(panelName) {
+        var nextPanel = panelName === 'rooms' || panelName === 'private' ? panelName : '';
+
+        if (sidebar) {
+            sidebar.setAttribute('data-mobile-panel', nextPanel);
+        }
+        syncMobileSidebarButtons(nextPanel);
+    }
+
+    function collapseMobileSidebarPanels() {
+        if (!isCompactSidebarLayout()) {
+            return;
+        }
+        setMobileSidebarPanel('');
+    }
+
+    function toggleMobileSidebarPanel(panelName) {
+        var currentPanel;
+
+        if (!isCompactSidebarLayout()) {
+            return;
+        }
+        currentPanel = sidebar ? (sidebar.getAttribute('data-mobile-panel') || '') : '';
+        setMobileSidebarPanel(currentPanel === panelName ? '' : panelName);
+    }
+
+    function syncMobileSidebarLayout(forceCollapse) {
+        var isCompact = isCompactSidebarLayout();
+        var currentPanel = sidebar ? (sidebar.getAttribute('data-mobile-panel') || '') : '';
+
+        if (!sidebar) {
+            return;
+        }
+
+        if (isCompact) {
+            if (!wasCompactSidebarLayout || forceCollapse) {
+                currentPanel = '';
+            }
+            setMobileSidebarPanel(currentPanel);
+        } else {
+            sidebar.setAttribute('data-mobile-panel', '');
+            syncMobileSidebarButtons('');
+        }
+
+        wasCompactSidebarLayout = isCompact;
+    }
+
+    function getMessageBottomGap() {
+        if (!msgContainer) {
+            return 0;
+        }
+        return Math.max(0, msgContainer.scrollHeight - msgContainer.clientHeight - msgContainer.scrollTop);
+    }
+
+    function isMessageListNearBottom() {
+        return getMessageBottomGap() <= 32;
+    }
+
+    function cancelPendingMessageScroll() {
+        if (!pendingMessageScrollFrame) {
+            return;
+        }
+        window.cancelAnimationFrame(pendingMessageScrollFrame);
+        pendingMessageScrollFrame = 0;
+    }
+
+    function jumpMessagesToBottom() {
+        if (!msgContainer) {
+            return;
+        }
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
+
+    function queueMessageScrollToBottom() {
+        cancelPendingMessageScroll();
+        pendingMessageScrollFrame = window.requestAnimationFrame(function () {
+            pendingMessageScrollFrame = 0;
+            jumpMessagesToBottom();
+            window.requestAnimationFrame(jumpMessagesToBottom);
+        });
+    }
+
+    function syncMessageBottomLock() {
+        messageBottomLocked = forceMessageScrollToBottom || isMessageListNearBottom();
+        if (!messageBottomLocked && !forceMessageScrollToBottom) {
+            cancelPendingMessageScroll();
+        }
     }
 
     function normalizeUpper(value) {
@@ -1003,6 +1367,170 @@ textarea.chat-web-input {
 
     function linkify(text) {
         return escapeHtml(text || '').replace(/(https?:\/\/[^\s<]+)/gi, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    }
+
+    function filenameTitle(name) {
+        return String(name || '')
+            .replace(/\.mp3$/i, '')
+            .replace(/_/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/^\s+|\s+$/g, '');
+    }
+
+    function formatSeconds(seconds) {
+        var total = parseInt(seconds, 10);
+        var mins;
+        var secs;
+
+        if (!isFinite(total) || total < 0) return '';
+        mins = Math.floor(total / 60);
+        secs = total % 60;
+        return mins > 0 ? (mins + 'm ' + secs + 's') : (secs + 's');
+    }
+
+    function normalizeTrackLookupText(value) {
+        return trimText(String(value || ''))
+            .toLowerCase()
+            .replace(/[\u2018\u2019]/g, "'")
+            .replace(/[\u201c\u201d]/g, '"')
+            .replace(/feat\./g, 'feat')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ');
+    }
+
+    function extractAudioTitleHint(label) {
+        var quoted = String(label || '').match(/"([^"]+)"/);
+        var byline;
+
+        if (quoted && trimText(quoted[1]).length) {
+            return trimText(quoted[1]);
+        }
+
+        byline = String(label || '').match(/^(.+?)\s+by\s+/i);
+        if (byline && trimText(byline[1]).length) {
+            return trimText(byline[1]).replace(/^["']|["']$/g, '');
+        }
+
+        return trimText(String(label || '').replace(/^["']|["']$/g, ''));
+    }
+
+    function parseUploadMeta(text) {
+        var match = String(text || '').match(/(?:^|\s)(?:--|—|–|-)?\s*uploaded to\s+([A-Z0-9_]+)\s*\((\d+)s\)\s*$/i);
+
+        if (!match) return null;
+        return {
+            dirCode: match[1],
+            dirCodeLower: String(match[1] || '').toLowerCase(),
+            seconds: parseInt(match[2], 10) || 0,
+            matchText: match[0]
+        };
+    }
+
+    function parseAudioEmbed(text) {
+        var match = String(text || '').match(/^\s*(?:🎵\s*)?\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)\s*(?:--|—|–|-)\s*uploaded to\s+([A-Z0-9_]+)\s*\((\d+)s\)\s*$/i);
+
+        if (!match) return null;
+
+        return {
+            label: trimText(match[1]),
+            titleHint: extractAudioTitleHint(match[1]),
+            url: match[2],
+            dirCode: match[3],
+            dirCodeLower: String(match[3] || '').toLowerCase(),
+            seconds: parseInt(match[4], 10) || 0
+        };
+    }
+
+    function parseImageEmbed(text) {
+        var source = String(text || '');
+        var match = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/i.exec(source);
+        var suffixMeta;
+        var suffixText;
+
+        if (!match) return null;
+
+        suffixText = source.slice(match.index + match[0].length);
+        suffixMeta = parseUploadMeta(suffixText);
+
+        if (suffixMeta) {
+            suffixText = suffixText.replace(suffixMeta.matchText, '');
+        }
+
+        return {
+            prefixText: source.slice(0, match.index),
+            alt: trimText(match[1]),
+            url: match[2],
+            suffixText: suffixText,
+            uploadMeta: suffixMeta
+        };
+    }
+
+    function renderAudioEmbedHtml(embed) {
+        var durationText = formatSeconds(embed.seconds);
+
+        if (embed.dirCodeLower !== 'originalcontent_mp3s') {
+            return '<a href="' + escapeAttr(embed.url) + '" target="_blank" rel="noopener">' + escapeHtml(embed.label) + '</a>';
+        }
+
+        return '<div class="chat-rich-audio-card" data-chat-audio-card="1" data-chat-audio-label="' + escapeAttr(embed.label) + '" data-chat-audio-title="' + escapeAttr(embed.titleHint) + '" data-chat-audio-url="' + escapeAttr(embed.url) + '" data-chat-audio-dir="' + escapeAttr(embed.dirCodeLower) + '">' +
+            '<div class="chat-rich-audio-main">' +
+            '<div class="chat-rich-audio-icon" aria-hidden="true">&#9835;</div>' +
+            '<div class="chat-rich-audio-copy">' +
+            '<div class="chat-rich-audio-title">' + escapeHtml(embed.label) + '</div>' +
+            '<div class="chat-rich-audio-meta">' + escapeHtml(embed.dirCode) + (durationText.length ? (' • ' + escapeHtml(durationText)) : '') + '</div>' +
+            '</div>' +
+            '<button type="button" class="chat-rich-audio-button" data-chat-audio-play="1" disabled>Loading Track</button>' +
+            '</div>' +
+            '<div class="chat-rich-audio-actions">' +
+            '<a class="chat-rich-audio-link" href="' + escapeAttr(embed.url) + '" target="_blank" rel="noopener">Open Upload</a>' +
+            '<span class="chat-rich-audio-status" data-chat-audio-status>Resolving track…</span>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function renderImageEmbedHtml(embed) {
+        var parts = [];
+        var suffixText = trimText(embed.suffixText);
+        var durationText = embed.uploadMeta ? formatSeconds(embed.uploadMeta.seconds) : '';
+
+        if (trimText(embed.prefixText).length) {
+            parts.push('<div class="chat-rich-text">' + linkify(trimText(embed.prefixText)) + '</div>');
+        }
+
+        parts.push(
+            '<div class="chat-rich-image-card">' +
+                '<a class="chat-rich-image-link" href="' + escapeAttr(embed.url) + '" target="_blank" rel="noopener">' +
+                    '<span class="chat-rich-image-frame">' +
+                        '<img class="chat-rich-image-preview" src="' + escapeAttr(embed.url) + '" alt="' + escapeAttr(embed.alt || 'Chat image') + '" loading="lazy">' +
+                    '</span>' +
+                    '<span class="chat-rich-image-fallback">Open image</span>' +
+                '</a>' +
+                (embed.alt.length ? ('<div class="chat-rich-image-caption">' + escapeHtml(embed.alt) + '</div>') : '') +
+                (embed.uploadMeta ? ('<div class="chat-rich-image-meta">' + escapeHtml(embed.uploadMeta.dirCode) + (durationText.length ? (' • ' + escapeHtml(durationText)) : '') + '</div>') : '') +
+            '</div>'
+        );
+
+        if (suffixText.length) {
+            parts.push('<div class="chat-rich-text">' + linkify(suffixText) + '</div>');
+        }
+
+        return '<div class="chat-rich-block">' + parts.join('') + '</div>';
+    }
+
+    function renderRichMessageHtml(text) {
+        var audioEmbed = parseAudioEmbed(text);
+        var imageEmbed;
+
+        if (audioEmbed) {
+            return renderAudioEmbedHtml(audioEmbed);
+        }
+
+        imageEmbed = parseImageEmbed(text);
+        if (imageEmbed) {
+            return renderImageEmbedHtml(imageEmbed);
+        }
+
+        return linkify(text || '');
     }
 
     function formatTime(ts) {
@@ -1345,13 +1873,13 @@ textarea.chat-web-input {
             html += '</div>';
             html += '<div>';
             html += '<div class="chat-web-nav-top">';
-            html += '<span class="chat-web-nav-title">@' + escapeHtml(thread.name) + '</span>';
+            html += '<span class="chat-web-nav-title is-user">@' + escapeHtml(thread.name) + '</span>';
             if ((thread.unreadCount || 0) > 0) {
                 html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(thread.unreadCount)) + '</span>';
             }
             html += '</div>';
             if (thread.system) {
-                html += '<div class="chat-web-nav-secondary">' + escapeHtml(thread.system) + '</div>';
+                html += '<div class="chat-web-nav-secondary chat-web-system-name">' + escapeHtml(thread.system) + '</div>';
             }
             if (thread.preview) {
                 html += '<div class="chat-web-nav-preview">' + escapeHtml(thread.preview) + '</div>';
@@ -1396,9 +1924,9 @@ textarea.chat-web-input {
             }
             html += '</div>';
             html += '<div>';
-            html += '<div><strong>' + escapeHtml(entry.nick || 'Unknown') + '</strong></div>';
+            html += '<div><strong class="chat-web-user-name">' + escapeHtml(entry.nick || 'Unknown') + '</strong></div>';
             if (entry.system) {
-                html += '<div class="chat-web-channel">' + escapeHtml(entry.system) + '</div>';
+                html += '<div class="chat-web-channel chat-web-system-name">' + escapeHtml(entry.system) + '</div>';
             }
             html += '</div></button>';
         });
@@ -1436,15 +1964,270 @@ textarea.chat-web-input {
             '</div>';
     }
 
+    var CHAT_AUDIO_DIR = 'originalcontent_mp3s';
+    var chatAudioCatalogPromise = null;
+    var chatAudioCatalog = null;
+
+    function addTrackLookupKeys(target, seen, value) {
+        var key = normalizeTrackLookupText(value);
+
+        if (!key.length || seen[key]) return;
+        seen[key] = true;
+        target.push(key);
+    }
+
+    function buildChatAudioCatalogEntry(item) {
+        var name = String((item && item.name) || '');
+        var desc = String((item && item.desc) || '');
+        var title = filenameTitle(name);
+        var keys = [];
+        var seen = {};
+
+        addTrackLookupKeys(keys, seen, name);
+        addTrackLookupKeys(keys, seen, title);
+        addTrackLookupKeys(keys, seen, desc);
+
+        return {
+            name: name,
+            desc: desc,
+            title: title,
+            matchKeys: keys
+        };
+    }
+
+    function loadChatAudioCatalog() {
+        if (chatAudioCatalog) {
+            return Promise.resolve(chatAudioCatalog);
+        }
+        if (chatAudioCatalogPromise) {
+            return chatAudioCatalogPromise;
+        }
+
+        chatAudioCatalogPromise = window.fetch('./api/files.ssjs?call=list-files&dir=' + CHAT_AUDIO_DIR, {
+            credentials: 'same-origin'
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (list) {
+                var catalog = {
+                    entries: [],
+                    lookup: {}
+                };
+
+                if (!Array.isArray(list)) {
+                    return catalog;
+                }
+
+                catalog.entries = list.map(buildChatAudioCatalogEntry).filter(function (entry) {
+                    return entry.name.length > 0;
+                });
+
+                catalog.entries.forEach(function (entry) {
+                    entry.matchKeys.forEach(function (key) {
+                        if (!catalog.lookup[key]) {
+                            catalog.lookup[key] = [];
+                        }
+                        catalog.lookup[key].push(entry);
+                    });
+                });
+
+                chatAudioCatalog = catalog;
+                return catalog;
+            })
+            .catch(function (error) {
+                console.error('[chat] audio catalog load failed:', error);
+                chatAudioCatalogPromise = null;
+                return {
+                    entries: [],
+                    lookup: {}
+                };
+            });
+
+        return chatAudioCatalogPromise;
+    }
+
+    function resolveChatAudioTrack(card, catalog) {
+        var label = card.getAttribute('data-chat-audio-label') || '';
+        var title = card.getAttribute('data-chat-audio-title') || '';
+        var candidateKeys = [];
+        var seen = {};
+        var exactMatches;
+        var i;
+
+        function pushCandidate(value) {
+            var key = normalizeTrackLookupText(value);
+            if (!key.length || seen[key]) return;
+            seen[key] = true;
+            candidateKeys.push(key);
+        }
+
+        pushCandidate(label);
+        pushCandidate(title);
+
+        for (i = 0; i < candidateKeys.length; i += 1) {
+            exactMatches = catalog.lookup[candidateKeys[i]] || [];
+            if (exactMatches.length === 1) {
+                return exactMatches[0];
+            }
+        }
+
+        for (i = 0; i < candidateKeys.length; i += 1) {
+            exactMatches = catalog.lookup[candidateKeys[i]] || [];
+            if (exactMatches.length > 0) {
+                return exactMatches[0];
+            }
+        }
+
+        if (candidateKeys.length) {
+            for (i = 0; i < catalog.entries.length; i += 1) {
+                if (catalog.entries[i].matchKeys.indexOf(candidateKeys[0]) >= 0) {
+                    return catalog.entries[i];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    function updateChatAudioPlaybackState(root) {
+        var scope = root || document;
+        var cards = scope.querySelectorAll('[data-chat-audio-card]');
+        var currentTrack = window.sbbsRadio && window.sbbsRadio.currentTrackFile
+            ? window.sbbsRadio.currentTrackFile
+            : '';
+        var isPlaying = !!(window.sbbsRadio && window.sbbsRadio.isPlaying);
+
+        cards.forEach(function (card) {
+            var button = card.querySelector('[data-chat-audio-play]');
+            var status = card.querySelector('[data-chat-audio-status]');
+            var trackName = card.getAttribute('data-chat-track-name') || '';
+
+            if (!button || !status) return;
+
+            if (!trackName.length) {
+                button.disabled = true;
+                if (card.classList.contains('is-missing')) {
+                    button.textContent = 'Track Missing';
+                    status.textContent = 'Could not match this upload to the radio playlist';
+                } else {
+                    button.textContent = 'Loading Track';
+                    status.textContent = 'Resolving track…';
+                }
+                return;
+            }
+
+            card.classList.add('is-ready');
+            card.classList.remove('is-missing');
+
+            if (currentTrack === trackName && isPlaying) {
+                button.disabled = true;
+                button.textContent = 'Now Playing';
+                status.textContent = 'Playing in Futureland Records';
+            } else if (currentTrack === trackName) {
+                button.disabled = false;
+                button.textContent = 'Resume Track';
+                status.textContent = 'Loaded in Futureland Records';
+            } else {
+                button.disabled = false;
+                button.textContent = 'Play Track';
+                status.textContent = 'Ready in Futureland Records';
+            }
+        });
+    }
+
+    function hydrateChatAudioEmbeds(root) {
+        var scope = root || document;
+        var cards = scope.querySelectorAll('[data-chat-audio-card]');
+
+        if (!cards.length) return;
+
+        loadChatAudioCatalog().then(function (catalog) {
+            cards.forEach(function (card) {
+                var button = card.querySelector('[data-chat-audio-play]');
+                var status = card.querySelector('[data-chat-audio-status]');
+                var entry;
+
+                if (!button || !status) return;
+                if ((card.getAttribute('data-chat-audio-dir') || '') !== CHAT_AUDIO_DIR) return;
+
+                entry = resolveChatAudioTrack(card, catalog);
+                if (entry) {
+                    card.setAttribute('data-chat-track-name', entry.name);
+                    updateChatAudioPlaybackState(card.parentNode || scope);
+                    return;
+                }
+
+                card.classList.add('is-missing');
+                button.disabled = true;
+                button.textContent = 'Track Missing';
+                status.textContent = 'Could not match this upload to the radio playlist';
+            });
+        });
+    }
+
+    function hydrateChatImageEmbeds(root) {
+        var scope = root || document;
+        var images = scope.querySelectorAll('.chat-rich-image-preview');
+
+        images.forEach(function (img) {
+            if (img.dataset.bound === '1') return;
+            img.dataset.bound = '1';
+            img.addEventListener('error', function () {
+                var card = img.closest('.chat-rich-image-card');
+                if (card) {
+                    card.classList.add('is-error');
+                }
+            });
+        });
+    }
+
+    function hydrateRichChatEmbeds(root) {
+        hydrateChatImageEmbeds(root);
+        hydrateChatAudioEmbeds(root);
+    }
+
+    function playChatAudioCard(button) {
+        var card = button && button.closest('[data-chat-audio-card]');
+        var trackName = card ? (card.getAttribute('data-chat-track-name') || '') : '';
+        var radio = window.sbbsRadio;
+        var playButton;
+
+        if (!card || !trackName.length) return;
+
+        if (radio && radio.currentTrackFile === trackName) {
+            document.dispatchEvent(new CustomEvent('viz:open'));
+            if (!radio.isPlaying) {
+                playButton = document.getElementById('radio-play');
+                if (playButton) {
+                    playButton.click();
+                }
+            }
+            updateChatAudioPlaybackState(msgContainer || document);
+            return;
+        }
+
+        document.dispatchEvent(new CustomEvent('viz:picktrack', {
+            detail: { name: trackName }
+        }));
+        document.dispatchEvent(new CustomEvent('viz:open'));
+        window.setTimeout(function () {
+            updateChatAudioPlaybackState(msgContainer || document);
+        }, 80);
+    }
+
     function renderMessages() {
         var msgs = getMessages();
         var html = '';
         var prevSender = '';
         var prevTime = 0;
         var groupWindow = 120000;
+        var shouldStickToBottom = forceMessageScrollToBottom || isMessageListNearBottom();
+        var previousScrollTop = msgContainer ? msgContainer.scrollTop : 0;
 
         if (!msgs.length) {
             msgContainer.innerHTML = '<div class="chat-web-empty">No messages yet. Say hello.</div>';
+            messageBottomLocked = true;
+            forceMessageScrollToBottom = false;
+            queueMessageScrollToBottom();
             return;
         }
 
@@ -1500,9 +2283,9 @@ textarea.chat-web-input {
                 } else {
                     html += '<div class="chat-sender">';
                 }
-                html += '<strong>' + escapeHtml(displaySender) + '</strong>';
+                html += '<strong class="chat-sender-name">' + escapeHtml(displaySender) + '</strong>';
                 if (message.system) {
-                    html += ' <span class="chat-web-channel">- ' + escapeHtml(message.system) + '</span>';
+                    html += ' <span class="chat-web-channel chat-web-system-name">' + escapeHtml(message.system) + '</span>';
                 }
                 html += ' <small class="chat-timestamp">' + escapeHtml(formatTime(message.timestamp)) + '</small>';
                 if (actorAttrs.length) {
@@ -1516,7 +2299,7 @@ textarea.chat-web-input {
             if (message.kind === 'bitmap' && message.bitmapKey) {
                 html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble">' + renderBitmapBubble(message) + '</div>';
             } else {
-                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + linkify(message.text || '') + '</div>';
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + renderRichMessageHtml(message.text || '') + '</div>';
             }
             prevSender = displaySender;
             prevTime = message.timestamp || 0;
@@ -1529,11 +2312,17 @@ textarea.chat-web-input {
         msgContainer.innerHTML = html;
         renderEmbeddedAvatars(msgContainer);
         renderEmbeddedBitmaps(msgContainer);
+        hydrateRichChatEmbeds(msgContainer);
         renderLocalAvatars(msgContainer);
         renderAvatarFallbacks(msgContainer);
-        requestAnimationFrame(function () {
-            msgContainer.scrollTop = msgContainer.scrollHeight;
-        });
+        if (shouldStickToBottom) {
+            messageBottomLocked = true;
+            queueMessageScrollToBottom();
+        } else {
+            msgContainer.scrollTop = previousScrollTop;
+            syncMessageBottomLock();
+        }
+        forceMessageScrollToBottom = false;
     }
 
     function renderAll() {
@@ -1599,13 +2388,19 @@ textarea.chat-web-input {
         renderStatus(e.detail || {});
     }
 
+    function onRadioPlaybackChanged() {
+        updateChatAudioPlaybackState(msgContainer || document);
+    }
+
     function onViewChanged(e) {
         var view = e.detail || getActiveView();
+        forceMessageScrollToBottom = true;
         renderViewLabel(view);
         renderRooms();
         renderPrivateThreads();
         updateQueryString(view);
         updateComposer();
+        collapseMobileSidebarPanels();
     }
 
     function openPrivateFromButton(button) {
@@ -1625,6 +2420,7 @@ textarea.chat-web-input {
             button.getAttribute('data-private-system'),
             button.getAttribute('data-private-avatar')
         );
+        collapseMobileSidebarPanels();
     }
 
     function openRoomModal() {
@@ -1670,6 +2466,30 @@ textarea.chat-web-input {
         usersClose.addEventListener('click', closeUsersModal);
     }
 
+    if (mobileRoomsToggle) {
+        mobileRoomsToggle.addEventListener('click', function () {
+            toggleMobileSidebarPanel('rooms');
+        });
+    }
+
+    if (mobilePrivateToggle) {
+        mobilePrivateToggle.addEventListener('click', function () {
+            toggleMobileSidebarPanel('private');
+        });
+    }
+
+    if (compactSidebarMedia && compactSidebarMedia.addEventListener) {
+        onCompactSidebarMediaChanged = function () {
+            syncMobileSidebarLayout(false);
+        };
+        compactSidebarMedia.addEventListener('change', onCompactSidebarMediaChanged);
+    } else {
+        onCompactSidebarWindowResize = function () {
+            syncMobileSidebarLayout(false);
+        };
+        window.addEventListener('resize', onCompactSidebarWindowResize);
+    }
+
     if (statusRetry) {
         statusRetry.addEventListener('click', function () {
             chatService.retrySync();
@@ -1683,6 +2503,7 @@ textarea.chat-web-input {
 
             if (joinButton) {
                 chatService.setActiveChannel(joinButton.getAttribute('data-room-join'));
+                collapseMobileSidebarPanels();
                 return;
             }
 
@@ -1705,10 +2526,29 @@ textarea.chat-web-input {
     }
 
     if (msgContainer) {
+        msgContainer.addEventListener('scroll', syncMessageBottomLock, { passive: true });
+        msgContainer.addEventListener('load', function (event) {
+            if (!messageBottomLocked) {
+                return;
+            }
+            if (event.target && String(event.target.tagName || '').toUpperCase() === 'IMG') {
+                queueMessageScrollToBottom();
+            }
+        }, true);
         msgContainer.addEventListener('click', function (event) {
+            var audioButton = event.target.closest('[data-chat-audio-play]');
+
+            if (audioButton) {
+                event.preventDefault();
+                playChatAudioCard(audioButton);
+                return;
+            }
             openPrivateFromButton(event.target.closest('[data-private-user]'));
         });
     }
+
+    document.addEventListener('radio:trackchange', onRadioPlaybackChanged);
+    document.addEventListener('radio:statechange', onRadioPlaybackChanged);
 
     if (roomForm) {
         roomForm.addEventListener('submit', function (event) {
@@ -1723,13 +2563,14 @@ textarea.chat-web-input {
             chatService.createRoom(nextRoom).then(function (ok) {
                 if (!ok) return;
                 closeRoomModal();
+                collapseMobileSidebarPanels();
             });
         });
     }
 
-    if (roomOpen) {
-        roomOpen.addEventListener('click', openRoomModal);
-    }
+    roomOpenButtons.forEach(function (button) {
+        button.addEventListener('click', openRoomModal);
+    });
 
     if (roomClose) {
         roomClose.addEventListener('click', closeRoomModal);
@@ -1782,6 +2623,7 @@ textarea.chat-web-input {
                 var rows = doc.rows;
                 var fromName = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
 
+                forceMessageScrollToBottom = true;
                 chatService.buildBitmapPayload(cells, cols, rows, fromName).then(function (payload) {
                     return chatService.send(payload);
                 }).then(function (ok) {
@@ -1795,6 +2637,7 @@ textarea.chat-web-input {
             var text = chatText.value.replace(/^\s+|\s+$/g, '');
             if (!text.length) return;
 
+            forceMessageScrollToBottom = true;
             chatService.send(text).then(function (ok) {
                 if (!ok) return;
                 chatText.value = '';
@@ -1830,6 +2673,7 @@ textarea.chat-web-input {
                     var cols = doc.columns;
                     var rows = doc.rows;
                     var fromName = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
+                    forceMessageScrollToBottom = true;
                     chatService.buildBitmapPayload(cells, cols, rows, fromName).then(function (payload) {
                         return chatService.send(payload);
                     });
@@ -1944,82 +2788,6 @@ textarea.chat-web-input {
     // refresh MOTD every 5 minutes
     var motdRefreshTimer = setInterval(loadMotd, 5 * 60 * 1000);
 
-
-    /* ── MOTD ticker ── */
-    var motdBar = document.getElementById('chat-motd');
-    var motdWindow = document.getElementById('chat-motd-window');
-    var motdTrack = document.getElementById('chat-motd-track');
-    var motdPrimary = document.getElementById('chat-motd-primary');
-    var motdClone = document.getElementById('chat-motd-clone');
-    var motdText = '';
-    var motdRenderSignature = '';
-
-    function syncMotdTicker() {
-        var primaryWidth = 0;
-        var windowWidth = 0;
-        var gap = 40;
-        var distance = 0;
-        var duration = 0;
-
-        if (!motdBar || !motdWindow || !motdTrack || !motdPrimary || !motdClone) return;
-
-        motdBar.classList.remove('is-scrolling');
-        motdTrack.style.removeProperty('--motd-scroll-width');
-        motdTrack.style.removeProperty('--motd-duration');
-        motdClone.style.display = 'none';
-
-        if (!motdText.length) {
-            motdBar.classList.add('is-empty');
-            return;
-        }
-
-        motdBar.classList.remove('is-empty');
-        primaryWidth = motdPrimary.scrollWidth || 0;
-        windowWidth = motdWindow.clientWidth || 0;
-
-        if (primaryWidth <= windowWidth + 8) return;
-
-        distance = primaryWidth + gap;
-        duration = Math.max(12, Math.round(distance / 42));
-        motdClone.style.display = 'inline-block';
-        motdBar.classList.add('is-scrolling');
-        motdTrack.style.setProperty('--motd-scroll-width', String(distance) + 'px');
-        motdTrack.style.setProperty('--motd-duration', String(duration) + 's');
-    }
-
-    function renderMotdBar(text) {
-        text = (text || '').replace(/^\s+|\s+$/g, '');
-        motdText = text;
-        var primaryText = text.length ? text : '';
-        var cloneText = text.length ? text : '';
-        var sig = primaryText + '|' + cloneText;
-
-        if (!motdPrimary || !motdClone) return;
-        if (motdRenderSignature === sig) return;
-
-        motdRenderSignature = sig;
-        motdPrimary.textContent = primaryText;
-        motdClone.textContent = cloneText;
-        window.requestAnimationFrame(syncMotdTicker);
-    }
-
-    function loadMotd() {
-        window.fetch('./api/chat.ssjs?action=motd', { credentials: 'include' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data && data.previewText) {
-                    renderMotdBar(data.previewText);
-                } else {
-                    renderMotdBar('');
-                }
-            })
-            .catch(function () { renderMotdBar(''); });
-    }
-
-    loadMotd();
-    // refresh MOTD every 5 minutes
-    var motdRefreshTimer = setInterval(loadMotd, 5 * 60 * 1000);
-
         chatService.setChatPageActive(true);
     renderAll();
     if (!syncRouteIntoService()) {
@@ -2046,11 +2814,20 @@ textarea.chat-web-input {
         window.removeEventListener('chat:status', onStatusUpdated);
         window.removeEventListener('chat:viewChanged', onViewChanged);
         window.removeEventListener('spa:beforeNavigate', cleanup);
-        if (motdRefreshTimer) clearInterval(motdRefreshTimer);
+        document.removeEventListener('radio:trackchange', onRadioPlaybackChanged);
+        document.removeEventListener('radio:statechange', onRadioPlaybackChanged);
+        if (compactSidebarMedia && compactSidebarMedia.removeEventListener && onCompactSidebarMediaChanged) {
+            compactSidebarMedia.removeEventListener('change', onCompactSidebarMediaChanged);
+        }
+        if (onCompactSidebarWindowResize) {
+            window.removeEventListener('resize', onCompactSidebarWindowResize);
+        }
+        cancelPendingMessageScroll();
         if (motdRefreshTimer) clearInterval(motdRefreshTimer);
         chatService.setChatPageActive(false);
     }
 
+    syncMobileSidebarLayout(true);
     window.addEventListener('spa:beforeNavigate', cleanup);
 })();
 </script>

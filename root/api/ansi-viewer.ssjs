@@ -20,7 +20,24 @@ var response = JSON.stringify(
         mode: (
             http_request.query.mode !== undefined &&
             http_request.query.mode.length
-        ) ? http_request.query.mode[0] : 'random'
+        ) ? http_request.query.mode[0] : 'random',
+        slide_scope: (
+            http_request.query.slide_scope !== undefined &&
+            http_request.query.slide_scope.length
+        ) ? http_request.query.slide_scope[0] : '',
+        slide_order: (
+            http_request.query.slide_order !== undefined &&
+            http_request.query.slide_order.length
+        ) ? http_request.query.slide_order[0] : '',
+        slide_action: (
+            http_request.query.slide_action !== undefined &&
+            http_request.query.slide_action.length
+        ) ? http_request.query.slide_action[0] : '',
+        slideshow_active: (
+            http_request.query.slideshow !== undefined &&
+            http_request.query.slideshow.length &&
+            http_request.query.slideshow[0] === '1'
+        )
     })
 );
 

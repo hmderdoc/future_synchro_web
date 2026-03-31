@@ -1,260 +1,454 @@
 <!--HIDDEN:Registration-->
 
-<!--
-Username/alias and password are always required. All other fields are set
-as 'required' (or not) based on your New User Question Toggles as set in
-the System Configuration section of scfg.  You can delete any fields of
-this form that your system does not require.
--->
-
 <?xjs
 if (user.number > 0 && user.alias !== settings.guest) exit();
 
 require('sbbsdefs.js', 'SYS_CLOSED');
+require('xjs.js', 'xjs_compile');
 
-if (system.settings&SYS_CLOSED) {
+if (system.settings & SYS_CLOSED) {
 ?>
 <div class="alert alert-danger"><h3><?xjs write('Sorry, the system is closed to new users.'); ?></h3></div>
 <?xjs
-exit();
+    exit();
 }
 
-function required(mask) {
-return ((system.new_user_questions&mask) ? (' ' + locale.strings.page_register.stat_suffix_field_required) : '');
+function fieldRequired(mask) {
+    return (system.new_user_questions & mask) ? true : false;
 }
 
-function notRequired(mask) {
-return ((system.new_user_questions&mask) ? '' : (' ' + locale.strings.page_register.stat_suffix_field_required));
+function emailRequired() {
+    return !fieldRequired(UQ_NONETMAIL);
 }
 
-function iconRequired(mask) {
-if (required(mask).length > 0) {
+function writeRequiredStar(flag) {
+    if (!flag) return;
 ?>
 <span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
 <?xjs
 }
-}
 
-function iconNotRequired(mask) {
-if (notRequired(mask).length > 0) {
+var showRegistrationPassword = (system.newuser_password !== '');
+var showEmail = emailRequired();
+var showRealname = fieldRequired(UQ_REALNAME);
+var showAddress = fieldRequired(UQ_ADDRESS);
+var showPhone = fieldRequired(UQ_PHONE);
+var showBirth = fieldRequired(UQ_BIRTH);
+var showGender = fieldRequired(UQ_SEX);
+var locationRequired = fieldRequired(UQ_LOCATION);
 ?>
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<?xjs
+
+<link rel="stylesheet" href="./css/ansi-editor-modal.css">
+<script type="text/javascript" src="./js/ansi-editor.js"></script>
+<script type="text/javascript" src="./js/ansi-editor-modal.js"></script>
+<script type="text/javascript" src="./js/avatar-settings.js?_v=<?xjs write(time()); ?>"></script>
+
+<style>
+.register-page {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
+
+.register-page .register-card,
+.register-page .register-hero {
+    background: #000000;
+    border: 1px solid #55ffff;
+    border-radius: 8px;
+    overflow: hidden;
 }
-?>
 
-<div class="card mb-3"><div class="card-body py-2"><h3 class="mb-0"><?xjs write(locale.strings.page_register.title); ?></h3></div></div>
+.register-page .register-card .card-header,
+.register-page .register-hero .card-body {
+    background: #0000aa;
+    color: #ffff55;
+    font-family: "Spleen", "VT323", monospace;
+}
 
-<div id="errorbox" class="alert alert-danger" hidden></div>
+.register-page .register-hero .card-body {
+    padding: 0.85rem 1rem;
+}
 
-<div id="form-register-container">
+.register-page .register-hero h3,
+.register-page .register-card .card-header {
+    margin: 0;
+    font-weight: 400;
+}
 
-<div class="mb-3">
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<?xjs write(locale.strings.page_register.help_text_required); ?>
-</div>
+.register-page .register-card .card-body {
+    padding: 1rem 1.1rem 1.2rem;
+    background: #000000;
+}
 
-<form id="form-register">
+.register-page .register-intro {
+    margin-bottom: 1rem;
+    color: #aaaaaa;
+    font-family: "Spleen", "VT323", monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
 
-<?xjs if(system.newuser_password !== '') { ?>
-<div class="mb-3">
-<label for="newuser-password" class="form-label"><?xjs write(locale.strings.page_register.input_registration_password); ?></label>
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<input type="password" class="form-control" id="newuser-password" name="newuser-password" placeholder="<?xjs write(locale.strings.page_register.input_registration_password); ?>" required>
-</div>
+.register-page .register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+}
+
+.register-page .register-field {
+    margin: 0;
+}
+
+.register-page .form-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.45rem;
+    color: #ffff55;
+    font-family: "Spleen", "VT323", monospace;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.register-page .form-text,
+.register-page .register-note,
+.register-page .form-check-label {
+    color: #aaaaaa;
+    font-family: "Spleen", "VT323", monospace;
+}
+
+.register-page .form-text {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.register-page .form-control,
+.register-page .form-select {
+    background: #0000aa;
+    border: 1px solid #55ffff;
+    color: #55ffff;
+    font-family: "Spleen", "VT323", monospace;
+    font-size: 1rem;
+    border-radius: 6px;
+    box-shadow: none;
+}
+
+.register-page .form-control::placeholder {
+    color: #a8ffff;
+    opacity: 0.78;
+}
+
+.register-page .form-control:focus,
+.register-page .form-select:focus {
+    background: #0000aa;
+    border-color: #ffff55;
+    color: #55ffff;
+    box-shadow: 0 0 0 1px rgba(255, 255, 85, 0.25);
+}
+
+.register-page .form-check {
+    margin-bottom: 0.45rem;
+}
+
+.register-page .form-check-input {
+    accent-color: #55ffff;
+}
+
+.register-page .register-avatar-field {
+    margin-top: 0.2rem;
+}
+
+.register-page .register-avatar-field .avatar-settings-widget {
+    margin-bottom: 0;
+}
+
+.register-page .register-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.25rem;
+}
+
+.register-page .register-submit {
+    min-width: 220px;
+}
+
+.register-page .register-error,
+.register-page .register-success {
+    margin: 0;
+    font-family: "Spleen", "VT323", monospace;
+}
+
+@media (max-width: 575.98px) {
+    .register-page .register-card .card-body,
+    .register-page .register-hero .card-body {
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+    }
+
+    .register-page .register-submit {
+        width: 100%;
+        min-width: 0;
+    }
+}
+</style>
+
+<div class="register-page">
+    <div class="card register-hero">
+        <div class="card-body py-2">
+            <h3 class="mb-0"><?xjs write(locale.strings.page_register.title); ?></h3>
+        </div>
+    </div>
+
+    <div id="errorbox" class="alert alert-danger register-error" hidden></div>
+
+    <div id="form-register-container" class="card register-card">
+        <div class="card-header">Create Your Account</div>
+        <div class="card-body">
+            <div class="register-intro">
+                Required fields only. Location stays visible, and choosing an avatar is part of sign-up.
+            </div>
+
+            <form id="form-register" class="register-form">
+
+<?xjs if (showRegistrationPassword) { ?>
+                <div class="register-field">
+                    <label for="newuser-password" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_registration_password); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="password" class="form-control" id="newuser-password" name="newuser-password" placeholder="<?xjs write(locale.strings.page_register.input_registration_password); ?>" required>
+                </div>
 <?xjs } ?>
 
-<div class="mb-3">
-<label for="alias" class="form-label"><?xjs write(locale.strings.page_register.input_alias); ?></label>
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<input type="text" minlength="1" maxlength="<?xjs write(LEN_ALIAS); ?>" class="form-control" id="alias" name="alias" placeholder="<?xjs write(locale.strings.page_register.input_alias); ?>" required>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ALIAS)); ?>
-</div>
-</div>
+                <div class="register-field">
+                    <label for="alias" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_alias); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="1" maxlength="<?xjs write(LEN_ALIAS); ?>" class="form-control" id="alias" name="alias" placeholder="<?xjs write(locale.strings.page_register.input_alias); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ALIAS)); ?></div>
+                </div>
 
-<div class="mb-3">
-<label for="password1" class="form-label">
-<?xjs write(locale.strings.page_register.input_password); ?>
-</label>
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<input type="password" minlength="<?xjs write(system.min_password_length) ?>" maxlength="<?xjs write(system.max_password_length) ?>" class="form-control" id="password1" name="password1" placeholder="<?xjs write(locale.strings.page_register.input_password); ?>" required>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_minimum_characters, system.min_password_length)); ?>,
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, system.max_password_length)); ?>
-</div>
-</div>
+                <div class="register-field">
+                    <label for="password1" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_password); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="password" minlength="<?xjs write(system.min_password_length); ?>" maxlength="<?xjs write(system.max_password_length); ?>" class="form-control" id="password1" name="password1" placeholder="<?xjs write(locale.strings.page_register.input_password); ?>" required>
+                    <div class="form-text">
+                        <?xjs write(format(locale.strings.page_register.help_text_minimum_characters, system.min_password_length)); ?>,
+                        <?xjs write(format(locale.strings.page_register.help_text_maximum_characters, system.max_password_length)); ?>
+                    </div>
+                </div>
 
-<div class="mb-3">
-<label for="password2" class="form-label">
-<?xjs write(locale.strings.page_register.input_password_confirm); ?>
-</label>
-<span title="<?xjs write(locale.strings.page_register.label_field_required); ?>" class="text-danger fw-bold">*</span>
-<input type="password" minlength="<?xjs write(system.min_password_length) ?>" maxlength="<?xjs write(system.max_password_length) ?>" class="form-control" id="password2" name="password2" placeholder="<?xjs write(locale.strings.page_register.input_password_confirm); ?>" required>
-</div>
+                <div class="register-field">
+                    <label for="password2" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_password_confirm); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="password" minlength="<?xjs write(system.min_password_length); ?>" maxlength="<?xjs write(system.max_password_length); ?>" class="form-control" id="password2" name="password2" placeholder="<?xjs write(locale.strings.page_register.input_password_confirm); ?>" required>
+                </div>
 
-<div class="mb-3">
-<label for="netmail" class="form-label"><?xjs write(locale.strings.page_register.input_email); ?></label>
-<?xjs iconNotRequired(UQ_NONETMAIL); ?>
-<input type="email" minlength="6" maxlength="<?xjs write(LEN_NETMAIL); ?>" class="form-control" id="netmail" name="netmail" placeholder="<?xjs write(locale.strings.page_register.placeholder_netmail); ?>"<?xjs write(notRequired(UQ_NONETMAIL)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_NETMAIL)); ?>
-</div>
-</div>
+<?xjs if (showEmail) { ?>
+                <div class="register-field">
+                    <label for="netmail" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_email); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="email" minlength="6" maxlength="<?xjs write(LEN_NETMAIL); ?>" class="form-control" id="netmail" name="netmail" placeholder="<?xjs write(locale.strings.page_register.placeholder_netmail); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_NETMAIL)); ?></div>
+                </div>
+<?xjs } ?>
 
-<div class="mb-3">
-<label for="realname" class="form-label"><?xjs write(locale.strings.page_register.input_name); ?></label>
-<?xjs iconRequired(UQ_REALNAME); ?>
-<input type="text" minlength="1" maxlength="<?xjs write(LEN_NAME); ?>" class="form-control" id="realname" name="realname" placeholder="<?xjs write(locale.strings.page_register.placeholder_name); ?>"<?xjs write(required(UQ_REALNAME)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_NAME)); ?>
-</div>
-</div>
+<?xjs if (showRealname) { ?>
+                <div class="register-field">
+                    <label for="realname" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_name); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="1" maxlength="<?xjs write(LEN_NAME); ?>" class="form-control" id="realname" name="realname" placeholder="<?xjs write(locale.strings.page_register.placeholder_name); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_NAME)); ?></div>
+                </div>
+<?xjs } ?>
 
-<div class="mb-3">
-<label for="address" class="form-label">
-<?xjs write(locale.strings.page_register.input_street_address); ?>
-</label>
-<?xjs iconRequired(UQ_ADDRESS); ?>
-<input type="text" minlength="3" maxlength="<?xjs write(LEN_ADDRESS); ?>" class="form-control" id="address" name="address" placeholder="<?xjs write(locale.strings.page_register.placeholder_street_address); ?>"<?xjs write(required(UQ_ADDRESS)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ADDRESS)); ?>
-</div>
-</div>
+<?xjs if (showAddress) { ?>
+                <div class="register-field">
+                    <label for="address" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_street_address); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="3" maxlength="<?xjs write(LEN_ADDRESS); ?>" class="form-control" id="address" name="address" placeholder="<?xjs write(locale.strings.page_register.placeholder_street_address); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ADDRESS)); ?></div>
+                </div>
 
-<div class="mb-3">
-<label for="zipcode" class="form-label"><?xjs write(locale.strings.page_register.input_zipcode); ?></label>
-<?xjs iconRequired(UQ_ADDRESS); ?>
-<input type="text" minlength="3" maxlength="<?xjs write(LEN_ADDRESS); ?>" class="form-control" id="zipcode" name="zipcode" placeholder="<?xjs write(locale.strings.page_register.placeholder_zipcode); ?>"<?xjs write(required(UQ_ADDRESS)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ADDRESS)); ?>
-</div>
-</div>
+                <div class="register-field">
+                    <label for="zipcode" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_zipcode); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="3" maxlength="<?xjs write(LEN_ADDRESS); ?>" class="form-control" id="zipcode" name="zipcode" placeholder="<?xjs write(locale.strings.page_register.placeholder_zipcode); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_ADDRESS)); ?></div>
+                </div>
+<?xjs } ?>
 
-<div class="mb-3">
-<label for="location" class="form-label"><?xjs write(locale.strings.page_register.input_location); ?></label>
-<?xjs iconRequired(UQ_LOCATION); ?>
-<input type="text" minlength="1" maxlength="<?xjs write(LEN_LOCATION); ?>" class="form-control" id="location" name="location" placeholder="<?xjs write(locale.strings.page_register.placeholder_location); ?>"<?xjs write(required(UQ_LOCATION)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_LOCATION)); ?>
-</div>
-</div>
+                <div class="register-field">
+                    <label for="location" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_location); ?>
+                        <?xjs writeRequiredStar(locationRequired); ?>
+                    </label>
+                    <input type="text" minlength="1" maxlength="<?xjs write(LEN_LOCATION); ?>" class="form-control" id="location" name="location" placeholder="<?xjs write(locale.strings.page_register.placeholder_location); ?>"<?xjs if (locationRequired) write(' required'); ?>>
+                    <div class="form-text">
+                        <?xjs write(locale.strings.page_register.help_text_location_examples); ?>.
+                        <?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_LOCATION)); ?>
+                    </div>
+                </div>
 
-<div class="mb-3">
-<label for="phone" class="form-label"><?xjs write(locale.strings.page_register.input_phone); ?></label>
-<?xjs iconRequired(UQ_PHONE); ?>
-<input type="text" minlength="3" maxlength="<?xjs write(LEN_PHONE); ?>" class="form-control" id="phone" name="phone" placeholder="<?xjs write(locale.strings.page_register.placeholder_phone); ?>"<?xjs write(required(UQ_PHONE)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_PHONE)); ?>
-</div>
-</div>
+<?xjs if (showPhone) { ?>
+                <div class="register-field">
+                    <label for="phone" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_phone); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="3" maxlength="<?xjs write(LEN_PHONE); ?>" class="form-control" id="phone" name="phone" placeholder="<?xjs write(locale.strings.page_register.placeholder_phone); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_PHONE)); ?></div>
+                </div>
+<?xjs } ?>
 
-<div class="mb-3">
-<label for="birth" class="form-label"><?xjs write(locale.strings.page_register.input_birthdate); ?></label>
-<?xjs iconRequired(UQ_BIRTH); ?>
-<input type="text" minlength="<?xjs write(LEN_BIRTH); ?>" maxlength="<?xjs write(LEN_BIRTH); ?>" class="form-control" id="birth" name="birth" placeholder="<?xjs write(system.settings&SYS_EURODATE ? 'DD/MM/YY' : 'MM/DD/YY'); ?>" <?xjs write(required(UQ_BIRTH)); ?>>
-<div class="form-text">
-<?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_BIRTH)); ?>
-</div>
-</div>
+<?xjs if (showBirth) { ?>
+                <div class="register-field">
+                    <label for="birth" class="form-label">
+                        <?xjs write(locale.strings.page_register.input_birthdate); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <input type="text" minlength="<?xjs write(LEN_BIRTH); ?>" maxlength="<?xjs write(LEN_BIRTH); ?>" class="form-control" id="birth" name="birth" placeholder="<?xjs write(system.settings & SYS_EURODATE ? 'DD/MM/YY' : 'MM/DD/YY'); ?>" required>
+                    <div class="form-text"><?xjs write(format(locale.strings.page_register.help_text_maximum_characters, LEN_BIRTH)); ?></div>
+                </div>
+<?xjs } ?>
 
-<div class="mb-3">
-<?xjs iconRequired(UQ_SEX); ?>
-<label class="form-label"><?xjs write(locale.strings.page_register.input_gender); ?></label>
-<div class="form-check">
-<input class="form-check-input" type="radio" id="gender-withheld" name="gender" value="X" checked>
-<label class="form-check-label" for="gender-withheld"><?xjs write(locale.strings.page_register.input_gender_withheld); ?></label>
-</div>
-<div class="form-check">
-<input class="form-check-input" type="radio" id="gender-male" name="gender" value="M">
-<label class="form-check-label" for="gender-male"><?xjs write(locale.strings.page_register.input_gender_male); ?></label>
-</div>
-<div class="form-check">
-<input class="form-check-input" type="radio" id="gender-female" name="gender" value="F">
-<label class="form-check-label" for="gender-female"><?xjs write(locale.strings.page_register.input_gender_female); ?></label>
-</div>
-<div class="form-check">
-<input class="form-check-input" type="radio" id="gender-other" name="gender" value="O">
-<label class="form-check-label" for="gender-other"><?xjs write(locale.strings.page_register.input_gender_other); ?></label>
-</div>
-</div>
+<?xjs if (showGender) { ?>
+                <div class="register-field">
+                    <label class="form-label">
+                        <?xjs write(locale.strings.page_register.input_gender); ?>
+                        <?xjs writeRequiredStar(true); ?>
+                    </label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="gender-withheld" name="gender" value="X" checked>
+                        <label class="form-check-label" for="gender-withheld"><?xjs write(locale.strings.page_register.input_gender_withheld); ?></label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="gender-male" name="gender" value="M">
+                        <label class="form-check-label" for="gender-male"><?xjs write(locale.strings.page_register.input_gender_male); ?></label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="gender-female" name="gender" value="F">
+                        <label class="form-check-label" for="gender-female"><?xjs write(locale.strings.page_register.input_gender_female); ?></label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="gender-other" name="gender" value="O">
+                        <label class="form-check-label" for="gender-other"><?xjs write(locale.strings.page_register.input_gender_other); ?></label>
+                    </div>
+                </div>
+<?xjs } ?>
 
-<!-- Traps - leave these here. They will be hidden from users. -->
-<input id="send-me-free-stuff" title="Don't fill this field" name="send-me-free-stuff" type="text">
-<input id="subscribe-to-newsletter" title="Don't check this box" name="subscribe-to-newsletter" value="1" type="checkbox">
+                <div class="register-field register-avatar-field">
+<?xjs
+var avatar_settings_mode = 'registration';
+var avatar_settings_title = locale.strings.page_register.input_avatar;
+var avatar_settings_field_name = 'avatar-data';
+var avatar_settings_required = true;
+var avatar_settings_empty_text = locale.strings.page_register.help_text_avatar_required;
+load(xjs_compile(settings.web_components + 'avatar-settings.xjs'));
+avatar_settings_mode = undefined;
+avatar_settings_title = undefined;
+avatar_settings_field_name = undefined;
+avatar_settings_required = undefined;
+avatar_settings_empty_text = undefined;
+?>
+                </div>
 
-<div class="text-end mb-3">
-<button class="btn btn-primary" type="submit">
-<?xjs write(locale.strings.page_register.button_register); ?>
-</button>
-</div>
+                <input id="send-me-free-stuff" title="Don't fill this field" name="send-me-free-stuff" type="text" hidden>
+                <input id="subscribe-to-newsletter" title="Don't check this box" name="subscribe-to-newsletter" value="1" type="checkbox" hidden>
 
-</form>
-
+                <div class="register-actions">
+                    <button class="btn btn-primary register-submit" type="submit"><?xjs write(locale.strings.page_register.button_register); ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script type="text/javascript">
-
 (function () {
 var form = document.getElementById('form-register');
 var errorbox = document.getElementById('errorbox');
 var container = document.getElementById('form-register-container');
 
+if (typeof initAvatarSettingsWidgets === 'function') initAvatarSettingsWidgets(document);
 if (!form) return;
 
-// Hide honeypot traps
-var trap1 = document.getElementById('send-me-free-stuff');
-var trap2 = document.getElementById('subscribe-to-newsletter');
-if (trap1) trap1.hidden = true;
-if (trap2) trap2.hidden = true;
-
-// Custom password-match validation
 var pw1 = document.getElementById('password1');
 var pw2 = document.getElementById('password2');
+var avatarInput = form.querySelector('[data-avatar-settings-input]');
+var avatarWidget = form.querySelector('[data-avatar-settings]');
+
+function showErrors(errors) {
+    errorbox.innerHTML = '';
+    errors.forEach(function (err) {
+        var p = document.createElement('p');
+        p.className = 'mb-1';
+        p.textContent = err;
+        errorbox.appendChild(p);
+    });
+    errorbox.hidden = false;
+    errorbox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 if (pw1 && pw2) {
-function checkMatch() {
-if (pw2.value && pw2.value !== pw1.value) {
-pw2.setCustomValidity('Passwords do not match');
-} else {
-pw2.setCustomValidity('');
-}
-}
-pw1.addEventListener('input', checkMatch);
-pw2.addEventListener('input', checkMatch);
+    function checkMatch() {
+        if (pw2.value && pw2.value !== pw1.value) {
+            pw2.setCustomValidity('Passwords do not match');
+        } else {
+            pw2.setCustomValidity('');
+        }
+    }
+    pw1.addEventListener('input', checkMatch);
+    pw2.addEventListener('input', checkMatch);
 }
 
 form.addEventListener('submit', function (evt) {
-evt.preventDefault();
+    evt.preventDefault();
 
-var formData = new URLSearchParams(new FormData(form));
-fetch('./api/register.ssjs', {
-method: 'POST',
-headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-body: formData.toString()
-})
-.then(function (res) { return res.json(); })
-.then(function (data) {
-if (data.errors && data.errors.length > 0) {
-errorbox.innerHTML = '';
-data.errors.forEach(function (err) {
-var p = document.createElement('p');
-p.className = 'mb-1';
-p.textContent = err;
-errorbox.appendChild(p);
-});
-errorbox.hidden = false;
-errorbox.scrollIntoView({ behavior: 'smooth' });
-} else {
-errorbox.hidden = true;
-container.innerHTML = '<?xjs write(locale.strings.page_register.message_account_created); ?>';
-}
-})
-.catch(function () {
-errorbox.innerHTML = '<p>Registration failed. Please try again.</p>';
-errorbox.hidden = false;
-});
+    if (!avatarInput || !avatarInput.value) {
+        showErrors(['<?xjs write(locale.strings.api_register.error_avatar_required); ?>']);
+        if (avatarWidget) avatarWidget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    var formData = new URLSearchParams(new FormData(form));
+    fetch('./api/register.ssjs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    })
+    .then(function (res) { return res.json(); })
+    .then(async function (data) {
+        if (data.errors && data.errors.length > 0) {
+            showErrors(data.errors);
+            return;
+        }
+
+        errorbox.hidden = true;
+        if (typeof maybeStoreCredential === 'function') {
+            await maybeStoreCredential(
+                document.getElementById('alias') ? document.getElementById('alias').value.trim() : '',
+                pw1 ? pw1.value : ''
+            );
+        }
+        window.location.href = './?page=000-home.xjs';
+    })
+    .catch(function () {
+        showErrors(['Registration failed. Please try again.']);
+    });
 });
 })();
-
 </script>

@@ -78,6 +78,277 @@
 })();
 </script>
 
+<!-- ═══════════ Futureland Records ═══════════ -->
+<style>
+.flr-panel{--bs-card-border-color:#5555FF;--bs-card-bg:#000;--bs-card-cap-bg:#000;--bs-card-cap-color:#5555FF;border-color:#5555FF!important;background:#000!important;container-type:inline-size}
+.flr-panel>.card-header{color:#5555FF!important;background:#000!important;border-bottom:2px solid #5555FF!important;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.flr-brand{display:inline-flex;align-items:center;gap:12px;font-weight:bold;white-space:nowrap;color:#5555FF}
+.flr-brand-head{width:36px;height:36px;flex:0 0 auto;display:block;object-fit:contain;background:transparent;image-rendering:auto;filter:drop-shadow(0 0 8px rgba(85,255,85,.6))}
+.flr-brand-label{display:inline-block;color:#5555FF;border-bottom:2px solid #55FFFF;padding-bottom:2px;line-height:1}
+.flr-nav{display:flex;align-items:center;gap:6px}
+.flr-nav button{background:transparent;border:1px solid #5555FF;color:#55FFFF;font-family:monospace;font-size:14px;line-height:1;padding:2px 8px;cursor:pointer;border-radius:2px}
+.flr-nav button:hover{background:rgba(85,255,255,.12);border-color:#55FFFF;color:#55FFFF}
+.flr-counter{color:#AAAAAA;font-size:.75em;font-weight:normal}
+.flr-body{padding:clamp(16px,3vw,24px);display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"art" "meta";gap:clamp(16px,3vw,22px);align-items:start;justify-items:center}
+.flr-art-wrap{grid-area:art;width:min(100%,420px);aspect-ratio:1/1;background:#111;border:1px solid #333;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:box-shadow .3s;justify-self:center}
+.flr-art-wrap:hover{box-shadow:0 0 18px rgba(255,85,255,.4)}
+.flr-art-wrap img{width:100%;height:100%;object-fit:cover}
+.flr-art-wrap .flr-no-art{color:#555;font-size:3em}
+.flr-play-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.72);color:#55FF55;font-size:1.3em;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s}
+.flr-art-wrap:hover .flr-play-badge{opacity:1}
+.flr-meta{grid-area:meta;min-width:0;width:min(100%,420px);display:flex;flex-direction:column;gap:6px;align-items:flex-start;justify-content:center}
+.flr-title{color:#55FFFF;font-weight:bold;font-size:clamp(1.05rem,2.2cqi,1.55rem);line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flr-credits{display:flex;flex-wrap:wrap;align-items:baseline;gap:.34em;font-size:clamp(.92rem,1.65cqi,1.15rem);line-height:1.2}
+.flr-artist-name{color:#55FF55}
+.flr-credit-sep{color:#AAAAAA}
+.flr-composer-name{color:#55FF55}
+.flr-albumline{color:#AAAAAA;font-size:clamp(.86rem,1.4cqi,1rem);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flr-album-name{font-style:italic}
+.flr-album-year{color:#FF5555}
+.flr-detail{color:#AAAAAA;font-size:clamp(.8rem,1.25cqi,.92rem);line-height:1.35}
+.flr-detail .flr-genre{color:#FFFF55}
+.flr-play-btn{margin-top:auto;padding-top:10px}
+.flr-play-btn button{background:transparent;border:1px solid #00AA00;color:#55FF55;font-family:monospace;font-size:.82em;padding:4px 14px;cursor:pointer;border-radius:2px;transition:background .2s,color .2s,border-color .2s}
+.flr-play-btn button:hover{background:#00AA00;color:#000}
+.flr-play-icon{color:#55FFFF}
+.flr-play-btn button.flr-playing{border-color:#FF55FF;color:#FF55FF;cursor:default}
+.flr-play-btn button.flr-playing:hover{background:transparent;color:#FF55FF}
+.flr-loading{color:#AAAAAA;padding:32px 14px;text-align:center;width:100%}
+.flr-empty{color:#AA5500;padding:32px 14px;text-align:center;width:100%}
+@container (min-width:600px){
+    .flr-body{grid-template-columns:minmax(260px,min(34cqi,360px)) minmax(300px,min(40cqi,420px));grid-template-areas:"meta art";gap:clamp(18px,2.4cqi,28px);align-items:center;justify-content:center;padding:clamp(18px,2.4cqi,28px)}
+    .flr-art-wrap{width:min(40cqi,420px);justify-self:start}
+    .flr-meta{width:min(34cqi,360px)}
+    .flr-title{font-size:clamp(1.2rem,2.6cqi,1.85rem)}
+    .flr-credits{font-size:clamp(1rem,1.8cqi,1.28rem)}
+    .flr-albumline{font-size:clamp(.92rem,1.45cqi,1.08rem)}
+    .flr-detail{font-size:clamp(.84rem,1.2cqi,.96rem)}
+}
+@media(max-width:600px){
+    .flr-art-wrap{width:min(82vw,280px)}
+    .flr-meta{width:min(100%,320px)}
+    .flr-title{white-space:normal}
+    .flr-albumline{white-space:normal}
+}
+</style>
+
+<div class="card mb-3 flr-panel" id="flr-panel">
+    <div class="card-header">
+        <div class="flr-brand"><img src="./images/vektrax-head-anim.png" alt="" class="flr-brand-head"><span class="flr-brand-label">Futureland Records</span></div>
+        <div class="flr-nav">
+            <button id="flr-prev" title="Previous">&laquo;</button>
+            <span class="flr-counter" id="flr-counter">&mdash;</span>
+            <button id="flr-next" title="Next">&raquo;</button>
+        </div>
+    </div>
+    <div id="flr-body" class="flr-body">
+        <div class="flr-loading" id="flr-loading">Loading tracks&hellip;</div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    var API_URL     = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s';
+    var STREAM_URL  = './radio-stream/';
+    var RANGE_BYTES = 262144;           // 256 KB for ID3 header
+    var ROTATE_MS   = 8000;             // auto-advance every 8 s
+    var panel       = document.getElementById('flr-panel');
+    if (!panel || panel.dataset.bound === '1') return;
+    panel.dataset.bound = '1';
+
+    var body    = document.getElementById('flr-body');
+    var counter = document.getElementById('flr-counter');
+    var prevBtn = document.getElementById('flr-prev');
+    var nextBtn = document.getElementById('flr-next');
+    var tracks  = [];   // [{name, tags, artURL}]
+    var cur     = 0;
+    var rotateTimer = null;
+    var nowPlaying  = '';   // filename currently playing in radio
+
+    // ── helpers ──
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ── fetch track list then ID3 for each ──
+    function init() {
+        fetch(API_URL, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                if (!list || !list.length) {
+                    body.innerHTML = '<div class="flr-empty">No tracks available.</div>';
+                    return;
+                }
+                return parseAll(list);
+            })
+            .then(function () {
+                if (tracks.length === 0) {
+                    body.innerHTML = '<div class="flr-empty">No tracks with metadata found.</div>';
+                    return;
+                }
+                // shuffle so every page load is different
+                shuffle(tracks);
+                render();
+                startRotate();
+            })
+            .catch(function (err) {
+                console.error('[flr] init error:', err);
+                body.innerHTML = '<div class="flr-empty">Unable to load tracks.</div>';
+            });
+    }
+
+    function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+    }
+
+    function parseAll(list) {
+        // parse ID3 for every track in parallel (limited concurrency)
+        var promises = list.map(function (item) {
+            var url = STREAM_URL + encodeURIComponent(item.name);
+            return fetch(url, {
+                headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
+            })
+            .then(function (r) { return r.arrayBuffer(); })
+            .then(function (buf) {
+                if (typeof window.parseID3v2 !== 'function') return null;
+                var tags = window.parseID3v2(buf);
+                // require at least artist or picture
+                if (!tags.artist && !tags.picture) return null;
+                var artURL = '';
+                if (tags.picture && tags.picture.blob) {
+                    artURL = URL.createObjectURL(tags.picture.blob);
+                }
+                tracks.push({
+                    name: item.name,
+                    tags: tags,
+                    artURL: artURL
+                });
+            })
+            .catch(function () { /* skip unreadable files */ });
+        });
+        return Promise.all(promises);
+    }
+
+    // ── rendering ──
+    function render() {
+        if (!tracks.length) return;
+        var t = tracks[cur];
+        var tags = t.tags;
+        counter.textContent = (cur + 1) + ' / ' + tracks.length;
+
+        var isPlaying = (nowPlaying === t.name);
+
+        var html = '';
+        // album art
+        html += '<div class="flr-art-wrap" data-flr-play="' + esc(t.name) + '">';
+        if (t.artURL) {
+            html += '<img src="' + esc(t.artURL) + '" alt="Album art">';
+        } else {
+            html += '<div class="flr-no-art">♫</div>';
+        }
+        html += '<div class="flr-play-badge">▶</div>';
+        html += '</div>';
+
+        // metadata
+        html += '<div class="flr-meta">';
+        html += '<div class="flr-title">' + esc(tags.title || t.name.replace(/\.mp3$/i, '').replace(/_/g, ' ')) + '</div>';
+
+        if (tags.artist || tags.composer) {
+            html += '<div class="flr-credits">';
+            if (tags.artist) html += '<span class="flr-artist-name">' + esc(tags.artist) + '</span>';
+            if (tags.artist && tags.composer) html += '<span class="flr-credit-sep">and</span>';
+            if (tags.composer) html += '<span class="flr-composer-name">' + esc(tags.composer) + '</span>';
+            html += '</div>';
+        }
+
+        if (tags.album || tags.year) {
+            html += '<div class="flr-albumline">';
+            if (tags.album) {
+                html += '<span class="flr-album-name">' + esc(tags.album) + '</span>';
+                if (tags.year) html += '<span class="flr-album-year"> (' + esc(tags.year) + ')</span>';
+            } else if (tags.year) {
+                html += '<span class="flr-album-year">' + esc(tags.year) + '</span>';
+            }
+            html += '</div>';
+        }
+
+        if (tags.genre) html += '<div class="flr-detail"><span class="flr-genre">' + esc(tags.genre) + '</span></div>';
+
+        html += '<div class="flr-play-btn">';
+        if (isPlaying) {
+            html += '<button class="flr-playing" disabled>♫ Now Playing</button>';
+        } else {
+            html += '<button data-flr-play="' + esc(t.name) + '"><span class="flr-play-icon">▶</span> Play This Track</button>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        body.innerHTML = html;
+
+        // attach click-to-play handlers
+        var playEls = body.querySelectorAll('[data-flr-play]');
+        for (var i = 0; i < playEls.length; i++) {
+            playEls[i].addEventListener('click', onPlay);
+        }
+    }
+
+    // ── play handler ──
+    function onPlay(e) {
+        var el = e.currentTarget;
+        var name = el.getAttribute('data-flr-play');
+        if (!name || name === nowPlaying) return;
+        document.dispatchEvent(new CustomEvent('viz:picktrack', {
+            detail: { name: name }
+        }));
+        document.dispatchEvent(new CustomEvent('viz:open'));
+        pauseRotate();
+        startRotate();
+    }
+
+    // ── navigation ──
+    function go(dir) {
+        if (!tracks.length) return;
+        cur = ((cur + dir) % tracks.length + tracks.length) % tracks.length;
+        render();
+        pauseRotate();
+        startRotate();
+    }
+
+    prevBtn.addEventListener('click', function () { go(-1); });
+    nextBtn.addEventListener('click', function () { go(1); });
+
+    // ── auto-rotate ──
+    function startRotate() {
+        pauseRotate();
+        rotateTimer = setInterval(function () { go(1); }, ROTATE_MS);
+    }
+    function pauseRotate() {
+        if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+    }
+
+    // pause rotation while user hovers
+    panel.addEventListener('mouseenter', pauseRotate);
+    panel.addEventListener('mouseleave', startRotate);
+
+    // ── react to radio events ──
+    document.addEventListener('radio:trackchange', function (e) {
+        if (e.detail && e.detail.filename) {
+            nowPlaying = e.detail.filename;
+            render();
+        }
+    });
+
+    // pick up current track if radio is already playing
+    if (window.sbbsRadio && window.sbbsRadio.currentTrackFile) {
+        nowPlaying = window.sbbsRadio.currentTrackFile;
+    }
+
+    init();
+})();
+</script>
+
 <!-- Bulletins Carousel -->
 <style>
 .bl-panel {
@@ -191,7 +462,6 @@
 })();
 </script>
 <?xjs } ?>
-
 <style>
 .ahv-panel {
     --bs-card-border-color: #AAAAAA;
@@ -293,16 +563,15 @@
 }
 .ahv-stage-wrap {
     border: 1px solid #333333;
-    background:
-        radial-gradient(circle at top, rgba(85, 85, 255, 0.16), transparent 56%),
-        #000;
-    padding: 10px;
+    background: #000;
+    padding: 0;
     overflow: hidden;
     min-height: 280px;
 }
 .ahv-stage {
-    min-width: fit-content;
-    transform-origin: top left;
+    width: fit-content;
+    margin: 0 auto;
+    transform-origin: top center;
 }
 .ahv-stage pre.ahv-ansi-pre {
     margin: 0;
@@ -480,15 +749,41 @@
         var wrap = document.querySelector('.ahv-stage-wrap');
         if (!wrap || !stage) return;
         stage.style.transform = 'none';
-        wrap.style.height = '';
+        wrap.style.height = 'auto';
         var pre = stage.querySelector('pre.ahv-ansi-pre');
         if (!pre) return;
-        var wrapW = wrap.clientWidth - 20;
+        var wrapW = wrap.clientWidth;
         var preW = pre.scrollWidth;
-        if (preW > wrapW && preW > 0) {
+        if (preW > 0) {
             var s = wrapW / preW;
-            stage.style.transform = 'scale(' + s + ')';
-            wrap.style.height = (pre.scrollHeight * s + 20) + 'px';
+            if (Math.abs(s - 1) > 0.02) {
+                stage.style.transform = 'scale(' + s + ')';
+                wrap.style.height = (Math.ceil(pre.scrollHeight * s) + 2) + 'px';
+            }
+        }
+    }
+
+    function scheduleScale() {
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(function () {
+                requestAnimationFrame(scaleAnsi);
+            });
+        } else {
+            requestAnimationFrame(function () {
+                setTimeout(scaleAnsi, 50);
+            });
+        }
+    }
+
+    function scheduleScale() {
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(function () {
+                requestAnimationFrame(scaleAnsi);
+            });
+        } else {
+            requestAnimationFrame(function () {
+                setTimeout(scaleAnsi, 50);
+            });
         }
     }
 
@@ -512,7 +807,7 @@
         statusLabel.textContent = payload.status_text || '';
         errorLabel.textContent = payload.error || '';
         updateControls(payload);
-        setTimeout(scaleAnsi, 0);
+        scheduleScale();
     }
 
     function fetchState(mode, overrides) {

@@ -25,9 +25,21 @@ import cssText from './editor.css';
 // ─── Constants ───
 
 const TOOLS = ['select', 'brush', 'line', 'rect', 'ellipse', 'fill', 'sample'];
-const TOOL_LABELS = {
-    select: '⬚', brush: 'B', line: '╲', rect: '▭', ellipse: '◯',
-    fill: 'F', sample: '⊙',
+const TOOL_ICONS = {
+    // Marquee / selection (dashed rectangle)
+    select: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"><rect x="2" y="2" width="12" height="12" rx="1"/></svg>',
+    // Paintbrush
+    brush: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2l4 4-7 7H3v-4l7-7z"/><path d="M8.5 3.5l4 4"/></svg>',
+    // Diagonal line
+    line: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="13" x2="13" y2="3"/><circle cx="3" cy="13" r="1.2" fill="currentColor"/><circle cx="13" cy="3" r="1.2" fill="currentColor"/></svg>',
+    // Rectangle
+    rect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/></svg>',
+    // Ellipse
+    ellipse: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="6" ry="5"/></svg>',
+    // Paint bucket / fill
+    fill: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 9.5l4-8 4 8c0 2.2-1.8 4-4 4s-4-1.8-4-4z"/><path d="M3.5 9.5h8" stroke-dasharray="1 1.5"/><circle cx="13.5" cy="11" r="1.5" fill="currentColor" stroke="none"/></svg>',
+    // Eyedropper / color picker
+    sample: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 1.5l1.5 1.5-2 2-1.5-1.5z"/><path d="M11.5 3.5L5 10l-1 3 3-1 6.5-6.5"/><path d="M4 12l-1.5 1.5"/></svg>',
 };
 const TOOL_TIPS = {
     select:  'Select Mode (Alt+K)',  brush:   'Brush Mode (Alt+B)',
@@ -228,7 +240,7 @@ export class AnsiEditor {
         for (const tool of TOOLS) {
             const btn = document.createElement('div');
             btn.className = 'me-tool-btn';
-            btn.textContent = TOOL_LABELS[tool];
+            btn.innerHTML = TOOL_ICONS[tool];
             btn.title = TOOL_TIPS[tool];
             btn.onclick = () => this._selectTool(tool);
             toolList.appendChild(btn);
@@ -703,7 +715,13 @@ export class AnsiEditor {
         }
 
         switch (this.activeTool) {
-            case 'select': this._moveCursor(pos.x, pos.y); break;
+            case 'select':
+                this._clearSelection();
+                this._selDragStart = { x: pos.x, y: pos.y };
+                this._selection = { sx: pos.x, sy: pos.y, dx: pos.x, dy: pos.y };
+                this._updateSelectionOverlay();
+                this._moveCursor(pos.x, pos.y);
+                break;
             case 'brush': this.doc.startUndo(); this._brushDraw(pos.x, pos.y, pos.halfY, e.button); break;
             case 'fill': this._doFill(pos.x, pos.halfY, e.button); break;
             case 'sample': this._doSample(pos.x, pos.y); break;
@@ -727,7 +745,14 @@ export class AnsiEditor {
 
         if (this.activeTool === 'brush') {
             this._brushDrawLine(this._lastMouseX, this._lastMouseHalfY, pos.x, pos.halfY, this._mouseButton);
-        } else if (this.activeTool === 'select') {
+        } else if (this.activeTool === 'select' && this._selDragStart) {
+            var sx = Math.min(this._selDragStart.x, pos.x);
+            var sy = Math.min(this._selDragStart.y, pos.y);
+            var dx = Math.max(this._selDragStart.x, pos.x);
+            var dy = Math.max(this._selDragStart.y, pos.y);
+            this._selection = { sx: sx, sy: sy, dx: dx, dy: dy };
+            this._updateSelectionOverlay();
+            this._updateStatusBar();
             this._moveCursor(pos.x, pos.y);
         }
         this._lastMouseX = pos.x;
@@ -749,6 +774,15 @@ export class AnsiEditor {
         }
 
         if (this.activeTool === 'brush') this.doc.endUndo();
+        if (this.activeTool === 'select') {
+            // If it was just a click (no drag), clear the selection
+            if (this._selection && this._selection.sx === this._selection.dx
+                && this._selection.sy === this._selection.dy) {
+                this._clearSelection();
+            }
+            this._selDragStart = null;
+            this._updateStatusBar();
+        }
     }
 
     // ═══ SHAPE OVERLAY ═══

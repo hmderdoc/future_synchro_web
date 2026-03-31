@@ -2,6 +2,7 @@ require('sbbsdefs.js', 'SYS_CLOSED');
 var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
+var avatar_lib = load({}, 'avatar_lib.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
 
 if (user.alias !== settings.guest) exit();
@@ -17,7 +18,8 @@ var MIN_ALIAS = 1,
 
 var reply = {
 	errors : [],
-	userNumber : 0
+	userNumber : 0,
+	authenticated : false
 };
 
 var prepUser = {
@@ -33,6 +35,7 @@ var prepUser = {
 	gender : ' ',
 	password : ''
 };
+var avatarData = '';
 
 function required(mask) {
 	return (system.new_user_questions&mask);
@@ -50,6 +53,23 @@ function in_range(n, min, max) {
 function valid_param(p, min, max) {
 	if (!request.has_param(p)) return false;
 	if (!in_range(clean_param(p).length, min, max)) return false;
+	return true;
+}
+
+function valid_avatar_param(p) {
+	var data = '';
+	var bin = '';
+	if (!request.has_param(p)) return false;
+	data = request.get_param(p);
+	if (!data || typeof data !== 'string') return false;
+	try {
+		bin = base64_decode(data);
+	} catch (err) {
+		bin = '';
+	}
+	if (!bin || bin.length !== avatar_lib.size) return false;
+	if (typeof avatar_lib.is_valid === 'function' && !avatar_lib.is_valid(bin)) return false;
+	avatarData = data;
 	return true;
 }
 
@@ -78,7 +98,15 @@ function newUser() {
 			usr.security[e] = '+' + settings[k];
 		}
 	});
+	if (avatarData.length) {
+		if (avatar_lib.update_localuser(usr.number, avatarData)) {
+			avatar_lib.enable_localuser(usr.number, true);
+		}
+	}
+	destroySession(http_request.cookie.synchronet || {});
+	setCookie(usr, randomString(512));
 	reply.userNumber = usr.number;
+	reply.authenticated = true;
 }
 
 // See if the hidden form fields were filled
@@ -152,6 +180,10 @@ if (request.has_param('birth') && clean_param('birth').match(/^\d\d\/\d\d\/\d\d$
 	prepUser.birthdate = clean_param('birth');
 } else if (required(UQ_BIRTH)) {
 	reply.errors.push(locale.strings.api_register.error_invalid_birthdate);
+}
+
+if (!valid_avatar_param('avatar-data')) {
+	reply.errors.push(locale.strings.api_register.error_avatar_required);
 }
 
 if (reply.errors.length < 1) newUser();

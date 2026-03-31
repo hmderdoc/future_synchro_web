@@ -4,6 +4,45 @@
 
 var updateInterval = 60000;
 var _sbbs_events = {};
+var _sbbs_event_payloads = {};
+var _sbbs_event_scopes = [];
+
+function _sbbsBuildEventQuery() {
+    var entries = Object.entries(_sbbs_events);
+    if (!entries.length) return '';
+    return entries.reduce(function (a, c, i) {
+        return a + (i === 0 ? '?' : '&') + c[1].qs;
+    }, '');
+}
+
+function _sbbsStartEventSource() {
+    var entries = Object.entries(_sbbs_events);
+    if (!entries.length) return;
+
+    if (window._sbbsEventSource && typeof window._sbbsEventSource.close === 'function') {
+        window._sbbsEventSource.close();
+    }
+
+    var es = new EventSource('./api/events.ssjs' + _sbbsBuildEventQuery());
+    window._sbbsEventSource = es;
+    _sbbs_event_scopes = entries.map(function (entry) { return entry[0]; });
+
+    es.onopen = function () {
+        window.dispatchEvent(new CustomEvent('sbbs:sseOpen'));
+    };
+    es.onerror = function () {
+        window.dispatchEvent(new CustomEvent('sbbs:sseError'));
+    };
+
+    _sbbs_event_scopes.forEach(function (scope) {
+        es.addEventListener(scope, function (evt) {
+            _sbbs_event_payloads[scope] = evt.data;
+            if (_sbbs_events[scope] && typeof _sbbs_events[scope].callback === 'function') {
+                _sbbs_events[scope].callback(evt);
+            }
+        });
+    });
+}
 
 /* ---------- Fetch helpers ---------- */
 
@@ -56,6 +95,24 @@ async function v4_fetch_jsonl(url) {
 
 /* ---------- Auth ---------- */
 
+async function maybeStoreCredential(username, password) {
+    if (!username || !password) return false;
+    if (!window.isSecureContext) return false;
+    if (!navigator.credentials || typeof navigator.credentials.store !== 'function') return false;
+    if (typeof window.PasswordCredential === 'undefined') return false;
+    try {
+        await navigator.credentials.store(new PasswordCredential({
+            id: username,
+            password: password,
+            name: username
+        }));
+        return true;
+    } catch (err) {
+        console.debug('Credential store unavailable:', err);
+        return false;
+    }
+}
+
 async function login(evt) {
     if (evt) evt.preventDefault();
     var usernameEl = document.getElementById('input-username');
@@ -70,6 +127,7 @@ async function login(evt) {
         password: password
     });
     if (res && res.authenticated) {
+        await maybeStoreCredential(username, password);
         // Dispatch event for terminal auto-connect
         document.dispatchEvent(new CustomEvent('spa:login', {
             detail: { username: username, password: password }
@@ -156,6 +214,7 @@ function sendTelegram(alias) {
 /* ---------- EventSource / SSE ---------- */
 
 function registerEventListener(scope, callback, params) {
+    var previous = _sbbs_events[scope];
     params = Object.keys(params || {}).reduce(function (a, c) {
         return a + '&' + c + '=' + params[c];
     }, '');
@@ -163,6 +222,18 @@ function registerEventListener(scope, callback, params) {
         qs: 'subscribe=' + scope + params,
         callback: callback
     };
+
+    if (document.readyState !== 'loading') {
+        if (!window._sbbsEventSource
+            || _sbbs_event_scopes.indexOf(scope) < 0
+            || !previous
+            || previous.qs !== _sbbs_events[scope].qs
+        ) {
+            _sbbsStartEventSource();
+        } else if (typeof _sbbs_event_payloads[scope] !== 'undefined' && typeof callback === 'function') {
+            callback({ data: _sbbs_event_payloads[scope] });
+        }
+    }
 }
 
 /* ---------- Theme: CGA on, dark off (hardcoded) ---------- */
@@ -198,6 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (logoutBtn) logoutBtn.addEventListener('click', function (e) { e.preventDefault(); logout(); });
     if (loginBtn) loginBtn.addEventListener('click', login);
     if (loginForm) loginForm.addEventListener('submit', login);
+    initForgotPassword();
 
     // Modal cleanup on hide
     var modalEl = document.getElementById('popUpModal');
@@ -240,21 +312,77 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Start SSE
-    var entries = Object.entries(_sbbs_events);
-    if (entries.length) {
-        var qs = entries.reduce(function (a, c, i) {
-            return a + (i === 0 ? '?' : '&') + c[1].qs;
-        }, '');
-        var es = new EventSource('./api/events.ssjs' + qs);
-        window._sbbsEventSource = es;
-        es.onopen = function () {
-            window.dispatchEvent(new CustomEvent('sbbs:sseOpen'));
-        };
-        es.onerror = function () {
-            window.dispatchEvent(new CustomEvent('sbbs:sseError'));
-        };
-        Object.keys(_sbbs_events).forEach(function (e) {
-            es.addEventListener(e, _sbbs_events[e].callback);
-        });
-    }
+    _sbbsStartEventSource();
 });
+
+/* ---------- Forgot Password inline flow ---------- */
+
+function initForgotPassword() {
+    var toggle   = document.getElementById('forgot-pw-toggle');
+    var form     = document.getElementById('forgot-pw-form');
+    var emailIn  = document.getElementById('forgot-pw-email');
+    var submit   = document.getElementById('forgot-pw-submit');
+    var result   = document.getElementById('forgot-pw-result');
+
+    if (!toggle || !form) return;
+
+    toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();           // keep the dropdown open
+        if (result.style.display !== 'none') {
+            // Already submitted – toggle resets the whole thing
+            result.style.display = 'none';
+            result.textContent = '';
+            form.style.display = 'none';
+            toggle.textContent = 'Forgot password?';
+            return;
+        }
+        var showing = form.style.display !== 'none';
+        form.style.display = showing ? 'none' : 'block';
+        if (!showing && emailIn) emailIn.focus();
+    });
+
+    submit.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var email = (emailIn.value || '').trim();
+        if (!email || email.indexOf('@') < 1) {
+            emailIn.classList.add('is-invalid');
+            return;
+        }
+        emailIn.classList.remove('is-invalid');
+        submit.disabled = true;
+        submit.textContent = 'Sending\u2026';
+
+        v4_post('./api/forgot-password.ssjs', { email: email })
+            .then(function () {
+                form.style.display = 'none';
+                result.style.display = 'block';
+                result.innerHTML =
+                    'If an account matching <strong>' +
+                    email.replace(/</g, '&lt;') +
+                    '</strong> was found, a recovery email has been sent. ' +
+                    'Check your spam or junk folder if you don\u2019t see it.';
+                toggle.textContent = 'Done \u2013 tap to reset';
+            })
+            .catch(function () {
+                result.style.display = 'block';
+                result.textContent = 'Something went wrong. Please try again later.';
+            })
+            .finally(function () {
+                submit.disabled = false;
+                submit.textContent = 'Send Recovery Email';
+            });
+    });
+
+    // Allow Enter key in the email field
+    emailIn.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); submit.click(); }
+    });
+
+    // Prevent the dropdown from closing when interacting with the forgot-pw area
+    var section = document.getElementById('forgot-password-section');
+    if (section) {
+        section.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+}

@@ -88,37 +88,6 @@
 
     /* Build page list for nav */
     var nav_pages = getPageList();
-    var more_nav_names = [
-        'futureland-records',
-        'futureland-gallery',
-        'nodespy',
-        'webmonitor'
-    ];
-
-    function pullNavPage(list, name) {
-        var idx = list.findIndex(function (item) {
-            return item.name === name;
-        });
-        if (idx < 0) return null;
-        return list.splice(idx, 1)[0];
-    }
-
-    var more_nav_pages = more_nav_names.reduce(function (items, name) {
-        var page = pullNavPage(nav_pages, name);
-        if (page) items.push(page);
-        return items;
-    }, []);
-
-    if (more_nav_pages.length) {
-        nav_pages.push({
-            file: '999-more',
-            name: 'more',
-            title: 'More',
-            type: 'list',
-            list: more_nav_pages,
-            path_prefix: ''
-        });
-    }
 
     /* Sidebar HTML (captured for initial load) */
     function _sidebarOff() {
@@ -127,63 +96,32 @@
 ?>
 <?xjs
     /* Nav menu helpers */
-    function navHref(e, path) {
-        return './?page=' + ((path || '') + e.page);
-    }
-
-    function navIcon(e) {
-        return e.icon || e.name || '';
-    }
-
     function navItem(e, path) {
         if (e.type == 'list') {
             navDropdown(e, path);
         } else if (e.type == 'link') {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="<? write(navHref(e, path)); ?>" target="_blank"><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>" target="_blank"><span class="bin-icon" data-icon="<? write(e.name); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
     </li>
 <?xjs
         } else {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="<? write(navHref(e, path)); ?>"><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
+        <a class="nav-link" href="./?page=<? write((path || '') + e.page); ?>"><span class="bin-icon" data-icon="<? write(e.name); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
     </li>
 <?xjs
         }
     }
 
-    function navDropdownItem(e, path) {
-        var target_attr = e.type == 'link' ? ' target="_blank"' : '';
-        if (e.type == 'list') {
-?>
-            <li><h6 class="dropdown-header"><? write(e.title.replace(/^.*\-/, '')); ?></h6></li>
-<?xjs
-            e.list.forEach(function (child) {
-                navDropdownItem(child, (path || '') + e.file + '/');
-            });
-            return;
-        }
-?>
-            <li>
-                <a class="dropdown-item" href="<? write(navHref(e, path)); ?>"<? write(target_attr); ?>>
-                    <span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span>
-                </a>
-            </li>
-<?xjs
-    }
-
     function navDropdown(obj, path) {
-        var child_path = (typeof obj.path_prefix === 'string')
-            ? obj.path_prefix
-            : ((path || '') + obj.file + '/');
 ?>
     <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="bin-icon" data-icon="<? write(navIcon(obj)); ?>"></span><span class="nav-label"><? write(obj.title.replace(/^.*\-/, '')); ?></span>
+            <span class="bin-icon" data-icon="<? write(obj.name || ''); ?>"></span><span class="nav-label"><? write(obj.title.replace(/^.*\-/, '')); ?></span>
         </a>
-        <ul class="dropdown-menu dropdown-menu-end">
-<?xjs obj.list.forEach(function(e) { navDropdownItem(e, child_path); }); ?>
+        <ul class="dropdown-menu">
+<?xjs obj.list.forEach(function(e) { navItem(e, (path || '') + obj.title + '/'); }); ?>
         </ul>
     </li>
 <?xjs
@@ -235,10 +173,7 @@
         fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
         heart: 'heart_normal',
         at_symbol: 'at_symbol',
-        news: 'newsitems',
-        more: 'group',
-        'futureland-records': 'headphones',
-        'futureland-gallery': 'art_gallery'
+        news: 'newsitems'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -290,15 +225,9 @@
             <div class="radio-stack">
                 <span class="radio-track-name" id="radio-track">INSERT DISC</span>
                 <div class="radio-controls">
-                    <button class="radio-btn" id="radio-prev" type="button" title="Previous" aria-label="Previous">
-                        <span class="radio-glyph" aria-hidden="true"></span>
-                    </button>
-                    <button class="radio-btn radio-btn-play" id="radio-play" type="button" title="Play BBS Radio" aria-label="Play BBS Radio">
-                        <span class="radio-glyph" aria-hidden="true"></span>
-                    </button>
-                    <button class="radio-btn" id="radio-next" type="button" title="Next" aria-label="Next">
-                        <span class="radio-glyph" aria-hidden="true"></span>
-                    </button>
+                    <button class="radio-btn" id="radio-prev" title="Previous">&#x23EE;</button>
+                    <button class="radio-btn radio-btn-play" id="radio-play" title="Play BBS Radio">&#x25B6;</button>
+                    <button class="radio-btn" id="radio-next" title="Next">&#x23ED;</button>
                     <div class="radio-vol-wrap">
                         <input type="range" id="radio-volume" class="radio-volume" min="0" max="1" step="0.05" value="0.8" title="Volume">
                     </div>
@@ -333,17 +262,6 @@
                             </div>
                             <button id="button-login" class="btn btn-primary btn-sm w-100" type="submit"><? write(locale.strings.main.button_login); ?></button>
                         </form>
-                        <!-- Forgot Password inline flow -->
-                        <div id="forgot-password-section" class="forgot-pw-section">
-                            <a href="#" id="forgot-pw-toggle" class="forgot-pw-link">Forgot password?</a>
-                            <div id="forgot-pw-form" class="forgot-pw-form" style="display:none;">
-                                <div class="mb-2 mt-2">
-                                    <input id="forgot-pw-email" type="email" class="form-control form-control-sm" placeholder="Email on file">
-                                </div>
-                                <button id="forgot-pw-submit" class="btn btn-outline-info btn-sm w-100" type="button">Send Recovery Email</button>
-                            </div>
-                            <div id="forgot-pw-result" class="forgot-pw-result" style="display:none;"></div>
-                        </div>
 <?xjs   if (settings.user_registration) { ?>
                         <div class="login-signup-panel">
                             <div class="login-signup-copy">New here? Join futureland and make yourself an account.</div>

@@ -570,6 +570,26 @@ function setThreadAvatar(slot, msg) {
     return key;
 }
 
+/** Render an AI Definition binary avatar directly from base64 data */
+function renderAiDefAvatar(slot, b64) {
+    if (!slot || !b64) return;
+    slot.innerHTML = '';
+    slot.removeAttribute('data-avatar');
+    slot.removeAttribute('hidden');
+    try {
+        var gc = GraphicsConverter.shared();
+        gc.from_bin(atob(b64), 10, 6, function (url) {
+            var img = document.createElement('img');
+            img.src = url;
+            img.style.maxWidth = '100%';
+            img.style.imageRendering = 'pixelated';
+            slot.appendChild(img);
+        }, true);
+    } catch (ex) {
+        slot.setAttribute('hidden', true);
+    }
+}
+
 function setThreadReplyState(elem, threadData) {
     var replies = elem.querySelector('div[data-replies]');
     var noReplies = elem.querySelector('[data-no-replies]');
@@ -664,9 +684,21 @@ function populateThreadCard(elem, e) {
     }
 
     if (stats) stats.setAttribute('hidden', true);
-    var originKey = setThreadAvatar(elem.querySelector('[data-thread-origin-avatar]'), e.first);
-    if (originKey) avatarKeys.push(originKey);
+    /* For AI Definitions sub, show the AI's avatar instead of the poster's */
+    var originSlot = elem.querySelector('[data-thread-origin-avatar]');
+    if (e.aiAvatar && originSlot) {
+        renderAiDefAvatar(originSlot, e.aiAvatar);
+    } else {
+        var originKey = setThreadAvatar(originSlot, e.first);
+        if (originKey) avatarKeys.push(originKey);
+    }
     avatarKeys = avatarKeys.concat(setThreadReplyState(elem, e));
+
+    /* For AI Definitions, also override the latest reply avatar */
+    if (e.aiAvatar) {
+        var latestSlot = elem.querySelector('[data-thread-latest-avatar]');
+        if (latestSlot) renderAiDefAvatar(latestSlot, e.aiAvatar);
+    }
 
     var hasUnread = setThreadUnreadState(elem, typeof e.unread === 'number' ? e.unread : 0);
     var hasVotes = setThreadVoteState(elem, e.votes);

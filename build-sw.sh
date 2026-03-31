@@ -16,7 +16,7 @@ ASSETS=()
 while IFS= read -r f; do
     ASSETS+=("./${f}")
 done < <(
-    find js css lib images -type f \( \
+    find -L js css lib images -type f \( \
         -name '*.js' -o -name '*.css' -o -name '*.png' \
         -o -name '*.jpg' -o -name '*.gif' -o -name '*.ico' \
         -o -name '*.svg' -o -name '*.woff2' -o -name '*.woff' \

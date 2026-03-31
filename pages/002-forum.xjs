@@ -34,7 +34,7 @@
 <script type="text/javascript" src="./js/cache.js"></script>
 
 <?xjs if (request.has_param('sub') && request.get_param('sub') === 'local-aidefinitions') { ?>
-<script type="text/javascript" src="./js/bin-avatar-upload.js"></script>
+<script type="text/javascript" src="./js/bin-avatar-upload.js?_v=<?xjs write(time()); ?>"></script>
 <?xjs } ?>
 <script type="text/javascript" src="./js/ansi-editor.js"></script>
 <script type="text/javascript" src="./js/ansi-editor-forum.js"></script>

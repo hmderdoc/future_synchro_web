@@ -445,7 +445,7 @@ function summarizePrivateThreads(client, ownAlias, sinceTimestamp) {
         if (timestamp >= threads[key].lastTimestamp) {
             threads[key].lastTimestamp = timestamp;
             threads[key].preview = message && message.str ? String(message.str) : '';
-            threads[key].avatar = peer.avatar || threads[key].avatar;
+            if (peer.avatar) threads[key].avatar = peer.avatar;
             threads[key].system = peer.host || threads[key].system;
         }
 
@@ -467,6 +467,24 @@ function summarizePrivateThreads(client, ownAlias, sinceTimestamp) {
 
     summaries.sort(function (a, b) {
         return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+    });
+
+    /* Live-lookup current avatars for local users so the sidebar
+       never shows stale avatars from old messages */
+    var _sumAvatarLib = null;
+    summaries.forEach(function (entry) {
+        var isLocal = !entry.system || normalizeUpper(entry.system) === normalizeUpper(system.name);
+        if (!isLocal) return;
+        try {
+            var userNum = system.matchuser(entry.name) || 0;
+            if (userNum > 0) {
+                if (!_sumAvatarLib) _sumAvatarLib = load({}, 'avatar_lib.js');
+                var avatarObj = _sumAvatarLib.read_localuser(userNum) || {};
+                if (avatarObj && avatarObj.data) {
+                    entry.avatar = String(avatarObj.data);
+                }
+            }
+        } catch (_e) {}
     });
 
     return summaries;
@@ -494,18 +512,37 @@ function loadPrivateHistory(client, ownAlias, targetName, targetSystem) {
             continue;
         }
 
-        if (!selectedPeer) {
-            selectedPeer = peer;
-        }
+        /* Always update so we end up with the most recent peer avatar */
+        selectedPeer = peer;
 
         messages.push(formatChatMessage(message, ownAlias));
+    }
+
+    /* Live-lookup the peer's CURRENT avatar so we never return stale data
+       from old messages. Local users get an avatar_lib lookup; remote peers
+       fall back to whatever the most-recent message carried. */
+    var liveAvatar = undefined;
+    if (selectedPeer) {
+        var isLocal = !selectedPeer.host || normalizeUpper(selectedPeer.host) === normalizeUpper(system.name);
+        if (isLocal) {
+            try {
+                var peerUserNum = system.matchuser(selectedPeer.name) || 0;
+                if (peerUserNum > 0) {
+                    var peerAvatarLib = load({}, 'avatar_lib.js');
+                    var peerAvatarObj = peerAvatarLib.read_localuser(peerUserNum) || {};
+                    if (peerAvatarObj && peerAvatarObj.data) {
+                        liveAvatar = String(peerAvatarObj.data);
+                    }
+                }
+            } catch (_avErr) {}
+        }
     }
 
     return {
         peer: selectedPeer ? {
             name: selectedPeer.name,
             system: selectedPeer.host || '',
-            avatar: selectedPeer.avatar || undefined
+            avatar: liveAvatar || selectedPeer.avatar || undefined
         } : null,
         messages: messages
     };

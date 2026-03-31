@@ -243,7 +243,12 @@
             var lastOnTitle = users[i].laston_date > 0 ? system.timestr(users[i].laston_date) : '';
 
             writeln('<article class="userlist-card">');
-            writeln('<div class="userlist-name">' + escapeHtml(users[i].alias) + '</div>');
+            writeln(
+                '<div class="userlist-name">' +
+                    escapeHtml(users[i].alias) +
+                    '<span class="userlist-number">#' + users[i].number + '</span>' +
+                '</div>'
+            );
             writeln(
                 '<div class="userlist-avatar-shell">' +
                     '<div class="userlist-avatar" data-avatar="' + escapeAttr(users[i].alias) + '"></div>' +
@@ -389,6 +394,10 @@
     line-height: 1.2;
     word-break: break-word;
     min-height: 2.4em;
+}
+.userlist-page .userlist-number {
+    margin-left: 0.35rem;
+    color: var(--userlist-white);
 }
 .userlist-page .userlist-avatar-shell {
     display: flex;

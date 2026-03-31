@@ -1,139 +1,524 @@
 <!--Files-->
 
 <?xjs
-	var request = require({}, settings.web_lib + 'request.js', 'request');
-	load(settings.web_lib + 'files.js');
+    var request = require({}, settings.web_lib + 'request.js', 'request');
+    load(settings.web_lib + 'files.js');
     locale.section = 'page_files';
-	if (request.has_param('dir') && file_area.dir[request.get_param('dir')]) {
+
+    /* ── Helpers ── */
+    function escHtml(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function fileExt(name) {
+        var m = String(name||'').match(/\.([^.]+)$/);
+        return m ? m[1].toLowerCase() : '';
+    }
+    function viewableType(ext) {
+        var images = ['png','jpg','jpeg','gif','bmp','svg','webp','ico'];
+        var text   = ['txt','log','nfo','diz','asc','cfg','ini','md','csv','json','js','c','h','py','sh','bat'];
+        var ansi   = ['ans'];
+        var audio  = ['mp3','wav','ogg','flac','m4a'];
+        if (images.indexOf(ext) >= 0) return 'image';
+        if (text.indexOf(ext) >= 0)   return 'text';
+        if (ansi.indexOf(ext) >= 0)   return 'ansi';
+        if (audio.indexOf(ext) >= 0)  return 'audio';
+        return '';
+    }
 ?>
-	<ol class="breadcrumb">
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>">
-				<? locale.write('title'); ?>
-			</a>
-		</li>
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>&amp;library=<? write(file_area.dir[request.get_param('dir')].lib_index); ?>">
-				<? write(file_area.dir[request.get_param('dir')].lib_name); ?>
-			</a>
-		</li>
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>&amp;dir=<? request.write_param('dir'); ?>">
-				<? request.write_param('dir'); ?>
-			</a>
-		</li>
-	</ol>
 
-	<? function writeFileDetails(file) { ?>
-		<? const cd = file_area.dir[request.get_param('dir')].can_download && user.compare_ars(file_area.dir[request.get_param('dir')].download_ars); ?>
-		<? if (cd) { ?>
-			<a href="./api/files.ssjs?call=download-file&amp;dir=<? request.write_param('dir'); ?>&amp;file=<? write(file.name); ?>" target="_blank" class="list-group-item striped" data-file-list-element data-size="<? write(file._size); ?>" data-uploaded="<? write(file.uldate); ?>" data-name="<? write(file.name); ?>">
-		<? } else { ?>
-			<li class="list-group-item striped" data-file-list-element data-size="<? write(file._size); ?>" data-uploaded="<? write(file.uldate); ?>" data-name="<? write(file.name); ?>">
-		<? } ?>
-		<strong><? write(file.name); ?></strong> (<? write(file.size); ?>)
-		<p><em>Uploaded <? write(system.timestr(file.uldate)); ?></em></p>
-		<?xjs if (typeof file.extdesc === 'undefined') { ?>
-			<p><? if (file.desc !== undefined) write(file.desc); ?></p>
-		<?xjs } else if (file.extdesc.search(/(\x1B\[|[\xA8-\xFE])|\x01/) > -1) { ?>
-			<pre class="ansi"><? write(html_encode(file.extdesc, true, false, true, true)); ?></pre>
-		<?xjs } else { ?>
-			<pre class="list"><? write(file.extdesc.replace(/[^\r,\n\x20-\x7E]/g, '')); ?></pre>
-		<?xjs } ?>
-		<? if (cd) { ?>
-			</a>
-		<? } else { ?>
-			</li>
-		<? } ?>
-	<? } ?>
+<style>
+/* ── Files page styles ── */
+.files-breadcrumb {
+    margin: 0 0 0.4rem;
+    padding: 0.65rem 1rem !important;
+    border-radius: 8px !important;
+}
+.files-breadcrumb li,
+.files-breadcrumb li a {
+    display: inline-flex;
+    align-items: center;
+}
 
-	<div class="clearfix" style="margin-bottom:1em;">
-		<div class="dropdown pull-right">
-			<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-				Sort by <span class="caret"></span>
-			</button>
-			<ul class="dropdown-menu dropdown-menu-right">
-				<li class="text-right"><a href="#" onclick="file_sort('data-uploaded', true)">Date Uploaded <span class="glyphicon glyphicon-chevron-up" aria-hidden="true"></span></a></li>
-				<li class="text-right"><a href="#" onclick="file_sort('data-uploaded', false)">Date Uploaded <span class="glyphicon glyphicon-chevron-down" aria-hidden="true"></span></a></li>
-				<li class="text-right"><a href="#" onclick="file_sort('data-name', true)">Name <span class="glyphicon glyphicon-chevron-up" aria-hidden="true"></span></a></li>
-				<li class="text-right"><a href="#" onclick="file_sort('data-name', false)">Name <span class="glyphicon glyphicon-chevron-down" aria-hidden="true"></span></a></li>
-				<li class="text-right"><a href="#" onclick="file_sort('data-size', true)">Size <span class="glyphicon glyphicon-chevron-up" aria-hidden="true"></span></a></li>
-				<li class="text-right"><a href="#" onclick="file_sort('data-size', false)">Size <span class="glyphicon glyphicon-chevron-down" aria-hidden="true"></span></a></li>
-			</ul>
-		</div>
-	</div>
-	<div id="file-list-container" class="list-group">
-	<?xjs listFiles(request.get_param('dir')).forEach(writeFileDetails); ?>
-	</div>
+/* Library cards on root view */
+.files-lib-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+}
+.files-lib-card {
+    background: #000;
+    border: 1px solid var(--cga-bright-cyan, #55FFFF);
+    border-radius: 0.375rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-decoration: none !important;
+    display: block;
+}
+.files-lib-card:hover {
+    border-color: var(--cga-bright-cyan, #55FFFF);
+    box-shadow: 0 0 8px rgba(85, 255, 255, 0.25);
+}
+.files-lib-name {
+    font-weight: bold;
+    font-size: 1.05rem;
+    color: var(--cga-bright-cyan, #55FFFF);
+    margin: 0;
+}
+.files-lib-desc {
+    color: var(--cga-light-gray, #AAAAAA);
+    font-size: 0.85rem;
+    margin: 0.2rem 0 0;
+}
 
-<?xjs } else if (request.has_param('library') && file_area.lib_list[request.get_param('library')]) { ?>
+/* Directory cards */
+.files-dir-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+}
+.files-dir-card {
+    background: #000;
+    border: 1px solid var(--cga-light-gray, #AAAAAA);
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-decoration: none !important;
+    display: block;
+}
+.files-dir-card:hover {
+    border-color: var(--cga-bright-green, #55FF55);
+    box-shadow: 0 0 6px rgba(85, 255, 85, 0.2);
+}
+.files-dir-name {
+    font-weight: bold;
+    color: var(--cga-bright-green, #55FF55);
+    margin: 0;
+}
+.files-dir-desc {
+    color: var(--cga-light-gray, #AAAAAA);
+    font-size: 0.85rem;
+    margin: 0.15rem 0 0;
+}
+.files-dir-count {
+    color: var(--cga-bright-magenta, #FF55FF);
+    font-size: 0.8rem;
+}
 
-	<ol class="breadcrumb">
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>">
-				<? locale.write('title'); ?>
-			</a>
-		</li>
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>&amp;library=<? request.write_param('library'); ?>">
-				<? write(file_area.lib_list[request.get_param('library')].name); ?>
-			</a>
-		</li>
-	</ol>
+/* File list */
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.files-item {
+    background: #000;
+    border: 1px solid #333;
+    border-radius: 0.375rem;
+    padding: 0.65rem 0.85rem;
+    transition: border-color 0.15s;
+}
+.files-item:hover {
+    border-color: #555;
+}
+.files-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.files-item-name {
+    font-weight: bold;
+    color: var(--cga-yellow, #FFFF55);
+    font-size: 0.95rem;
+    word-break: break-all;
+}
+.files-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+.files-item-size {
+    color: var(--cga-bright-cyan, #55FFFF);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+.files-item-date {
+    color: var(--cga-light-gray, #AAAAAA);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+.files-item-desc {
+    color: #ccc;
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+}
+.files-item-desc pre {
+    margin: 0.3rem 0 0;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #ccc;
+}
+.files-item-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+.files-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #111;
+    color: #ccc;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: none !important;
+    transition: background 0.15s, border-color 0.15s;
+}
+.files-btn:hover {
+    background: #222;
+    border-color: #888;
+    color: #fff;
+}
+.files-btn-view {
+    border-color: var(--cga-bright-green, #55FF55);
+    color: var(--cga-bright-green, #55FF55);
+}
+.files-btn-view:hover {
+    background: rgba(85, 255, 85, 0.1);
+    color: var(--cga-bright-green, #55FF55);
+}
+.files-btn-dl {
+    border-color: var(--cga-bright-cyan, #55FFFF);
+    color: var(--cga-bright-cyan, #55FFFF);
+}
+.files-btn-dl:hover {
+    background: rgba(85, 255, 255, 0.1);
+    color: var(--cga-bright-cyan, #55FFFF);
+}
+.files-btn svg {
+    width: 14px;
+    height: 14px;
+}
 
+/* Sort controls */
+.files-sort-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+}
 
-	<?xjs function writeDirectory(dir) { ?>
-		<a href="./?page=<? request.write_param('page'); ?>&amp;dir=<? write(dir.dir.code); ?>" class="list-group-item striped">
-			<h4><strong><? write(dir.dir.name); ?></strong></h4>
-			<p>
-				<? write(dir.dir.description); ?>:
-				<? write(dir.fileCount); ?>
-				<? locale.write(dir.fileCount === 1 ? 'stat_suffix_file' : 'stat_suffix_files'); ?>
-			</p>
-		</a>
-	<?xjs } ?>
+/* Preview panel */
+.files-preview {
+    margin-top: 0.5rem;
+    border: 1px solid #333;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+.files-preview-close {
+    float: right;
+    background: none;
+    border: none;
+    color: #FF5555;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px 8px;
+    line-height: 1;
+}
+.files-preview-close:hover {
+    color: #FF8888;
+}
+.files-preview img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    image-rendering: auto;
+}
+.files-preview pre {
+    margin: 0;
+    padding: 0.75rem;
+    max-height: 400px;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 0.82rem;
+    color: #ccc;
+    background: transparent;
+    border: none;
+}
+.files-preview .ansi-wrap {
+    padding: 10px;
+    overflow: auto;
+}
+.files-preview .ansi-wrap pre.ansi {
+    margin: 0;
+    display: inline-block;
+    white-space: pre;
+    font-family: 'Courier New', 'Courier', monospace;
+    font-size: 13px;
+    line-height: 1.2;
+    background: #000;
+}
+.files-preview audio {
+    width: 100%;
+    display: block;
+}
+.files-preview-loading {
+    padding: 1.5rem;
+    text-align: center;
+    color: #AAAAAA;
+}
 
-	<div id="file-list-container" class="list-group">
-		<?xjs listDirectories(request.get_param('library')).forEach(writeDirectory); ?>
-	</div>
+@media (max-width: 600px) {
+    .files-item-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+    .files-item-actions {
+        flex-wrap: wrap;
+    }
+}
+</style>
 
+<?xjs
+    /* ═══════════════════════════════════════════
+       VIEW: FILE LISTING (directory selected)
+       ═══════════════════════════════════════════ */
+    if (request.has_param('dir') && file_area.dir[request.get_param('dir')]) {
+        var _dir = request.get_param('dir');
+        var _dirObj = file_area.dir[_dir];
+        var _canDL = _dirObj.can_download && user.compare_ars(_dirObj.download_ars);
+?>
+
+<ol class="breadcrumb files-breadcrumb">
+    <li>
+        <a href="./?page=<? request.write_param('page'); ?>">
+            <? locale.write('title'); ?>
+        </a>
+    </li>
+    <li>
+        <a href="./?page=<? request.write_param('page'); ?>&amp;library=<? write(_dirObj.lib_index); ?>">
+            <? write(_dirObj.lib_name); ?>
+        </a>
+    </li>
+    <li class="active"><? write(_dirObj.name); ?></li>
+</ol>
+
+<?xjs if (_canDL) { ?>
+<div class="files-sort-bar">
+    <div class="dropdown">
+        <button class="btn btn-sm btn-default dropdown-toggle" type="button"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Sort <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-right">
+            <li><a href="#" onclick="fileSort('date',true);return false">Date ↑</a></li>
+            <li><a href="#" onclick="fileSort('date',false);return false">Date ↓</a></li>
+            <li><a href="#" onclick="fileSort('name',true);return false">Name ↑</a></li>
+            <li><a href="#" onclick="fileSort('name',false);return false">Name ↓</a></li>
+            <li><a href="#" onclick="fileSort('size',true);return false">Size ↑</a></li>
+            <li><a href="#" onclick="fileSort('size',false);return false">Size ↓</a></li>
+        </ul>
+    </div>
+</div>
+
+<div class="files-list" id="files-list">
+<?xjs
+    var _files = listFiles(_dir);
+    _files.forEach(function(file) {
+        var ext = fileExt(file.name);
+        var vtype = viewableType(ext);
+        var dlUrl = './api/files.ssjs?call=download-file&dir=' + encodeURIComponent(_dir) + '&file=' + encodeURIComponent(file.name);
+        var viewUrl = './api/files.ssjs?call=view-file&dir=' + encodeURIComponent(_dir) + '&file=' + encodeURIComponent(file.name);
+?>
+    <div class="files-item" data-name="<? write(escHtml(file.name)); ?>"
+         data-size="<? write(file._size); ?>"
+         data-date="<? write(file.uldate); ?>">
+        <div class="files-item-header">
+            <span class="files-item-name"><? write(escHtml(file.name)); ?></span>
+            <div class="files-item-meta">
+                <span class="files-item-size"><? write(file.size); ?></span>
+                <span class="files-item-date"><? write(system.timestr(file.uldate)); ?></span>
+            </div>
+        </div>
+        <?xjs if (file.desc || file.extdesc) { ?>
+        <div class="files-item-desc">
+            <?xjs if (typeof file.extdesc !== 'undefined') { ?>
+                <?xjs if (file.extdesc.search(/(\x1B\[|[\xA8-\xFE])|\x01/) > -1) { ?>
+                    <pre class="ansi"><? write(html_encode(file.extdesc, true, false, true, true)); ?></pre>
+                <?xjs } else { ?>
+                    <pre><? write(escHtml(file.extdesc)); ?></pre>
+                <?xjs } ?>
+            <?xjs } else if (file.desc) { ?>
+                <? write(escHtml(file.desc)); ?>
+            <?xjs } ?>
+        </div>
+        <?xjs } ?>
+        <div class="files-item-actions">
+            <?xjs if (vtype) { ?>
+            <button class="files-btn files-btn-view" onclick="viewFile(this, '<? write(escHtml(vtype)); ?>', '<? write(escHtml(viewUrl)); ?>')">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/></svg>
+                View
+            </button>
+            <?xjs } ?>
+            <a class="files-btn files-btn-dl" href="<? write(escHtml(dlUrl)); ?>" target="_blank">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v9m0 0l-3-3m3 3l3-3M3 13h10"/></svg>
+                Download
+            </a>
+        </div>
+    </div>
+<?xjs }); ?>
+</div>
 <?xjs } else { ?>
+<div class="files-list">
+    <div class="files-item" style="text-align:center;color:#AAAAAA;padding:2rem">
+        You do not have permission to access files in this directory.
+    </div>
+</div>
+<?xjs } ?>
 
-	<ol class="breadcrumb">
-		<li>
-			<a href="./?page=<? request.write_param('page'); ?>"><? locale.write('title'); ?></a>
-		</li>
-	</ol>
+<?xjs
+    /* ═══════════════════════════════════════════
+       VIEW: DIRECTORY LISTING (library selected)
+       ═══════════════════════════════════════════ */
+    } else if (request.has_param('library') && file_area.lib_list[request.get_param('library')]) {
+        var _lib = file_area.lib_list[request.get_param('library')];
+?>
 
-	<?xjs function writeLibrary(library) { ?>
-		<a href="./?page=<? request.write_param('page'); ?>&amp;library=<? write(library.index); ?>" class="list-group-item striped">
-			<h3><strong><? write(library.name); ?></strong></h3>
-			<p>
-				<? write(library.description); ?>:
-				<? write(library.dir_list.length); ?>
-				<? locale.write(library.dir_list.length === 1 ? 'stat_suffix_directory' : 'stat_suffix_directories'); ?>
-			</p>
-		</a>
-	<?xjs } ?>
+<ol class="breadcrumb files-breadcrumb">
+    <li>
+        <a href="./?page=<? request.write_param('page'); ?>">
+            <? locale.write('title'); ?>
+        </a>
+    </li>
+    <li class="active"><? write(_lib.name); ?></li>
+</ol>
 
-	<div id="file-list-container" class="list-group">
-		<?xjs listLibraries().forEach(writeLibrary); ?>
-	</div>
+<div class="files-dir-grid">
+<?xjs
+    listDirectories(request.get_param('library')).forEach(function(dir) {
+?>
+    <a class="files-dir-card" href="./?page=<? request.write_param('page'); ?>&amp;dir=<? write(dir.dir.code); ?>">
+        <div class="files-dir-name"><? write(dir.dir.name); ?></div>
+        <div class="files-dir-desc">
+            <? write(dir.dir.description); ?>
+            <span class="files-dir-count"> — <? write(dir.fileCount); ?> <? locale.write(dir.fileCount === 1 ? 'stat_suffix_file' : 'stat_suffix_files'); ?></span>
+        </div>
+    </a>
+<?xjs }); ?>
+</div>
+
+<?xjs
+    /* ═══════════════════════════════════════════
+       VIEW: LIBRARY LISTING (root)
+       ═══════════════════════════════════════════ */
+    } else {
+?>
+
+<ol class="breadcrumb files-breadcrumb">
+    <li class="active"><? locale.write('title'); ?></li>
+</ol>
+
+<div class="files-lib-grid">
+<?xjs
+    listLibraries().forEach(function(library) {
+?>
+    <a class="files-lib-card" href="./?page=<? request.write_param('page'); ?>&amp;library=<? write(library.index); ?>">
+        <div class="files-lib-name"><? write(library.name); ?></div>
+        <div class="files-lib-desc">
+            <? write(library.description); ?>:
+            <? write(library.dir_list.length); ?>
+            <? locale.write(library.dir_list.length === 1 ? 'stat_suffix_directory' : 'stat_suffix_directories'); ?>
+        </div>
+    </a>
+<?xjs }); ?>
+</div>
 
 <?xjs } ?>
 
-<script type="text/javascript">
-	function file_sort(field, ascending) {
-		const list = Array.from(document.querySelectorAll('a[data-file-list-element]')).sort((a, b) => {
-			if (a.getAttribute(field) == b.getAttribute(field)) return 0;
-			if (a.getAttribute(field) > b.getAttribute(field)) {
-				return ascending ? 1 : -1
-			} else {
-				return ascending ? -1 : 1
-			}
-		});
-		const flc = document.getElementById('file-list-container');
-		flc.innerHTML = '';
-		list.forEach(e => flc.appendChild(e));
-	}
+<script>
+(function () {
+    /* ── Sort ── */
+    window.fileSort = function (field, asc) {
+        var list = document.getElementById('files-list');
+        if (!list) return;
+        var items = Array.from(list.querySelectorAll('.files-item'));
+        items.sort(function (a, b) {
+            var va = a.getAttribute('data-' + field) || '';
+            var vb = b.getAttribute('data-' + field) || '';
+            if (field === 'size' || field === 'date') { va = Number(va); vb = Number(vb); }
+            if (va < vb) return asc ? -1 : 1;
+            if (va > vb) return asc ? 1 : -1;
+            return 0;
+        });
+        items.forEach(function (el) { list.appendChild(el); });
+    };
+
+    /* ── Preview / View ── */
+    window.viewFile = function (btn, type, url) {
+        var item = btn.closest('.files-item');
+        if (!item) return;
+        var existing = item.querySelector('.files-preview');
+        if (existing) { existing.remove(); return; }    /* toggle off */
+
+        var panel = document.createElement('div');
+        panel.className = 'files-preview';
+
+        var closeBtn = '<button class="files-preview-close" onclick="this.parentNode.remove()" title="Close">&times;</button>';
+
+        if (type === 'image') {
+            panel.innerHTML = closeBtn + '<img src="' + url + '" alt="preview" loading="lazy">';
+        } else if (type === 'audio') {
+            panel.innerHTML = closeBtn + '<div class="files-preview-loading">Loading…</div>';
+            fetch(url).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.blob();
+            }).then(function (blob) {
+                var blobUrl = URL.createObjectURL(blob);
+                var aud = document.createElement('audio');
+                aud.controls = true;
+                aud.preload = 'auto';
+                aud.src = blobUrl;
+                aud.addEventListener('ended', function () { URL.revokeObjectURL(blobUrl); });
+                var loading = panel.querySelector('.files-preview-loading');
+                if (loading) loading.replaceWith(aud);
+            }).catch(function (err) {
+                var loading = panel.querySelector('.files-preview-loading');
+                if (loading) loading.textContent = 'Failed to load audio: ' + err.message;
+            });
+        } else if (type === 'text') {
+            panel.innerHTML = closeBtn + '<div class="files-preview-loading">Loading…</div>';
+            fetch(url).then(function (r) { return r.text(); }).then(function (txt) {
+                var pre = document.createElement('pre');
+                pre.textContent = txt;
+                panel.querySelector('.files-preview-loading').replaceWith(pre);
+            }).catch(function () {
+                panel.querySelector('.files-preview-loading').textContent = 'Failed to load file.';
+            });
+        } else if (type === 'ansi') {
+            panel.innerHTML = closeBtn + '<div class="files-preview-loading">Loading…</div>';
+            fetch(url).then(function (r) { return r.text(); }).then(function (html) {
+                var wrap = document.createElement('div');
+                wrap.className = 'ansi-wrap';
+                wrap.innerHTML = '<pre class="ansi">' + html + '</pre>';
+                panel.querySelector('.files-preview-loading').replaceWith(wrap);
+            }).catch(function () {
+                panel.querySelector('.files-preview-loading').textContent = 'Failed to load ANSI.';
+            });
+        }
+
+        item.appendChild(panel);
+    };
+})();
 </script>
