@@ -5,8 +5,6 @@
     var TOAST_DURATION = 5000;
     var audioHandles = {};
     var audioBufferCache = {};
-    var audioBufferCacheKeys = [];  // LRU order
-    var AUDIO_CACHE_MAX = 30;
     var audioContext = null;
     var audioUnlockPromise = null;
     var audioUnlockBound = false;
@@ -291,20 +289,7 @@
     function getDecodedAudioBuffer(src) {
         var ctx = ensureAudioContext();
         if (!ctx) return Promise.reject(new Error('Web Audio unavailable'));
-        if (audioBufferCache[src]) {
-            // Touch: move to end of LRU list
-            var ci = audioBufferCacheKeys.indexOf(src);
-            if (ci !== -1) audioBufferCacheKeys.splice(ci, 1);
-            audioBufferCacheKeys.push(src);
-            return audioBufferCache[src];
-        }
-
-        // Evict oldest entries when cache is full
-        while (audioBufferCacheKeys.length >= AUDIO_CACHE_MAX) {
-            var evictKey = audioBufferCacheKeys.shift();
-            delete audioBufferCache[evictKey];
-        }
-        audioBufferCacheKeys.push(src);
+        if (audioBufferCache[src]) return audioBufferCache[src];
 
         audioBufferCache[src] = fetch(src, { credentials: 'same-origin' })
             .then(function (response) {
