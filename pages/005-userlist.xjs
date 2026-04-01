@@ -755,7 +755,10 @@
             center: [30, 0],
             zoom: 2,
             minZoom: 2,
-            maxZoom: 10,
+            maxZoom: 12,
+            maxBounds: [[-60, -180], [75, 180]],
+            maxBoundsViscosity: 0.9,
+            worldCopyJump: false,
             zoomControl: true,
             attributionControl: true
         });
@@ -764,13 +767,15 @@
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://osm.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
             subdomains: 'abcd',
-            maxZoom: 19
+            maxZoom: 19,
+            noWrap: true
         }).addTo(map);
 
         // Labels overlay (cities, countries) — no roads
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 19,
+            noWrap: true,
             pane: 'shadowPane'
         }).addTo(map);
 
@@ -784,6 +789,12 @@
                 }
                 statusEl.textContent = geoUsers.length + ' users located';
                 placeMarkers(geoUsers);
+
+                // Auto-fit map to where the users actually are
+                var lats = geoUsers.map(function (u) { return [u.lat, u.lon]; });
+                if (lats.length) {
+                    map.fitBounds(lats, { padding: [30, 30], maxZoom: 8 });
+                }
             })
             .catch(function (err) {
                 console.warn('[usermap]', err);
