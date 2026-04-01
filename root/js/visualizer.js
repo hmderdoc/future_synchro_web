@@ -386,6 +386,20 @@
         }
         bcViz = null;
 
+        // Explicitly lose WebGL context to free GPU memory immediately
+        // (otherwise it lingers until GC collects the detached canvas)
+        if (milkCanvas) {
+            try {
+                var gl = milkCanvas.getContext('webgl2') ||
+                         milkCanvas.getContext('webgl');
+                if (gl) {
+                    var ext = gl.getExtension('WEBGL_lose_context');
+                    if (ext) ext.loseContext();
+                }
+            } catch (_) {}
+            milkCanvas = null;
+        }
+
         // Disconnect ResizeObserver to prevent leaks
         if (resizeObserver) {
             resizeObserver.disconnect();

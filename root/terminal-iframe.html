@@ -943,11 +943,28 @@
             };
 
             /* ---- Fix B: requestAnimationFrame paint-keepalive ---- */
+            /* Gated on Page Visibility: when the tab/iframe is hidden
+               (user switched tabs, locked screen, walked away), we stop
+               the rAF loop entirely.  This prevents Safari from killing
+               the page for "using significant resources" while idle. */
             var rafActive = false;
+            var rafPaused = false;
             function paintKeepAlive() {
+                if (rafPaused) { rafActive = false; return; }
                 rafActive = true;
                 requestAnimationFrame(paintKeepAlive);
             }
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    rafPaused = true;
+                    /* rafActive will self-clear on next frame */
+                } else {
+                    rafPaused = false;
+                    if (!rafActive) {
+                        requestAnimationFrame(paintKeepAlive);
+                    }
+                }
+            });
             function startRAF() {
                 var c = document.querySelector('#fTelnetContainer canvas');
                 if (c) {

@@ -103,6 +103,7 @@
     }
 
     function refreshSidebar() {
+        if (document.hidden) return Promise.resolve();
         if (!sidebarEl || sidebarEl.style.display === 'none') return Promise.resolve();
         return fetch('./api/sidebar.ssjs', {
             credentials: 'same-origin',
@@ -233,4 +234,9 @@
     drawAvatars(contentEl);
     refreshSidebar();
     window.setInterval(refreshSidebar, sidebarRefreshMs);
+
+    // Refresh sidebar immediately when tab becomes visible again
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) refreshSidebar();
+    });
 })();

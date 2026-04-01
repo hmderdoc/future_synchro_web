@@ -44,6 +44,8 @@
     var _status = { type: '', message: '', showRetry: false };
     var _guestMode = false;
     var _bitmapRecords = {};
+    var _bitmapRecordKeys = [];   // LRU order (oldest first)
+    var _BITMAP_CACHE_MAX = 100;
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
@@ -267,6 +269,17 @@
                 renderPending: false,
                 error: ''
             };
+            _bitmapRecordKeys.push(key);
+            // Evict oldest entries when cache exceeds cap
+            while (_bitmapRecordKeys.length > _BITMAP_CACHE_MAX) {
+                var evict = _bitmapRecordKeys.shift();
+                delete _bitmapRecords[evict];
+            }
+        } else {
+            // Touch: move to end of LRU list
+            var idx = _bitmapRecordKeys.indexOf(key);
+            if (idx !== -1) _bitmapRecordKeys.splice(idx, 1);
+            _bitmapRecordKeys.push(key);
         }
 
         return _bitmapRecords[key];
