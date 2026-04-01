@@ -492,6 +492,312 @@
 </style>
 
 <div class="userlist-page">
+
+    <!-- ====== World Map ====== -->
+    <script>
+    (function () {
+        if (!document.querySelector('link[href*="leaflet.css"]')) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = './lib/leaflet/leaflet.css';
+            document.head.appendChild(link);
+        }
+    })();
+    </script>
+    <style>
+    .usermap-wrap {
+        margin-bottom: 1rem;
+        border: 1px solid var(--userlist-border, #5555ff);
+        border-radius: 0.85rem;
+        overflow: hidden;
+        background: #000;
+    }
+    .usermap-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 1rem;
+        background: #000;
+        border-bottom: 2px solid #ffff55;
+        color: #ff5555;
+        font-weight: bold;
+        cursor: pointer;
+        user-select: none;
+    }
+    .usermap-header:hover { color: #fff; }
+    .usermap-toggle {
+        font-size: 0.8rem;
+        color: #aaa;
+        transition: transform 0.2s;
+    }
+    .usermap-toggle.collapsed { transform: rotate(-90deg); }
+    #usermap {
+        height: 420px;
+        background: #0a0a1a;
+        transition: height 0.3s ease;
+    }
+    #usermap.collapsed { height: 0; overflow: hidden; }
+    .usermap-count {
+        color: #ffff55;
+        font-size: 0.82rem;
+        font-weight: normal;
+        margin-left: 0.5rem;
+    }
+    /* Avatar marker styling */
+    .avatar-marker {
+        background: #000;
+        border: 2px solid #5555ff;
+        border-radius: 4px;
+        box-shadow: 0 0 6px rgba(85, 85, 255, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .avatar-marker:hover {
+        border-color: #ff5555;
+        box-shadow: 0 0 12px rgba(255, 85, 85, 0.7);
+        z-index: 9999 !important;
+    }
+    .avatar-marker img {
+        display: block;
+        image-rendering: pixelated;
+    }
+    .leaflet-popup-content-wrapper {
+        background: #111 !important;
+        color: #fff !important;
+        border: 1px solid #5555ff !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 10px rgba(85, 85, 255, 0.4) !important;
+    }
+    .leaflet-popup-tip { background: #111 !important; }
+    .leaflet-popup-content {
+        margin: 8px 12px !important;
+        font-size: 0.85rem;
+    }
+    .leaflet-popup-content .popup-alias {
+        color: #ff5555;
+        font-weight: bold;
+        font-size: 0.95rem;
+    }
+    .leaflet-popup-content .popup-loc {
+        color: #ffff55;
+        font-size: 0.8rem;
+    }
+    .leaflet-popup-content .popup-avatar {
+        display: flex;
+        justify-content: center;
+        margin-top: 4px;
+    }
+    .leaflet-popup-content .popup-avatar img {
+        image-rendering: pixelated;
+    }
+    /* Dark theme for map controls */
+    .leaflet-control-zoom a {
+        background: #111 !important;
+        color: #5555ff !important;
+        border-color: #5555ff !important;
+    }
+    .leaflet-control-zoom a:hover {
+        background: #5555ff !important;
+        color: #000 !important;
+    }
+    .leaflet-control-attribution {
+        background: rgba(0,0,0,0.7) !important;
+        color: #555 !important;
+        font-size: 0.65rem !important;
+    }
+    .leaflet-control-attribution a { color: #777 !important; }
+    /* Dark tile filter */
+    .leaflet-tile-pane { filter: invert(1) hue-rotate(200deg) saturate(0.3) brightness(0.55) contrast(1.8); }
+    </style>
+
+    <div class="usermap-wrap">
+        <div class="usermap-header" id="usermapToggle">
+            <span><span class="bin-icon" data-icon="userlist"></span> User Map <span class="usermap-count" id="usermapCount"></span></span>
+            <span class="usermap-toggle" id="usermapArrow">&#9660;</span>
+        </div>
+        <div id="usermap"></div>
+    </div>
+
+    <script src="./lib/leaflet/leaflet.js"></script>
+    <script>
+    (function () {
+        var mapEl = document.getElementById('usermap');
+        var toggleEl = document.getElementById('usermapToggle');
+        var arrowEl = document.getElementById('usermapArrow');
+        var countEl = document.getElementById('usermapCount');
+        var map = null;
+        var visible = true;
+
+        // Toggle collapse
+        toggleEl.addEventListener('click', function () {
+            visible = !visible;
+            if (visible) {
+                mapEl.classList.remove('collapsed');
+                arrowEl.classList.remove('collapsed');
+                if (map) setTimeout(function () { map.invalidateSize(); }, 310);
+            } else {
+                mapEl.classList.add('collapsed');
+                arrowEl.classList.add('collapsed');
+            }
+        });
+
+        // Initialize map
+        map = L.map('usermap', {
+            center: [30, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxZoom: 10,
+            zoomControl: true,
+            attributionControl: true
+        });
+
+        // OSM tiles (free, no key needed) — CSS filter makes them dark
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OSM contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Fetch geo data and place markers
+        fetch('./api/user-geo.ssjs', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (users) {
+                if (!users || !users.length) {
+                    countEl.textContent = '(no data)';
+                    return;
+                }
+                countEl.textContent = '(' + users.length + ' located)';
+
+                // Collect avatar aliases for batch fetch
+                var aliases = users.map(function (u) { return u.alias; });
+
+                users.forEach(function (u) {
+                    // Create a placeholder div for the avatar
+                    var size = 32;
+                    var markerDiv = document.createElement('div');
+                    markerDiv.className = 'avatar-marker';
+                    markerDiv.style.width = size + 'px';
+                    markerDiv.style.height = (size * 0.6) + 'px'; // avatars are ~10:6 ratio
+
+                    var icon = L.divIcon({
+                        html: markerDiv.outerHTML,
+                        className: '',
+                        iconSize: [size, size * 0.6],
+                        iconAnchor: [size / 2, size * 0.6],
+                        popupAnchor: [0, -(size * 0.6)]
+                    });
+
+                    var popupHtml =
+                        '<div class="popup-avatar" data-avatar="' + u.alias.replace(/"/g, '&quot;') + '"></div>' +
+                        '<div class="popup-alias">' + u.alias.replace(/</g, '&lt;') + '</div>' +
+                        '<div class="popup-loc">' +
+                            (u.location || (u.region ? u.region + ', ' + u.country : u.country) || 'Unknown') +
+                        '</div>';
+
+                    var marker = L.marker([u.lat, u.lon], { icon: icon })
+                        .bindPopup(popupHtml, { maxWidth: 200 });
+
+                    // Store user info on the marker for avatar rendering
+                    marker._userAlias = u.alias;
+                    marker._userNumber = u.number;
+                    marker.addTo(map);
+                });
+
+                // Now draw avatars into the markers
+                drawMapAvatars(users);
+            })
+            .catch(function (err) {
+                console.warn('[usermap] Failed to load geo data:', err);
+                countEl.textContent = '(error)';
+            });
+
+        function drawMapAvatars(users) {
+            if (typeof Avatars === 'undefined' || !Avatars.draw) {
+                // Avatars not loaded yet, retry
+                setTimeout(function () { drawMapAvatars(users); }, 500);
+                return;
+            }
+
+            var aliases = users.map(function (u) { return u.alias; });
+            Avatars.draw(aliases).then(function () {
+                // After Avatars.draw, avatar images are cached in sbbs.avatars
+                // Render them into map marker divs and popup divs
+                users.forEach(function (u) {
+                    if (typeof sbbs !== 'undefined' && sbbs.avatars) {
+                        sbbs.avatars.get(u.alias).then(function (av) {
+                            if (!av || !av.dataURL) return;
+
+                            // Update marker icons on the map
+                            document.querySelectorAll('.avatar-marker').forEach(function (el) {
+                                if (el.querySelector('img')) return; // already has image
+                            });
+
+                            // For markers: find the corresponding leaflet marker and update its icon
+                            map.eachLayer(function (layer) {
+                                if (layer._userAlias !== u.alias) return;
+                                var img = new Image();
+                                img.src = av.dataURL;
+                                img.style.width = '100%';
+                                img.style.height = '100%';
+
+                                var html = '<div class="avatar-marker" style="width:32px;height:19px;">' +
+                                    '<img src="' + av.dataURL + '" style="width:100%;height:100%;" />' +
+                                    '</div>';
+
+                                var newIcon = L.divIcon({
+                                    html: html,
+                                    className: '',
+                                    iconSize: [32, 19],
+                                    iconAnchor: [16, 19],
+                                    popupAnchor: [0, -19]
+                                });
+                                layer.setIcon(newIcon);
+                            });
+
+                            // For popups that are open
+                            document.querySelectorAll('.popup-avatar[data-avatar="' + u.alias.replace(/"/g, '\\"') + '"]').forEach(function (el) {
+                                if (!el.querySelector('img')) {
+                                    var pimg = new Image();
+                                    pimg.src = av.dataURL;
+                                    pimg.style.imageRendering = 'pixelated';
+                                    el.appendChild(pimg);
+                                }
+                            });
+                        });
+                    }
+                });
+            });
+        }
+
+        // Cleanup on SPA navigation
+        document.addEventListener('spa:beforeNavigate', function cleanup() {
+            document.removeEventListener('spa:beforeNavigate', cleanup);
+            if (map) { map.remove(); map = null; }
+        });
+
+        // Re-render popup avatars when popups open
+        map.on('popupopen', function (e) {
+            var el = e.popup.getElement();
+            if (!el) return;
+            var avDiv = el.querySelector('.popup-avatar[data-avatar]');
+            if (!avDiv || avDiv.querySelector('img')) return;
+            var alias = avDiv.getAttribute('data-avatar');
+            if (typeof sbbs !== 'undefined' && sbbs.avatars) {
+                sbbs.avatars.get(alias).then(function (av) {
+                    if (av && av.dataURL && !avDiv.querySelector('img')) {
+                        var img = new Image();
+                        img.src = av.dataURL;
+                        img.style.imageRendering = 'pixelated';
+                        avDiv.appendChild(img);
+                    }
+                });
+            }
+        });
+    })();
+    </script>
+
     <div class="card mb-3 userlist-shell">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><span class="bin-icon" data-icon="userlist"></span>User List</span>
