@@ -523,16 +523,45 @@
     #usermap-panel.is-visible { display: block; }
     #usermap {
         height: 500px;
-        background: #0d1117;
+        background: #0a0a12;
         border: 1px solid var(--userlist-border, #5555ff);
         border-radius: 0.85rem;
         overflow: hidden;
     }
     .usermap-status {
-        margin-top: 0.5rem;
-        color: var(--userlist-gray, #aaa);
-        font-size: 0.82rem;
+        position: absolute;
+        bottom: 0.6rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #55ffff;
+        font-size: 0.78rem;
+        text-shadow: 0 0 6px #000, 0 0 3px #000;
+        z-index: 800;
+        pointer-events: none;
     }
+
+    /* --- Fullscreen map mode --- */
+    body.map-fullscreen #sidebar { display: none !important; }
+    body.map-fullscreen #content {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+    body.map-fullscreen .spa-container { padding-left: 0; padding-right: 0; }
+    body.map-fullscreen .spa-container > .row { margin: 0; }
+    body.map-fullscreen .userlist-shell { margin-bottom: 0 !important; border: none; border-radius: 0; }
+    body.map-fullscreen .userlist-shell .card-header {
+        border-radius: 0;
+        position: relative;
+        z-index: 900;
+    }
+    body.map-fullscreen #usermap {
+        height: calc(100vh - var(--navbar-h, 70px) - 46px);
+        border: none;
+        border-radius: 0;
+    }
+    body.map-fullscreen #usermap-panel { position: relative; }
 
     /* --- Avatar markers --- */
     .avatar-marker {
@@ -587,14 +616,13 @@
     }
     .leaflet-control-attribution a { color: #777 !important; }
 
-    /* --- Dark tile tint (visible but moody) --- */
+    /* --- CGA color tint for CartoDB Dark Matter tiles --- */
     .leaflet-tile-pane {
-        filter: invert(1) hue-rotate(180deg) saturate(0.25) brightness(0.8) contrast(1.3);
+        filter: saturate(0.3) brightness(1.1);
     }
-    /* Undo filter for our markers so avatars render correctly */
-    .leaflet-marker-pane,
-    .leaflet-popup-pane {
-        filter: none;
+    /* Labels overlay gets CGA cyan/green tint */
+    .leaflet-labels-pane {
+        filter: hue-rotate(140deg) saturate(2) brightness(1.4);
     }
     </style>
 
@@ -693,12 +721,15 @@
         gridParts.forEach(function (el) { el.style.display = view === 'grid' ? '' : 'none'; });
         mapPanel.classList.toggle('is-visible', view === 'map');
 
+        // Fullscreen map: hide sidebar, expand content
+        document.body.classList.toggle('map-fullscreen', view === 'map');
+
         if (view === 'map' && !mapLoaded) {
             mapLoaded = true;
             initMap();
         }
         if (view === 'map' && map) {
-            setTimeout(function () { map.invalidateSize(); }, 50);
+            setTimeout(function () { map.invalidateSize(); }, 100);
         }
     }
 
@@ -729,9 +760,18 @@
             attributionControl: true
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OSM contributors',
+        // CartoDB Dark Matter: dark base (no labels) + labels overlay
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://osm.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
             maxZoom: 19
+        }).addTo(map);
+
+        // Labels overlay (cities, countries) — no roads
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19,
+            pane: 'shadowPane'
         }).addTo(map);
 
         // Fetch geo data
@@ -806,6 +846,7 @@
     // Cleanup on SPA navigation
     document.addEventListener('spa:beforeNavigate', function cleanup() {
         document.removeEventListener('spa:beforeNavigate', cleanup);
+        document.body.classList.remove('map-fullscreen');
         if (map) { map.remove(); map = null; }
     });
 })();

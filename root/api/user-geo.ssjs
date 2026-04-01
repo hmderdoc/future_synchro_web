@@ -29,7 +29,6 @@ function regenerate() {
     }
     u = undefined;
 
-    var dir = new Directory(DATA_DIR);
     if (!file_isdir(DATA_DIR)) {
         mkpath(DATA_DIR);
     }
@@ -39,7 +38,7 @@ function regenerate() {
         f.write(JSON.stringify(out));
         f.close();
     }
-    system.exec('node ' + GEN_SCRIPT + ' ' + RAW_FILE);
+    system.exec('node ' + GEN_SCRIPT);
 }
 
 if (fileAge(GEO_FILE) > MAX_AGE) {
