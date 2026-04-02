@@ -872,7 +872,7 @@
             label: 'METATRON'
         },
 
-        inkstain: {
+        inktain: {
             name: 'iNK\$tAiN',
             // Standard rotational head (human skull shape) — trapped inside a cage
             profile: [
