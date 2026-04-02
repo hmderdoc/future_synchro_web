@@ -312,15 +312,16 @@
                 right: { x:  0.15, y: 0.18, z: 0.28, r: 0.050 }
             },
             eyeColor: { hex: '#55FF55', rgb: '85,255,85' },
-            eyeOutlineColor: null,
+            eyeOutlineColor: { hex: '#FF55FF', rgb: '255,85,255' },
             eyeShape: 'round',
             eyelashes: {
                 count: 5,
                 length: 0.045,
-                color: '#CCCCCC',
-                rgb: '204,204,204',
+                color: '#FFFF55',
+                rgb: '255,255,85',
                 width: 1.0,
-                reactive: true
+                reactive: true,
+                bottom: true
             },
             // Drive slot mouth — wide rectangular opening
             mouth: { y: -0.12, hw: 0.36, z: 0.28, segs: 2,
@@ -1559,9 +1560,12 @@
         wireCtx.shadowBlur = 6 + bass * 10;
         wireCtx.shadowColor = char.wireColor;
 
+        // All structural edges at uniform thickness
+        var edgeWidth = 1.6;
+
         // --- Front face (main face) ---
         wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.65)';
-        wireCtx.lineWidth = 1.6;
+        wireCtx.lineWidth = edgeWidth;
         wireCtx.beginPath();
         wireCtx.moveTo(ftl.x, ftl.y);
         wireCtx.lineTo(ftr.x, ftr.y);
@@ -1570,9 +1574,9 @@
         wireCtx.closePath();
         wireCtx.stroke();
 
-        // --- Back face (dimmer) ---
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.20)';
-        wireCtx.lineWidth = 1.0;
+        // --- Back face ---
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
+        wireCtx.lineWidth = edgeWidth;
         wireCtx.beginPath();
         wireCtx.moveTo(btl.x, btl.y);
         wireCtx.lineTo(btr.x, btr.y);
@@ -1582,8 +1586,8 @@
         wireCtx.stroke();
 
         // --- Side edges (connect front to back) ---
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
-        wireCtx.lineWidth = 1.0;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.45)';
+        wireCtx.lineWidth = edgeWidth;
         var frontCorners = [ftl, ftr, fbr, fbl];
         var backCorners  = [btl, btr, bbr, bbl];
         for (var i = 0; i < 4; i++) {
@@ -1593,14 +1597,17 @@
             wireCtx.stroke();
         }
 
-        // --- Horizontal section lines (side detail for wireframe feel) ---
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.18)';
-        wireCtx.lineWidth = 0.7;
+        // --- Internal ribbing (horizontal + vertical) ---
+        var ribAlpha = 0.18;
+        var ribWidth = 0.7;
         var sections = 6;
+
+        // Horizontal ribs
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + ribAlpha + ')';
+        wireCtx.lineWidth = ribWidth;
         for (var si = 1; si < sections; si++) {
             var frac = si / sections;
             var yy = -h + 2 * h * frac;
-            // All four side lines at this height
             var fl = proj(-w, yy, d);
             var fr = proj(w, yy, d);
             var bl = proj(-w, yy, -d);
@@ -1617,7 +1624,65 @@
             wireCtx.beginPath();
             wireCtx.moveTo(fr.x, fr.y); wireCtx.lineTo(br.x, br.y);
             wireCtx.stroke();
+            // Back horizontal
+            wireCtx.beginPath();
+            wireCtx.moveTo(bl.x, bl.y); wireCtx.lineTo(br.x, br.y);
+            wireCtx.stroke();
         }
+
+        // Vertical ribs (front, sides, back)
+        var vSections = 4;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + ribAlpha + ')';
+        wireCtx.lineWidth = ribWidth;
+        for (var vi = 1; vi < vSections; vi++) {
+            var vfrac = vi / vSections;
+            var xx = -w + 2 * w * vfrac;
+            // Front vertical
+            var fTop = proj(xx, h, d);
+            var fBot = proj(xx, -h, d);
+            wireCtx.beginPath();
+            wireCtx.moveTo(fTop.x, fTop.y); wireCtx.lineTo(fBot.x, fBot.y);
+            wireCtx.stroke();
+            // Back vertical
+            var bTop = proj(xx, h, -d);
+            var bBot = proj(xx, -h, -d);
+            wireCtx.beginPath();
+            wireCtx.moveTo(bTop.x, bTop.y); wireCtx.lineTo(bBot.x, bBot.y);
+            wireCtx.stroke();
+        }
+        // Side vertical ribs (along depth)
+        var dSections = 3;
+        for (var di = 1; di < dSections; di++) {
+            var dfrac = di / dSections;
+            var zz = -d + 2 * d * dfrac;
+            // Left side vertical
+            var lTop = proj(-w, h, zz);
+            var lBot = proj(-w, -h, zz);
+            wireCtx.beginPath();
+            wireCtx.moveTo(lTop.x, lTop.y); wireCtx.lineTo(lBot.x, lBot.y);
+            wireCtx.stroke();
+            // Right side vertical
+            var rTop = proj(w, h, zz);
+            var rBot = proj(w, -h, zz);
+            wireCtx.beginPath();
+            wireCtx.moveTo(rTop.x, rTop.y); wireCtx.lineTo(rBot.x, rBot.y);
+            wireCtx.stroke();
+        }
+
+        // --- "SCSI GAL" tramp stamp on the back, near the bottom ---
+        wireCtx.save();
+        // Position at back face, bottom area
+        var stampY = -h * 0.75;
+        var stampZ = -d - 0.001;  // just behind back face
+        var stampC = proj(0, stampY, stampZ);
+        var stampScale = Math.abs(proj(0.1, stampY, stampZ).x - stampC.x);
+        wireCtx.font = (stampScale * 0.9) + 'px monospace';
+        wireCtx.textAlign = 'center';
+        wireCtx.textBaseline = 'middle';
+        wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.12)';
+        wireCtx.shadowBlur = 0;
+        wireCtx.fillText('SCSI GAL', stampC.x, stampC.y);
+        wireCtx.restore();
 
         // --- Front panel detail: label area ---
         // A recessed rectangular area in the upper portion (like a floppy label)
@@ -1798,66 +1863,88 @@
         if (!char.eyelashes) return;
         var lash = char.eyelashes;
         var eyes = [char.eyes.left, char.eyes.right];
+        var t = performance.now() * 0.001;
 
-        wireCtx.shadowBlur = 3 + bass * 4;
+        wireCtx.shadowBlur = 3 + bass * 5;
         wireCtx.shadowColor = lash.color;
         wireCtx.lineCap = 'round';
+
+        // Which sets to draw: top always, bottom if flagged
+        var sets = ['top'];
+        if (lash.bottom) sets.push('bottom');
 
         for (var ei = 0; ei < 2; ei++) {
             var eye = eyes[ei];
             var blinkAmt = getEyeBlinkAmount(ei === 0 ? 'left' : 'right');
-
-            // Don't draw lashes when fully blinked
             if (blinkAmt > 0.8) continue;
 
+            var eyeScaleY = Math.max(0.08, 0.7 - blinkAmt * 0.62);
             var count = lash.count;
-            for (var i = 0; i < count; i++) {
-                var frac = count > 1 ? (i / (count - 1)) : 0.5;
 
-                // Fan from ~50deg to ~130deg above the eye
-                var baseAngle = (0.28 + frac * 0.44) * Math.PI;
+            for (var si = 0; si < sets.length; si++) {
+                var isBottom = (sets[si] === 'bottom');
+                // Bottom lashes: shorter, fewer
+                var setCount = isBottom ? Math.max(3, count - 1) : count;
+                var setLen   = isBottom ? lash.length * 0.55 : lash.length;
 
-                // High-frequency flutter
-                var flutter = 0;
-                if (lash.reactive && headFreqData.length > 60) {
-                    var fi = Math.min(headFreqData.length - 1,
-                                      50 + Math.floor(i * 4) + ei * 20);
-                    flutter = (headFreqData[fi] || 0) * 0.18;
+                for (var i = 0; i < setCount; i++) {
+                    var frac = setCount > 1 ? (i / (setCount - 1)) : 0.5;
+
+                    // Arc range: top ~50-130deg, bottom ~230-310deg (mirrored)
+                    var baseAngle;
+                    if (isBottom) {
+                        baseAngle = Math.PI + (0.28 + frac * 0.44) * Math.PI;
+                    } else {
+                        baseAngle = (0.28 + frac * 0.44) * Math.PI;
+                    }
+
+                    // Music-reactive wiggle — oscillating wave per lash
+                    var wiggle = 0;
+                    if (lash.reactive && headFreqData.length > 60) {
+                        var fi = Math.min(headFreqData.length - 1,
+                                          50 + Math.floor(i * 4) + ei * 20);
+                        var freq = headFreqData[fi] || 0;
+                        // Continuous sinusoidal wiggle driven by freq energy
+                        wiggle = freq * 0.22 * Math.sin(t * 8 + i * 1.8 + ei * 3.5);
+                    }
+
+                    // Breath sway + bass pulse
+                    var sway = Math.sin(breathPhase * 1.5 + i * 0.7 + si * 2) * 0.035;
+                    var bassPulse = bass * 0.06 * Math.sin(t * 12 + i * 2);
+                    var angle = baseAngle + wiggle + sway + bassPulse;
+
+                    // Length: longest in center
+                    var centerBoost = 1 - Math.abs(frac - 0.5) * 1.2;
+                    var len = setLen * (0.7 + centerBoost * 0.6);
+
+                    // Blink effect
+                    if (!isBottom) {
+                        angle = angle * (1 - blinkAmt * 0.7) + (Math.PI * 0.5) * blinkAmt * 0.7;
+                    } else {
+                        angle = angle * (1 - blinkAmt * 0.7) + (Math.PI * 1.5) * blinkAmt * 0.7;
+                    }
+
+                    // Start at eye edge
+                    var sx = eye.x + eye.r * Math.cos(angle);
+                    var sy = eye.y + eye.r * Math.sin(angle) * eyeScaleY;
+
+                    // End with curl
+                    var ex = eye.x + (eye.r + len) * Math.cos(angle);
+                    var ey = eye.y + (eye.r + len) * Math.sin(angle) * eyeScaleY;
+                    // Curl: top curls up, bottom curls down
+                    ey += len * (isBottom ? -0.12 : 0.15);
+
+                    var p1 = proj(sx, sy, eye.z);
+                    var p2 = proj(ex, ey, eye.z + 0.01);
+
+                    var alpha = (isBottom ? 0.35 : 0.5) + Math.abs(wiggle) * 1.5 + bass * 0.2;
+                    wireCtx.strokeStyle = 'rgba(' + lash.rgb + ',' + Math.min(0.9, alpha) + ')';
+                    wireCtx.lineWidth = lash.width * (0.8 + centerBoost * 0.4) * (isBottom ? 0.7 : 1.0);
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(p1.x, p1.y);
+                    wireCtx.lineTo(p2.x, p2.y);
+                    wireCtx.stroke();
                 }
-
-                // Alternating flutter direction + breath sway
-                var sway = Math.sin(breathPhase * 1.5 + i * 0.7) * 0.03;
-                var angle = baseAngle + (flutter * (i % 2 === 0 ? 1 : -1)) + sway;
-
-                // Length varies: longest in center
-                var centerBoost = 1 - Math.abs(frac - 0.5) * 1.2;
-                var len = lash.length * (0.7 + centerBoost * 0.6);
-
-                // Blink squishes lash angle toward horizontal
-                angle = angle * (1 - blinkAmt * 0.7) + (Math.PI * 0.5) * blinkAmt * 0.7;
-
-                // Start at eye edge
-                var eyeScaleY = Math.max(0.08, 0.7 - blinkAmt * 0.62);
-                var sx = eye.x + eye.r * Math.cos(angle);
-                var sy = eye.y + eye.r * Math.sin(angle) * eyeScaleY;
-
-                // End extends outward with slight curve
-                var ex = eye.x + (eye.r + len) * Math.cos(angle);
-                var ey = eye.y + (eye.r + len) * Math.sin(angle) * eyeScaleY;
-
-                // Slight upward curl at tip
-                ey += len * 0.15;
-
-                var p1 = proj(sx, sy, eye.z);
-                var p2 = proj(ex, ey, eye.z + 0.01);
-
-                var alpha = 0.5 + flutter * 0.8 + bass * 0.2;
-                wireCtx.strokeStyle = 'rgba(' + lash.rgb + ',' + Math.min(0.9, alpha) + ')';
-                wireCtx.lineWidth = lash.width * (0.8 + centerBoost * 0.4);
-                wireCtx.beginPath();
-                wireCtx.moveTo(p1.x, p1.y);
-                wireCtx.lineTo(p2.x, p2.y);
-                wireCtx.stroke();
             }
         }
     }
