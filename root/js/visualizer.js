@@ -243,6 +243,61 @@
             hair: null,
             hat: null,
             facialHair: null
+        },
+
+        cowboy: {
+            name: 'Cowboy',
+            // Similar to Crosswire but slightly rounder jaw
+            profile: [
+                [0.00, -0.78], [0.23, -0.69], [0.39, -0.56],
+                [0.49, -0.40], [0.52, -0.22], [0.51, -0.05],
+                [0.49,  0.10], [0.47,  0.24], [0.45,  0.36],
+                [0.41,  0.47], [0.34,  0.55], [0.24,  0.61],
+                [0.00,  0.64]
+            ],
+            ringN: 16,
+            eyes: {
+                left:  { x: -0.16, y: -0.03, z: 0.46, r: 0.065 },
+                right: { x:  0.16, y: -0.03, z: 0.46, r: 0.065 }
+            },
+            eyeColor: { hex: '#332211', rgb: '51,34,17' },
+            eyeShape: 'round',
+            mouth: { y: -0.52, hw: 0.20, z: 0.46, segs: 8,
+                     teeth: false, bucktooth: true, bucktoothColor: '255,255,255' },
+            nose: {
+                bridge: [[0, -0.14, 0.54], [0, -0.28, 0.57], [0, -0.32, 0.58]],
+                base:   [[-0.05, -0.34, 0.52], [0, -0.32, 0.58], [0.05, -0.34, 0.52]]
+            },
+            wireColor: '#FFDD33',
+            wireRGB:   '255,221,51',
+            accentColor: '#FFAA00',
+            accentRGB:   '255,170,0',
+            eyebrows: {
+                color: '#885522',
+                rgb:   '136,85,34',
+                width: 2.2,
+                innerOff: { dx:  0.00, dy: 0.06, dz: 0.02 },
+                outerOff: { dx:  0.11, dy: 0.07, dz: 0.00 },
+                thickness: 0.020
+            },
+            hair: null,
+            hat: {
+                type: 'cowboy',
+                color: '#AA6622',
+                rgb:   '170,102,34',
+                bandColor: '#664411',
+                bandRGB:   '102,68,17'
+            },
+            facialHair: {
+                type: 'moustache',
+                color: '#885522',
+                rgb:   '136,85,34',
+                width: 1.8,
+                // Moustache spans from nose base down toward mouth corners
+                spread: 0.22,   // how far out from center the ends reach
+                droop:  0.06,   // how far below nose the ends hang
+                curl:   0.02    // upward curl at tips (0 = straight down)
+            }
         }
     };
 
@@ -1178,6 +1233,52 @@
             }
         }
 
+        // Bucktooth (two big front teeth hanging from upper lip)
+        if (mth.bucktooth && open > 0.008) {
+            var btRGB = mth.bucktoothColor || '255,255,255';
+            var btAlpha = Math.min(0.95, open * 6);
+            var btHang = open * 0.65 + 0.012;  // how far they hang down
+            var btWidth = mth.hw * 0.18;        // width of each tooth
+            var btGap   = mth.hw * 0.04;        // gap between teeth
+
+            wireCtx.shadowColor = 'rgba(' + btRGB + ',1)';
+            wireCtx.shadowBlur  = 6 + mouthOpen * 8;
+
+            // Left buck tooth
+            var ltl = proj(-btGap - btWidth, mth.y + 0.005, mth.z);
+            var ltr = proj(-btGap,           mth.y + 0.005, mth.z);
+            var lbr = proj(-btGap,           mth.y - btHang, mth.z);
+            var lbl = proj(-btGap - btWidth, mth.y - btHang, mth.z);
+
+            wireCtx.strokeStyle = 'rgba(' + btRGB + ',' + btAlpha + ')';
+            wireCtx.lineWidth = 1.2;
+            wireCtx.beginPath();
+            wireCtx.moveTo(ltl.x, ltl.y);
+            wireCtx.lineTo(ltr.x, ltr.y);
+            wireCtx.lineTo(lbr.x, lbr.y);
+            wireCtx.lineTo(lbl.x, lbl.y);
+            wireCtx.closePath();
+            wireCtx.stroke();
+            wireCtx.fillStyle = 'rgba(' + btRGB + ',' + (btAlpha * 0.3) + ')';
+            wireCtx.fill();
+
+            // Right buck tooth
+            var rtl = proj(btGap,           mth.y + 0.005, mth.z);
+            var rtr = proj(btGap + btWidth, mth.y + 0.005, mth.z);
+            var rbr = proj(btGap + btWidth, mth.y - btHang, mth.z);
+            var rbl = proj(btGap,           mth.y - btHang, mth.z);
+
+            wireCtx.beginPath();
+            wireCtx.moveTo(rtl.x, rtl.y);
+            wireCtx.lineTo(rtr.x, rtr.y);
+            wireCtx.lineTo(rbr.x, rbr.y);
+            wireCtx.lineTo(rbl.x, rbl.y);
+            wireCtx.closePath();
+            wireCtx.stroke();
+            wireCtx.fillStyle = 'rgba(' + btRGB + ',' + (btAlpha * 0.3) + ')';
+            wireCtx.fill();
+        }
+
         // Inner glow when wide open
         if (mouthOpen > 0.3) {
             wireCtx.strokeStyle = 'rgba(255,200,50,' + ((mouthOpen - 0.3) * 0.6) + ')';
@@ -1373,12 +1474,202 @@
 
     function drawHat(char, proj, amp, bass) {
         if (!char.hat) return;
-        // TODO: implement hat rendering
+        if (char.hat.type === 'cowboy') {
+            drawCowboyHat(char, proj, amp, bass);
+        }
+    }
+
+    function drawCowboyHat(char, proj, amp, bass) {
+        var hat = char.hat;
+        var t = performance.now() * 0.001;
+
+        // Hat sits on top of the head — find the crown top from profile
+        var topY = 0.64;  // approximate top of skull
+        for (var i = 0; i < char.profile.length; i++) {
+            if (char.profile[i][1] > topY) topY = char.profile[i][1];
+        }
+
+        // Subtle bob with music
+        var bob = bass * 0.012 + Math.sin(breathPhase) * 0.003;
+        var hatBase = topY - 0.02 + bob;
+
+        // === Brim ===
+        // Wide oval below the crown — cowboy hat brim extends far out
+        var brimY = hatBase + 0.02;
+        var brimSegs = 20;
+        var brimPts = [];
+        for (var i = 0; i <= brimSegs; i++) {
+            var a = (i / brimSegs) * Math.PI * 2;
+            var brimRadX = 0.72;  // wide
+            var brimRadZ = 0.45;  // front-to-back
+            // Curve the brim: front and back tilt down, sides stay up
+            var brimDip = -Math.abs(Math.cos(a)) * 0.04 + Math.abs(Math.sin(a)) * 0.03;
+            brimPts.push(proj(
+                brimRadX * Math.cos(a),
+                brimY + brimDip,
+                brimRadZ * Math.sin(a)
+            ));
+        }
+
+        wireCtx.shadowBlur  = 6 + bass * 8;
+        wireCtx.shadowColor = hat.color;
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.7)';
+        wireCtx.lineWidth   = 1.8;
+        wireCtx.lineCap = 'round';
+        stroke(brimPts);
+
+        // Inner brim edge (gives thickness)
+        var innerBrimPts = [];
+        for (var i = 0; i <= brimSegs; i++) {
+            var a = (i / brimSegs) * Math.PI * 2;
+            var iRadX = 0.38;
+            var iRadZ = 0.28;
+            innerBrimPts.push(proj(
+                iRadX * Math.cos(a),
+                brimY + 0.01,
+                iRadZ * Math.sin(a)
+            ));
+        }
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.4)';
+        wireCtx.lineWidth   = 1.0;
+        stroke(innerBrimPts);
+
+        // === Crown (the tall part) ===
+        var crownBase = hatBase + 0.03;
+        var crownTop  = crownBase + 0.28;
+        var crownRadX = 0.30;
+        var crownRadZ = 0.22;
+
+        // Crown rings (horizontal bands)
+        var crownRings = 5;
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.55)';
+        wireCtx.lineWidth   = 1.2;
+        for (var r = 0; r <= crownRings; r++) {
+            var frac = r / crownRings;
+            var cy = crownBase + (crownTop - crownBase) * frac;
+            // Slight taper toward top, pinch at very top for dent
+            var taper = 1.0 - frac * 0.15;
+            var dent = (frac > 0.85) ? (1.0 - (frac - 0.85) * 3.0) : 1.0;
+            var rpts = [];
+            for (var i = 0; i <= 16; i++) {
+                var a = (i / 16) * Math.PI * 2;
+                rpts.push(proj(
+                    crownRadX * taper * dent * Math.cos(a),
+                    cy,
+                    crownRadZ * taper * dent * Math.sin(a)
+                ));
+            }
+            stroke(rpts);
+        }
+
+        // Crown vertical ribs
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.3)';
+        wireCtx.lineWidth   = 0.8;
+        for (var s = 0; s < 8; s++) {
+            var a = (s / 8) * Math.PI * 2;
+            wireCtx.beginPath();
+            for (var r = 0; r <= crownRings; r++) {
+                var frac = r / crownRings;
+                var cy = crownBase + (crownTop - crownBase) * frac;
+                var taper = 1.0 - frac * 0.15;
+                var dent = (frac > 0.85) ? (1.0 - (frac - 0.85) * 3.0) : 1.0;
+                var pt = proj(
+                    crownRadX * taper * dent * Math.cos(a),
+                    cy,
+                    crownRadZ * taper * dent * Math.sin(a)
+                );
+                r === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+            }
+            wireCtx.stroke();
+        }
+
+        // === Hat band ===
+        var bandY = crownBase + 0.04;
+        var bandPts = [];
+        for (var i = 0; i <= 16; i++) {
+            var a = (i / 16) * Math.PI * 2;
+            bandPts.push(proj(
+                crownRadX * 1.02 * Math.cos(a),
+                bandY,
+                crownRadZ * 1.02 * Math.sin(a)
+            ));
+        }
+        wireCtx.shadowColor = hat.bandColor;
+        wireCtx.strokeStyle = 'rgba(' + hat.bandRGB + ',0.8)';
+        wireCtx.lineWidth   = 2.5;
+        stroke(bandPts);
     }
 
     function drawFacialHair(char, proj, amp, bass) {
         if (!char.facialHair) return;
-        // TODO: implement facial hair rendering
+        if (char.facialHair.type === 'moustache') {
+            drawMoustache(char, proj, amp, bass);
+        }
+    }
+
+    function drawMoustache(char, proj, amp, bass) {
+        var stache = char.facialHair;
+        var t = performance.now() * 0.001;
+        var mth = char.mouth;
+
+        // Moustache sits between nose base and upper lip
+        var stacheY = (char.nose.base[0][1] + mth.y) * 0.5 + 0.01;
+        var stacheZ = mth.z + 0.02;  // slightly in front of mouth
+
+        // Center point (under nose)
+        var center = proj(0, stacheY, stacheZ);
+
+        // Subtle droop/sway with music
+        var breathSway = Math.sin(breathPhase + 1.5) * 0.004;
+        var bassBounce = bass * 0.008;
+
+        wireCtx.shadowBlur  = 4 + bass * 6;
+        wireCtx.shadowColor = stache.color;
+        wireCtx.strokeStyle = 'rgba(' + stache.rgb + ',0.85)';
+        wireCtx.lineWidth   = stache.width || 1.5;
+        wireCtx.lineCap = 'round';
+
+        // Each side: bezier from center outward and down
+        var sides = [-1, 1];
+        for (var si = 0; si < sides.length; si++) {
+            var sign = sides[si];
+            var spread = stache.spread || 0.20;
+            var droop  = stache.droop  || 0.05;
+            var curl   = stache.curl   || 0.01;
+
+            // Endpoint: out to the side and drooping down
+            var endX = sign * spread;
+            var endY = stacheY - droop - bassBounce + breathSway;
+            var endZ = stacheZ - 0.04;  // recede slightly at tips
+
+            // Curl: tip lifts back up a bit
+            endY += curl;
+
+            // Control point: gives the classic handlebar curve
+            var cpX = sign * spread * 0.55;
+            var cpY = stacheY + 0.005 - droop * 0.3;  // sag in middle
+            var cpZ = stacheZ;
+
+            var pEnd = proj(endX, endY, endZ);
+            var pCP  = proj(cpX, cpY, cpZ);
+
+            wireCtx.beginPath();
+            wireCtx.moveTo(center.x, center.y);
+            wireCtx.quadraticCurveTo(pCP.x, pCP.y, pEnd.x, pEnd.y);
+            wireCtx.stroke();
+
+            // Thickness: parallel stroke slightly below
+            wireCtx.globalAlpha = 0.45;
+            wireCtx.lineWidth   = (stache.width || 1.5) * 0.6;
+            var pEnd2 = proj(endX, endY - 0.012, endZ);
+            var pCP2  = proj(cpX,  cpY  - 0.012, cpZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(center.x, center.y + 1);
+            wireCtx.quadraticCurveTo(pCP2.x, pCP2.y, pEnd2.x, pEnd2.y);
+            wireCtx.stroke();
+            wireCtx.globalAlpha = 1;
+            wireCtx.lineWidth   = stache.width || 1.5;
+        }
     }
 
     function stroke(pts) {
