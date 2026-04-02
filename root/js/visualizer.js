@@ -75,11 +75,6 @@
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
 
-    // Metatron emanating text particle system
-    var metatronParticles = [];
-    var metatronSpawnTimer = 0;
-    var METATRON_WORDS = ['LIGHT','TRUTH','SACRED','DIVINE','ANGEL','CUBE','UNITY','SPIRIT','FORM','VOID'];
-
     // Shifty eye state — animated pupil offset for 'shifty' eyeBehavior
     var shiftyState = {
         targetX: 0, targetY: 0,    // where the pupils want to go
@@ -2269,9 +2264,9 @@
     function drawMetatronsCube(char, proj, amp, bass) {
         var t = performance.now() * 0.001;
 
-        // === Color cycling: slow hue rotation (like the crystal ball) ===
+        // === Color cycling: slow hue rotation ===
         var hue = (t * 0.035) % 1.0;
-        function hsl(h, s, l) {
+        function hsl2rgb(h, s, l) {
             var c = (1 - Math.abs(2 * l - 1)) * s;
             var x = c * (1 - Math.abs((h * 6) % 2 - 1));
             var m = l - c / 2;
@@ -2288,75 +2283,63 @@
                 b: Math.round((b + m) * 255)
             };
         }
-        var pri = hsl(hue, 0.88, 0.48);
-        var acc = hsl(hue, 0.78, 0.68);
+        var pri = hsl2rgb(hue, 0.88, 0.48);
+        var acc = hsl2rgb(hue, 0.78, 0.68);
         var cRGB = pri.r + ',' + pri.g + ',' + pri.b;
         var aRGB = acc.r + ',' + acc.g + ',' + acc.b;
         var cHex = 'rgb(' + cRGB + ')';
         var aHex = 'rgb(' + aRGB + ')';
 
-        // === 3D Metatron's Cube mapped onto a sphere ===
-        // Sacred proportions: 13 nodes on a sphere surface.
-        // Circle radius = chord distance from center to inner ring.
-        // This creates the overlapping Fruit-of-Life / Flower-of-Life pattern.
+        // === Full 3D Metatron's Cube: mirrored front + back ===
+        // 26 nodes total on a sphere surface:
+        //   [0] = front pole, [1-6] = inner front, [7-12] = outer front
+        //   [13] = back pole, [14-19] = inner back, [20-25] = outer back
+        // Front and back are mirror images -> looks the same from any angle.
 
-        var S = 0.42;  // sphere radius in model units
-        var colatInner = 32 * Math.PI / 180;  // inner ring: 32° from pole
-        var colatOuter = 58 * Math.PI / 180;  // outer ring: 58° from pole
-        // Sacred circle radius = chord distance center→inner
-        var circleR = 2 * S * Math.sin(colatInner / 2);  // ~0.23
+        var S = 0.40;  // sphere radius
+        var colatInner = 38 * Math.PI / 180;  // inner ring ~38° from poles
+        var colatOuter = 64 * Math.PI / 180;  // outer ring ~64° from poles
 
-        // Generate 13 nodes on sphere surface:
-        // [0] = front pole (center of the figure)
-        // [1-6] = inner ring at colatInner (60° apart)
-        // [7-12] = outer ring at colatOuter (60° apart)
-        var sphereNodes = [{x: 0, y: 0, z: S}];
+        var nodes = [];
+        // Front pole
+        nodes.push({x: 0, y: 0, z: S});
+        // Inner front ring
         for (var i = 0; i < 6; i++) {
             var phi = (i * 60 + 90) * Math.PI / 180;
-            sphereNodes.push({
+            nodes.push({
                 x: S * Math.sin(colatInner) * Math.cos(phi),
                 y: S * Math.sin(colatInner) * Math.sin(phi),
                 z: S * Math.cos(colatInner)
             });
         }
+        // Outer front ring
         for (var i = 0; i < 6; i++) {
             var phi = (i * 60 + 90) * Math.PI / 180;
-            sphereNodes.push({
+            nodes.push({
                 x: S * Math.sin(colatOuter) * Math.cos(phi),
                 y: S * Math.sin(colatOuter) * Math.sin(phi),
                 z: S * Math.cos(colatOuter)
             });
         }
-
-        // Center the sphere so the geometry is roughly centered at origin
-        var zShift = S * 0.55;
-        for (var i = 0; i < sphereNodes.length; i++) {
-            sphereNodes[i].z -= zShift;
+        // Back pole (mirror)
+        nodes.push({x: 0, y: 0, z: -S});
+        // Inner back ring (mirror z)
+        for (var i = 0; i < 6; i++) {
+            var phi = (i * 60 + 90) * Math.PI / 180;
+            nodes.push({
+                x: S * Math.sin(colatInner) * Math.cos(phi),
+                y: S * Math.sin(colatInner) * Math.sin(phi),
+                z: -S * Math.cos(colatInner)
+            });
         }
-
-        // Precompute normals and tangent frames for each node
-        // (for drawing circles in the tangent plane of the sphere)
-        var nodeFrames = [];
-        for (var i = 0; i < sphereNodes.length; i++) {
-            var p = sphereNodes[i];
-            // Normal = direction from sphere center to node (before z-shift undone)
-            var nx = p.x, ny = p.y, nz = p.z + zShift;
-            var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
-            nx /= nl; ny /= nl; nz /= nl;
-            // Choose "up" vector for cross product
-            var upx = 0, upy = 1, upz = 0;
-            if (Math.abs(ny) > 0.95) { upx = 1; upy = 0; }
-            // U = normalize(cross(up, N))
-            var ux = upy*nz - upz*ny;
-            var uy = upz*nx - upx*nz;
-            var uz = upx*ny - upy*nx;
-            var ul = Math.sqrt(ux*ux + uy*uy + uz*uz) || 1;
-            ux /= ul; uy /= ul; uz /= ul;
-            // V = cross(N, U)
-            var vx = ny*uz - nz*uy;
-            var vy = nz*ux - nx*uz;
-            var vz = nx*uy - ny*ux;
-            nodeFrames.push({ ux:ux, uy:uy, uz:uz, vx:vx, vy:vy, vz:vz });
+        // Outer back ring (mirror z)
+        for (var i = 0; i < 6; i++) {
+            var phi = (i * 60 + 90) * Math.PI / 180;
+            nodes.push({
+                x: S * Math.sin(colatOuter) * Math.cos(phi),
+                y: S * Math.sin(colatOuter) * Math.sin(phi),
+                z: -S * Math.cos(colatOuter)
+            });
         }
 
         // 3D rotation: steady Y spin + gentle X wobble
@@ -2365,8 +2348,7 @@
         var cosRY = Math.cos(rotY), sinRY = Math.sin(rotY);
         var cosRX = Math.cos(rotX), sinRX = Math.sin(rotX);
 
-        function rotate(px, py, pz) {
-            // Y rotation then X rotation
+        function rot3d(px, py, pz) {
             var x1 = px * cosRY + pz * sinRY;
             var z1 = -px * sinRY + pz * cosRY;
             var y2 = py * cosRX - z1 * sinRX;
@@ -2374,128 +2356,173 @@
             return { x: x1, y: y2, z: z2 };
         }
 
-        // Bass breathing: uniform scale of entire geometry
         var breathe = 1 + bass * 0.05;
 
-        // Project all 13 node centers (with wiggle + breathing + rotation)
+        // Project all 26 nodes
         var pts = [];
-        for (var p = 0; p < sphereNodes.length; p++) {
-            var sn = sphereNodes[p];
-            var px = sn.x, py = sn.y, pz = sn.z;
+        for (var p = 0; p < nodes.length; p++) {
+            var nd = nodes[p];
+            var px = nd.x, py = nd.y, pz = nd.z;
 
-            // Per-node frequency wiggle (gentle)
-            var fpos = p / 13;
+            // Per-node freq wiggle
+            var fpos = (p % 13) / 13;
             var fval = getFreqSample(fpos);
-            var wa = t * 1.8 + p * 1.7;
-            px += Math.sin(wa) * fval * 0.006;
-            py += Math.cos(wa * 0.7) * fval * 0.006;
+            var wa = t * 1.8 + p * 1.1;
+            px += Math.sin(wa) * fval * 0.005;
+            py += Math.cos(wa * 0.7) * fval * 0.005;
 
-            // Bass breathing
             px *= breathe; py *= breathe; pz *= breathe;
 
-            // Rotate and project
-            var r = rotate(px, py, pz);
+            var r = rot3d(px, py, pz);
             pts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
         }
 
         wireCtx.lineCap = 'round';
         wireCtx.lineJoin = 'round';
 
-        // --- Layer 1: All 78 connection lines (sacred web) ---
+        // === Build connection list ===
+        // Front face: all 78 pairs among [0..12]
+        // Back face: all 78 pairs among [13..25]
+        // Cross connections: pole-pole + corresponding ring nodes
+        // We batch by visual category for performance.
+
+        // Helper: classify a pair within a 13-node face
+        function classifyFacePair(a, b) {
+            // a, b are local indices 0-12 within one face
+            if (a > b) { var tmp = a; a = b; b = tmp; }
+            var isOuterEdge = (a >= 7 && b >= 7 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
+            var isInnerEdge = (a >= 1 && a <= 6 && b >= 1 && b <= 6 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
+            var isSpoke = (a === 0);
+            var isStarEdge = (
+                (a===7&&b===9)||(a===7&&b===11)||(a===9&&b===11)||
+                (a===8&&b===10)||(a===8&&b===12)||(a===10&&b===12)
+            );
+            if (isStarEdge) return 'star';
+            if (isOuterEdge) return 'outer';
+            if (isInnerEdge) return 'inner';
+            if (isSpoke) return 'spoke';
+            return 'web';
+        }
+
+        function drawLine(ai, bi, cls) {
+            var shimmer = getFreqSample(((ai * 7 + bi * 3) % 13) / 13);
+            var alpha, lw;
+
+            if (cls === 'star') {
+                var treble = getFreqSample(0.82);
+                alpha = 0.32 + treble * 0.32;
+                lw = 1.3 + treble * 0.5;
+                wireCtx.shadowBlur = 7 + treble * 12;
+                wireCtx.shadowColor = aHex;
+                wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            } else if (cls === 'outer') {
+                alpha = 0.28 + bass * 0.28;
+                lw = 1.1 + bass * 0.4;
+                wireCtx.shadowBlur = 5 + bass * 9;
+                wireCtx.shadowColor = aHex;
+                wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            } else if (cls === 'inner') {
+                var midF = getFreqSample(0.45);
+                alpha = 0.22 + midF * 0.28;
+                lw = 0.9 + midF * 0.35;
+                wireCtx.shadowBlur = 4 + midF * 7;
+                wireCtx.shadowColor = cHex;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            } else if (cls === 'spoke') {
+                alpha = 0.10 + amp * 0.12 + shimmer * 0.06;
+                lw = 0.5 + amp * 0.25;
+                wireCtx.shadowBlur = 2 + amp * 5;
+                wireCtx.shadowColor = cHex;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            } else if (cls === 'cross') {
+                alpha = 0.08 + shimmer * 0.12;
+                lw = 0.4 + shimmer * 0.2;
+                wireCtx.shadowBlur = 2 + shimmer * 4;
+                wireCtx.shadowColor = cHex;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            } else {
+                alpha = 0.03 + shimmer * 0.08;
+                lw = 0.3 + shimmer * 0.2;
+                wireCtx.shadowBlur = 1 + shimmer * 3;
+                wireCtx.shadowColor = cHex;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            }
+            wireCtx.lineWidth = lw;
+            wireCtx.beginPath();
+            wireCtx.moveTo(pts[ai].x, pts[ai].y);
+            wireCtx.lineTo(pts[bi].x, pts[bi].y);
+            wireCtx.stroke();
+        }
+
+        // Front face: all 78 pairs among indices 0-12
         for (var a = 0; a < 13; a++) {
             for (var b = a + 1; b < 13; b++) {
-                // Classify line for visual hierarchy
-                var isOuterEdge = (a >= 7 && b >= 7 && (Math.abs(a-b) === 1 || Math.abs(a-b) === 5));
-                var isInnerEdge = (a >= 1 && a <= 6 && b >= 1 && b <= 6 && (Math.abs(a-b) === 1 || Math.abs(a-b) === 5));
-                var isSpoke = (a === 0);
-                var isStarEdge = (
-                    (a===7&&b===9)||(a===7&&b===11)||(a===9&&b===11)||
-                    (a===8&&b===10)||(a===8&&b===12)||(a===10&&b===12)
-                );
-
-                var shimIdx = (a * 7 + b * 3) % 13;
-                var shimmer = getFreqSample(shimIdx / 13);
-                var alpha, lw;
-
-                if (isStarEdge) {
-                    var treble = getFreqSample(0.82);
-                    alpha = 0.35 + treble * 0.35;
-                    lw = 1.4 + treble * 0.6;
-                    wireCtx.shadowBlur = 8 + treble * 14;
-                    wireCtx.shadowColor = aHex;
-                    wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
-                } else if (isOuterEdge) {
-                    alpha = 0.30 + bass * 0.30;
-                    lw = 1.2 + bass * 0.5;
-                    wireCtx.shadowBlur = 6 + bass * 10;
-                    wireCtx.shadowColor = aHex;
-                    wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
-                } else if (isInnerEdge) {
-                    var midF = getFreqSample(0.45);
-                    alpha = 0.25 + midF * 0.30;
-                    lw = 1.0 + midF * 0.4;
-                    wireCtx.shadowBlur = 5 + midF * 8;
-                    wireCtx.shadowColor = cHex;
-                    wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
-                } else if (isSpoke) {
-                    alpha = 0.12 + amp * 0.15 + shimmer * 0.08;
-                    lw = 0.6 + amp * 0.3;
-                    wireCtx.shadowBlur = 3 + amp * 6;
-                    wireCtx.shadowColor = cHex;
-                    wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
-                } else {
-                    alpha = 0.04 + shimmer * 0.10;
-                    lw = 0.35 + shimmer * 0.25;
-                    wireCtx.shadowBlur = 2 + shimmer * 4;
-                    wireCtx.shadowColor = cHex;
-                    wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
-                }
-                wireCtx.lineWidth = lw;
-                wireCtx.beginPath();
-                wireCtx.moveTo(pts[a].x, pts[a].y);
-                wireCtx.lineTo(pts[b].x, pts[b].y);
-                wireCtx.stroke();
+                drawLine(a, b, classifyFacePair(a, b));
             }
         }
 
-        // --- Layer 2: 13 sacred circles on the sphere surface ---
-        // Each circle lies in the tangent plane at its node, radius = circleR
-        // Projected through 3D rotation as proper ellipses
-        var CSEGS = 48;
-        for (var i = 0; i < 13; i++) {
-            var sn = sphereNodes[i];
-            var fr = nodeFrames[i];
-            var fval = getFreqSample(i / 13);
-            var isCenter = (i === 0);
+        // Back face: all 78 pairs among indices 13-25
+        for (var a = 0; a < 13; a++) {
+            for (var b = a + 1; b < 13; b++) {
+                drawLine(13 + a, 13 + b, classifyFacePair(a, b));
+            }
+        }
 
-            // Per-node wiggle (same as node center computation)
-            var wa3 = t * 1.8 + i * 1.7;
-            var wigX = Math.sin(wa3) * fval * 0.006;
-            var wigY = Math.cos(wa3 * 0.7) * fval * 0.006;
+        // Cross connections: corresponding front↔back nodes
+        for (var i = 0; i < 13; i++) {
+            drawLine(i, 13 + i, 'cross');
+        }
+
+        // === Circles: draw on all 26 nodes ===
+        // Sacred circle radius (chord length) = inner ring chord
+        var circleR = 2 * S * Math.sin(colatInner / 2);
+        var CSEGS = 36;
+
+        for (var ni = 0; ni < nodes.length; ni++) {
+            var nd = nodes[ni];
+            var fval = getFreqSample((ni % 13) / 13);
+            var isPole = (ni === 0 || ni === 13);
+
+            // Compute tangent frame at this node on the sphere
+            var nx = nd.x, ny = nd.y, nz = nd.z;
+            var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+            nx /= nl; ny /= nl; nz /= nl;
+            var upx = 0, upy = 1, upz = 0;
+            if (Math.abs(ny) > 0.95) { upx = 1; upy = 0; }
+            var ux = upy*nz - upz*ny;
+            var uy = upz*nx - upx*nz;
+            var uz = upx*ny - upy*nx;
+            var ul = Math.sqrt(ux*ux + uy*uy + uz*uz) || 1;
+            ux /= ul; uy /= ul; uz /= ul;
+            var vx = ny*uz - nz*uy;
+            var vy = nz*ux - nx*uz;
+            var vz = nx*uy - ny*ux;
 
             var cpts = [];
             for (var s = 0; s <= CSEGS; s++) {
                 var ca = (s / CSEGS) * Math.PI * 2;
                 var cosA = Math.cos(ca), sinA = Math.sin(ca);
+                var cpx = (nd.x + circleR * (cosA * ux + sinA * vx)) * breathe;
+                var cpy = (nd.y + circleR * (cosA * uy + sinA * vy)) * breathe;
+                var cpz = (nd.z + circleR * (cosA * uz + sinA * vz)) * breathe;
 
-                // Circle point in model space: node + circleR * (cos*U + sin*V)
-                var cpx = (sn.x + circleR * (cosA * fr.ux + sinA * fr.vx) + wigX) * breathe;
-                var cpy = (sn.y + circleR * (cosA * fr.uy + sinA * fr.vy) + wigY) * breathe;
-                var cpz = (sn.z + circleR * (cosA * fr.uz + sinA * fr.vz)) * breathe;
+                // Same per-node wiggle
+                var wa2 = t * 1.8 + ni * 1.1;
+                cpx += Math.sin(wa2) * fval * 0.005;
+                cpy += Math.cos(wa2 * 0.7) * fval * 0.005;
 
-                var r = rotate(cpx, cpy, cpz);
+                var r = rot3d(cpx, cpy, cpz);
                 cpts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
             }
 
-            // Style: center circle brighter, all freq-reactive
-            var cAlpha = isCenter ? (0.35 + bass * 0.25 + fval * 0.15)
-                                  : (0.15 + fval * 0.25 + bass * 0.08);
-            var cLw = isCenter ? (1.4 + bass * 0.5) : (0.9 + fval * 0.4);
+            var cAlpha = isPole ? (0.32 + bass * 0.22 + fval * 0.12)
+                                : (0.12 + fval * 0.22 + bass * 0.06);
+            var cLw = isPole ? (1.3 + bass * 0.4) : (0.7 + fval * 0.3);
 
-            wireCtx.strokeStyle = 'rgba(' + (isCenter ? aRGB : cRGB) + ',' + Math.min(1, cAlpha).toFixed(3) + ')';
+            wireCtx.strokeStyle = 'rgba(' + (isPole ? aRGB : cRGB) + ',' + Math.min(1, cAlpha).toFixed(3) + ')';
             wireCtx.lineWidth = cLw;
-            wireCtx.shadowBlur = isCenter ? (10 + bass * 14) : (3 + fval * 8);
-            wireCtx.shadowColor = isCenter ? aHex : cHex;
+            wireCtx.shadowBlur = isPole ? (8 + bass * 12) : (2 + fval * 6);
+            wireCtx.shadowColor = isPole ? aHex : cHex;
 
             wireCtx.beginPath();
             for (var s = 0; s < cpts.length; s++) {
@@ -2504,73 +2531,40 @@
             wireCtx.stroke();
         }
 
-        // --- Layer 3: Center glow orb ---
-        var glowR = 12 + bass * 10 + amp * 5;
-        wireCtx.shadowBlur = 20 + bass * 25;
+        // --- Center glow ---
+        var cx = (pts[0].x + pts[13].x) / 2;
+        var cy = (pts[0].y + pts[13].y) / 2;
+        var glowR = 10 + bass * 8 + amp * 4;
+        wireCtx.shadowBlur = 18 + bass * 22;
         wireCtx.shadowColor = aHex;
-        var gradient = wireCtx.createRadialGradient(
-            pts[0].x, pts[0].y, 0,
-            pts[0].x, pts[0].y, glowR
-        );
-        gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.20 + bass * 0.15).toFixed(3) + ')');
-        gradient.addColorStop(0.5, 'rgba(' + cRGB + ',' + (0.07 + bass * 0.06).toFixed(3) + ')');
+        var gradient = wireCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+        gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.18 + bass * 0.14).toFixed(3) + ')');
+        gradient.addColorStop(0.5, 'rgba(' + cRGB + ',' + (0.06 + bass * 0.05).toFixed(3) + ')');
         gradient.addColorStop(1, 'rgba(' + cRGB + ',0)');
         wireCtx.fillStyle = gradient;
         wireCtx.beginPath();
-        wireCtx.arc(pts[0].x, pts[0].y, glowR, 0, Math.PI * 2);
+        wireCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
         wireCtx.fill();
 
-        // --- Layer 4: Emanating text ---
-        drawMetatronText(char, pts[0], t, amp, bass, cRGB, aRGB, aHex);
+        // === Set eyeScreenPoints for lyrics + lasers ===
+        // Words emit from the geometric center (between front and back poles)
+        // Lasers fire from two outer nodes on opposite sides
+        // Use the rightmost and leftmost outer nodes as "eyes"
+        var rightmostIdx = 7, leftmostIdx = 7;
+        for (var i = 7; i < 13; i++) {
+            if (pts[i].x > pts[rightmostIdx].x) rightmostIdx = i;
+            if (pts[i].x < pts[leftmostIdx].x) leftmostIdx = i;
+        }
+        // Also check back outer ring
+        for (var i = 20; i < 26; i++) {
+            if (pts[i].x > pts[rightmostIdx].x) rightmostIdx = i;
+            if (pts[i].x < pts[leftmostIdx].x) leftmostIdx = i;
+        }
+        eyeScreenPoints.left = pts[leftmostIdx];
+        eyeScreenPoints.right = pts[rightmostIdx];
+        eyeScreenPoints.mouth = { x: cx, y: cy, d: pts[0].d || 1 };
     }
 
-    function drawMetatronText(char, center, t, amp, bass, cycleRGB, cycleAccRGB, cycleAccHex) {
-        // Spawn new text particles periodically
-        metatronSpawnTimer -= 0.016;
-        if (metatronSpawnTimer <= 0) {
-            metatronSpawnTimer = 1.2 + Math.random() * 2.5;
-            var angle = Math.random() * Math.PI * 2;
-            var speed = 28 + Math.random() * 20;  // pixels per second
-            metatronParticles.push({
-                word: METATRON_WORDS[Math.floor(Math.random() * METATRON_WORDS.length)],
-                x: 0, y: 0,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                life: 1.0,
-                decay: 0.18 + Math.random() * 0.12,
-                size: 8 + Math.floor(Math.random() * 4)
-            });
-        }
-
-        // Update and draw particles
-        for (var i = metatronParticles.length - 1; i >= 0; i--) {
-            var p = metatronParticles[i];
-            p.x += p.vx * 0.016;
-            p.y += p.vy * 0.016;
-            p.life -= p.decay * 0.016;
-            // Bass gives a little kick outward
-            var kickMul = 1 + bass * 0.4;
-            p.x *= 1 + (kickMul - 1) * 0.016;
-            p.y *= 1 + (kickMul - 1) * 0.016;
-
-            if (p.life <= 0) {
-                metatronParticles.splice(i, 1);
-                continue;
-            }
-
-            var alpha = p.life * 0.55;
-            wireCtx.font = p.size + 'px monospace';
-            wireCtx.textAlign = 'center';
-            wireCtx.textBaseline = 'middle';
-            wireCtx.shadowBlur = 6 + p.life * 8;
-            wireCtx.shadowColor = cycleAccHex || char.accentColor;
-            wireCtx.fillStyle = 'rgba(' + (cycleAccRGB || char.accentRGB) + ',' + alpha.toFixed(3) + ')';
-            wireCtx.fillText(p.word, center.x + p.x, center.y + p.y);
-        }
-
-        // Cap particle count
-        while (metatronParticles.length > 12) metatronParticles.shift();
-    }
 
     function drawPaperclipBody(char, proj, amp, bass) {
         if (!char.wirePath) return;
@@ -4695,7 +4689,7 @@
 
     function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
         var projState = headProjectionState || buildProjectionState(w, h);
-        var mouthPoint = eyeScreenPoints.mouth || projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, projState.pulse || 1);
+        var mouthPoint = eyeScreenPoints.mouth || (activeChar.mouth ? projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, projState.pulse || 1) : { x: w / 2, y: h / 2, d: 1 });
         var spawnX = mouthPoint.x;
         var spawnY = mouthPoint.y;
 
