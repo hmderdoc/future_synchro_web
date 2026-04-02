@@ -74,6 +74,8 @@
     var mouthOpen     = 0;      // 0-1 smoothed
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
+    var headAmp       = 0;      // module-level amp for sub-renderers
+    var headBass      = 0;      // module-level bass for sub-renderers
     var headWaveform  = [];     // normalized analyser time-domain samples
     var headFreqData  = [];     // normalized frequency bin data (0-1)
     var headProjectionState = null;
@@ -389,6 +391,76 @@
                 bot: -0.30,
                 hw: 0.38
             }
+        },
+        clippy: {
+            name: 'Clippy',
+            headShape: 'paperclip',
+            profile: null,
+            ringN: 0,
+            // Wire path: series of [x, y, z] control points defining the paperclip shape
+            // Y is up (positive = up). Clippy stands vertically.
+            wirePath: [
+                // Classic paperclip silhouette — single continuous wire path.
+                // Outer wire at z ≈ +0.015, inner wire at z ≈ -0.015
+                // for 3D depth when the head rotates.
+                //
+                // Outer edges ±0.12, inner edges ±0.05
+                [ 0.12, -0.60, 0.015], // 0: bottom-right tip (outer start)
+                [ 0.12,  0.20, 0.015], // 1: right outer going up
+                [ 0.12,  0.50, 0.015], // 2: right outer approaching top
+                [ 0.08,  0.62, 0.015], // 3: outer top-right curve
+                [ 0.00,  0.66, 0.015], // 4: outer top apex
+                [-0.08,  0.62, 0.015], // 5: outer top-left curve
+                [-0.12,  0.50, 0.015], // 6: left outer from top
+                [-0.12,  0.00, 0.015], // 7: left outer mid
+                [-0.12, -0.40, 0.015], // 8: left outer approaching bottom
+                [-0.08, -0.54, 0.01],  // 9: outer bottom-left curve (transitioning)
+                [ 0.00, -0.58, 0.00],  // 10: outer bottom apex (z crossing)
+                [ 0.05, -0.50,-0.015], // 11: inner bottom-right (now behind)
+                [ 0.05, -0.20,-0.015], // 12: inner left going up
+                [ 0.05,  0.20,-0.015], // 13: inner left mid
+                [ 0.05,  0.46,-0.015], // 14: inner left approaching top
+                [ 0.03,  0.54,-0.01],  // 15: inner top-left curve (transitioning)
+                [ 0.00,  0.56, 0.00],  // 16: inner top apex (z crossing)
+                [-0.03,  0.54,-0.01],  // 17: inner top-right curve
+                [-0.05,  0.46,-0.015], // 18: inner right from top
+                [-0.05,  0.10,-0.015], // 19: inner right going down
+                [-0.05, -0.30,-0.015], // 20: inner right lower
+                [-0.05, -0.55,-0.015], // 21: bottom-left tip (inner end)
+            ],
+            wireThickness: 4.0,
+            wireColor: '#AAAAAA',
+            wireRGB: '170,170,170',
+            accentColor: '#CCCCCC',
+            accentRGB: '204,204,204',
+            // Eyes sit on the top bend of the paperclip
+            eyes: {
+                left:  { x: -0.035, y: 0.58, z: 0.06, r: 0.042 },
+                right: { x:  0.035, y: 0.58, z: 0.06, r: 0.042 }
+            },
+            eyeColor: { hex: '#000000', rgb: '0,0,0' },
+            eyeOutlineColor: { hex: '#222222', rgb: '34,34,34' },
+            eyeShape: 'clippy',  // special googly eyes
+            mascara: false,
+            eyelashes: null,
+            // Clippy's eyebrows are very expressive
+            eyebrows: {
+                color: '#888888',
+                rgb: '136,136,136',
+                width: 2.0,
+                innerOff: { dx: 0.00, dy: 0.035, dz: 0.03 },
+                outerOff: { dx: 0.05, dy: 0.045, dz: 0.00 },
+                thickness: 0.010
+            },
+            // Small mouth between/below eyes
+            mouth: { y: 0.50, hw: 0.030, z: 0.06, segs: 6,
+                     teeth: false, smiley: true },
+            nose: null,
+            hair: null,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null
         }
     };
 
@@ -410,6 +482,10 @@
         if (CHARACTERS[key]) return key;
         return '_default';
     }
+
+    // DEBUG: expose character switching for testing
+    window._setChar = setActiveCharacter;
+    window._CHARS = CHARACTERS;
 
     var LASER_RED = '#FF5555';
 
@@ -1023,6 +1099,8 @@
             : (lyricMouth.active ? 0.18 : 0.10);
         mouthOpen += (mouthTarget - mouthOpen) * mouthLerp;
         eyeGlow   += (Math.min(bass * 2, 1) - eyeGlow) * 0.2;
+        headAmp  = amp;
+        headBass = bass;
 
         var pulse = 1 + bass * 0.06 + Math.sin(breathPhase) * 0.01;
         var projState = buildProjectionState(W, H);
@@ -1042,6 +1120,9 @@
         if (activeChar.headShape === 'box') {
             // --- Box wireframe (floppy drive etc.) ---
             drawBoxHead(activeChar, proj, amp, bass);
+        } else if (activeChar.headShape === 'paperclip') {
+            // --- Paperclip wireframe (Clippy) ---
+            drawPaperclipBody(activeChar, proj, amp, bass);
         } else {
             // --- Rotational profile rings ---
             var rings = [];
@@ -1135,6 +1216,8 @@
 
         if (shape === 'square') {
             drawSquareEye(eye, proj, eyeName, char, blinkAmount);
+        } else if (shape === 'clippy') {
+            drawGooglyEye(eye, proj, eyeName, char, blinkAmount);
         } else {
             drawRoundEye(eye, proj, eyeName, char, blinkAmount);
         }
@@ -1641,6 +1724,171 @@
                 wireCtx.globalAlpha = 1;
             }
         }
+    }
+
+    // =========================================================
+    //  Paperclip Body Renderer (Clippy)
+    // =========================================================
+    function drawPaperclipBody(char, proj, amp, bass) {
+        if (!char.wirePath) return;
+        var path = char.wirePath;
+        var t = performance.now() * 0.001;
+
+        // === Music-reactive wobble ===
+        // Clippy bounces and sways — his whole wire body is springy
+        var bounce = bass * 0.015 * Math.sin(t * 6);
+        var sway   = amp * 0.02 * Math.sin(t * 3.5);
+        var breathBob = Math.sin(breathPhase) * 0.005;
+
+        // Project all wire points with wobble applied
+        var pts = [];
+        for (var i = 0; i < path.length; i++) {
+            var px = path[i][0];
+            var py = path[i][1];
+            var pz = path[i][2];
+
+            // Wobble increases toward extremities (top and bottom)
+            // Center of mass is roughly at y=0
+            var distFromCenter = Math.abs(py) * 0.8 + 0.2;
+
+            // Sway: horizontal displacement, more at top
+            var wobX = sway * (0.3 + py * 0.7);
+            // Bounce: vertical displacement
+            var wobY = bounce * distFromCenter + breathBob;
+            // Springy oscillation on the tip
+            var spring = Math.sin(t * 8 + i * 0.4) * amp * 0.004 * distFromCenter;
+
+            pts.push(proj(px + wobX + spring, py + wobY, pz));
+        }
+
+        // === Draw the paperclip wire ===
+        var thickness = char.wireThickness || 3.0;
+        wireCtx.shadowBlur = 6 + bass * 12;
+        wireCtx.shadowColor = char.wireColor;
+        wireCtx.lineCap = 'round';
+        wireCtx.lineJoin = 'round';
+
+        // Main wire stroke — thick silver
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.75 + bass * 0.15) + ')';
+        wireCtx.lineWidth = thickness;
+        wireCtx.beginPath();
+        // Use quadratic curves for smooth bends
+        wireCtx.moveTo(pts[0].x, pts[0].y);
+        for (var i = 1; i < pts.length; i++) {
+            // Smooth curve through control points
+            if (i < pts.length - 1) {
+                var midX = (pts[i].x + pts[i+1].x) * 0.5;
+                var midY = (pts[i].y + pts[i+1].y) * 0.5;
+                wireCtx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+            } else {
+                wireCtx.lineTo(pts[i].x, pts[i].y);
+            }
+        }
+        wireCtx.stroke();
+
+        // Highlight stroke — thinner, brighter, gives metallic sheen
+        wireCtx.strokeStyle = 'rgba(255,255,255,' + (0.15 + bass * 0.08) + ')';
+        wireCtx.lineWidth = thickness * 0.35;
+        wireCtx.beginPath();
+        wireCtx.moveTo(pts[0].x, pts[0].y);
+        for (var i = 1; i < pts.length; i++) {
+            if (i < pts.length - 1) {
+                var midX = (pts[i].x + pts[i+1].x) * 0.5;
+                var midY = (pts[i].y + pts[i+1].y) * 0.5;
+                wireCtx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+            } else {
+                wireCtx.lineTo(pts[i].x, pts[i].y);
+            }
+        }
+        wireCtx.stroke();
+
+        // Wire end caps — small circles at the two free ends
+        var endRadius = thickness * 0.6;
+        wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.6)';
+        wireCtx.beginPath();
+        wireCtx.arc(pts[0].x, pts[0].y, endRadius, 0, Math.PI * 2);
+        wireCtx.fill();
+        wireCtx.beginPath();
+        wireCtx.arc(pts[pts.length-1].x, pts[pts.length-1].y, endRadius, 0, Math.PI * 2);
+        wireCtx.fill();
+    }
+
+    // =========================================================
+    //  Googly Eye Renderer (Clippy-style big white circles with rolling pupil)
+    // =========================================================
+    function drawGooglyEye(eye, proj, eyeName, char, blinkAmount) {
+        var t = performance.now() * 0.001;
+
+        // Eye scale — Clippy has BIG eyes relative to his wire body
+        var r = eye.r;
+        var squish = Math.max(0.06, 1 - blinkAmount * 0.92);
+        var c = proj(eye.x, eye.y, eye.z);
+
+        // Scale factor from projection
+        var edgeP = proj(eye.x + r, eye.y, eye.z);
+        var screenR = Math.abs(edgeP.x - c.x);
+        var screenRY = screenR * squish;
+
+        if (blinkAmount > 0.85) {
+            // Fully blinked — just a line
+            wireCtx.strokeStyle = 'rgba(80,80,80,0.7)';
+            wireCtx.lineWidth = 1.5;
+            wireCtx.beginPath();
+            wireCtx.moveTo(c.x - screenR * 0.8, c.y);
+            wireCtx.lineTo(c.x + screenR * 0.8, c.y);
+            wireCtx.stroke();
+            return;
+        }
+
+        // White sclera (big white circle)
+        wireCtx.shadowBlur = 4;
+        wireCtx.shadowColor = '#FFFFFF';
+        wireCtx.fillStyle = 'rgba(255,255,255,' + (0.85 + eyeGlow * 0.15) + ')';
+        wireCtx.beginPath();
+        wireCtx.ellipse(c.x, c.y, screenR, screenRY, 0, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        // Sclera outline
+        wireCtx.strokeStyle = 'rgba(80,80,80,' + (0.5 + eyeGlow * 0.3) + ')';
+        wireCtx.lineWidth = 1.2;
+        wireCtx.beginPath();
+        wireCtx.ellipse(c.x, c.y, screenR, screenRY, 0, 0, Math.PI * 2);
+        wireCtx.stroke();
+
+        // Pupil — rolls around based on music + head rotation
+        // Pupils look toward the viewer, with slight music drift
+        var lookX = Math.sin(headRotY) * 0.25;  // follow head rotation
+        var lookY = Math.sin(t * 0.7) * 0.08 + headBass * 0.12;  // gentle vertical drift
+        // Music makes pupils jitter slightly
+        var jitterX = Math.sin(t * 11 + (eyeName === 'left' ? 0 : 2)) * headAmp * 0.08;
+        var jitterY = Math.cos(t * 9 + (eyeName === 'left' ? 1 : 3)) * headAmp * 0.06;
+
+        var pupilOffX = (lookX + jitterX) * screenR * 0.45;
+        var pupilOffY = (lookY + jitterY) * screenRY * 0.45;
+        var pupilR = screenR * 0.48;
+        var pupilRY = screenRY * 0.48;
+
+        // Constrain pupil inside sclera
+        var maxOff = screenR * 0.35;
+        var dist = Math.sqrt(pupilOffX * pupilOffX + pupilOffY * pupilOffY);
+        if (dist > maxOff) {
+            pupilOffX *= maxOff / dist;
+            pupilOffY *= maxOff / dist;
+        }
+
+        // Black pupil
+        wireCtx.shadowBlur = 0;
+        wireCtx.fillStyle = 'rgba(0,0,0,' + (0.85 + eyeGlow * 0.15) + ')';
+        wireCtx.beginPath();
+        wireCtx.ellipse(c.x + pupilOffX, c.y - pupilOffY, pupilR, pupilRY, 0, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        // Pupil highlight (small white dot for that googly shine)
+        var hlR = pupilR * 0.25;
+        wireCtx.fillStyle = 'rgba(255,255,255,0.8)';
+        wireCtx.beginPath();
+        wireCtx.arc(c.x + pupilOffX - pupilR * 0.25, c.y - pupilOffY - pupilRY * 0.25, hlR, 0, Math.PI * 2);
+        wireCtx.fill();
     }
 
     // =========================================================
