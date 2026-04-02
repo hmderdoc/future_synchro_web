@@ -532,6 +532,88 @@
             facialHair: null,
             ledIndicators: null,
             shutter: null
+        },
+        donaldtrump: {
+            name: 'Donald Trump',
+            // Wider face, heavier jaw, broad forehead
+            profile: [
+                [0.00, -0.80], [0.20, -0.72], [0.36, -0.62],
+                [0.48, -0.48], [0.54, -0.34], [0.56, -0.20],
+                [0.54, -0.06], [0.52,  0.06], [0.50,  0.18],
+                [0.48,  0.28], [0.46,  0.38], [0.42,  0.46],
+                [0.36,  0.54], [0.25,  0.60],
+                [0.00,  0.63]
+            ],
+            ringN: 18,
+            eyes: {
+                left:  { x: -0.18, y: -0.02, z: 0.48, r: 0.055 },
+                right: { x:  0.18, y: -0.02, z: 0.48, r: 0.055 }
+            },
+            // Small squinty eyes
+            eyeColor: { hex: '#445566', rgb: '68,85,102' },
+            eyeOutlineColor: { hex: '#FF8833', rgb: '255,136,51' },
+            eyeShape: 'round',
+            mascara: false,
+            eyelashes: null,
+            // Prominent brows, often furrowed
+            eyebrows: {
+                color: '#CC9944',
+                rgb:   '204,153,68',
+                width: 2.6,
+                innerOff: { dx:  0.00, dy: 0.05, dz: 0.02 },
+                outerOff: { dx:  0.13, dy: 0.06, dz: 0.00 },
+                thickness: 0.022
+            },
+            // Pucker mouth: ranges from tight pursed O to wide screaming oval
+            mouth: { y: -0.54, hw: 0.22, z: 0.48, segs: 12,
+                     teeth: false, pucker: true },
+            nose: {
+                bridge: [[0, -0.12, 0.56], [0, -0.26, 0.60], [0, -0.32, 0.62]],
+                base:   [[-0.07, -0.35, 0.54], [0, -0.32, 0.62], [0.07, -0.35, 0.54]]
+            },
+            // ORANGE — the signature look
+            wireColor: '#FF8833',
+            wireRGB:   '255,136,51',
+            accentColor: '#FFAA44',
+            accentRGB:   '255,170,68',
+            // Combover hair — wispy blonde/golden strands swept from left to right
+            hair: [
+                // Combover: originates from left side, sweeps across top to right
+                // These are long, thin strands that flow from left crown over the top
+                { rx: -0.30, ry: 0.52, rz:  0.05, len: 0.60, color: '#DDBB55', width: 1.5, freq: 0.05 },
+                { rx: -0.28, ry: 0.56, rz:  0.08, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.10 },
+                { rx: -0.24, ry: 0.58, rz:  0.10, len: 0.70, color: '#DDCC66', width: 1.7, freq: 0.15 },
+                { rx: -0.18, ry: 0.60, rz:  0.12, len: 0.72, color: '#EEDD77', width: 1.8, freq: 0.20 },
+                { rx: -0.12, ry: 0.62, rz:  0.10, len: 0.68, color: '#DDBB55', width: 1.7, freq: 0.25 },
+                { rx: -0.06, ry: 0.63, rz:  0.08, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.30 },
+                // Over the top and right — the swept part
+                { rx:  0.00, ry: 0.64, rz:  0.06, len: 0.60, color: '#DDCC66', width: 1.5, freq: 0.35 },
+                { rx:  0.08, ry: 0.63, rz:  0.08, len: 0.55, color: '#EEDD77', width: 1.4, freq: 0.40 },
+                { rx:  0.14, ry: 0.61, rz:  0.10, len: 0.50, color: '#DDBB55', width: 1.3, freq: 0.45 },
+                { rx:  0.20, ry: 0.58, rz:  0.08, len: 0.45, color: '#CCAA44', width: 1.2, freq: 0.50 },
+                // Wispy flyaways that stick out (the wind-blown effect)
+                { rx: -0.32, ry: 0.48, rz:  0.02, len: 0.50, color: '#BBAA55', width: 1.1, freq: 0.55 },
+                { rx:  0.26, ry: 0.55, rz:  0.04, len: 0.40, color: '#CCBB66', width: 1.0, freq: 0.60 },
+                { rx: -0.08, ry: 0.64, rz: -0.04, len: 0.45, color: '#AA9944', width: 1.1, freq: 0.65 },
+                { rx:  0.04, ry: 0.65, rz: -0.06, len: 0.42, color: '#BB9944', width: 1.0, freq: 0.70 },
+                // Back strands peeking out from under the cap
+                { rx: -0.20, ry: 0.55, rz: -0.10, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.75 },
+                { rx:  0.20, ry: 0.55, rz: -0.10, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.80 },
+                { rx: -0.10, ry: 0.60, rz: -0.14, len: 0.30, color: '#998833', width: 1.1, freq: 0.85 },
+                { rx:  0.10, ry: 0.60, rz: -0.14, len: 0.30, color: '#998833', width: 1.1, freq: 0.90 }
+            ],
+            hat: {
+                type: 'baseballcap',
+                color: '#CC2222',
+                rgb:   '204,34,34',
+                // Brim color can differ from crown
+                brimColor: '#CC2222',
+                brimRGB:   '204,34,34',
+                text: 'MAGA'
+            },
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null
         }
     };
 
@@ -1518,6 +1600,12 @@
             return;
         }
 
+        // Pucker mouth variant (pursed O → screaming oval)
+        if (mth.pucker) {
+            drawPuckerMouth(proj, char, mth);
+            return;
+        }
+
         var upper = [], lower = [];
 
         for (var i = 0; i <= mth.segs; i++) {
@@ -2265,7 +2353,141 @@
 
     // =========================================================
     //  Smiley Mouth (simple curved smile for disk label faces)
+        // =========================================================
+    //  Pucker Mouth Renderer (pursed lips → screaming oval)
     // =========================================================
+    function drawPuckerMouth(proj, char, mth) {
+        var open = mouthOpen;
+        var t = performance.now() * 0.001;
+
+        // === Shape interpolation ===
+        // When closed (open ≈ 0): small tight pursed circle
+        // When open (open → 1): wide screaming oval
+        //
+        // Pucker radius (closed): very small circle
+        // Scream dimensions (open): wide horizontally, tall vertically
+
+        var puckerR  = 0.03;              // base pucker radius
+        var maxW     = mth.hw * 1.2;      // max scream width
+        var maxH     = 0.12;              // max scream height
+
+        // Interpolate between pucker (circle) and scream (oval)
+        // Use a curve that stays puckered longer then opens fast
+        var openCurve = open * open;  // quadratic: stays small longer, then snaps open
+        var mouthW = puckerR + (maxW - puckerR) * openCurve;
+        var mouthH = puckerR + (maxH - puckerR) * openCurve;
+
+        var cx = 0;
+        var cy = mth.y;
+        var cz = mth.z;
+
+        // Draw the mouth as an ellipse
+        var segs = mth.segs || 12;
+        var outerPts = [];
+        for (var i = 0; i <= segs; i++) {
+            var a = (i / segs) * Math.PI * 2;
+            var px = cx + mouthW * Math.cos(a);
+            var py = cy + mouthH * Math.sin(a);
+            outerPts.push(proj(px, py, cz));
+        }
+
+        // Lip color — more visible when puckered
+        var lipAlpha = 0.5 + open * 0.4 + (1 - open) * 0.3;
+        wireCtx.shadowBlur = 6 + mouthOpen * 14;
+        wireCtx.shadowColor = char.accentColor;
+        wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + lipAlpha + ')';
+        wireCtx.lineWidth = 1.8 + (1 - openCurve) * 1.2;  // thicker lips when pursed
+        wireCtx.lineCap = 'round';
+        wireCtx.beginPath();
+        for (var i = 0; i < outerPts.length; i++) {
+            i === 0 ? wireCtx.moveTo(outerPts[i].x, outerPts[i].y) : wireCtx.lineTo(outerPts[i].x, outerPts[i].y);
+        }
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Inner lip line for depth (slightly smaller)
+        if (openCurve > 0.02) {
+            var innerPts = [];
+            var shrink = 0.7;
+            for (var i = 0; i <= segs; i++) {
+                var a = (i / segs) * Math.PI * 2;
+                var px = cx + mouthW * shrink * Math.cos(a);
+                var py = cy + mouthH * shrink * Math.sin(a);
+                innerPts.push(proj(px, py, cz));
+            }
+            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (lipAlpha * 0.4) + ')';
+            wireCtx.lineWidth = 1.0;
+            wireCtx.beginPath();
+            for (var i = 0; i < innerPts.length; i++) {
+                i === 0 ? wireCtx.moveTo(innerPts[i].x, innerPts[i].y) : wireCtx.lineTo(innerPts[i].x, innerPts[i].y);
+            }
+            wireCtx.closePath();
+            wireCtx.stroke();
+        }
+
+        // Dark interior when mouth is open enough
+        if (openCurve > 0.08) {
+            wireCtx.fillStyle = 'rgba(0,0,0,' + Math.min(0.5, openCurve * 0.6) + ')';
+            wireCtx.beginPath();
+            for (var i = 0; i < outerPts.length; i++) {
+                i === 0 ? wireCtx.moveTo(outerPts[i].x, outerPts[i].y) : wireCtx.lineTo(outerPts[i].x, outerPts[i].y);
+            }
+            wireCtx.closePath();
+            wireCtx.fill();
+        }
+
+        // Teeth visible when screaming (open > 0.3)
+        if (openCurve > 0.15) {
+            var teethAlpha = Math.min(0.9, (openCurve - 0.15) * 2.5);
+            wireCtx.strokeStyle = 'rgba(255,255,255,' + teethAlpha + ')';
+            wireCtx.shadowColor = 'rgba(255,255,255,1)';
+            wireCtx.shadowBlur  = 4 + mouthOpen * 8;
+            wireCtx.lineWidth   = 0.8;
+
+            // Upper teeth: short vertical lines hanging from top of mouth
+            var teethN = 6;
+            for (var ti = 0; ti < teethN; ti++) {
+                var tt = ((ti + 0.5) / teethN) * 2 - 1;  // -1..1
+                var tWidth = mouthW * 0.85;
+                var tx = cx + tt * tWidth;
+                // Only draw where the ellipse has room
+                var ellipseTop = cy + mouthH * Math.sqrt(Math.max(0, 1 - (tt * tt)));
+                var toothBot = cy + mouthH * 0.3;  // teeth hang 30% into mouth
+                var topP = proj(tx, ellipseTop, cz);
+                var botP = proj(tx, toothBot, cz);
+                wireCtx.beginPath();
+                wireCtx.moveTo(topP.x, topP.y);
+                wireCtx.lineTo(botP.x, botP.y);
+                wireCtx.stroke();
+            }
+        }
+
+        // Pucker lines radiating out when mouth is closed/pursed
+        if (openCurve < 0.25) {
+            var puckerIntensity = 1 - openCurve * 4;  // fades as mouth opens
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (puckerIntensity * 0.25) + ')';
+            wireCtx.lineWidth = 0.6;
+            wireCtx.shadowBlur = 0;
+            var lineCount = 8;
+            for (var li = 0; li < lineCount; li++) {
+                var la = (li / lineCount) * Math.PI * 2;
+                var innerR = mouthW * 1.3;
+                var outerR = mouthW * 2.2;
+                var lx1 = cx + innerR * Math.cos(la);
+                var ly1 = cy + innerR * Math.sin(la) * (mouthH / mouthW);
+                var lx2 = cx + outerR * Math.cos(la);
+                var ly2 = cy + outerR * Math.sin(la) * (mouthH / mouthW);
+                var p1 = proj(lx1, ly1, cz);
+                var p2 = proj(lx2, ly2, cz);
+                wireCtx.beginPath();
+                wireCtx.moveTo(p1.x, p1.y);
+                wireCtx.lineTo(p2.x, p2.y);
+                wireCtx.stroke();
+            }
+        }
+    }
+
+// =========================================================
     function drawSmileyMouth(proj, char, mth) {
         var open = mouthOpen * 0.07;
 
@@ -2685,6 +2907,8 @@
         if (!char.hat) return;
         if (char.hat.type === 'cowboy') {
             drawCowboyHat(char, proj, amp, bass);
+        } else if (char.hat.type === 'baseballcap') {
+            drawBaseballCap(char, proj, amp, bass);
         }
     }
 
@@ -2806,6 +3030,140 @@
         wireCtx.shadowColor = hat.bandColor;
         wireCtx.strokeStyle = 'rgba(' + hat.bandRGB + ',0.8)';
         wireCtx.lineWidth   = 2.5;
+        stroke(bandPts);
+    }
+
+    // =========================================================
+    //  Baseball Cap Renderer
+    // =========================================================
+    function drawBaseballCap(char, proj, amp, bass) {
+        var hat = char.hat;
+        var t = performance.now() * 0.001;
+
+        // Find the top of the head from profile
+        var topY = 0.62;
+        if (char.profile) {
+            for (var i = 0; i < char.profile.length; i++) {
+                if (char.profile[i][1] > topY) topY = char.profile[i][1];
+            }
+        }
+
+        // Bob with music
+        var bob = bass * 0.010 + Math.sin(breathPhase) * 0.003;
+        var capBase = topY - 0.10 + bob;
+
+        // === Curved front brim ===
+        // Baseball cap brim extends forward and slightly down
+        var brimSegs = 14;
+        var brimPts = [];
+        for (var i = 0; i <= brimSegs; i++) {
+            var frac = i / brimSegs;  // 0..1 across the brim arc
+            var a = -Math.PI * 0.45 + frac * Math.PI * 0.90;  // front 90° arc
+            var brimRadX = 0.50;  // side extent
+            var brimRadZ = 0.50;  // forward extent
+            // Brim slopes down at the front
+            var brimDip = -0.04 * Math.cos(a);  // lower in front
+            brimPts.push(proj(
+                brimRadX * Math.sin(a),
+                capBase + 0.02 + brimDip,
+                brimRadZ * Math.cos(a)
+            ));
+        }
+
+        var brimC = hat.brimColor || hat.color;
+        var brimR = hat.brimRGB || hat.rgb;
+        wireCtx.shadowBlur  = 6 + bass * 8;
+        wireCtx.shadowColor = brimC;
+        wireCtx.strokeStyle = 'rgba(' + brimR + ',0.8)';
+        wireCtx.lineWidth   = 2.8;
+        wireCtx.lineCap = 'round';
+        wireCtx.lineJoin = 'round';
+        stroke(brimPts);
+
+        // Brim underside shadow line
+        var underPts = [];
+        for (var i = 0; i <= brimSegs; i++) {
+            var frac = i / brimSegs;
+            var a = -Math.PI * 0.45 + frac * Math.PI * 0.90;
+            var brimRadX = 0.48;
+            var brimRadZ = 0.48;
+            var brimDip = -0.04 * Math.cos(a) - 0.02;
+            underPts.push(proj(
+                brimRadX * Math.sin(a),
+                capBase + 0.02 + brimDip,
+                brimRadZ * Math.cos(a)
+            ));
+        }
+        wireCtx.strokeStyle = 'rgba(' + brimR + ',0.35)';
+        wireCtx.lineWidth   = 1.2;
+        stroke(underPts);
+
+        // === Crown (dome) ===
+        var crownTop = capBase + 0.30;
+        var crownRadX = 0.38;
+        var crownRadZ = 0.34;
+
+        // Crown rings (horizontal bands)
+        var crownRings = 4;
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.55)';
+        wireCtx.lineWidth   = 1.4;
+        for (var r = 0; r <= crownRings; r++) {
+            var frac = r / crownRings;
+            var cy = capBase + (crownTop - capBase) * frac;
+            // Dome taper — narrower at top
+            var taper = 1.0 - frac * frac * 0.45;
+            var rpts = [];
+            for (var i = 0; i <= 16; i++) {
+                var a = (i / 16) * Math.PI * 2;
+                rpts.push(proj(
+                    crownRadX * taper * Math.cos(a),
+                    cy,
+                    crownRadZ * taper * Math.sin(a)
+                ));
+            }
+            stroke(rpts);
+        }
+
+        // Crown vertical ribs (panels — baseball caps have 6 panels)
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.3)';
+        wireCtx.lineWidth   = 0.8;
+        var panels = 6;
+        for (var s = 0; s < panels; s++) {
+            var a = (s / panels) * Math.PI * 2;
+            wireCtx.beginPath();
+            for (var r = 0; r <= crownRings; r++) {
+                var frac = r / crownRings;
+                var cy = capBase + (crownTop - capBase) * frac;
+                var taper = 1.0 - frac * frac * 0.45;
+                var pt = proj(
+                    crownRadX * taper * Math.cos(a),
+                    cy,
+                    crownRadZ * taper * Math.sin(a)
+                );
+                r === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+            }
+            wireCtx.stroke();
+        }
+
+        // Button on top
+        var buttonPt = proj(0, crownTop + 0.01, 0);
+        wireCtx.fillStyle = 'rgba(' + hat.rgb + ',0.7)';
+        wireCtx.beginPath();
+        wireCtx.arc(buttonPt.x, buttonPt.y, 2.5, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        // === Band where crown meets brim ===
+        var bandPts = [];
+        for (var i = 0; i <= 16; i++) {
+            var a = (i / 16) * Math.PI * 2;
+            bandPts.push(proj(
+                crownRadX * 1.02 * Math.cos(a),
+                capBase + 0.02,
+                crownRadZ * 1.02 * Math.sin(a)
+            ));
+        }
+        wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.7)';
+        wireCtx.lineWidth   = 2.0;
         stroke(bandPts);
     }
 
