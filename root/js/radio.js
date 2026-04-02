@@ -66,6 +66,7 @@
         artist: '',
         composer: '',
         genre: '',
+        sortMode: 'title-asc',
         playlistSearch: ''
     };
 
@@ -77,7 +78,7 @@
     var elModeAdd, elModePlaylist;
     var elContextBar, elContextName, elContextCount, elContextPlay, elContextChange;
     var elSearch, elFilterArtist, elFilterGenre, elFilterComposer;
-    var elModeShuffle, elModeOrdered, elPlayView, elClearFilters;
+    var elModeShuffle, elModeOrdered, elPlayView, elClearFilters, elSortMode;
     var elMainList, elSummary;
     var elCreateBar, elCreateInput, elCreateBtn;
     var vizW, vizH, vizCtx;
@@ -205,6 +206,7 @@
         if (typeof stored.playlistId === 'string') libraryView.playlistId = stored.playlistId;
         if (typeof stored.artist === 'string') libraryView.artist = stored.artist;
         if (typeof stored.genre === 'string') libraryView.genre = stored.genre;
+        if (typeof stored.sortMode === 'string') libraryView.sortMode = stored.sortMode;
         if (typeof stored.panelMode === 'string') panelMode = stored.panelMode === 'playlist' ? 'playlist' : 'add';
         if (typeof stored.panelWidth === 'number' && isFinite(stored.panelWidth) && stored.panelWidth > 0) {
             panelFrame.width = Math.round(stored.panelWidth);
@@ -226,6 +228,7 @@
             playlistId: libraryView.playlistId,
             artist: libraryView.artist,
             genre: libraryView.genre,
+            sortMode: libraryView.sortMode,
             panelMode: panelMode,
             panelWidth: panelFrame.width || 0,
             panelHeight: panelFrame.height || 0,
@@ -303,6 +306,14 @@
               '<select class="rl-filter" id="rl-filter-artist"><option value="">All artists</option></select>',
               '<select class="rl-filter" id="rl-filter-genre"><option value="">All genres</option></select>',
               '<select class="rl-filter" id="rl-filter-composer"><option value="">All composers</option></select>',
+              '<select class="rl-filter rl-sort" id="rl-sort">',
+                '<option value="title-asc">Title A\u2192Z</option>',
+                '<option value="title-desc">Title Z\u2192A</option>',
+                '<option value="artist-asc">Artist A\u2192Z</option>',
+                '<option value="artist-desc">Artist Z\u2192A</option>',
+                '<option value="newest">Newest First</option>',
+                '<option value="oldest">Oldest First</option>',
+              '</select>',
               '<div class="rl-toolbar-right">',
                 '<div class="rl-playmode" role="group" aria-label="Playback order">',
                   '<button type="button" class="rl-playmode-btn" id="rl-mode-shuffle">Shuffle</button>',
@@ -346,6 +357,7 @@
         elFilterArtist   = document.getElementById('rl-filter-artist');
         elFilterGenre    = document.getElementById('rl-filter-genre');
         elFilterComposer = document.getElementById('rl-filter-composer');
+        elSortMode       = document.getElementById('rl-sort');
         elModeShuffle    = document.getElementById('rl-mode-shuffle');
         elModeOrdered    = document.getElementById('rl-mode-ordered');
         elPlayView       = document.getElementById('rl-play-view');
@@ -650,6 +662,13 @@
         if (elFilterComposer) {
             elFilterComposer.addEventListener('change', function () {
                 libraryView.composer = this.value || '';
+                persistLibraryPrefs();
+                renderPanel();
+            });
+        }
+        if (elSortMode) {
+            elSortMode.addEventListener('change', function () {
+                libraryView.sortMode = this.value || 'title-asc';
                 persistLibraryPrefs();
                 renderPanel();
             });
@@ -1244,7 +1263,9 @@
         libraryView.genre = '';
         libraryView.composer = '';
         libraryView.composer = '';
+        libraryView.sortMode = 'title-asc';
         if (elSearch) elSearch.value = '';
+        if (elSortMode) elSortMode.value = 'title-asc';
         persistLibraryPrefs();
         renderPanel();
     }
@@ -1709,6 +1730,7 @@
                 libraryView.composer = elFilterComposer.value || '';
             }
             if (elSearch && elSearch.value !== libraryView.search) elSearch.value = libraryView.search;
+            if (elSortMode) elSortMode.value = libraryView.sortMode || 'title-asc';
         }
 
         // --- Playmode buttons ---
@@ -1725,8 +1747,37 @@
         persistLibraryPrefs();
     }
 
+    function sortIndices(indices) {
+        var mode = libraryView.sortMode || 'title-asc';
+        var copy = indices.slice();
+        copy.sort(function (a, b) {
+            var ta = playlist[a], tb = playlist[b];
+            switch (mode) {
+                case 'title-asc':
+                    return trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                case 'title-desc':
+                    return trackTitle(tb).toLowerCase().localeCompare(trackTitle(ta).toLowerCase());
+                case 'artist-asc':
+                    return (trackArtist(ta).toLowerCase() || '\uFFFF').localeCompare(trackArtist(tb).toLowerCase() || '\uFFFF')
+                        || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                case 'artist-desc':
+                    return (trackArtist(tb).toLowerCase() || '').localeCompare(trackArtist(ta).toLowerCase() || '')
+                        || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                case 'newest':
+                    return (tb.added || 0) - (ta.added || 0)
+                        || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                case 'oldest':
+                    return (ta.added || 0) - (tb.added || 0)
+                        || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                default:
+                    return 0;
+            }
+        });
+        return copy;
+    }
+
     function renderAddMode() {
-        var indices = getLibraryFilteredTrackIndices();
+        var indices = sortIndices(getLibraryFilteredTrackIndices());
         var selected = selectedPlaylistEntry();
 
         // Summary

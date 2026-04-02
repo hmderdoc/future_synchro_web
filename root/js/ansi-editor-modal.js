@@ -171,18 +171,21 @@
     }
 
     function doDone() {
-        // Grab editor ref BEFORE destroying so the callback can read .doc
         var cb = _onDone;
         var ed = editorInstance;
-        // Detach so close() won't destroy the editor (we hand it to the callback)
+        // Capture ANSI data while editor is still fully alive in the DOM
+        var ansiData = null;
+        if (ed && ed.getAnsiData) {
+            try { ansiData = ed.getAnsiData(); } catch (e) {}
+        }
+        // Detach so close() won't destroy the editor
         editorInstance = null;
         _onDone = null;
         _onCancel = null;
         _onReady = null;
         teardown();
-        // Now call back — editor is not yet destroyed, caller can read .doc
-        if (cb) cb(ed);
-        // Clean up the editor after the callback has used it
+        // Pass both editor (for doc.data access) and pre-captured ANSI bytes
+        if (cb) cb(ed, ansiData);
         if (ed) { try { ed.destroy(); } catch (e) {} }
     }
 

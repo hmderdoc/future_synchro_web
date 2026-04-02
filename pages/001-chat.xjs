@@ -2603,10 +2603,69 @@ textarea.chat-web-input {
             chatText.style.height = Math.min(chatText.scrollHeight, 160) + 'px';
         }
         chatText.addEventListener('input', autoResize);
+
+        // --- Tab-completion for usernames ---
+        var tabState = { active: false, matches: [], index: 0, start: 0, prefix: '' };
+
+        chatText.addEventListener('input', function () {
+            // Any manual typing resets tab cycle
+            tabState.active = false;
+        });
+
         chatText.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 if (chatInput) chatInput.dispatchEvent(new Event('submit', { cancelable: true }));
+                tabState.active = false;
+                return;
+            }
+
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                var val = chatText.value;
+                var cursor = chatText.selectionStart;
+
+                if (!tabState.active) {
+                    // Find the word fragment before the cursor
+                    var before = val.substring(0, cursor);
+                    var wordStart = before.lastIndexOf(' ') + 1;
+                    // Strip a leading quote if the user already typed one
+                    var raw = before.substring(wordStart);
+                    var prefix = raw.replace(/^"/, '').toLowerCase();
+                    if (!prefix.length) return;
+
+                    // Get online nicks
+                    var nicks = (Array.isArray(usersPanelUsers) ? usersPanelUsers : [])
+                        .map(function (u) { return u.nick || ''; })
+                        .filter(function (n) { return n.toLowerCase().indexOf(prefix) === 0; });
+                    if (!nicks.length) return;
+
+                    tabState.active = true;
+                    tabState.matches = nicks;
+                    tabState.index = 0;
+                    tabState.start = wordStart;
+                    tabState.prefix = prefix;
+                } else {
+                    // Cycle to next match
+                    tabState.index = (tabState.index + 1) % tabState.matches.length;
+                }
+
+                var nick = tabState.matches[tabState.index];
+                var needs_quotes = nick.indexOf(' ') >= 0;
+                var replacement = needs_quotes ? '"' + nick + '"' : nick;
+                // Add trailing space if at end of input
+                var after = val.substring(cursor);
+                // Find end of previous completion (might have trailing space or quote)
+                var tail = val.substring(tabState.start);
+                // Remove the old completion: everything from wordStart to cursor
+                var newVal = val.substring(0, tabState.start) + replacement;
+                // If nothing follows or only whitespace, add a space
+                var rest = val.substring(cursor).replace(/^"?[^ ]*\s?/, '');
+                if (!rest.length) newVal += ' ';
+                else newVal += rest;
+                chatText.value = newVal;
+                var newCursor = tabState.start + replacement.length + (!rest.length ? 1 : 0);
+                chatText.setSelectionRange(newCursor, newCursor);
             }
         });
     }

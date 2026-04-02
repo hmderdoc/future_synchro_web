@@ -1053,6 +1053,14 @@
 
             case 'connect':
                 if (client) {
+                    if (client.Options &&
+                        client.Options.ConnectionType === 'rlogin') {
+                        client.Options.RLoginTerminalType = 'ansi-bbs-cp437';
+                    }
+                    if (client._Options &&
+                        client._Options.ConnectionType === 'rlogin') {
+                        client._Options.RLoginTerminalType = 'ansi-bbs-cp437';
+                    }
                     try { client.Connect(); } catch (ex) {}
                 }
                 break;

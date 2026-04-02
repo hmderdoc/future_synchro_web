@@ -62,15 +62,14 @@
             columns: 79,
             rows: 25,
             fontUrl: './fonts/ansi-editor/IBM VGA.F16',
-            onDone: function (editor) {
-                if (editor && editor.doc) {
-                    // Get raw ANSI bytes from the document
-                    var ansiBytes = editor.doc.toAnsi ? editor.doc.toAnsi() : null;
-                    if (ansiBytes) {
-                        var base64 = ansiBytesToBase64(ansiBytes);
-                        textarea.value = base64;
-                        textarea.dataset.ansi = '1';
-                    }
+            onDone: function (editor, ansiData) {
+                // ansiData is pre-captured by the modal before DOM teardown
+                var ansiBytes = ansiData
+                    || (editor && editor.getAnsiData ? editor.getAnsiData() : null);
+                if (ansiBytes && ansiBytes.length > 0) {
+                    var base64 = ansiBytesToBase64(ansiBytes);
+                    textarea.value = base64;
+                    textarea.dataset.ansi = '1';
                 }
                 setToggleButtonState(toggleBtn, false);
                 if (typeof onFinish === 'function') onFinish(true, textarea.value);

@@ -144,7 +144,18 @@
         function applyZoom(nextZoom) {
             nextZoom = Math.max(MIN_EDITOR_ZOOM, Math.min(MAX_EDITOR_ZOOM, nextZoom));
             currentZoom = nextZoom;
-            editor.el.canvasContainer.style.zoom = String(currentZoom);
+            var container = editor.el.canvasContainer;
+            var canvas = editor.el.canvas;
+            // Use transform instead of zoom — zoom breaks getBoundingClientRect
+            // in some browsers, which makes _getCanvasXY return wrong coords
+            container.style.zoom = '';
+            container.style.transform = 'scale(' + currentZoom + ')';
+            container.style.transformOrigin = 'top left';
+            // Reserve layout space so the viewport scrolls correctly
+            if (canvas) {
+                container.style.marginRight = ((canvas.width * currentZoom) - canvas.width) + 'px';
+                container.style.marginBottom = ((canvas.height * currentZoom) - canvas.height) + 'px';
+            }
             zoomValue.textContent = (currentZoom * 100) + '%';
             zoomOut.disabled = currentZoom <= MIN_EDITOR_ZOOM;
             zoomIn.disabled = currentZoom >= MAX_EDITOR_ZOOM;

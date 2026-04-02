@@ -51,6 +51,48 @@
         }
         _bltn_mb.close();
     }
+
+    /* Fetch AI co-writer names + avatar data for Futureland performers */
+    var _cowriters = [];
+    try {
+        var _cw_sub = 'local-aidefinitions';
+        if (msg_area.sub[_cw_sub]) {
+            var _cw_mb = new MsgBase(_cw_sub);
+            if (_cw_mb.open()) {
+                var _cw_hdrs = _cw_mb.get_all_msg_headers(true);
+                if (_cw_hdrs) {
+                    var _cw_origins = {};
+                    var _cw_order = [];
+                    for (var _ch in _cw_hdrs) {
+                        if (_cw_hdrs[_ch] === null) continue;
+                        if (_cw_hdrs[_ch].attr & MSG_DELETE) continue;
+                        var _cw_tid = _cw_hdrs[_ch].thread_id;
+                        if (!_cw_origins[_cw_tid]) {
+                            _cw_origins[_cw_tid] = _cw_hdrs[_ch];
+                            _cw_order.push(_cw_tid);
+                        }
+                    }
+                    for (var _ci = 0; _ci < _cw_order.length; _ci++) {
+                        var _cw_hdr = _cw_origins[_cw_order[_ci]];
+                        var _cw_name = _cw_hdr.subject.replace(/^re:\s*/ig, '').trim();
+                        if (!_cw_name) continue;
+                        var _cw_avatar = '';
+                        try {
+                            var _cw_body = _cw_mb.get_msg_body(_cw_hdr.number) || '';
+                            var _m1 = _cw_body.indexOf('avatar_data_begin');
+                            var _m2 = _cw_body.indexOf('avatar_data_end');
+                            if (_m1 >= 0 && _m2 > _m1) {
+                                _cw_avatar = _cw_body.substring(_m1 + 17, _m2).replace(/[\r\n\s]/g, '');
+                            }
+                        } catch (_ce) {}
+                        _cowriters.push({ name: _cw_name, avatar: _cw_avatar });
+                    }
+                }
+                _cw_mb.close();
+            }
+        }
+    } catch (_cw_err) {}
+    var _cowriters_json = JSON.stringify(_cowriters).replace(/<\//g, '<\\/');
 ?>
 
 <!-- Welcome Banner -->
@@ -96,17 +138,22 @@
 .flr-art-wrap .flr-no-art{color:#555;font-size:3em}
 .flr-play-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.72);color:#55FF55;font-size:1.3em;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s}
 .flr-art-wrap:hover .flr-play-badge{opacity:1}
-.flr-meta{grid-area:meta;min-width:0;width:min(100%,420px);display:flex;flex-direction:column;gap:6px;align-items:flex-start;justify-content:center}
+.flr-meta{grid-area:meta;min-width:0;width:min(100%,420px);display:flex;flex-direction:column;gap:12px;align-items:flex-start;justify-content:center}
 .flr-title{color:#55FFFF;font-weight:bold;font-size:clamp(1.05rem,2.2cqi,1.55rem);line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .flr-credits{display:flex;flex-wrap:wrap;align-items:baseline;gap:.34em;font-size:clamp(.92rem,1.65cqi,1.15rem);line-height:1.2}
 .flr-artist-name{color:#55FF55}
 .flr-credit-sep{color:#AAAAAA}
 .flr-composer-name{color:#55FF55}
-.flr-albumline{color:#AAAAAA;font-size:clamp(.86rem,1.4cqi,1rem);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.flr-album-name{font-style:italic}
 .flr-album-year{color:#FF5555}
 .flr-detail{color:#AAAAAA;font-size:clamp(.8rem,1.25cqi,.92rem);line-height:1.35}
 .flr-detail .flr-genre{color:#FFFF55}
+.flr-performers{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:4px 0 2px}
+.flr-performer{display:flex;flex-direction:column;align-items:center;gap:2px}
+.flr-performer-avatar{width:60px;height:36px;image-rendering:pixelated;background:#111;border:1px solid #333;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.flr-performer-avatar img{display:block;width:100%;height:100%;image-rendering:pixelated;object-fit:contain}
+.flr-performer-avatar:empty::after{content:'?';color:#555;font-size:1rem}
+.flr-performer-name{font-size:.62rem;color:#55FF55;text-align:center;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flr-performer-name.is-persona{color:#FF55FF}
 .flr-play-btn{margin-top:auto;padding-top:10px}
 .flr-play-btn button{background:transparent;border:1px solid #00AA00;color:#55FF55;font-family:monospace;font-size:.82em;padding:4px 14px;cursor:pointer;border-radius:2px;transition:background .2s,color .2s,border-color .2s}
 .flr-play-btn button:hover{background:#00AA00;color:#000}
@@ -121,14 +168,12 @@
     .flr-meta{width:min(34cqi,360px)}
     .flr-title{font-size:clamp(1.2rem,2.6cqi,1.85rem)}
     .flr-credits{font-size:clamp(1rem,1.8cqi,1.28rem)}
-    .flr-albumline{font-size:clamp(.92rem,1.45cqi,1.08rem)}
     .flr-detail{font-size:clamp(.84rem,1.2cqi,.96rem)}
 }
 @media(max-width:600px){
     .flr-art-wrap{width:min(82vw,280px)}
     .flr-meta{width:min(100%,320px)}
     .flr-title{white-space:normal}
-    .flr-albumline{white-space:normal}
 }
 </style>
 
@@ -156,6 +201,8 @@
     var panel       = document.getElementById('flr-panel');
     if (!panel || panel.dataset.bound === '1') return;
     panel.dataset.bound = '1';
+    var PERSONA_LIST = [];
+    try { PERSONA_LIST = <?xjs write(typeof _cowriters_json === 'string' ? _cowriters_json : '[]'); ?>; } catch(_e) {}
 
     var body    = document.getElementById('flr-body');
     var counter = document.getElementById('flr-counter');
@@ -231,6 +278,27 @@
         return Promise.all(promises);
     }
 
+    // ── performer helpers ──
+    function parsePerformers(artistStr) {
+        if (!artistStr) return [];
+        var parts = artistStr.split(/\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*/i)
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+        if (parts.length === 0) return [];
+        return parts.map(function (name, idx) {
+            var isPersona = parts.length === 3 && idx === 1;
+            return { name: name, persona: isPersona };
+        });
+    }
+    function findPersonaAvatar(name) {
+        for (var i = 0; i < PERSONA_LIST.length; i++) {
+            if (PERSONA_LIST[i].name.toLowerCase() === name.toLowerCase()) {
+                return PERSONA_LIST[i].avatar || '';
+            }
+        }
+        return '';
+    }
+
     // ── rendering ──
     function render() {
         if (!tracks.length) return;
@@ -255,6 +323,25 @@
         html += '<div class="flr-meta">';
         html += '<div class="flr-title">' + esc(tags.title || t.name.replace(/\.mp3$/i, '').replace(/_/g, ' ')) + '</div>';
 
+        // performer avatars
+        var _perfs = parsePerformers(tags.artist || '');
+        if (_perfs.length) {
+            html += '<div class="flr-performers" id="flr-perf-' + cur + '">';
+            var _userAvatars = [];
+            _perfs.forEach(function (p) {
+                html += '<div class="flr-performer">';
+                if (p.persona) {
+                    html += '<div class="flr-performer-avatar" data-persona-name="' + esc(p.name) + '"></div>';
+                } else {
+                    html += '<div class="flr-performer-avatar" data-avatar="' + esc(p.name) + '"></div>';
+                    _userAvatars.push(p.name);
+                }
+                html += '<div class="flr-performer-name' + (p.persona ? ' is-persona' : '') + '">' + esc(p.name) + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
         if (tags.artist || tags.composer) {
             html += '<div class="flr-credits">';
             if (tags.artist) html += '<span class="flr-artist-name">' + esc(tags.artist) + '</span>';
@@ -263,18 +350,14 @@
             html += '</div>';
         }
 
-        if (tags.album || tags.year) {
-            html += '<div class="flr-albumline">';
-            if (tags.album) {
-                html += '<span class="flr-album-name">' + esc(tags.album) + '</span>';
-                if (tags.year) html += '<span class="flr-album-year"> (' + esc(tags.year) + ')</span>';
-            } else if (tags.year) {
-                html += '<span class="flr-album-year">' + esc(tags.year) + '</span>';
-            }
+        // year + genre on one line
+        if (tags.year || tags.genre) {
+            html += '<div class="flr-detail">';
+            if (tags.year) html += '<span class="flr-album-year">' + esc(tags.year) + '</span>';
+            if (tags.year && tags.genre) html += ' ';
+            if (tags.genre) html += '<span class="flr-genre">' + esc(tags.genre) + '</span>';
             html += '</div>';
         }
-
-        if (tags.genre) html += '<div class="flr-detail"><span class="flr-genre">' + esc(tags.genre) + '</span></div>';
 
         html += '<div class="flr-play-btn">';
         if (isPlaying) {
@@ -286,6 +369,38 @@
         html += '</div>';
 
         body.innerHTML = html;
+
+        // render performer avatars
+        if (_perfs.length) {
+            // BBS user avatars
+            var _uaNames = [];
+            _perfs.forEach(function (p) { if (!p.persona) _uaNames.push(p.name); });
+            if (_uaNames.length && typeof Avatars !== 'undefined' && Avatars.draw) {
+                Avatars.draw(_uaNames);
+            }
+            // Persona avatars via GraphicsConverter
+            _perfs.forEach(function (p) {
+                if (!p.persona) return;
+                var b64 = findPersonaAvatar(p.name);
+                if (!b64 || !window.GraphicsConverter) return;
+                var el = body.querySelector('[data-persona-name="' + p.name + '"]');
+                if (!el) return;
+                try {
+                    GraphicsConverter.shared().from_bin(
+                        atob(b64), 10, 6,
+                        function (img) {
+                            el.innerHTML = '';
+                            if (typeof img === 'string') {
+                                var i = new Image(); i.src = img;
+                                el.appendChild(i);
+                            } else {
+                                el.appendChild(img);
+                            }
+                        }, true
+                    );
+                } catch (_e) {}
+            });
+        }
 
         // attach click-to-play handlers
         var playEls = body.querySelectorAll('[data-flr-play]');

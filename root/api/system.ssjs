@@ -151,9 +151,17 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 				var ret;
 				if (u.length === 1) {
 					var usernum = parseInt(u[0], 10) || system.matchuser(u[0]);
-					ret = avatar_lib.read_localuser(usernum) || {};
+					ret = avatar_lib.read(usernum, u[0]) || {};
 				} else {
-					ret = avatar_lib.read_netuser(u[0], u[1]) || {};
+					ret = avatar_lib.read(null, u[0], u[1]) || {};
+				}
+				// Generate identicon fallback if avatar has no data (disabled, empty, etc.)
+				if (!ret.data) {
+					try {
+						var alias = (u.length === 1 && usernum >= 1) ? (new User(usernum)).alias : u[0];
+						ret.data = base64_encode(load({}, 'identicon.js').identicon(alias).BIN);
+						ret.identicon = true;
+					} catch (ex) { /* identicon generation failed, leave blank */ }
 				}
 				ret.user = e;
 				return ret;

@@ -150,6 +150,17 @@
 .flrd-share {
     border-color: #55FFFF !important;
 }
+.flrd-track-select-header {
+    background: #050505;
+    color: #FFFFFF;
+    border: 1px solid #5555FF;
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    max-width: 260px;
+    min-width: 0;
+}
 .flrd-counter {
     color: #AAAAAA;
     font-size: 0.78em;
@@ -233,7 +244,7 @@
     width: min(100%, 720px);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 14px;
     align-items: flex-start;
     justify-content: center;
 }
@@ -258,13 +269,55 @@
 .flrd-credit-sep {
     color: #AAAAAA;
 }
-.flrd-albumline {
-    color: #AAAAAA;
-    font-size: clamp(0.94rem, 1.45cqi, 1.12rem);
-    line-height: 1.3;
+.flrd-performers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+    margin: 6px 0 2px;
 }
-.flrd-album-name {
-    font-style: italic;
+.flrd-performer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+.flrd-performer-avatar {
+    width: 80px;
+    height: 48px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #111;
+    border: 1px solid #333;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.flrd-performer-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    object-fit: contain;
+}
+.flrd-performer-avatar:empty::after {
+    content: '?';
+    color: #555;
+    font-size: 1.2rem;
+}
+.flrd-performer-name {
+    font-size: 0.72rem;
+    color: #55FF55;
+    text-align: center;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.flrd-performer-name.is-persona {
+    color: #FF55FF;
 }
 .flrd-album-year {
     color: #FF5555;
@@ -276,43 +329,8 @@
 .flrd-genre {
     color: #FFFF55;
 }
-.flrd-fileline {
-    color: #AAAAAA;
-    font-size: 0.84rem;
-    word-break: break-word;
-}
-.flrd-status {
-    color: #55FFFF;
-    font-size: 0.84rem;
-    min-height: 1.2em;
-}
-.flrd-control-grid {
-    width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-    margin-top: 10px;
-}
-.flrd-control {
-    display: block;
-    width: 100%;
-}
-.flrd-control span {
-    display: block;
-    color: #AAAAAA;
-    font-size: 0.72em;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-}
-.flrd-control select {
-    width: 100%;
-    background: #050505;
-    color: #FFFFFF;
-    border: 1px solid #5555FF;
-    padding: 8px 10px;
-    border-radius: 2px;
-    font-family: inherit;
-}
+
+
 .flrd-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1119,6 +1137,7 @@
                 <span class="flrd-brand-label">Futureland Records</span>
             </div>
             <div class="flrd-nav">
+                <select id="flrd-track-select" class="flrd-track-select-header"></select>
                 <button type="button" id="flrd-prev" title="Previous track">&laquo;</button>
                 <span class="flrd-counter" id="flrd-counter">&mdash;</span>
                 <button type="button" id="flrd-next" title="Next track">&raquo;</button>
@@ -1131,17 +1150,9 @@
             <div class="flrd-layout is-hidden" id="flrd-layout">
                 <div class="flrd-meta">
                     <div class="flrd-title" id="flrd-title"></div>
+                    <div class="flrd-performers" id="flrd-performers"></div>
                     <div class="flrd-credits" id="flrd-credits"></div>
-                    <div class="flrd-albumline" id="flrd-albumline"></div>
                     <div class="flrd-genre-line" id="flrd-genre-line"></div>
-                    <div class="flrd-fileline" id="flrd-fileline"></div>
-                    <div class="flrd-status" id="flrd-status"></div>
-                    <div class="flrd-control-grid">
-                        <label class="flrd-control" for="flrd-track-select">
-                            <span>Track</span>
-                            <select id="flrd-track-select"></select>
-                        </label>
-                    </div>
                     <div class="flrd-actions">
                         <button type="button" class="flrd-play-button" id="flrd-play-button">
                             <span class="flrd-play-icon">▶</span> Play This Track
@@ -1450,6 +1461,8 @@
     var STREAM_URL = './radio-stream/';
     var RANGE_BYTES = 262144;
     var REQUESTED_TRACK = <?xjs write(_records_track_json); ?>;
+    var PERSONA_LIST = [];
+    try { PERSONA_LIST = <?xjs write(typeof _cowriters_json === 'string' ? _cowriters_json : '[]'); ?>; } catch(_e) {}
 
     var panel = document.getElementById('flrd-panel');
     if (!panel || panel.dataset.bound === '1') return;
@@ -1460,10 +1473,8 @@
     var layoutEl = document.getElementById('flrd-layout');
     var titleEl = document.getElementById('flrd-title');
     var creditsEl = document.getElementById('flrd-credits');
-    var albumlineEl = document.getElementById('flrd-albumline');
+    var performersEl = document.getElementById('flrd-performers');
     var genreLineEl = document.getElementById('flrd-genre-line');
-    var filelineEl = document.getElementById('flrd-fileline');
-    var statusEl = document.getElementById('flrd-status');
     var counterEl = document.getElementById('flrd-counter');
     var prevButton = document.getElementById('flrd-prev');
     var nextButton = document.getElementById('flrd-next');
@@ -1548,7 +1559,6 @@
         emptyEl.hidden = false;
         emptyEl.textContent = message;
         counterEl.textContent = '0 / 0';
-        statusEl.textContent = '';
         document.title = 'Futureland Records';
         [prevButton, nextButton, shareButton, trackSelect, playButton, artWrap].forEach(function (el) {
             if (!el) return;
@@ -1675,26 +1685,86 @@
             : '<span class="flrd-credit-sep">Unknown artist</span>';
     }
 
-    function renderAlbumline(track) {
-        var album = trackAlbum(track);
-        var year = trackYear(track);
-        var html = '';
-
-        if (album) {
-            html += '<span class="flrd-album-name">' + esc(album) + '</span>';
-            if (year) html += '<span class="flrd-album-year"> (' + esc(year) + ')</span>';
-        } else if (year) {
-            html += '<span class="flrd-album-year">' + esc(year) + '</span>';
-        }
-
-        albumlineEl.innerHTML = html || '<span class="flrd-credit-sep">No album metadata</span>';
+    /**
+     * Parse artist string like "Data feat. ALF & Hm Derdoc" into performers.
+     * Names at start/end = BBS user accounts. If 3 names, middle = AI persona.
+     */
+    function parsePerformers(artistStr) {
+        if (!artistStr) return [];
+        var parts = artistStr.split(/\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*/i)
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+        if (parts.length === 0) return [];
+        return parts.map(function (name, idx) {
+            var isPersona = parts.length === 3 && idx === 1;
+            return { name: name, persona: isPersona };
+        });
     }
+
+    function findPersonaAvatar(name) {
+        for (var i = 0; i < PERSONA_LIST.length; i++) {
+            if (PERSONA_LIST[i].name.toLowerCase() === name.toLowerCase()) {
+                return PERSONA_LIST[i].avatar || '';
+            }
+        }
+        return '';
+    }
+
+    function renderPerformers(track) {
+        if (!performersEl) return;
+        performersEl.innerHTML = '';
+        var performers = parsePerformers(trackArtist(track));
+        if (!performers.length) return;
+        var userAvatarsNeeded = [];
+        performers.forEach(function (p) {
+            var wrap = document.createElement('div');
+            wrap.className = 'flrd-performer';
+            var avDiv = document.createElement('div');
+            avDiv.className = 'flrd-performer-avatar';
+            if (p.persona) {
+                var b64 = findPersonaAvatar(p.name);
+                if (b64 && window.GraphicsConverter) {
+                    try {
+                        GraphicsConverter.shared().from_bin(
+                            atob(b64), 10, 6,
+                            function (img) {
+                                avDiv.innerHTML = '';
+                                if (typeof img === 'string') {
+                                    var i = new Image(); i.src = img;
+                                    avDiv.appendChild(i);
+                                } else {
+                                    avDiv.appendChild(img);
+                                }
+                            }, true
+                        );
+                    } catch (_e) {}
+                }
+            } else {
+                avDiv.setAttribute('data-avatar', p.name);
+                userAvatarsNeeded.push(p.name);
+            }
+            var label = document.createElement('div');
+            label.className = 'flrd-performer-name' + (p.persona ? ' is-persona' : '');
+            label.textContent = p.name;
+            wrap.appendChild(avDiv);
+            wrap.appendChild(label);
+            performersEl.appendChild(wrap);
+        });
+        if (userAvatarsNeeded.length && typeof Avatars !== 'undefined' && Avatars.draw) {
+            Avatars.draw(userAvatarsNeeded);
+        }
+    }
+
+
 
     function renderGenreline(track) {
         var genre = trackGenre(track);
-        genreLineEl.innerHTML = genre.length
-            ? ('<span class="flrd-genre">' + esc(genre) + '</span>')
-            : '<span class="flrd-credit-sep">No genre metadata</span>';
+        var year = trackYear(track);
+        var html = '';
+        if (year) html += '<span class="flrd-album-year">' + esc(year) + '</span>';
+        if (year && genre) html += ' ';
+        if (genre) html += '<span class="flrd-genre">' + esc(genre) + '</span>';
+        genreLineEl.innerHTML = html || '<span class="flrd-credit-sep">No genre metadata</span>';
     }
 
     function renderArt(track) {
@@ -1732,11 +1802,9 @@
         layoutEl.classList.remove('is-hidden');
         counterEl.textContent = (cur + 1) + ' / ' + tracks.length;
         titleEl.textContent = trackTitle(track);
+        renderPerformers(track);
         renderCredits(track);
-        renderAlbumline(track);
         renderGenreline(track);
-        filelineEl.textContent = track.name;
-        statusEl.textContent = 'Track ' + (cur + 1) + ' of ' + tracks.length;
         fillTrackSelect();
         renderArt(track);
         syncUrl(track);

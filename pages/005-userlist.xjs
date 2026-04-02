@@ -540,6 +540,62 @@
         pointer-events: none;
     }
 
+    /* --- Map user search --- */
+    .usermap-search {
+        display: none;
+        position: relative;
+    }
+    body.map-fullscreen .usermap-search { display: flex; }
+    .usermap-search input {
+        background: rgba(0,0,0,0.6);
+        border: 1px solid var(--userlist-border, #5555ff);
+        border-radius: 999px;
+        color: #55ffff;
+        font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
+        width: 220px;
+        outline: none;
+    }
+    .usermap-search input::placeholder { color: rgba(85,255,255,0.4); }
+    .usermap-search input:focus { border-color: #ff5555; box-shadow: 0 0 6px rgba(255,85,85,0.4); }
+    .usermap-search-results {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 2px;
+        background: #0a0a18;
+        border: 1px solid #5555ff;
+        border-radius: 6px;
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 9999;
+    }
+    .usermap-search-results.is-open { display: block; }
+    .usermap-search-results .sr-item {
+        padding: 0.35rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        color: #aaa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .usermap-search-results .sr-item:hover,
+    .usermap-search-results .sr-item.is-active {
+        background: rgba(85,85,255,0.25);
+        color: #fff;
+    }
+    .usermap-search-results .sr-item .sr-alias { color: #ff5555; }
+    .usermap-search-results .sr-item .sr-loc { color: #555; margin-left: 0.5em; }
+    .usermap-search-results .sr-empty {
+        padding: 0.5rem 0.75rem;
+        color: #555;
+        font-size: 0.8rem;
+        font-style: italic;
+    }
+
     /* --- Fullscreen map mode --- */
     body.map-fullscreen #sidebar { display: none !important; }
     body.map-fullscreen #content {
@@ -633,6 +689,10 @@
                 <div class="userlist-view-tabs">
                     <button class="userlist-view-tab is-active" data-view="grid">Grid</button>
                     <button class="userlist-view-tab" data-view="map">Map</button>
+                </div>
+                <div class="usermap-search">
+                    <input type="text" id="usermap-search-input" placeholder="Find user on map…" autocomplete="off" />
+                    <div class="usermap-search-results" id="usermap-search-results"></div>
                 </div>
                 <span class="userlist-total"><?xjs write(format('%u visible user%s', allUsers.length, allUsers.length === 1 ? '' : 's')); ?></span>
             </div>
@@ -802,20 +862,23 @@
             });
     }
 
-    function placeMarkers(geoUsers) {
-        var pending = geoUsers.length;
-        var placed = 0;
+    var markersByAlias = {};
+    var geoUserList = [];
 
-        geoUsers.forEach(function (u) {
-            // Try to get avatar from cache (already loaded by the grid)
-            getAvatarDataURL(u.alias).then(function (dataURL) {
+    function placeMarkers(geoUsers) {
+        geoUserList = geoUsers;
+
+        // Batch-fetch all avatars from the API (now returns identicons for users without custom avatars)
+        var aliases = geoUsers.map(function (u) { return u.alias; });
+        fetchAvatarBatch(aliases).then(function (avatarMap) {
+            geoUsers.forEach(function (u) {
+                var dataURL = avatarMap[u.alias] || null;
                 var markerHtml;
                 if (dataURL) {
                     markerHtml = '<div class="avatar-marker" style="width:40px;height:24px;">' +
                         '<img src="' + dataURL + '" style="width:100%;height:100%;" />' +
                         '</div>';
                 } else {
-                    // Fallback: colored dot with first letter
                     markerHtml = '<div class="avatar-marker" style="width:24px;height:24px;border-radius:50%;font-size:11px;color:#ff5555;justify-content:center;">' +
                         u.alias.charAt(0).toUpperCase() + '</div>';
                 }
@@ -834,24 +897,150 @@
                     '<div class="popup-alias">' + u.alias.replace(/</g, '&lt;') + '</div>' +
                     (locText ? '<div class="popup-loc">' + locText.replace(/</g, '&lt;') + '</div>' : '');
 
-                L.marker([u.lat, u.lon], { icon: icon })
+                var marker = L.marker([u.lat, u.lon], { icon: icon })
                     .bindPopup(popupHtml, { maxWidth: 220 })
                     .addTo(map);
 
-                placed++;
+                markersByAlias[u.alias] = marker;
             });
+
+            initSearch();
         });
     }
 
-    function getAvatarDataURL(alias) {
-        // sbbs.avatars.get() is synchronous (returns object or null)
-        try {
-            if (typeof sbbs !== 'undefined' && sbbs.avatars && sbbs.avatars.get) {
-                var av = sbbs.avatars.get(alias);
-                return Promise.resolve((av && av.dataURL) ? av.dataURL : null);
+    // ---- Typeahead search ----
+    function initSearch() {
+        var input = document.getElementById('usermap-search-input');
+        var results = document.getElementById('usermap-search-results');
+        if (!input || !results) return;
+
+        var activeIdx = -1;
+        var filtered = [];
+
+        function render(items) {
+            filtered = items;
+            activeIdx = -1;
+            if (!items.length) {
+                results.innerHTML = '<div class="sr-empty">No matches</div>';
+                results.classList.add('is-open');
+                return;
             }
-        } catch (e) { /* ignore */ }
-        return Promise.resolve(null);
+            results.innerHTML = items.map(function (u, i) {
+                var loc = u.location || (u.region ? u.region + ', ' + u.country : u.country) || '';
+                return '<div class="sr-item" data-idx="' + i + '">' +
+                    '<span class="sr-alias">' + u.alias.replace(/</g, '&lt;') + '</span>' +
+                    (loc ? '<span class="sr-loc">' + loc.replace(/</g, '&lt;') + '</span>' : '') +
+                    '</div>';
+            }).join('');
+            results.classList.add('is-open');
+        }
+
+        function selectUser(u) {
+            results.classList.remove('is-open');
+            input.value = u.alias;
+            var m = markersByAlias[u.alias];
+            if (m && map) {
+                map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 6), { duration: 0.8 });
+                setTimeout(function () { m.openPopup(); }, 850);
+            }
+        }
+
+        function setActive(idx) {
+            var items = results.querySelectorAll('.sr-item');
+            items.forEach(function (el) { el.classList.remove('is-active'); });
+            if (idx >= 0 && idx < items.length) {
+                items[idx].classList.add('is-active');
+                items[idx].scrollIntoView({ block: 'nearest' });
+            }
+            activeIdx = idx;
+        }
+
+        input.addEventListener('input', function () {
+            var q = input.value.trim().toLowerCase();
+            if (!q) { results.classList.remove('is-open'); return; }
+            var matches = geoUserList.filter(function (u) {
+                return u.alias.toLowerCase().indexOf(q) >= 0;
+            }).slice(0, 15);
+            render(matches);
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (!results.classList.contains('is-open')) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActive(Math.min(activeIdx + 1, filtered.length - 1));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActive(Math.max(activeIdx - 1, 0));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (activeIdx >= 0 && filtered[activeIdx]) selectUser(filtered[activeIdx]);
+                else if (filtered.length === 1) selectUser(filtered[0]);
+            } else if (e.key === 'Escape') {
+                results.classList.remove('is-open');
+                input.blur();
+            }
+        });
+
+        results.addEventListener('click', function (e) {
+            var item = e.target.closest('.sr-item');
+            if (!item) return;
+            var idx = parseInt(item.getAttribute('data-idx'), 10);
+            if (filtered[idx]) selectUser(filtered[idx]);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.usermap-search')) results.classList.remove('is-open');
+        });
+    }
+
+    function fetchAvatarBatch(aliases) {
+        // Fetch avatars from the API in batches of 20 (API now returns identicons for missing avatars)
+        var gc = (typeof GraphicsConverter !== 'undefined') ? GraphicsConverter.shared() : null;
+        var result = {};
+
+        // Check sbbs.avatars cache first, collect misses
+        var uncached = [];
+        aliases.forEach(function (alias) {
+            try {
+                if (typeof sbbs !== 'undefined' && sbbs.avatars && sbbs.avatars.get) {
+                    var av = sbbs.avatars.get(alias);
+                    if (av && av.dataURL) { result[alias] = av.dataURL; return; }
+                }
+            } catch (e) { /* ignore */ }
+            uncached.push(alias);
+        });
+
+        if (!uncached.length || typeof v4_get === 'undefined') return Promise.resolve(result);
+
+        // Batch into chunks of 20
+        var chunks = [];
+        for (var i = 0; i < uncached.length; i += 20) {
+            chunks.push(uncached.slice(i, i + 20));
+        }
+
+        return chunks.reduce(function (chain, batch) {
+            return chain.then(function () {
+                return v4_get('./api/system.ssjs?call=get-avatar&user=' + batch.map(encodeURIComponent).join('&user='))
+                    .then(function (arr) {
+                        if (!arr) return;
+                        var pending = [];
+                        arr.forEach(function (e) {
+                            if (e.data && gc) {
+                                pending.push(new Promise(function (resolve) {
+                                    gc.from_bin(atob(e.data), 10, 6, function (dataURL) {
+                                        result[e.user] = dataURL;
+                                        var o = { user: e.user, data: e.data, dataURL: dataURL };
+                                        if (typeof sbbs !== 'undefined' && sbbs.avatars) sbbs.avatars.set(o);
+                                        resolve();
+                                    }, true);
+                                }));
+                            }
+                        });
+                        return Promise.all(pending);
+                    });
+            });
+        }, Promise.resolve()).then(function () { return result; });
     }
 
     // Cleanup on SPA navigation
