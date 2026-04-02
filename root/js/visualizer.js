@@ -107,32 +107,112 @@
     var elMetaHud, elMetaArt, elMetaTitle;
     var elMetaArtist, elMetaComposer, elMetaAlbum, elMetaYear, elMetaGenre;
 
-    // --- Head geometry ------------------------------------------------
-    // Skull profile: [radius, y] (unit scale, y+ = up)
-    var PROFILE = [
-        [0.00, -0.80], [0.22, -0.70], [0.38, -0.58],
-        [0.48, -0.42], [0.52, -0.25], [0.50, -0.08],
-        [0.46,  0.08], [0.44,  0.22], [0.42,  0.36],
-        [0.37,  0.48], [0.28,  0.58], [0.15,  0.65],
-        [0.00,  0.68]
-    ];
-    var RING_N = 16;  // segments per horizontal ring
+    // --- Character system ------------------------------------------------
+    // Each character defines head geometry, colors, and optional features
+    // (hair, hat, facial hair).  Active character selected by artist tag.
+    var CHARACTERS = {
+        _default: {
+            name: 'Skull',
+            profile: [
+                [0.00, -0.80], [0.22, -0.70], [0.38, -0.58],
+                [0.48, -0.42], [0.52, -0.25], [0.50, -0.08],
+                [0.46,  0.08], [0.44,  0.22], [0.42,  0.36],
+                [0.37,  0.48], [0.28,  0.58], [0.15,  0.65],
+                [0.00,  0.68]
+            ],
+            ringN: 16,
+            eyes: {
+                left:  { x: -0.18, y: -0.05, z: 0.45, r: 0.08 },
+                right: { x:  0.18, y: -0.05, z: 0.45, r: 0.08 }
+            },
+            eyeColor: null,   // null = derive from wireColor
+            mouth: { y: -0.52, hw: 0.25, z: 0.48, segs: 8, teeth: false },
+            nose: {
+                bridge: [[0, -0.15, 0.53], [0, -0.30, 0.57], [0, -0.34, 0.58]],
+                base:   [[-0.06, -0.36, 0.52], [0, -0.34, 0.58], [0.06, -0.36, 0.52]]
+            },
+            wireColor: '#33FF33',
+            wireRGB:   '51,255,51',
+            accentColor: '#FFAA00',
+            accentRGB:   '255,170,0',
+            hair: null,
+            hat: null,
+            facialHair: null
+        },
 
-    // Eyes: center (x,y,z) + radius
-    var L_EYE = { x: -0.18, y: -0.05, z: 0.45, r: 0.08 };
-    var R_EYE = { x:  0.18, y: -0.05, z: 0.45, r: 0.08 };
+        quantumacidface: {
+            name: 'QuantumAcidFace',
+            // Rounder, fuller face than the skeletal default
+            profile: [
+                [0.00, -0.76], [0.25, -0.67], [0.41, -0.54],
+                [0.50, -0.38], [0.53, -0.20], [0.52, -0.03],
+                [0.50,  0.12], [0.48,  0.26], [0.45,  0.38],
+                [0.40,  0.48], [0.33,  0.56], [0.22,  0.62],
+                [0.00,  0.65]
+            ],
+            ringN: 16,
+            eyes: {
+                left:  { x: -0.19, y: -0.03, z: 0.46, r: 0.09 },
+                right: { x:  0.19, y: -0.03, z: 0.46, r: 0.09 }
+            },
+            eyeColor: { hex: '#5599FF', rgb: '85,153,255' },
+            mouth: { y: -0.50, hw: 0.27, z: 0.45, segs: 10, teeth: true },
+            nose: {
+                bridge: [[0, -0.13, 0.54], [0, -0.27, 0.58], [0, -0.31, 0.59]],
+                base:   [[-0.07, -0.33, 0.53], [0, -0.31, 0.59], [0.07, -0.33, 0.53]]
+            },
+            wireColor: '#9999BB',
+            wireRGB:   '153,153,187',
+            accentColor: '#FFAA00',
+            accentRGB:   '255,170,0',
+            hair: [
+                // Left side — long flowing strands
+                { rx: -0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8 },
+                { rx: -0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5 },
+                { rx: -0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6 },
+                { rx: -0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4 },
+                { rx: -0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3 },
+                { rx: -0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5 },
+                { rx: -0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4 },
+                // Right side — mirror
+                { rx:  0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8 },
+                { rx:  0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5 },
+                { rx:  0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6 },
+                { rx:  0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4 },
+                { rx:  0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3 },
+                { rx:  0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5 },
+                { rx:  0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4 },
+                // Top / back — shorter strands
+                { rx: -0.12, ry: 0.63, rz: -0.12, len: 0.70, color: '#FF55FF', width: 1.2 },
+                { rx:  0.12, ry: 0.63, rz: -0.12, len: 0.70, color: '#55FFFF', width: 1.2 },
+                { rx:  0.00, ry: 0.65, rz: -0.10, len: 0.60, color: '#AA55FF', width: 1.3 },
+                { rx: -0.18, ry: 0.60, rz: -0.18, len: 0.80, color: '#FFFF55', width: 1.3 },
+                { rx:  0.18, ry: 0.60, rz: -0.18, len: 0.80, color: '#55FF55', width: 1.3 }
+            ],
+            hat: null,
+            facialHair: null
+        }
+    };
 
-    // Mouth
-    var MOUTH_Y = -0.52;
-    var MOUTH_HW = 0.25;   // half-width
-    var MOUTH_Z  = 0.48;
-    var MOUTH_SEGS = 8;
+    var activeChar = CHARACTERS._default;
 
-    // Colors
-    var GREEN     = '#33FF33';
-    var AMBER     = '#FFAA00';
-    var GREEN_RGB = '51,255,51';
-    var AMBER_RGB = '255,170,0';
+    function setActiveCharacter(key) {
+        var ch = CHARACTERS[key] || CHARACTERS._default;
+        if (ch === activeChar) return;
+        activeChar = ch;
+        console.log('[visualizer] character: ' + ch.name);
+    }
+
+    function getCharacterForArtist(artist) {
+        if (!artist) return '_default';
+        // Strip "feat." / "ft." and everything after
+        var primary = artist.split(/\s+feat\.?\s+|\s+ft\.?\s+/i)[0].trim();
+        // Normalize: lowercase, strip non-alphanumeric
+        var key = primary.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (CHARACTERS[key]) return key;
+        return '_default';
+    }
+
     var LASER_RED = '#FF5555';
 
     function isEditableTarget(target) {
@@ -216,7 +296,7 @@
     function updateWaveformSamples(timeData) {
         headWaveform = [];
         if (!timeData || !timeData.length) return;
-        var sampleCount = Math.max(32, RING_N * 2);
+        var sampleCount = Math.max(32, activeChar.ringN * 2);
         var step = timeData.length / sampleCount;
         for (var i = 0; i < sampleCount; i++) {
             var idx = Math.min(timeData.length - 1, Math.floor(i * step));
@@ -750,20 +830,20 @@
             return projectHeadPoint(projState, x, y, z, pulse);
         }
 
-        eyeScreenPoints.left = projectHeadPoint(projState, L_EYE.x, L_EYE.y, L_EYE.z, pulse);
-        eyeScreenPoints.right = projectHeadPoint(projState, R_EYE.x, R_EYE.y, R_EYE.z, pulse);
-        eyeScreenPoints.mouth = projectHeadPoint(projState, 0, MOUTH_Y, MOUTH_Z, pulse);
+        eyeScreenPoints.left = projectHeadPoint(projState, activeChar.eyes.left.x, activeChar.eyes.left.y, activeChar.eyes.left.z, pulse);
+        eyeScreenPoints.right = projectHeadPoint(projState, activeChar.eyes.right.x, activeChar.eyes.right.y, activeChar.eyes.right.z, pulse);
+        eyeScreenPoints.mouth = projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, pulse);
 
         // Generate rings
         var rings = [];
         var waveformTime = performance.now() * 0.0065;
         var waveStrength = waveHeadEnabled ? (0.016 + amp * 0.055 + bass * 0.035) : 0;
-        for (var p = 0; p < PROFILE.length; p++) {
+        for (var p = 0; p < activeChar.profile.length; p++) {
             var ring = [];
-            var baseRad = PROFILE[p][0];
-            var baseY = PROFILE[p][1];
-            for (var s = 0; s < RING_N; s++) {
-                var a = (s / RING_N) * Math.PI * 2;
+            var baseRad = activeChar.profile[p][0];
+            var baseY = activeChar.profile[p][1];
+            for (var s = 0; s < activeChar.ringN; s++) {
+                var a = (s / activeChar.ringN) * Math.PI * 2;
                 var rad = baseRad;
                 var yy = baseY;
                 if (waveHeadEnabled && headWaveform.length) {
@@ -782,8 +862,8 @@
 
         // --- Horizontal rings ---
         wireCtx.shadowBlur  = 8 + bass * 14 + (waveHeadEnabled ? 8 : 0);
-        wireCtx.shadowColor = GREEN;
-        wireCtx.strokeStyle = 'rgba(' + GREEN_RGB + ',0.55)';
+        wireCtx.shadowColor = activeChar.wireColor;
+        wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.55)';
         wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
 
         for (var r = 0; r < rings.length; r++) {
@@ -797,9 +877,9 @@
         }
 
         // --- Vertical ribs ---
-        wireCtx.strokeStyle = 'rgba(' + GREEN_RGB + ',0.30)';
+        wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.30)';
         wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
-        for (var s = 0; s < RING_N; s += 2) {
+        for (var s = 0; s < activeChar.ringN; s += 2) {
             wireCtx.beginPath();
             for (var r = 0; r < rings.length; r++) {
                 var pt = rings[r][s];
@@ -808,18 +888,28 @@
             wireCtx.stroke();
         }
 
+        // --- Hair (behind/around skull) ---
+        drawHair(activeChar, proj, amp, bass);
+
+        // --- Hat ---
+        drawHat(activeChar, proj, amp, bass);
+
         // --- Eyes ---
-        drawEye(L_EYE, proj, 'left');
-        drawEye(R_EYE, proj, 'right');
+        drawEye(activeChar.eyes.left, proj, 'left', activeChar);
+        drawEye(activeChar.eyes.right, proj, 'right', activeChar);
 
         // --- Nose ---
-        drawNose(proj);
+        drawNose(proj, activeChar);
 
         // --- Mouth ---
-        drawMouth(proj);
+        drawMouth(proj, activeChar);
+
+        // --- Facial hair ---
+        drawFacialHair(activeChar, proj, amp, bass);
     }
 
-    function drawEye(eye, proj, eyeName) {
+    function drawEye(eye, proj, eyeName, char) {
+        char = char || activeChar;
         var segs = 12, pts = [];
         var blinkAmount = getEyeBlinkAmount(eyeName);
         var eyeScaleY = Math.max(0.08, 0.7 - blinkAmount * 0.62);
@@ -832,10 +922,11 @@
             ));
         }
 
-        var gl = Math.floor(180 + eyeGlow * 75);
+        var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
+        var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
         wireCtx.shadowBlur  = 10 + eyeGlow * 16;
-        wireCtx.shadowColor = GREEN;
-        wireCtx.strokeStyle = 'rgba(' + gl + ',255,' + gl + ',' + (0.7 + eyeGlow * 0.3) + ')';
+        wireCtx.shadowColor = eHex;
+        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
         wireCtx.lineWidth   = 1.5 + eyeGlow;
 
         wireCtx.beginPath();
@@ -849,53 +940,89 @@
         if (blinkAmount < 0.72) {
             wireCtx.beginPath();
             wireCtx.arc(c.x, c.y, 2 + eyeGlow * 3, 0, Math.PI * 2);
-            wireCtx.fillStyle = 'rgba(' + gl + ',255,' + gl + ',' + (0.5 + eyeGlow * 0.5) + ')';
+            wireCtx.fillStyle = 'rgba(' + eRGB + ',' + (0.5 + eyeGlow * 0.5) + ')';
             wireCtx.fill();
         } else {
             wireCtx.beginPath();
             wireCtx.moveTo(c.x - eye.r * 30 * c.d * 0.22, c.y);
             wireCtx.lineTo(c.x + eye.r * 30 * c.d * 0.22, c.y);
-            wireCtx.strokeStyle = 'rgba(' + gl + ',255,' + gl + ',0.85)';
+            wireCtx.strokeStyle = 'rgba(' + eRGB + ',0.85)';
             wireCtx.lineWidth = 1.1 + eyeGlow * 0.5;
             wireCtx.stroke();
         }
     }
 
-    function drawNose(proj) {
+    function drawNose(proj, char) {
+        char = char || activeChar;
         wireCtx.shadowBlur  = 5;
-        wireCtx.shadowColor = GREEN;
-        wireCtx.strokeStyle = 'rgba(' + GREEN_RGB + ',0.35)';
+        wireCtx.shadowColor = char.wireColor;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
         wireCtx.lineWidth   = 1;
 
-        var a = proj(0, -0.15, 0.53);
-        var b = proj(0, -0.30, 0.57);
-        var c = proj(0, -0.34, 0.58);
-        var d = proj(-0.06, -0.36, 0.52);
-        var e = proj( 0.06, -0.36, 0.52);
+        var nose = char.nose;
+        var br = [];
+        for (var i = 0; i < nose.bridge.length; i++) {
+            br.push(proj(nose.bridge[i][0], nose.bridge[i][1], nose.bridge[i][2]));
+        }
+        var ba = [];
+        for (var j = 0; j < nose.base.length; j++) {
+            ba.push(proj(nose.base[j][0], nose.base[j][1], nose.base[j][2]));
+        }
 
-        wireCtx.beginPath(); wireCtx.moveTo(a.x,a.y); wireCtx.lineTo(b.x,b.y); wireCtx.lineTo(c.x,c.y); wireCtx.stroke();
-        wireCtx.beginPath(); wireCtx.moveTo(d.x,d.y); wireCtx.lineTo(c.x,c.y); wireCtx.lineTo(e.x,e.y); wireCtx.stroke();
+        wireCtx.beginPath();
+        for (var k = 0; k < br.length; k++) {
+            k === 0 ? wireCtx.moveTo(br[k].x, br[k].y) : wireCtx.lineTo(br[k].x, br[k].y);
+        }
+        wireCtx.stroke();
+        wireCtx.beginPath();
+        for (var m = 0; m < ba.length; m++) {
+            m === 0 ? wireCtx.moveTo(ba[m].x, ba[m].y) : wireCtx.lineTo(ba[m].x, ba[m].y);
+        }
+        wireCtx.stroke();
     }
 
-    function drawMouth(proj) {
+    function drawMouth(proj, char) {
+        char = char || activeChar;
+        var mth = char.mouth;
         var open = mouthOpen * 0.09;
         var upper = [], lower = [];
 
-        for (var i = 0; i <= MOUTH_SEGS; i++) {
-            var t    = (i / MOUTH_SEGS) * 2 - 1;  // -1…1
-            var curv = 1 - t * t;                   // parabola
-            var xp   = t * MOUTH_HW;
-            upper.push(proj(xp, MOUTH_Y + open * curv + 0.01 * curv, MOUTH_Z));
-            lower.push(proj(xp, MOUTH_Y - open * curv - 0.01 * curv, MOUTH_Z));
+        for (var i = 0; i <= mth.segs; i++) {
+            var t    = (i / mth.segs) * 2 - 1;  // -1…1
+            var curv = 1 - t * t;                 // parabola
+            var xp   = t * mth.hw;
+            upper.push(proj(xp, mth.y + open * curv + 0.01 * curv, mth.z));
+            lower.push(proj(xp, mth.y - open * curv - 0.01 * curv, mth.z));
         }
 
         wireCtx.shadowBlur  = 6 + mouthOpen * 16;
-        wireCtx.shadowColor = AMBER;
-        wireCtx.strokeStyle = 'rgba(' + AMBER_RGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
+        wireCtx.shadowColor = char.accentColor;
+        wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
         wireCtx.lineWidth   = 1.5 + mouthOpen;
 
         stroke(upper);
         stroke(lower);
+
+        // Teeth (optional per character)
+        if (mth.teeth && open > 0.015) {
+            var teethN = Math.max(3, Math.floor(mth.segs * 0.7));
+            var tAlpha = Math.min(0.75, open * 3);
+            wireCtx.strokeStyle = 'rgba(255,255,255,' + tAlpha + ')';
+            wireCtx.shadowColor = '#FFFFFF';
+            wireCtx.shadowBlur  = 3 + mouthOpen * 4;
+            wireCtx.lineWidth   = 0.7;
+            for (var ti = 1; ti < teethN; ti++) {
+                var tt = (ti / teethN) * 2 - 1;
+                var tcurv = 1 - tt * tt;
+                var tx = tt * mth.hw * 0.88;
+                var topP = proj(tx, mth.y + open * tcurv * 0.75, mth.z);
+                var botP = proj(tx, mth.y - open * tcurv * 0.75, mth.z);
+                wireCtx.beginPath();
+                wireCtx.moveTo(topP.x, topP.y);
+                wireCtx.lineTo(botP.x, botP.y);
+                wireCtx.stroke();
+            }
+        }
 
         // Inner glow when wide open
         if (mouthOpen > 0.3) {
@@ -904,15 +1031,71 @@
             for (var row = 1; row <= 2; row++) {
                 var frac = row / 3;
                 var inner = [];
-                for (var i = 0; i <= MOUTH_SEGS; i++) {
-                    var t    = (i / MOUTH_SEGS) * 2 - 1;
+                for (var i = 0; i <= mth.segs; i++) {
+                    var t    = (i / mth.segs) * 2 - 1;
                     var curv = 1 - t * t;
-                    inner.push(proj(t * MOUTH_HW * 0.85,
-                        MOUTH_Y + open * curv * frac, MOUTH_Z));
+                    inner.push(proj(t * mth.hw * 0.85,
+                        mth.y + open * curv * frac, mth.z));
                 }
                 stroke(inner);
             }
         }
+    }
+
+    // =========================================================
+    //  Character feature renderers
+    // =========================================================
+
+    function drawHair(char, proj, amp, bass) {
+        if (!char.hair || !char.hair.length) return;
+        var t = performance.now() * 0.001;
+        wireCtx.lineCap = 'round';
+
+        for (var i = 0; i < char.hair.length; i++) {
+            var h = char.hair[i];
+            var root = proj(h.rx, h.ry, h.rz);
+
+            // Audio-reactive sway: bass drives big swings, amp drives flutter
+            var phase = t * 1.8 + i * 1.1;
+            var bassSway = bass * 0.15 * Math.sin(phase * 0.7);
+            var ampFlutter = amp * 0.07 * Math.sin(phase * 2.3);
+            var breathSway = Math.sin(breathPhase + i * 0.3) * 0.015;
+
+            // Mid control point — slight outward bow + sway
+            var midFrac = 0.45;
+            var midY = h.ry - h.len * midFrac;
+            var midX = h.rx * 1.12 + (bassSway + breathSway) * 0.5;
+            var midZ = h.rz + Math.sin(phase * 0.5) * 0.03;
+            var mid = proj(midX, midY, midZ);
+
+            // Tip — full sway + flutter
+            var tipY = h.ry - h.len;
+            var tipX = h.rx * 1.05 + bassSway + ampFlutter + breathSway;
+            var tipZ = h.rz + Math.cos(phase * 0.8) * 0.05;
+            var tip = proj(tipX, tipY, tipZ);
+
+            wireCtx.strokeStyle = h.color;
+            wireCtx.shadowColor = h.color;
+            wireCtx.shadowBlur  = 5 + bass * 14;
+            wireCtx.lineWidth   = h.width || 1.2;
+            wireCtx.globalAlpha = 0.7 + amp * 0.3;
+
+            wireCtx.beginPath();
+            wireCtx.moveTo(root.x, root.y);
+            wireCtx.quadraticCurveTo(mid.x, mid.y, tip.x, tip.y);
+            wireCtx.stroke();
+        }
+        wireCtx.globalAlpha = 1;
+    }
+
+    function drawHat(char, proj, amp, bass) {
+        if (!char.hat) return;
+        // TODO: implement hat rendering
+    }
+
+    function drawFacialHair(char, proj, amp, bass) {
+        if (!char.facialHair) return;
+        // TODO: implement facial hair rendering
     }
 
     function stroke(pts) {
@@ -932,6 +1115,7 @@
         lrcLines  = [];
         lrcIndex  = -1;
         trackMeta = null;
+        setActiveCharacter('_default');
         resetLyricFxState();
         if (elLyrics) elLyrics.textContent = '';
         hideMetaHud(true);
@@ -966,6 +1150,7 @@
             .then(function (buf) {
                 var tags = window.parseID3v2(buf);
                 trackMeta = tags;
+                setActiveCharacter(getCharacterForArtist(tags.artist));
                 console.log('[viz] ID3 parsed:', tags.artist || '(none)',
                             '| genre:', tags.genre || '(none)',
                             '| SYLT lines:', tags.sylt.length,
@@ -1452,7 +1637,7 @@
 
     function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
         var projState = headProjectionState || buildProjectionState(w, h);
-        var mouthPoint = eyeScreenPoints.mouth || projectHeadPoint(projState, 0, MOUTH_Y, MOUTH_Z, projState.pulse || 1);
+        var mouthPoint = eyeScreenPoints.mouth || projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, projState.pulse || 1);
         var spawnX = mouthPoint.x;
         var spawnY = mouthPoint.y;
 
