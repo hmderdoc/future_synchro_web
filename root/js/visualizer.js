@@ -342,6 +342,53 @@
                 { x: 0.34, y: 0.30, color: '#FFAA00', rgb: '255,170,0',
                   mode: 'power' }
             ]
+        },
+
+        diskmchardy: {
+            name: 'Disk McHardy',
+            headShape: 'box',
+            boxDims: { w: 0.46, h: 0.52, d: 0.06 },  // thin like a 3.5" disk
+            boxStyle: 'floppy',  // triggers floppy-specific details
+            profile: null,
+            ringN: 0,
+            eyes: {
+                // Eyes sit on the label area of the front face
+                left:  { x: -0.10, y: -0.02, z: 0.06, r: 0.055 },
+                right: { x:  0.10, y: -0.02, z: 0.06, r: 0.055 }
+            },
+            eyeColor: { hex: '#000000', rgb: '0,0,0' },
+            eyeOutlineColor: { hex: '#111155', rgb: '17,17,85' },
+            eyeShape: 'round',
+            mascara: false,
+            eyelashes: null,
+            // Smiley mouth — small happy curve on the label
+            mouth: { y: -0.16, hw: 0.12, z: 0.06, segs: 8,
+                     teeth: false, smiley: true },
+            nose: null,
+            wireColor: '#5555FF',
+            wireRGB:   '85,85,255',
+            accentColor: '#7777FF',
+            accentRGB:   '119,119,255',
+            eyebrows: null,
+            hair: null,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: {
+                color: '#AAAAAA',
+                rgb: '170,170,170',
+                width: 0.28,      // width of the metal shutter
+                yTop: 0.52,       // top of disk = top of shutter
+                yBot: 0.30,       // bottom of shutter area
+                holeRadius: 0.04  // read/write hole behind shutter
+            },
+            label: {
+                color: '#FFFFFF',
+                rgb: '255,255,255',
+                top: 0.25,
+                bot: -0.30,
+                hw: 0.38
+            }
         }
     };
 
@@ -1074,6 +1121,9 @@
         // --- LEDs ---
         drawLEDs(activeChar, proj, amp, bass);
 
+        // --- Shutter ---
+        drawShutter(activeChar, proj, amp, bass);
+
         // --- Facial hair ---
         drawFacialHair(activeChar, proj, amp, bass);
     }
@@ -1305,6 +1355,12 @@
         // Drive slot variant (floppy drive mouth)
         if (mth.slot) {
             drawDriveSlot(proj, char, mth);
+            return;
+        }
+
+        // Smiley mouth variant (simple curved smile on label)
+        if (mth.smiley) {
+            drawSmileyMouth(proj, char, mth);
             return;
         }
 
@@ -1719,66 +1775,319 @@
             wireCtx.stroke();
         }
 
-        // --- "SCSI GAL" tramp stamp on the back, near the bottom ---
-        wireCtx.save();
-        // Position at back face, bottom area
-        var stampY = -h * 0.75;
-        var stampZ = -d - 0.001;  // just behind back face
-        var stampC = proj(0, stampY, stampZ);
-        var stampScale = Math.abs(proj(0.1, stampY, stampZ).x - stampC.x);
-        wireCtx.font = (stampScale * 0.9) + 'px monospace';
-        wireCtx.textAlign = 'center';
-        wireCtx.textBaseline = 'middle';
-        wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.12)';
-        wireCtx.shadowBlur = 0;
-        wireCtx.fillText('SCSI GAL', stampC.x, stampC.y);
-        wireCtx.restore();
+        // --- Character-specific front panel details ---
+        if (char.boxStyle === 'floppy') {
+            drawFloppyDiskDetails(char, proj, amp, bass, w, h, d);
+        } else {
+            // Default drive enclosure details (FDP etc.)
+            // "SCSI GAL" tramp stamp on the back, near the bottom
+            wireCtx.save();
+            var stampY = -h * 0.75;
+            var stampZ = -d - 0.001;
+            var stampC = proj(0, stampY, stampZ);
+            var stampScale = Math.abs(proj(0.1, stampY, stampZ).x - stampC.x);
+            wireCtx.font = (stampScale * 0.9) + 'px monospace';
+            wireCtx.textAlign = 'center';
+            wireCtx.textBaseline = 'middle';
+            wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.12)';
+            wireCtx.shadowBlur = 0;
+            wireCtx.fillText('SCSI GAL', stampC.x, stampC.y);
+            wireCtx.restore();
 
-        // --- Front panel detail: label area ---
-        // A recessed rectangular area in the upper portion (like a floppy label)
-        var labelW = w * 0.65, labelTop = h * 0.80, labelBot = h * 0.45;
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.22)';
-        wireCtx.lineWidth = 0.8;
-        var ltl = proj(-labelW, labelTop, d + 0.005);
-        var ltr = proj(labelW, labelTop, d + 0.005);
-        var lbr = proj(labelW, labelBot, d + 0.005);
-        var lbl = proj(-labelW, labelBot, d + 0.005);
-        wireCtx.beginPath();
-        wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
-        wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl.x, lbl.y);
-        wireCtx.closePath();
-        wireCtx.stroke();
-
-        // Tiny horizontal lines inside label (text lines)
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.12)';
-        wireCtx.lineWidth = 0.5;
-        for (var li = 0; li < 3; li++) {
-            var ly = labelBot + (labelTop - labelBot) * (0.25 + li * 0.25);
-            var ll = proj(-labelW * 0.85, ly, d + 0.005);
-            var lr = proj(labelW * 0.85, ly, d + 0.005);
+            // Front panel detail: label area
+            var labelW = w * 0.65, labelTop = h * 0.80, labelBot = h * 0.45;
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.22)';
+            wireCtx.lineWidth = 0.8;
+            var ltl = proj(-labelW, labelTop, d + 0.005);
+            var ltr = proj(labelW, labelTop, d + 0.005);
+            var lbr = proj(labelW, labelBot, d + 0.005);
+            var lbl = proj(-labelW, labelBot, d + 0.005);
             wireCtx.beginPath();
-            wireCtx.moveTo(ll.x, ll.y); wireCtx.lineTo(lr.x, lr.y);
+            wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
+            wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl.x, lbl.y);
+            wireCtx.closePath();
+            wireCtx.stroke();
+
+            // Tiny horizontal lines inside label (text lines)
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.12)';
+            wireCtx.lineWidth = 0.5;
+            for (var li = 0; li < 3; li++) {
+                var ly = labelBot + (labelTop - labelBot) * (0.25 + li * 0.25);
+                var ll = proj(-labelW * 0.85, ly, d + 0.005);
+                var lr = proj(labelW * 0.85, ly, d + 0.005);
+                wireCtx.beginPath();
+                wireCtx.moveTo(ll.x, ll.y); wireCtx.lineTo(lr.x, lr.y);
+                wireCtx.stroke();
+            }
+
+            // Eject button
+            var ejW = w * 0.12, ejH = h * 0.06;
+            var ejY = -h * 0.65;
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
+            wireCtx.lineWidth = 0.8;
+            var etl = proj(-ejW, ejY + ejH, d + 0.005);
+            var etr = proj(ejW, ejY + ejH, d + 0.005);
+            var ebr = proj(ejW, ejY - ejH, d + 0.005);
+            var ebl = proj(-ejW, ejY - ejH, d + 0.005);
+            wireCtx.beginPath();
+            wireCtx.moveTo(etl.x, etl.y); wireCtx.lineTo(etr.x, etr.y);
+            wireCtx.lineTo(ebr.x, ebr.y); wireCtx.lineTo(ebl.x, ebl.y);
+            wireCtx.closePath();
+            wireCtx.stroke();
+            if (bass > 0.4) {
+                wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',' + (bass * 0.15) + ')';
+                wireCtx.fill();
+            }
+        }
+    }
+
+    // =========================================================
+    //  Floppy Disk Details (3.5" disk face — label, notches, write-protect)
+    // =========================================================
+    function drawFloppyDiskDetails(char, proj, amp, bass, w, h, d) {
+        var t = performance.now() * 0.001;
+        var lbl = char.label;
+
+        // --- Label sticker (lower portion of front face) ---
+        if (lbl) {
+            wireCtx.strokeStyle = 'rgba(' + lbl.rgb + ',0.25)';
+            wireCtx.lineWidth = 0.9;
+            var ltl = proj(-lbl.hw, lbl.top, d + 0.003);
+            var ltr = proj(lbl.hw, lbl.top, d + 0.003);
+            var lbr = proj(lbl.hw, lbl.bot, d + 0.003);
+            var lbl2 = proj(-lbl.hw, lbl.bot, d + 0.003);
+            wireCtx.beginPath();
+            wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
+            wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl2.x, lbl2.y);
+            wireCtx.closePath();
+            wireCtx.stroke();
+
+            // Faint fill for the label area
+            wireCtx.fillStyle = 'rgba(' + lbl.rgb + ',0.04)';
+            wireCtx.fill();
+        }
+
+        // --- Metal shutter area at top ---
+        // (The actual shutter animation is in drawShutter, this just draws
+        //  the shutter housing/frame on the disk body)
+        if (char.shutter) {
+            var sh = char.shutter;
+            wireCtx.strokeStyle = 'rgba(' + sh.rgb + ',0.20)';
+            wireCtx.lineWidth = 0.7;
+            // Shutter housing outline
+            var stl = proj(-sh.width, sh.yTop, d + 0.004);
+            var str = proj(sh.width, sh.yTop, d + 0.004);
+            var sbr = proj(sh.width, sh.yBot, d + 0.004);
+            var sbl = proj(-sh.width, sh.yBot, d + 0.004);
+            wireCtx.beginPath();
+            wireCtx.moveTo(stl.x, stl.y); wireCtx.lineTo(str.x, str.y);
+            wireCtx.lineTo(sbr.x, sbr.y); wireCtx.lineTo(sbl.x, sbl.y);
+            wireCtx.closePath();
             wireCtx.stroke();
         }
 
-        // --- Front panel: eject button (small rectangle below drive slot) ---
-        var ejW = w * 0.12, ejH = h * 0.06;
-        var ejY = -h * 0.65;
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
-        wireCtx.lineWidth = 0.8;
-        var etl = proj(-ejW, ejY + ejH, d + 0.005);
-        var etr = proj(ejW, ejY + ejH, d + 0.005);
-        var ebr = proj(ejW, ejY - ejH, d + 0.005);
-        var ebl = proj(-ejW, ejY - ejH, d + 0.005);
+        // --- HD indicator notch (top-right corner, front) ---
+        var notchW = w * 0.08, notchH = h * 0.08;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.18)';
+        wireCtx.lineWidth = 0.6;
+        var ntl = proj(w - notchW * 3, h - notchH * 0.5, d + 0.003);
+        var ntr = proj(w - notchW * 0.5, h - notchH * 0.5, d + 0.003);
+        var nbr = proj(w - notchW * 0.5, h - notchH * 2.5, d + 0.003);
+        var nbl = proj(w - notchW * 3, h - notchH * 2.5, d + 0.003);
         wireCtx.beginPath();
-        wireCtx.moveTo(etl.x, etl.y); wireCtx.lineTo(etr.x, etr.y);
-        wireCtx.lineTo(ebr.x, ebr.y); wireCtx.lineTo(ebl.x, ebl.y);
+        wireCtx.moveTo(ntl.x, ntl.y); wireCtx.lineTo(ntr.x, ntr.y);
+        wireCtx.lineTo(nbr.x, nbr.y); wireCtx.lineTo(nbl.x, nbl.y);
         wireCtx.closePath();
         wireCtx.stroke();
-        // Eject button reacts to bass (subtle push)
-        if (bass > 0.4) {
-            wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',' + (bass * 0.15) + ')';
+        // "HD" text
+        wireCtx.save();
+        var hdC = proj(w - notchW * 1.75, h - notchH * 1.5, d + 0.004);
+        var hdScale = Math.abs(proj(0.05, 0, d).x - proj(0, 0, d).x);
+        wireCtx.font = Math.max(4, hdScale * 0.7) + 'px monospace';
+        wireCtx.textAlign = 'center';
+        wireCtx.textBaseline = 'middle';
+        wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.18)';
+        wireCtx.shadowBlur = 0;
+        wireCtx.fillText('HD', hdC.x, hdC.y);
+        wireCtx.restore();
+
+        // --- Write-protect tab (bottom-left, small square notch) ---
+        var wpW = w * 0.06, wpH = h * 0.10;
+        var wpX = -w + wpW * 1.5;
+        var wpY = -h + wpH * 1.5;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.15)';
+        wireCtx.lineWidth = 0.5;
+        var wptl = proj(wpX - wpW, wpY + wpH, d + 0.003);
+        var wptr = proj(wpX + wpW, wpY + wpH, d + 0.003);
+        var wpbr = proj(wpX + wpW, wpY - wpH, d + 0.003);
+        var wpbl = proj(wpX - wpW, wpY - wpH, d + 0.003);
+        wireCtx.beginPath();
+        wireCtx.moveTo(wptl.x, wptl.y); wireCtx.lineTo(wptr.x, wptr.y);
+        wireCtx.lineTo(wpbr.x, wpbr.y); wireCtx.lineTo(wpbl.x, wpbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // --- Center hub ring (visible through back, faint on front) ---
+        var hubY = -h * 0.15;
+        var hubR = w * 0.16;
+        var hubC = proj(0, hubY, d + 0.002);
+        var hubScale = Math.abs(proj(hubR, hubY, d).x - proj(0, hubY, d).x);
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.10)';
+        wireCtx.lineWidth = 0.5;
+        wireCtx.beginPath();
+        wireCtx.arc(hubC.x, hubC.y, hubScale, 0, Math.PI * 2);
+        wireCtx.stroke();
+        // Hub center dot
+        wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',0.08)';
+        wireCtx.beginPath();
+        wireCtx.arc(hubC.x, hubC.y, hubScale * 0.15, 0, Math.PI * 2);
+        wireCtx.fill();
+    }
+
+    // =========================================================
+    //  Smiley Mouth (simple curved smile for disk label faces)
+    // =========================================================
+    function drawSmileyMouth(proj, char, mth) {
+        var open = mouthOpen * 0.07;
+
+        // Simple arc smile — curves down (frown when closed, smile when singing)
+        wireCtx.shadowBlur = 4 + mouthOpen * 12;
+        wireCtx.shadowColor = char.wireColor;
+
+        // Upper lip (static gentle smile curve)
+        var pts = [];
+        for (var i = 0; i <= mth.segs; i++) {
+            var t = (i / mth.segs) * 2 - 1;  // -1..1
+            var curv = (1 - t * t);
+            var xp = t * mth.hw;
+            // Smile shape: ends up, center down — reversed parabola
+            var yBase = mth.y - curv * 0.025;
+            pts.push(proj(xp, yBase + open * curv * 0.5, mth.z));
+        }
+
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.50 + mouthOpen * 0.4) + ')';
+        wireCtx.lineWidth = 1.3 + mouthOpen * 0.8;
+        wireCtx.beginPath();
+        for (var i = 0; i < pts.length; i++) {
+            i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y);
+        }
+        wireCtx.stroke();
+
+        // When singing, open up a gap below (lower lip drops)
+        if (open > 0.003) {
+            var lower = [];
+            for (var i = 0; i <= mth.segs; i++) {
+                var t = (i / mth.segs) * 2 - 1;
+                var curv = (1 - t * t);
+                var xp = t * mth.hw * 0.9;
+                lower.push(proj(xp, mth.y - open * curv * 2.5 - 0.015, mth.z));
+            }
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.3 + mouthOpen * 0.35) + ')';
+            wireCtx.lineWidth = 1.0 + mouthOpen * 0.5;
+            wireCtx.beginPath();
+            for (var i = 0; i < lower.length; i++) {
+                i === 0 ? wireCtx.moveTo(lower[i].x, lower[i].y) : wireCtx.lineTo(lower[i].x, lower[i].y);
+            }
+            wireCtx.stroke();
+
+            // Inner glow when wide open
+            if (mouthOpen > 0.25) {
+                var gc = proj(0, mth.y - open * 1.2, mth.z - 0.01);
+                var glowR = Math.abs(pts[0].x - pts[pts.length-1].x) * 0.35;
+                var grad = wireCtx.createRadialGradient(gc.x, gc.y, 0, gc.x, gc.y, glowR);
+                grad.addColorStop(0, 'rgba(' + char.accentRGB + ',' + Math.min(0.10, mouthOpen * 0.12) + ')');
+                grad.addColorStop(1, 'rgba(' + char.accentRGB + ',0)');
+                wireCtx.fillStyle = grad;
+                wireCtx.beginPath();
+                wireCtx.arc(gc.x, gc.y, glowR, 0, Math.PI * 2);
+                wireCtx.fill();
+            }
+        }
+    }
+
+    // =========================================================
+    //  Metal Shutter (3.5" floppy disk shutter that slides with music)
+    // =========================================================
+    function drawShutter(char, proj, amp, bass) {
+        if (!char.shutter) return;
+        var sh = char.shutter;
+        var box = char.boxDims;
+        var d = box.d;
+        var t = performance.now() * 0.001;
+
+        // Shutter slides open/closed with vocal/amplitude
+        // More open = more singing energy
+        var slideAmount = Math.min(1, mouthOpen * 1.8 + bass * 0.3);
+        var slideOffset = slideAmount * sh.width * 0.7;  // slides to the right
+
+        var shutL = -sh.width + slideOffset;
+        var shutR =  sh.width + slideOffset;
+        var shutT =  sh.yTop;
+        var shutB =  sh.yBot;
+        var shutZ =  d + 0.006;  // slightly in front of disk body
+
+        wireCtx.shadowBlur = 3 + bass * 5;
+        wireCtx.shadowColor = sh.color;
+
+        // Shutter body (metal rectangle)
+        wireCtx.strokeStyle = 'rgba(' + sh.rgb + ',' + (0.45 + bass * 0.15) + ')';
+        wireCtx.lineWidth = 1.2;
+        var stl = proj(shutL, shutT, shutZ);
+        var str2 = proj(shutR, shutT, shutZ);
+        var sbr = proj(shutR, shutB, shutZ);
+        var sbl = proj(shutL, shutB, shutZ);
+        wireCtx.beginPath();
+        wireCtx.moveTo(stl.x, stl.y); wireCtx.lineTo(str2.x, str2.y);
+        wireCtx.lineTo(sbr.x, sbr.y); wireCtx.lineTo(sbl.x, sbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Shutter center groove (the ridge you grab)
+        var grooveX = (shutL + shutR) * 0.5;
+        var grooveT = proj(grooveX, shutT * 0.95, shutZ + 0.002);
+        var grooveB = proj(grooveX, shutB * 1.05, shutZ + 0.002);
+        wireCtx.strokeStyle = 'rgba(' + sh.rgb + ',0.25)';
+        wireCtx.lineWidth = 0.8;
+        wireCtx.beginPath();
+        wireCtx.moveTo(grooveT.x, grooveT.y);
+        wireCtx.lineTo(grooveB.x, grooveB.y);
+        wireCtx.stroke();
+
+        // When shutter is open, show the read/write hole underneath
+        if (slideAmount > 0.15) {
+            var holeAlpha = Math.min(0.4, (slideAmount - 0.15) * 0.6);
+            var holeX = -sh.width * 0.3;  // hole is left-of-center
+            var holeY = (shutT + shutB) * 0.5;
+            var holeC = proj(holeX, holeY, d + 0.001);
+            var holeScale = Math.abs(proj(sh.holeRadius, holeY, d).x - proj(0, holeY, d).x);
+
+            // Oval read/write window
+            wireCtx.strokeStyle = 'rgba(40,40,40,' + holeAlpha + ')';
+            wireCtx.lineWidth = 0.8;
+            wireCtx.beginPath();
+            wireCtx.ellipse(holeC.x, holeC.y, holeScale * 1.5, holeScale * 0.8,
+                            0, 0, Math.PI * 2);
+            wireCtx.stroke();
+
+            // Dark fill inside
+            wireCtx.fillStyle = 'rgba(0,0,0,' + (holeAlpha * 0.5) + ')';
             wireCtx.fill();
+
+            // Spinning disk media visible through the hole (subtle)
+            if (slideAmount > 0.3) {
+                var spinAngle = t * 6;  // steady spin
+                wireCtx.strokeStyle = 'rgba(60,60,60,' + (holeAlpha * 0.4) + ')';
+                wireCtx.lineWidth = 0.4;
+                for (var ri = 0; ri < 3; ri++) {
+                    var ra = spinAngle + ri * (Math.PI * 2 / 3);
+                    var rx = holeC.x + Math.cos(ra) * holeScale * 1.2;
+                    var ry = holeC.y + Math.sin(ra) * holeScale * 0.6;
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(holeC.x, holeC.y);
+                    wireCtx.lineTo(rx, ry);
+                    wireCtx.stroke();
+                }
+            }
         }
     }
 
