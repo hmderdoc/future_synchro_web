@@ -614,6 +614,57 @@
             facialHair: null,
             ledIndicators: null,
             shutter: null
+        },
+        robocop: {
+            name: 'RoboCop',
+            // Smooth helmet dome — more spherical/uniform than a human skull
+            // Slightly wider to convey the armored look
+            profile: [
+                [0.00, -0.78], [0.22, -0.70], [0.38, -0.60],
+                [0.50, -0.46], [0.55, -0.30], [0.56, -0.14],
+                [0.55,  0.02], [0.53,  0.16], [0.50,  0.30],
+                [0.46,  0.42], [0.40,  0.52], [0.30,  0.58],
+                [0.00,  0.62]
+            ],
+            ringN: 20,
+            // "Eyes" define the visor band endpoints
+            eyes: {
+                left:  { x: -0.42, y: 0.04, z: 0.30, r: 0.04 },
+                right: { x:  0.42, y: 0.04, z: 0.30, r: 0.04 }
+            },
+            eyeColor: { hex: '#FF3333', rgb: '255,51,51' },
+            eyeOutlineColor: { hex: '#666666', rgb: '102,102,102' },
+            eyeShape: 'visor',
+            mascara: false,
+            eyelashes: null,
+            eyebrows: null,
+            // Small stern human mouth — the exposed flesh below the helmet
+            mouth: { y: -0.54, hw: 0.16, z: 0.52, segs: 8,
+                     teeth: false },
+            // Nose guard — the vertical center piece of the helmet
+            nose: {
+                bridge: [[0, 0.10, 0.57], [0, -0.10, 0.60], [0, -0.28, 0.58]],
+                base:   [[-0.04, -0.32, 0.54], [0, -0.28, 0.58], [0.04, -0.32, 0.54]]
+            },
+            // Gunmetal steel with purple pixel-art tint
+            wireColor: '#8866AA',
+            wireRGB:   '136,102,170',
+            accentColor: '#AA88CC',
+            accentRGB:   '170,136,204',
+            hair: null,
+            hat: null,
+            facialHair: null,
+            // Helmet edge line (where armor meets exposed face)
+            // Drawn as a special feature via chinGuard
+            chinGuard: {
+                y: -0.38,
+                hw: 0.42,
+                z: 0.46,
+                color: '#666677',
+                rgb: '102,102,119'
+            },
+            ledIndicators: null,
+            shutter: null
         }
     };
 
@@ -1360,6 +1411,9 @@
 
         // --- Facial hair ---
         drawFacialHair(activeChar, proj, amp, bass);
+
+        // --- Chin guard / helmet edge (RoboCop etc.) ---
+        drawChinGuard(activeChar, proj, amp, bass);
     }
 
     function drawEye(eye, proj, eyeName, char) {
@@ -1371,6 +1425,9 @@
             drawSquareEye(eye, proj, eyeName, char, blinkAmount);
         } else if (shape === 'clippy') {
             drawGooglyEye(eye, proj, eyeName, char, blinkAmount);
+        } else if (shape === 'visor') {
+            // Visor is drawn once spanning both eyes — only draw on 'left' call
+            if (eyeName === 'left') drawVisor(char, proj);
         } else {
             drawRoundEye(eye, proj, eyeName, char, blinkAmount);
         }
@@ -2048,6 +2105,173 @@
         wireCtx.beginPath();
         wireCtx.arc(c.x + pupilOffX - pupilR * 0.25, c.y - pupilOffY - pupilRY * 0.25, hlR, 0, Math.PI * 2);
         wireCtx.fill();
+    }
+
+    // =========================================================
+    //  Visor Renderer (RoboCop-style horizontal slit)
+    // =========================================================
+    function drawVisor(char, proj) {
+        var eyes = char.eyes;
+        var t = performance.now() * 0.001;
+        var eCol = char.eyeColor || { hex: '#FF3333', rgb: '255,51,51' };
+        var oCol = char.eyeOutlineColor || { hex: '#666666', rgb: '102,102,102' };
+
+        // Visor spans from left eye x to right eye x at the eye y-level
+        // It wraps around the head following the surface curvature
+        var visorY  = eyes.left.y;
+        var visorHW = Math.abs(eyes.right.x - eyes.left.x) * 0.5;
+        var visorH  = 0.045;  // half-height of the slit
+
+        // The visor is a narrow horizontal band curving around the helmet
+        var segs = 16;
+
+        // Upper edge of visor
+        var upperPts = [];
+        var lowerPts = [];
+        for (var i = 0; i <= segs; i++) {
+            var frac = i / segs;  // 0..1 left to right
+            var x = -visorHW + frac * visorHW * 2;
+
+            // Z follows the head surface curvature (wider at center, recedes at edges)
+            // Use a circular-ish curve
+            var normX = Math.abs(x) / visorHW;  // 0 at center, 1 at edges
+            var zCurve = Math.sqrt(Math.max(0, 1 - normX * normX * 0.6));
+            var z = 0.52 * zCurve;
+
+            upperPts.push(proj(x, visorY + visorH, z));
+            lowerPts.push(proj(x, visorY - visorH, z));
+        }
+
+        // === Visor housing (dark outline around the slit) ===
+        wireCtx.shadowBlur = 4;
+        wireCtx.shadowColor = oCol.hex;
+        wireCtx.strokeStyle = 'rgba(' + oCol.rgb + ',0.7)';
+        wireCtx.lineWidth = 2.5;
+        wireCtx.lineCap = 'round';
+
+        // Upper edge
+        wireCtx.beginPath();
+        for (var i = 0; i < upperPts.length; i++) {
+            i === 0 ? wireCtx.moveTo(upperPts[i].x, upperPts[i].y) : wireCtx.lineTo(upperPts[i].x, upperPts[i].y);
+        }
+        wireCtx.stroke();
+
+        // Lower edge
+        wireCtx.beginPath();
+        for (var i = 0; i < lowerPts.length; i++) {
+            i === 0 ? wireCtx.moveTo(lowerPts[i].x, lowerPts[i].y) : wireCtx.lineTo(lowerPts[i].x, lowerPts[i].y);
+        }
+        wireCtx.stroke();
+
+        // Side caps (close the slit at the edges)
+        wireCtx.beginPath();
+        wireCtx.moveTo(upperPts[0].x, upperPts[0].y);
+        wireCtx.lineTo(lowerPts[0].x, lowerPts[0].y);
+        wireCtx.stroke();
+        wireCtx.beginPath();
+        wireCtx.moveTo(upperPts[upperPts.length-1].x, upperPts[upperPts.length-1].y);
+        wireCtx.lineTo(lowerPts[lowerPts.length-1].x, lowerPts[lowerPts.length-1].y);
+        wireCtx.stroke();
+
+        // === Red/amber glow inside the visor ===
+        // Intensity pulses with bass and vocal
+        var glowIntensity = 0.25 + eyeGlow * 0.55 + Math.sin(t * 2) * 0.08;
+
+        // Fill the visor slit with color glow
+        wireCtx.shadowBlur = 8 + eyeGlow * 18;
+        wireCtx.shadowColor = eCol.hex;
+        wireCtx.fillStyle = 'rgba(' + eCol.rgb + ',' + glowIntensity + ')';
+        wireCtx.beginPath();
+        for (var i = 0; i < upperPts.length; i++) {
+            i === 0 ? wireCtx.moveTo(upperPts[i].x, upperPts[i].y) : wireCtx.lineTo(upperPts[i].x, upperPts[i].y);
+        }
+        for (var i = lowerPts.length - 1; i >= 0; i--) {
+            wireCtx.lineTo(lowerPts[i].x, lowerPts[i].y);
+        }
+        wireCtx.closePath();
+        wireCtx.fill();
+
+        // Scanline effect — horizontal lines sweeping through the visor
+        var scanY = visorY - visorH + ((t * 0.3) % 1) * visorH * 2;
+        var scanPts = [];
+        for (var i = 0; i <= segs; i++) {
+            var frac = i / segs;
+            var x = -visorHW + frac * visorHW * 2;
+            var normX = Math.abs(x) / visorHW;
+            var zCurve = Math.sqrt(Math.max(0, 1 - normX * normX * 0.6));
+            var z = 0.52 * zCurve;
+            scanPts.push(proj(x, scanY, z));
+        }
+        wireCtx.strokeStyle = 'rgba(' + eCol.rgb + ',' + (0.15 + eyeGlow * 0.2) + ')';
+        wireCtx.lineWidth = 0.6;
+        wireCtx.shadowBlur = 3;
+        wireCtx.beginPath();
+        for (var i = 0; i < scanPts.length; i++) {
+            i === 0 ? wireCtx.moveTo(scanPts[i].x, scanPts[i].y) : wireCtx.lineTo(scanPts[i].x, scanPts[i].y);
+        }
+        wireCtx.stroke();
+
+        // Reflection highlight (narrow bright line near the top of visor)
+        wireCtx.strokeStyle = 'rgba(255,255,255,' + (0.06 + eyeGlow * 0.08) + ')';
+        wireCtx.lineWidth = 0.8;
+        wireCtx.shadowBlur = 0;
+        wireCtx.beginPath();
+        for (var i = 0; i < upperPts.length; i++) {
+            var ux = upperPts[i].x;
+            var uy = upperPts[i].y + (lowerPts[i].y - upperPts[i].y) * 0.2;
+            i === 0 ? wireCtx.moveTo(ux, uy) : wireCtx.lineTo(ux, uy);
+        }
+        wireCtx.stroke();
+    }
+
+    // =========================================================
+    //  Chin Guard / Helmet Edge Renderer (RoboCop jawline armor)
+    // =========================================================
+    function drawChinGuard(char, proj, amp, bass) {
+        if (!char.chinGuard) return;
+        var cg = char.chinGuard;
+        var t = performance.now() * 0.001;
+
+        // Horizontal edge where helmet meets exposed lower face
+        // Curves around the head at cg.y
+        var segs = 14;
+        var edgePts = [];
+        for (var i = 0; i <= segs; i++) {
+            var frac = i / segs;
+            var x = -cg.hw + frac * cg.hw * 2;
+            var normX = Math.abs(x) / cg.hw;
+            var zCurve = Math.sqrt(Math.max(0, 1 - normX * normX * 0.5));
+            var z = cg.z * zCurve;
+            edgePts.push(proj(x, cg.y, z));
+        }
+
+        wireCtx.shadowBlur = 4 + bass * 6;
+        wireCtx.shadowColor = cg.color;
+        wireCtx.strokeStyle = 'rgba(' + cg.rgb + ',0.6)';
+        wireCtx.lineWidth = 2.2;
+        wireCtx.lineCap = 'round';
+        wireCtx.beginPath();
+        for (var i = 0; i < edgePts.length; i++) {
+            i === 0 ? wireCtx.moveTo(edgePts[i].x, edgePts[i].y) : wireCtx.lineTo(edgePts[i].x, edgePts[i].y);
+        }
+        wireCtx.stroke();
+
+        // Cheek guards — vertical lines from helmet edge down the sides
+        var cheekL = proj(-cg.hw * 0.75, cg.y, cg.z * 0.65);
+        var cheekLBot = proj(-cg.hw * 0.70, cg.y - 0.14, cg.z * 0.60);
+        var cheekR = proj(cg.hw * 0.75, cg.y, cg.z * 0.65);
+        var cheekRBot = proj(cg.hw * 0.70, cg.y - 0.14, cg.z * 0.60);
+
+        wireCtx.strokeStyle = 'rgba(' + cg.rgb + ',0.4)';
+        wireCtx.lineWidth = 1.8;
+        wireCtx.beginPath();
+        wireCtx.moveTo(cheekL.x, cheekL.y);
+        wireCtx.lineTo(cheekLBot.x, cheekLBot.y);
+        wireCtx.stroke();
+        wireCtx.beginPath();
+        wireCtx.moveTo(cheekR.x, cheekR.y);
+        wireCtx.lineTo(cheekRBot.x, cheekRBot.y);
+        wireCtx.stroke();
     }
 
     // =========================================================
