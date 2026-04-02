@@ -461,6 +461,77 @@
             facialHair: null,
             ledIndicators: null,
             shutter: null
+        },
+        gavinnewsom: {
+            name: 'Gavin Newsom',
+            // Strong jaw, chiseled face, high forehead, prominent chin
+            profile: [
+                [0.00, -0.82], [0.18, -0.74], [0.34, -0.64],
+                [0.47, -0.50], [0.52, -0.36], [0.53, -0.22],
+                [0.51, -0.08], [0.48,  0.06], [0.46,  0.18],
+                [0.44,  0.30], [0.42,  0.40], [0.38,  0.50],
+                [0.30,  0.58], [0.18,  0.64],
+                [0.00,  0.67]
+            ],
+            ringN: 18,
+            eyes: {
+                left:  { x: -0.17, y: -0.04, z: 0.46, r: 0.065 },
+                right: { x:  0.17, y: -0.04, z: 0.46, r: 0.065 }
+            },
+            eyeColor: { hex: '#332222', rgb: '51,34,34' },
+            eyeOutlineColor: { hex: '#BB66CC', rgb: '187,102,204' },
+            eyeShape: 'round',
+            mascara: false,
+            eyelashes: null,
+            // Dark, prominent, well-groomed brows
+            eyebrows: {
+                color: '#442244',
+                rgb:   '68,34,68',
+                width: 2.4,
+                innerOff: { dx:  0.00, dy: 0.055, dz: 0.02 },
+                outerOff: { dx:  0.12, dy: 0.07, dz: 0.00 },
+                thickness: 0.020
+            },
+            // Big toothy white smile — his signature
+            mouth: { y: -0.52, hw: 0.25, z: 0.46, segs: 10,
+                     teeth: true, teethColor: '255,255,255' },
+            nose: {
+                bridge: [[0, -0.14, 0.54], [0, -0.29, 0.58], [0, -0.34, 0.60]],
+                base:   [[-0.06, -0.36, 0.53], [0, -0.34, 0.60], [0.06, -0.36, 0.53]]
+            },
+            wireColor: '#BB55CC',
+            wireRGB:   '187,85,204',
+            accentColor: '#DD88EE',
+            accentRGB:   '221,136,238',
+            // Slicked-back hair — swept backward from forehead, silver/gray
+            // Short-to-medium strands originating at top/front, flowing toward -z
+            hair: [
+                // Front hairline — swept back (the signature look)
+                { rx: -0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.08 },
+                { rx: -0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.15 },
+                { rx:  0.00, ry: 0.66, rz:  0.08, len: 0.52, color: '#888888', width: 1.7, freq: 0.22 },
+                { rx:  0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.30 },
+                { rx:  0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.38 },
+                // Mid-crown — slightly longer, flowing back
+                { rx: -0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.20 },
+                { rx:  0.00, ry: 0.65, rz:  0.00, len: 0.58, color: '#888888', width: 1.5, freq: 0.28 },
+                { rx:  0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.35 },
+                // Side sweeps — temples
+                { rx: -0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.42 },
+                { rx:  0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50 },
+                { rx: -0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55 },
+                { rx:  0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60 },
+                // Back strands — drape down behind
+                { rx: -0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.65 },
+                { rx:  0.00, ry: 0.64, rz: -0.14, len: 0.42, color: '#888888', width: 1.4, freq: 0.70 },
+                { rx:  0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.75 },
+                { rx: -0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.80 },
+                { rx:  0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.85 }
+            ],
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null
         }
     };
 
