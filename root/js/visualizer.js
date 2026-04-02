@@ -2269,103 +2269,172 @@
     function drawMetatronsCube(char, proj, amp, bass) {
         var t = performance.now() * 0.001;
 
-        // === Metatron's Cube: TRUE sacred geometry ===
-        // 13 equal circles: center + 6 inner (Fruit of Life) + 6 outer
-        // Circle radius = inner ring distance (so adjacent circles touch)
-        // All 78 lines connect every center to every other center
+        // === Color cycling: slow hue rotation (like the crystal ball) ===
+        var hue = (t * 0.035) % 1.0;
+        function hsl(h, s, l) {
+            var c = (1 - Math.abs(2 * l - 1)) * s;
+            var x = c * (1 - Math.abs((h * 6) % 2 - 1));
+            var m = l - c / 2;
+            var r, g, b;
+            if      (h < 1/6) { r=c; g=x; b=0; }
+            else if (h < 2/6) { r=x; g=c; b=0; }
+            else if (h < 3/6) { r=0; g=c; b=x; }
+            else if (h < 4/6) { r=0; g=x; b=c; }
+            else if (h < 5/6) { r=x; g=0; b=c; }
+            else               { r=c; g=0; b=x; }
+            return {
+                r: Math.round((r + m) * 255),
+                g: Math.round((g + m) * 255),
+                b: Math.round((b + m) * 255)
+            };
+        }
+        var pri = hsl(hue, 0.88, 0.48);
+        var acc = hsl(hue, 0.78, 0.68);
+        var cRGB = pri.r + ',' + pri.g + ',' + pri.b;
+        var aRGB = acc.r + ',' + acc.g + ',' + acc.b;
+        var cHex = 'rgb(' + cRGB + ')';
+        var aHex = 'rgb(' + aRGB + ')';
 
-        // Sacred proportion: circle radius = distance from center to inner ring
-        var D = 0.24;   // inner ring distance (= circle radius in model units)
-        var R2 = D * 2; // outer ring distance = 2x inner
+        // === 3D Metatron's Cube mapped onto a sphere ===
+        // Sacred proportions: 13 nodes on a sphere surface.
+        // Circle radius = chord distance from center to inner ring.
+        // This creates the overlapping Fruit-of-Life / Flower-of-Life pattern.
 
-        // 3D rotation: slow Y-axis spin + gentle X-axis wobble
-        var rotY = t * 0.18;
-        var rotX = Math.sin(t * 0.07) * 0.35 + 0.15;
+        var S = 0.42;  // sphere radius in model units
+        var colatInner = 32 * Math.PI / 180;  // inner ring: 32° from pole
+        var colatOuter = 58 * Math.PI / 180;  // outer ring: 58° from pole
+        // Sacred circle radius = chord distance center→inner
+        var circleR = 2 * S * Math.sin(colatInner / 2);  // ~0.23
 
-        var cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-        var cosX = Math.cos(rotX), sinX = Math.sin(rotX);
-
-        // Generate 13 base points in flat XY plane:
-        // [0] = center, [1-6] = inner hexagon at D, [7-12] = outer hexagon at 2D
-        var raw3d = [{x: 0, y: 0, z: 0}];
+        // Generate 13 nodes on sphere surface:
+        // [0] = front pole (center of the figure)
+        // [1-6] = inner ring at colatInner (60° apart)
+        // [7-12] = outer ring at colatOuter (60° apart)
+        var sphereNodes = [{x: 0, y: 0, z: S}];
         for (var i = 0; i < 6; i++) {
-            var a = (i * 60 + 90) * Math.PI / 180;
-            raw3d.push({x: D * Math.cos(a), y: D * Math.sin(a), z: 0});
+            var phi = (i * 60 + 90) * Math.PI / 180;
+            sphereNodes.push({
+                x: S * Math.sin(colatInner) * Math.cos(phi),
+                y: S * Math.sin(colatInner) * Math.sin(phi),
+                z: S * Math.cos(colatInner)
+            });
         }
         for (var i = 0; i < 6; i++) {
-            var a = (i * 60 + 90) * Math.PI / 180;
-            raw3d.push({x: R2 * Math.cos(a), y: R2 * Math.sin(a), z: 0});
+            var phi = (i * 60 + 90) * Math.PI / 180;
+            sphereNodes.push({
+                x: S * Math.sin(colatOuter) * Math.cos(phi),
+                y: S * Math.sin(colatOuter) * Math.sin(phi),
+                z: S * Math.cos(colatOuter)
+            });
         }
 
-        // 3D-rotate and project all 13 node centers
+        // Center the sphere so the geometry is roughly centered at origin
+        var zShift = S * 0.55;
+        for (var i = 0; i < sphereNodes.length; i++) {
+            sphereNodes[i].z -= zShift;
+        }
+
+        // Precompute normals and tangent frames for each node
+        // (for drawing circles in the tangent plane of the sphere)
+        var nodeFrames = [];
+        for (var i = 0; i < sphereNodes.length; i++) {
+            var p = sphereNodes[i];
+            // Normal = direction from sphere center to node (before z-shift undone)
+            var nx = p.x, ny = p.y, nz = p.z + zShift;
+            var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+            nx /= nl; ny /= nl; nz /= nl;
+            // Choose "up" vector for cross product
+            var upx = 0, upy = 1, upz = 0;
+            if (Math.abs(ny) > 0.95) { upx = 1; upy = 0; }
+            // U = normalize(cross(up, N))
+            var ux = upy*nz - upz*ny;
+            var uy = upz*nx - upx*nz;
+            var uz = upx*ny - upy*nx;
+            var ul = Math.sqrt(ux*ux + uy*uy + uz*uz) || 1;
+            ux /= ul; uy /= ul; uz /= ul;
+            // V = cross(N, U)
+            var vx = ny*uz - nz*uy;
+            var vy = nz*ux - nx*uz;
+            var vz = nx*uy - ny*ux;
+            nodeFrames.push({ ux:ux, uy:uy, uz:uz, vx:vx, vy:vy, vz:vz });
+        }
+
+        // 3D rotation: steady Y spin + gentle X wobble
+        var rotY = t * 0.15;
+        var rotX = Math.sin(t * 0.07) * 0.25 + 0.12;
+        var cosRY = Math.cos(rotY), sinRY = Math.sin(rotY);
+        var cosRX = Math.cos(rotX), sinRX = Math.sin(rotX);
+
+        function rotate(px, py, pz) {
+            // Y rotation then X rotation
+            var x1 = px * cosRY + pz * sinRY;
+            var z1 = -px * sinRY + pz * cosRY;
+            var y2 = py * cosRX - z1 * sinRX;
+            var z2 = py * sinRX + z1 * cosRX;
+            return { x: x1, y: y2, z: z2 };
+        }
+
+        // Bass breathing: uniform scale of entire geometry
+        var breathe = 1 + bass * 0.05;
+
+        // Project all 13 node centers (with wiggle + breathing + rotation)
         var pts = [];
-        for (var p = 0; p < raw3d.length; p++) {
-            var px = raw3d[p].x, py = raw3d[p].y, pz = raw3d[p].z;
+        for (var p = 0; p < sphereNodes.length; p++) {
+            var sn = sphereNodes[p];
+            var px = sn.x, py = sn.y, pz = sn.z;
 
-            // Per-node frequency wiggle (gentle, sacred)
+            // Per-node frequency wiggle (gentle)
             var fpos = p / 13;
             var fval = getFreqSample(fpos);
             var wa = t * 1.8 + p * 1.7;
-            px += Math.sin(wa) * fval * 0.008;
-            py += Math.cos(wa * 0.7) * fval * 0.008;
+            px += Math.sin(wa) * fval * 0.006;
+            py += Math.cos(wa * 0.7) * fval * 0.006;
 
-            // Bass: entire geometry breathes outward
-            var breathe = 1 + bass * 0.04;
-            px *= breathe; py *= breathe;
+            // Bass breathing
+            px *= breathe; py *= breathe; pz *= breathe;
 
-            // Rotate around Y then X for 3D tumble
-            var x1 = px * cosY + pz * sinY;
-            var z1 = -px * sinY + pz * cosY;
-            var y1 = py;
-            var y2 = y1 * cosX - z1 * sinX;
-            var z2 = y1 * sinX + z1 * cosX;
-
-            pts.push(proj(x1, y2 - 0.06, 0.10 + z2));
+            // Rotate and project
+            var r = rotate(px, py, pz);
+            pts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
         }
-
-        var cRGB = char.wireRGB;
-        var aRGB = char.accentRGB;
-        var cHex = char.wireColor;
-        var aHex = char.accentColor;
 
         wireCtx.lineCap = 'round';
         wireCtx.lineJoin = 'round';
 
         // --- Layer 1: All 78 connection lines (sacred web) ---
-        // Each line connects every node center to every other
         for (var a = 0; a < 13; a++) {
             for (var b = a + 1; b < 13; b++) {
                 // Classify line for visual hierarchy
-                var isOuterEdge = (a >= 7 && b >= 7 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
-                var isInnerEdge = (a >= 1 && a <= 6 && b >= 1 && b <= 6 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
+                var isOuterEdge = (a >= 7 && b >= 7 && (Math.abs(a-b) === 1 || Math.abs(a-b) === 5));
+                var isInnerEdge = (a >= 1 && a <= 6 && b >= 1 && b <= 6 && (Math.abs(a-b) === 1 || Math.abs(a-b) === 5));
                 var isSpoke = (a === 0);
-                var isStarEdge = false;
-                // Star of David: tri1=7,9,11 tri2=8,10,12
-                if ((a===7&&b===9)||(a===7&&b===11)||(a===9&&b===11)) isStarEdge = true;
-                if ((a===8&&b===10)||(a===8&&b===12)||(a===10&&b===12)) isStarEdge = true;
+                var isStarEdge = (
+                    (a===7&&b===9)||(a===7&&b===11)||(a===9&&b===11)||
+                    (a===8&&b===10)||(a===8&&b===12)||(a===10&&b===12)
+                );
 
                 var shimIdx = (a * 7 + b * 3) % 13;
                 var shimmer = getFreqSample(shimIdx / 13);
-
                 var alpha, lw;
+
                 if (isStarEdge) {
                     var treble = getFreqSample(0.82);
-                    alpha = 0.35 + treble * 0.35 + shimmer * 0.10;
+                    alpha = 0.35 + treble * 0.35;
                     lw = 1.4 + treble * 0.6;
                     wireCtx.shadowBlur = 8 + treble * 14;
                     wireCtx.shadowColor = aHex;
                     wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
                 } else if (isOuterEdge) {
-                    alpha = 0.30 + bass * 0.30 + shimmer * 0.10;
+                    alpha = 0.30 + bass * 0.30;
                     lw = 1.2 + bass * 0.5;
                     wireCtx.shadowBlur = 6 + bass * 10;
                     wireCtx.shadowColor = aHex;
                     wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
                 } else if (isInnerEdge) {
-                    var midFreq = getFreqSample(0.45);
-                    alpha = 0.25 + midFreq * 0.30 + shimmer * 0.10;
-                    lw = 1.0 + midFreq * 0.4;
-                    wireCtx.shadowBlur = 5 + midFreq * 8;
+                    var midF = getFreqSample(0.45);
+                    alpha = 0.25 + midF * 0.30;
+                    lw = 1.0 + midF * 0.4;
+                    wireCtx.shadowBlur = 5 + midF * 8;
                     wireCtx.shadowColor = cHex;
                     wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
                 } else if (isSpoke) {
@@ -2389,42 +2458,39 @@
             }
         }
 
-        // --- Layer 2: 13 sacred circles, all radius D ---
-        // Projected as proper 3D ellipses (48-segment approximation)
-        // They overlap and intersect, forming the Flower of Life pattern
+        // --- Layer 2: 13 sacred circles on the sphere surface ---
+        // Each circle lies in the tangent plane at its node, radius = circleR
+        // Projected through 3D rotation as proper ellipses
+        var CSEGS = 48;
         for (var i = 0; i < 13; i++) {
+            var sn = sphereNodes[i];
+            var fr = nodeFrames[i];
             var fval = getFreqSample(i / 13);
             var isCenter = (i === 0);
-            var CSEGS = 48;
-            var cpts = [];
-            var cx = raw3d[i].x, cy = raw3d[i].y;
 
+            // Per-node wiggle (same as node center computation)
+            var wa3 = t * 1.8 + i * 1.7;
+            var wigX = Math.sin(wa3) * fval * 0.006;
+            var wigY = Math.cos(wa3 * 0.7) * fval * 0.006;
+
+            var cpts = [];
             for (var s = 0; s <= CSEGS; s++) {
                 var ca = (s / CSEGS) * Math.PI * 2;
-                var cpx = cx + D * Math.cos(ca);
-                var cpy = cy + D * Math.sin(ca);
-                var cpz = 0;
+                var cosA = Math.cos(ca), sinA = Math.sin(ca);
 
-                // Same wiggle as node center
-                var wa2 = t * 1.8 + i * 1.7;
-                cpx += Math.sin(wa2) * fval * 0.008;
-                cpy += Math.cos(wa2 * 0.7) * fval * 0.008;
-                cpx *= (1 + bass * 0.04);
-                cpy *= (1 + bass * 0.04);
+                // Circle point in model space: node + circleR * (cos*U + sin*V)
+                var cpx = (sn.x + circleR * (cosA * fr.ux + sinA * fr.vx) + wigX) * breathe;
+                var cpy = (sn.y + circleR * (cosA * fr.uy + sinA * fr.vy) + wigY) * breathe;
+                var cpz = (sn.z + circleR * (cosA * fr.uz + sinA * fr.vz)) * breathe;
 
-                // 3D rotation (same as nodes)
-                var x1 = cpx * cosY + cpz * sinY;
-                var z1 = -cpx * sinY + cpz * cosY;
-                var y1 = cpy;
-                var y2 = y1 * cosX - z1 * sinX;
-                var z2 = y1 * sinX + z1 * cosX;
-
-                cpts.push(proj(x1, y2 - 0.06, 0.10 + z2));
+                var r = rotate(cpx, cpy, cpz);
+                cpts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
             }
 
+            // Style: center circle brighter, all freq-reactive
             var cAlpha = isCenter ? (0.35 + bass * 0.25 + fval * 0.15)
                                   : (0.15 + fval * 0.25 + bass * 0.08);
-            var cLw = isCenter ? (1.3 + bass * 0.5) : (0.8 + fval * 0.4);
+            var cLw = isCenter ? (1.4 + bass * 0.5) : (0.9 + fval * 0.4);
 
             wireCtx.strokeStyle = 'rgba(' + (isCenter ? aRGB : cRGB) + ',' + Math.min(1, cAlpha).toFixed(3) + ')';
             wireCtx.lineWidth = cLw;
@@ -2439,19 +2505,15 @@
         }
 
         // --- Layer 3: Center glow orb ---
-        // Use projected distance for proper 3D-scaled glow
-        var refA = proj(0, -0.06, 0.10);
-        var refB = proj(D * cosY, -0.06, 0.10);
-        var circScreenR = Math.sqrt((refB.x-refA.x)*(refB.x-refA.x)+(refB.y-refA.y)*(refB.y-refA.y));
-        var glowR = circScreenR * 0.35 + bass * 8 + amp * 4;
+        var glowR = 12 + bass * 10 + amp * 5;
         wireCtx.shadowBlur = 20 + bass * 25;
         wireCtx.shadowColor = aHex;
         var gradient = wireCtx.createRadialGradient(
             pts[0].x, pts[0].y, 0,
             pts[0].x, pts[0].y, glowR
         );
-        gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.18 + bass * 0.15).toFixed(3) + ')');
-        gradient.addColorStop(0.5, 'rgba(' + cRGB + ',' + (0.06 + bass * 0.06).toFixed(3) + ')');
+        gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.20 + bass * 0.15).toFixed(3) + ')');
+        gradient.addColorStop(0.5, 'rgba(' + cRGB + ',' + (0.07 + bass * 0.06).toFixed(3) + ')');
         gradient.addColorStop(1, 'rgba(' + cRGB + ',0)');
         wireCtx.fillStyle = gradient;
         wireCtx.beginPath();
@@ -2459,10 +2521,10 @@
         wireCtx.fill();
 
         // --- Layer 4: Emanating text ---
-        drawMetatronText(char, pts[0], t, amp, bass);
+        drawMetatronText(char, pts[0], t, amp, bass, cRGB, aRGB, aHex);
     }
 
-    function drawMetatronText(char, center, t, amp, bass) {
+    function drawMetatronText(char, center, t, amp, bass, cycleRGB, cycleAccRGB, cycleAccHex) {
         // Spawn new text particles periodically
         metatronSpawnTimer -= 0.016;
         if (metatronSpawnTimer <= 0) {
@@ -2501,8 +2563,8 @@
             wireCtx.textAlign = 'center';
             wireCtx.textBaseline = 'middle';
             wireCtx.shadowBlur = 6 + p.life * 8;
-            wireCtx.shadowColor = char.accentColor;
-            wireCtx.fillStyle = 'rgba(' + char.accentRGB + ',' + alpha.toFixed(3) + ')';
+            wireCtx.shadowColor = cycleAccHex || char.accentColor;
+            wireCtx.fillStyle = 'rgba(' + (cycleAccRGB || char.accentRGB) + ',' + alpha.toFixed(3) + ')';
             wireCtx.fillText(p.word, center.x + p.x, center.y + p.y);
         }
 
