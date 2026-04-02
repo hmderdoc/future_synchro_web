@@ -125,7 +125,7 @@
     // (hair, hat, facial hair).  Active character selected by artist tag.
     var CHARACTERS = {
         _default: {
-            name: 'Skull',
+            name: 'Vektrax',   // The green skull — default / fallback character
             profile: [
                 [0.00, -0.80], [0.22, -0.70], [0.38, -0.58],
                 [0.48, -0.42], [0.52, -0.25], [0.50, -0.08],
@@ -150,7 +150,45 @@
             accentRGB:   '255,170,0',
             hair: null,
             hat: null,
-            facialHair: null
+            facialHair: null,
+            // Chibi wireframe body — Vectrex laser-scan neon glow
+            body: {
+                color: '#33FF33',
+                rgb: '51,255,51',
+                // Skeleton keypoints in body-local coords (x, y)
+                // y=0 is the neck (connects to chin), positive = downward
+                // Body is roughly 0.7 head-heights tall (chibi proportions)
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                // Which joints connect via bone segments
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003     // beam scan speed for phosphor trail
+            }
         },
 
         quantumacidface: {
@@ -1884,6 +1922,11 @@
                 wireCtx.stroke();
             }
             wireCtx.shadowBlur = 0;
+        }
+
+        // --- Body (Vectrex laser-scan wireframe below head) ---
+        if (activeChar.body) {
+            drawBody(activeChar, projState, amp, bass);
         }
     }
 
@@ -4673,6 +4716,158 @@
             wireCtx.globalAlpha = 1;
             wireCtx.lineWidth   = stache.width || 1.5;
         }
+    }
+
+    // =========================================================
+    //  Body Renderer — Vectrex / laser-scan neon wireframe
+    //  2D skeleton with Z-wobble phosphor trail effect
+    // =========================================================
+    var bodyDancePhase = 0;
+    var bodyBeamPhase  = 0;
+
+    function drawBody(char, projState, amp, bass) {
+        var body = char.body;
+        if (!body || !body.skeleton || !body.bones) return;
+
+        var t = performance.now() * 0.001;
+        bodyDancePhase += 0.035;
+        bodyBeamPhase  += body.scanSpeed || 0.003;
+
+        var skel = body.skeleton;
+        var color = body.color || char.wireColor || '#33FF33';
+        var rgb   = body.rgb   || char.wireRGB   || '51,255,51';
+        var baseLineW = body.lineWidth || 1.8;
+        var glowW     = body.glowWidth || 6;
+
+        // Body origin: directly below the chin
+        // Head chin is at profile y = -0.80, projected through proj()
+        // We'll position the body neck at the chin screen position
+        var chinY = -0.80;
+        var neckScreen = projectHeadPoint(projState, 0, chinY, 0, projState.pulse || 1);
+        var bodyOriginX = neckScreen.x;
+        var bodyOriginY = neckScreen.y;
+
+        // Scale: body coords are in head-units, scale to screen pixels
+        // Use the same scale as the head projection but smaller (chibi)
+        var bodyScale = projState.scale * (projState.pulse || 1) * 0.52;
+
+        // Dance animation: compute offsets per joint based on audio
+        // Simple dance: sway hips, bounce knees, swing arms
+        var sway     = Math.sin(bodyDancePhase) * (0.03 + bass * 0.06);
+        var bounce   = Math.abs(Math.sin(bodyDancePhase * 2)) * (0.01 + bass * 0.03);
+        var armSwing = Math.sin(bodyDancePhase * 1.0) * (0.04 + amp * 0.08);
+        var legPump  = Math.sin(bodyDancePhase * 2.0) * (0.02 + bass * 0.04);
+
+        // Compute animated joint positions (body-local, 2D)
+        var joints = {};
+        for (var name in skel) {
+            var j = skel[name];
+            var x = j.x;
+            var y = j.y;
+
+            // Apply dance motion per body region
+            if (name === 'hip' || name === 'hipL' || name === 'hipR') {
+                x += sway;
+                y -= bounce * 0.3;
+            } else if (name === 'kneeL') {
+                x += sway * 0.5;
+                y -= bounce * 0.5 + legPump * 0.5;
+            } else if (name === 'kneeR') {
+                x += sway * 0.5;
+                y -= bounce * 0.5 - legPump * 0.5;
+            } else if (name === 'footL') {
+                x += sway * 0.3;
+                y -= bounce + legPump * 0.8;
+            } else if (name === 'footR') {
+                x += sway * 0.3;
+                y -= bounce - legPump * 0.8;
+            } else if (name === 'elbowL' || name === 'handL') {
+                x -= armSwing * (name === 'handL' ? 1.2 : 0.6);
+                y += armSwing * 0.3;
+            } else if (name === 'elbowR' || name === 'handR') {
+                x += armSwing * (name === 'handR' ? 1.2 : 0.6);
+                y -= armSwing * 0.3;
+            } else if (name === 'shoulderL' || name === 'shoulderR') {
+                y -= bounce * 0.15;
+            } else if (name === 'neck') {
+                y -= bounce * 0.1;
+            }
+
+            // Project to screen: body is 2D but with Z-wobble for depth shimmer
+            var zWobble = Math.sin(t * 1.5 + y * 4.0) * 0.06;
+            var screenX = bodyOriginX + x * bodyScale;
+            var screenY = bodyOriginY + y * bodyScale;
+            // Z-wobble shifts screen X slightly for phosphor depth effect
+            screenX += zWobble * bodyScale * 0.4;
+
+            joints[name] = { x: screenX, y: screenY, localY: j.y };
+        }
+
+        // Draw the body using Vectrex phosphor beam aesthetic:
+        // Each bone segment is drawn as a glowing neon line with
+        // a scanning beam trail that fades along its length.
+        var bones = body.bones;
+        var totalBones = bones.length;
+
+        wireCtx.lineCap = 'round';
+        wireCtx.lineJoin = 'round';
+
+        for (var b = 0; b < totalBones; b++) {
+            var j0 = joints[bones[b][0]];
+            var j1 = joints[bones[b][1]];
+            if (!j0 || !j1) continue;
+
+            // Beam scan phase: each bone lights up sequentially
+            // creating the classic Vectrex "beam drawing" effect
+            var bonePhase = (bodyBeamPhase + b / totalBones) % 1.0;
+
+            // Phosphor persistence: recently-scanned bones glow bright,
+            // older ones fade to a dim afterglow
+            var timeSinceScan = bonePhase; // 0 = just scanned, 1 = about to be scanned again
+            var brightness = Math.max(0.15, 1.0 - timeSinceScan * 0.85);
+            var glowBrightness = Math.max(0, 1.0 - timeSinceScan * 1.5);
+
+            // Audio reactivity: bass pumps brightness
+            brightness = Math.min(1, brightness + bass * 0.15);
+            glowBrightness = Math.min(1, glowBrightness + bass * 0.2);
+
+            // Outer glow layer (wide, soft)
+            if (glowBrightness > 0.05) {
+                wireCtx.strokeStyle = 'rgba(' + rgb + ',' + (glowBrightness * 0.25).toFixed(3) + ')';
+                wireCtx.lineWidth = glowW + bass * 3;
+                wireCtx.shadowBlur = 12 + bass * 8;
+                wireCtx.shadowColor = color;
+                wireCtx.beginPath();
+                wireCtx.moveTo(j0.x, j0.y);
+                wireCtx.lineTo(j1.x, j1.y);
+                wireCtx.stroke();
+            }
+
+            // Core line (thin, bright)
+            wireCtx.strokeStyle = 'rgba(' + rgb + ',' + brightness.toFixed(3) + ')';
+            wireCtx.lineWidth = baseLineW;
+            wireCtx.shadowBlur = 4 + glowBrightness * 6;
+            wireCtx.shadowColor = color;
+            wireCtx.beginPath();
+            wireCtx.moveTo(j0.x, j0.y);
+            wireCtx.lineTo(j1.x, j1.y);
+            wireCtx.stroke();
+        }
+
+        // Draw joints as small glowing dots (Vectrex vertex flare)
+        for (var name in joints) {
+            var jt = joints[name];
+            // Joint brightness based on nearest bone scan
+            var jBright = 0.3 + bass * 0.2;
+            wireCtx.fillStyle = 'rgba(' + rgb + ',' + jBright.toFixed(3) + ')';
+            wireCtx.shadowBlur = 6;
+            wireCtx.shadowColor = color;
+            wireCtx.beginPath();
+            wireCtx.arc(jt.x, jt.y, 1.5 + bass * 1.0, 0, Math.PI * 2);
+            wireCtx.fill();
+        }
+
+        wireCtx.shadowBlur = 0;
     }
 
     function stroke(pts) {
