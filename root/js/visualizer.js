@@ -261,6 +261,7 @@
                 right: { x:  0.16, y: -0.03, z: 0.46, r: 0.065 }
             },
             eyeColor: { hex: '#332211', rgb: '51,34,17' },
+            eyeOutlineColor: { hex: '#FFFFFF', rgb: '255,255,255' },
             eyeShape: 'round',
             mouth: { y: -0.52, hw: 0.20, z: 0.46, segs: 8,
                      teeth: false, bucktooth: true, bucktoothColor: '255,255,255' },
@@ -273,8 +274,8 @@
             accentColor: '#FFAA00',
             accentRGB:   '255,170,0',
             eyebrows: {
-                color: '#885522',
-                rgb:   '136,85,34',
+                color: '#FFFF55',
+                rgb:   '255,255,85',
                 width: 2.2,
                 innerOff: { dx:  0.00, dy: 0.06, dz: 0.02 },
                 outerOff: { dx:  0.11, dy: 0.07, dz: 0.00 },
@@ -290,8 +291,8 @@
             },
             facialHair: {
                 type: 'moustache',
-                color: '#885522',
-                rgb:   '136,85,34',
+                color: '#FFFF55',
+                rgb:   '255,255,85',
                 width: 1.8,
                 // Moustache spans from nose base down toward mouth corners
                 spread: 0.22,   // how far out from center the ends reach
@@ -1049,9 +1050,12 @@
 
         var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
         var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
+        // Use separate outline color when defined (e.g. white outline + dark pupil)
+        var oHex = (char.eyeOutlineColor ? char.eyeOutlineColor.hex : eHex);
+        var oRGB = (char.eyeOutlineColor ? char.eyeOutlineColor.rgb : eRGB);
         wireCtx.shadowBlur  = 10 + eyeGlow * 16;
-        wireCtx.shadowColor = eHex;
-        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
+        wireCtx.shadowColor = oHex;
+        wireCtx.strokeStyle = 'rgba(' + oRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
         wireCtx.lineWidth   = 1.5 + eyeGlow;
 
         wireCtx.beginPath();
@@ -1491,7 +1495,7 @@
 
         // Subtle bob with music
         var bob = bass * 0.012 + Math.sin(breathPhase) * 0.003;
-        var hatBase = topY - 0.02 + bob;
+        var hatBase = topY - 0.08 + bob;  // sit lower, hug the head
 
         // === Brim ===
         // Wide oval below the crown — cowboy hat brim extends far out
@@ -1500,10 +1504,10 @@
         var brimPts = [];
         for (var i = 0; i <= brimSegs; i++) {
             var a = (i / brimSegs) * Math.PI * 2;
-            var brimRadX = 0.72;  // wide
-            var brimRadZ = 0.45;  // front-to-back
+            var brimRadX = 0.88;  // wide
+            var brimRadZ = 0.55;  // front-to-back
             // Curve the brim: front and back tilt down, sides stay up
-            var brimDip = -Math.abs(Math.cos(a)) * 0.04 + Math.abs(Math.sin(a)) * 0.03;
+            var brimDip = -Math.abs(Math.cos(a)) * 0.06 + Math.abs(Math.sin(a)) * 0.05;
             brimPts.push(proj(
                 brimRadX * Math.cos(a),
                 brimY + brimDip,
@@ -1514,7 +1518,7 @@
         wireCtx.shadowBlur  = 6 + bass * 8;
         wireCtx.shadowColor = hat.color;
         wireCtx.strokeStyle = 'rgba(' + hat.rgb + ',0.7)';
-        wireCtx.lineWidth   = 1.8;
+        wireCtx.lineWidth   = 2.2;
         wireCtx.lineCap = 'round';
         stroke(brimPts);
 
@@ -1522,8 +1526,8 @@
         var innerBrimPts = [];
         for (var i = 0; i <= brimSegs; i++) {
             var a = (i / brimSegs) * Math.PI * 2;
-            var iRadX = 0.38;
-            var iRadZ = 0.28;
+            var iRadX = 0.44;
+            var iRadZ = 0.34;
             innerBrimPts.push(proj(
                 iRadX * Math.cos(a),
                 brimY + 0.01,
@@ -1536,9 +1540,9 @@
 
         // === Crown (the tall part) ===
         var crownBase = hatBase + 0.03;
-        var crownTop  = crownBase + 0.28;
-        var crownRadX = 0.30;
-        var crownRadZ = 0.22;
+        var crownTop  = crownBase + 0.36;
+        var crownRadX = 0.36;
+        var crownRadZ = 0.28;
 
         // Crown rings (horizontal bands)
         var crownRings = 5;
