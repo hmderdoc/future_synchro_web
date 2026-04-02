@@ -75,6 +75,7 @@
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
     var headWaveform  = [];     // normalized analyser time-domain samples
+    var headFreqData  = [];     // normalized frequency bin data (0-1)
     var headProjectionState = null;
     var eyeScreenPoints = { left: null, right: null, mouth: null };
     var vizTime       = 0;
@@ -156,38 +157,47 @@
                 right: { x:  0.19, y: -0.03, z: 0.46, r: 0.09 }
             },
             eyeColor: { hex: '#5599FF', rgb: '85,153,255' },
-            mouth: { y: -0.50, hw: 0.27, z: 0.45, segs: 10, teeth: true },
+            mouth: { y: -0.50, hw: 0.27, z: 0.45, segs: 10,
+                     teeth: true, teethColor: '255,255,255' },
             nose: {
                 bridge: [[0, -0.13, 0.54], [0, -0.27, 0.58], [0, -0.31, 0.59]],
                 base:   [[-0.07, -0.33, 0.53], [0, -0.31, 0.59], [0.07, -0.33, 0.53]]
             },
             wireColor: '#9999BB',
             wireRGB:   '153,153,187',
-            accentColor: '#FFAA00',
-            accentRGB:   '255,170,0',
+            accentColor: '#CC55FF',
+            accentRGB:   '204,85,255',
             hair: [
-                // Left side — long flowing strands
-                { rx: -0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8 },
-                { rx: -0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5 },
-                { rx: -0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6 },
-                { rx: -0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4 },
-                { rx: -0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3 },
-                { rx: -0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5 },
-                { rx: -0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4 },
-                // Right side — mirror
-                { rx:  0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8 },
-                { rx:  0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5 },
-                { rx:  0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6 },
-                { rx:  0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4 },
-                { rx:  0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3 },
-                { rx:  0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5 },
-                { rx:  0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4 },
-                // Top / back — shorter strands
-                { rx: -0.12, ry: 0.63, rz: -0.12, len: 0.70, color: '#FF55FF', width: 1.2 },
-                { rx:  0.12, ry: 0.63, rz: -0.12, len: 0.70, color: '#55FFFF', width: 1.2 },
-                { rx:  0.00, ry: 0.65, rz: -0.10, len: 0.60, color: '#AA55FF', width: 1.3 },
-                { rx: -0.18, ry: 0.60, rz: -0.18, len: 0.80, color: '#FFFF55', width: 1.3 },
-                { rx:  0.18, ry: 0.60, rz: -0.18, len: 0.80, color: '#55FF55', width: 1.3 }
+                // Left side — long flowing strands (low→mid freq)
+                { rx: -0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.05 },
+                { rx: -0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.10 },
+                { rx: -0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.18 },
+                { rx: -0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.25 },
+                { rx: -0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.35 },
+                { rx: -0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.07 },
+                { rx: -0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.42 },
+                // Right side — mirror (mid→high freq)
+                { rx:  0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.50 },
+                { rx:  0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.58 },
+                { rx:  0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.65 },
+                { rx:  0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.72 },
+                { rx:  0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.80 },
+                { rx:  0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.55 },
+                { rx:  0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.88 },
+                // Top / crown — tighter coverage
+                { rx: -0.08, ry: 0.64, rz:  0.05, len: 0.65, color: '#FF55FF', width: 1.3, freq: 0.30 },
+                { rx:  0.08, ry: 0.64, rz:  0.05, len: 0.65, color: '#55FFFF', width: 1.3, freq: 0.38 },
+                { rx:  0.00, ry: 0.65, rz:  0.02, len: 0.55, color: '#AA55FF', width: 1.4, freq: 0.45 },
+                { rx: -0.15, ry: 0.62, rz:  0.00, len: 0.75, color: '#FFFF55', width: 1.2, freq: 0.22 },
+                { rx:  0.15, ry: 0.62, rz:  0.00, len: 0.75, color: '#55FF55', width: 1.2, freq: 0.68 },
+                { rx: -0.05, ry: 0.65, rz: -0.05, len: 0.50, color: '#FF55AA', width: 1.3, freq: 0.15 },
+                { rx:  0.05, ry: 0.65, rz: -0.05, len: 0.50, color: '#55AAFF', width: 1.3, freq: 0.75 },
+                // Back — draping down behind
+                { rx: -0.12, ry: 0.63, rz: -0.12, len: 0.80, color: '#FF55FF', width: 1.2, freq: 0.12 },
+                { rx:  0.12, ry: 0.63, rz: -0.12, len: 0.80, color: '#55FFFF', width: 1.2, freq: 0.62 },
+                { rx:  0.00, ry: 0.65, rz: -0.15, len: 0.70, color: '#AA55FF', width: 1.3, freq: 0.40 },
+                { rx: -0.20, ry: 0.58, rz: -0.18, len: 0.90, color: '#FFFF55', width: 1.3, freq: 0.08 },
+                { rx:  0.20, ry: 0.58, rz: -0.18, len: 0.90, color: '#55FF55', width: 1.3, freq: 0.85 }
             ],
             hat: null,
             facialHair: null
@@ -751,6 +761,10 @@
             var data = new Uint8Array(bins);
             radio.analyserNode.getByteFrequencyData(data);
 
+            // Store normalized frequency data for hair animation
+            headFreqData = new Array(bins);
+            for (var fi = 0; fi < bins; fi++) headFreqData[fi] = data[fi] / 255;
+
             var sum = 0;
             for (var i = 0; i < bins; i++) sum += data[i];
             amp = sum / (bins * 255);
@@ -775,6 +789,7 @@
             }
         } else {
             headWaveform = [];
+            headFreqData = [];
         }
 
         // Skip rendering when tab is hidden or panel is not visible
@@ -1006,11 +1021,12 @@
         // Teeth (optional per character)
         if (mth.teeth && open > 0.015) {
             var teethN = Math.max(3, Math.floor(mth.segs * 0.7));
-            var tAlpha = Math.min(0.75, open * 3);
-            wireCtx.strokeStyle = 'rgba(255,255,255,' + tAlpha + ')';
-            wireCtx.shadowColor = '#FFFFFF';
-            wireCtx.shadowBlur  = 3 + mouthOpen * 4;
-            wireCtx.lineWidth   = 0.7;
+            var tRGB = mth.teethColor || '255,255,255';
+            var tAlpha = Math.min(0.95, open * 5);
+            wireCtx.strokeStyle = 'rgba(' + tRGB + ',' + tAlpha + ')';
+            wireCtx.shadowColor = 'rgba(' + tRGB + ',1)';
+            wireCtx.shadowBlur  = 6 + mouthOpen * 10;
+            wireCtx.lineWidth   = 1.0;
             for (var ti = 1; ti < teethN; ti++) {
                 var tt = (ti / teethN) * 2 - 1;
                 var tcurv = 1 - tt * tt;
@@ -1046,6 +1062,16 @@
     //  Character feature renderers
     // =========================================================
 
+    var HAIR_SEGS = 8;  // subdivision points per strand
+
+    function getFreqSample(freqPos) {
+        // freqPos: 0-1 maps across the frequency spectrum
+        if (!headFreqData.length) return 0;
+        var idx = Math.min(headFreqData.length - 1,
+                           Math.floor(freqPos * headFreqData.length));
+        return headFreqData[idx] || 0;
+    }
+
     function drawHair(char, proj, amp, bass) {
         if (!char.hair || !char.hair.length) return;
         var t = performance.now() * 0.001;
@@ -1055,34 +1081,66 @@
             var h = char.hair[i];
             var root = proj(h.rx, h.ry, h.rz);
 
-            // Audio-reactive sway: bass drives big swings, amp drives flutter
-            var phase = t * 1.8 + i * 1.1;
-            var bassSway = bass * 0.15 * Math.sin(phase * 0.7);
-            var ampFlutter = amp * 0.07 * Math.sin(phase * 2.3);
-            var breathSway = Math.sin(breathPhase + i * 0.3) * 0.015;
+            // Each strand maps to a frequency band (or defaults to spread)
+            var freqPos = (typeof h.freq === 'number') ? h.freq : (i / char.hair.length);
+            var freqVal = getFreqSample(freqPos);
 
-            // Mid control point — slight outward bow + sway
-            var midFrac = 0.45;
-            var midY = h.ry - h.len * midFrac;
-            var midX = h.rx * 1.12 + (bassSway + breathSway) * 0.5;
-            var midZ = h.rz + Math.sin(phase * 0.5) * 0.03;
-            var mid = proj(midX, midY, midZ);
+            // Gravity direction: hair hangs down (negative Y) and outward
+            var outward = (h.rx >= 0) ? 1 : -1;
+            var phase = t * 1.5 + i * 0.9;
+            var breathSway = Math.sin(breathPhase + i * 0.3) * 0.012;
 
-            // Tip — full sway + flutter
-            var tipY = h.ry - h.len;
-            var tipX = h.rx * 1.05 + bassSway + ampFlutter + breathSway;
-            var tipZ = h.rz + Math.cos(phase * 0.8) * 0.05;
-            var tip = proj(tipX, tipY, tipZ);
+            // Build segmented strand with frequency-driven waveform displacement
+            var pts = [root];
+            for (var s = 1; s <= HAIR_SEGS; s++) {
+                var frac = s / HAIR_SEGS;  // 0..1 along strand length
 
+                // Base position: hang downward with slight outward drift
+                var baseY = h.ry - h.len * frac;
+                var baseX = h.rx + (h.rx * 0.15 * frac);  // drift outward
+                var baseZ = h.rz + Math.sin(phase * 0.3 + frac) * 0.02;
+
+                // Frequency-driven waveform displacement
+                // Higher freq strands oscillate faster, lower ones sway bigger
+                var waveSpeed = 2.0 + freqPos * 6.0;  // high freq = fast wave
+                var waveAmp = freqVal * (0.06 + (1 - freqPos) * 0.10);  // low freq = bigger
+                var wavePropagation = frac * 3.0;  // wave travels down the strand
+                var wave = Math.sin(t * waveSpeed + wavePropagation + i * 1.1) * waveAmp;
+
+                // Add bass thump: sharp displacement that decays along length
+                var bassKick = bass * 0.08 * Math.sin(phase * 0.7) * (0.3 + frac * 0.7);
+
+                // Combine displacements
+                var dx = wave * outward + bassKick + breathSway * frac;
+                var dz = Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
+
+                pts.push(proj(baseX + dx, baseY, baseZ + dz));
+            }
+
+            // Glow intensity scales with frequency energy
+            var glowBoost = freqVal * 12;
             wireCtx.strokeStyle = h.color;
             wireCtx.shadowColor = h.color;
-            wireCtx.shadowBlur  = 5 + bass * 14;
-            wireCtx.lineWidth   = h.width || 1.2;
-            wireCtx.globalAlpha = 0.7 + amp * 0.3;
+            wireCtx.shadowBlur  = 4 + bass * 8 + glowBoost;
+            wireCtx.lineWidth   = (h.width || 1.2) + freqVal * 0.6;
+            wireCtx.globalAlpha = 0.65 + freqVal * 0.35;
 
+            // Draw smooth curve through all segment points
             wireCtx.beginPath();
-            wireCtx.moveTo(root.x, root.y);
-            wireCtx.quadraticCurveTo(mid.x, mid.y, tip.x, tip.y);
+            wireCtx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 2) {
+                wireCtx.lineTo(pts[1].x, pts[1].y);
+            } else {
+                // Catmull-Rom-ish smooth curve via quadratic segments
+                for (var s = 1; s < pts.length - 1; s++) {
+                    var cpx = (pts[s].x + pts[s + 1].x) * 0.5;
+                    var cpy = (pts[s].y + pts[s + 1].y) * 0.5;
+                    wireCtx.quadraticCurveTo(pts[s].x, pts[s].y, cpx, cpy);
+                }
+                // Final segment to last point
+                var last = pts[pts.length - 1];
+                wireCtx.lineTo(last.x, last.y);
+            }
             wireCtx.stroke();
         }
         wireCtx.globalAlpha = 1;
