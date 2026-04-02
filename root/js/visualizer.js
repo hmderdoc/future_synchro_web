@@ -299,6 +299,47 @@
                 droop:  0.06,   // how far below nose the ends hang
                 curl:   0.02    // upward curl at tips (0 = straight down)
             }
+        },
+
+        floppydriveprincess: {
+            name: 'Floppy Drive Princess',
+            headShape: 'box',
+            boxDims: { w: 0.48, h: 0.52, d: 0.28 },
+            profile: null,
+            ringN: 0,
+            eyes: {
+                left:  { x: -0.15, y: 0.18, z: 0.28, r: 0.050 },
+                right: { x:  0.15, y: 0.18, z: 0.28, r: 0.050 }
+            },
+            eyeColor: { hex: '#55FF55', rgb: '85,255,85' },
+            eyeOutlineColor: null,
+            eyeShape: 'round',
+            eyelashes: {
+                count: 5,
+                length: 0.045,
+                color: '#CCCCCC',
+                rgb: '204,204,204',
+                width: 1.0,
+                reactive: true
+            },
+            // Drive slot mouth — wide rectangular opening
+            mouth: { y: -0.12, hw: 0.36, z: 0.28, segs: 2,
+                     teeth: false, slot: true },
+            nose: null,
+            wireColor: '#AAAAAA',
+            wireRGB:   '170,170,170',
+            accentColor: '#FF55FF',
+            accentRGB:   '255,85,255',
+            eyebrows: null,
+            hair: null,
+            hat: null,
+            facialHair: null,
+            ledIndicators: [
+                { x: 0.34, y: 0.38, color: '#55FF55', rgb: '85,255,85',
+                  mode: 'activity' },
+                { x: 0.34, y: 0.30, color: '#FFAA00', rgb: '255,170,0',
+                  mode: 'power' }
+            ]
         }
     };
 
@@ -947,58 +988,63 @@
         eyeScreenPoints.right = projectHeadPoint(projState, activeChar.eyes.right.x, activeChar.eyes.right.y, activeChar.eyes.right.z, pulse);
         eyeScreenPoints.mouth = projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, pulse);
 
-        // Generate rings
-        var rings = [];
-        var waveformTime = performance.now() * 0.0065;
-        var waveStrength = waveHeadEnabled ? (0.016 + amp * 0.055 + bass * 0.035) : 0;
-        for (var p = 0; p < activeChar.profile.length; p++) {
-            var ring = [];
-            var baseRad = activeChar.profile[p][0];
-            var baseY = activeChar.profile[p][1];
-            for (var s = 0; s < activeChar.ringN; s++) {
-                var a = (s / activeChar.ringN) * Math.PI * 2;
-                var rad = baseRad;
-                var yy = baseY;
-                if (waveHeadEnabled && headWaveform.length) {
-                    var sample = getWaveformSample((s * 2) + p);
-                    var shimmer = Math.sin(waveformTime + p * 0.55 + s * 0.42);
-                    var wave = sample * 0.78 + shimmer * 0.22;
-                    rad += wave * waveStrength * (0.55 + baseRad);
-                    yy += wave * waveStrength * 0.38;
-                }
-                ring.push(proj(rad * Math.cos(a), yy, rad * Math.sin(a)));
-            }
-            rings.push(ring);
-        }
-
         wireCtx.lineCap = wireCtx.lineJoin = 'round';
 
-        // --- Horizontal rings ---
-        wireCtx.shadowBlur  = 8 + bass * 14 + (waveHeadEnabled ? 8 : 0);
-        wireCtx.shadowColor = activeChar.wireColor;
-        wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.55)';
-        wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
-
-        for (var r = 0; r < rings.length; r++) {
-            wireCtx.beginPath();
-            for (var i = 0; i < rings[r].length; i++) {
-                var pt = rings[r][i];
-                i === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+        if (activeChar.headShape === 'box') {
+            // --- Box wireframe (floppy drive etc.) ---
+            drawBoxHead(activeChar, proj, amp, bass);
+        } else {
+            // --- Rotational profile rings ---
+            var rings = [];
+            var waveformTime = performance.now() * 0.0065;
+            var waveStrength = waveHeadEnabled ? (0.016 + amp * 0.055 + bass * 0.035) : 0;
+            for (var p = 0; p < activeChar.profile.length; p++) {
+                var ring = [];
+                var baseRad = activeChar.profile[p][0];
+                var baseY = activeChar.profile[p][1];
+                for (var s = 0; s < activeChar.ringN; s++) {
+                    var a = (s / activeChar.ringN) * Math.PI * 2;
+                    var rad = baseRad;
+                    var yy = baseY;
+                    if (waveHeadEnabled && headWaveform.length) {
+                        var sample = getWaveformSample((s * 2) + p);
+                        var shimmer = Math.sin(waveformTime + p * 0.55 + s * 0.42);
+                        var wave = sample * 0.78 + shimmer * 0.22;
+                        rad += wave * waveStrength * (0.55 + baseRad);
+                        yy += wave * waveStrength * 0.38;
+                    }
+                    ring.push(proj(rad * Math.cos(a), yy, rad * Math.sin(a)));
+                }
+                rings.push(ring);
             }
-            wireCtx.closePath();
-            wireCtx.stroke();
-        }
 
-        // --- Vertical ribs ---
-        wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.30)';
-        wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
-        for (var s = 0; s < activeChar.ringN; s += 2) {
-            wireCtx.beginPath();
+            // --- Horizontal rings ---
+            wireCtx.shadowBlur  = 8 + bass * 14 + (waveHeadEnabled ? 8 : 0);
+            wireCtx.shadowColor = activeChar.wireColor;
+            wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.55)';
+            wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
+
             for (var r = 0; r < rings.length; r++) {
-                var pt = rings[r][s];
-                r === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+                wireCtx.beginPath();
+                for (var i = 0; i < rings[r].length; i++) {
+                    var pt = rings[r][i];
+                    i === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+                }
+                wireCtx.closePath();
+                wireCtx.stroke();
             }
-            wireCtx.stroke();
+
+            // --- Vertical ribs ---
+            wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.30)';
+            wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
+            for (var s = 0; s < activeChar.ringN; s += 2) {
+                wireCtx.beginPath();
+                for (var r = 0; r < rings.length; r++) {
+                    var pt = rings[r][s];
+                    r === 0 ? wireCtx.moveTo(pt.x, pt.y) : wireCtx.lineTo(pt.x, pt.y);
+                }
+                wireCtx.stroke();
+            }
         }
 
         // --- Hair (behind/around skull) ---
@@ -1014,11 +1060,17 @@
         // --- Eyebrows ---
         drawEyebrows(activeChar, proj, amp, bass);
 
+        // --- Eyelashes ---
+        drawEyelashes(activeChar, proj, amp, bass);
+
         // --- Nose ---
         drawNose(proj, activeChar);
 
         // --- Mouth ---
         drawMouth(proj, activeChar);
+
+        // --- LEDs ---
+        drawLEDs(activeChar, proj, amp, bass);
 
         // --- Facial hair ---
         drawFacialHair(activeChar, proj, amp, bass);
@@ -1166,6 +1218,7 @@
 
     function drawNose(proj, char) {
         char = char || activeChar;
+        if (!char.nose) return;
         wireCtx.shadowBlur  = 5;
         wireCtx.shadowColor = char.wireColor;
         wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
@@ -1197,6 +1250,13 @@
         char = char || activeChar;
         var mth = char.mouth;
         var open = mouthOpen * 0.09;
+
+        // Drive slot variant (floppy drive mouth)
+        if (mth.slot) {
+            drawDriveSlot(proj, char, mth);
+            return;
+        }
+
         var upper = [], lower = [];
 
         for (var i = 0; i <= mth.segs; i++) {
@@ -1473,6 +1533,386 @@
                 wireCtx.stroke();
                 wireCtx.globalAlpha = 1;
             }
+        }
+    }
+
+    // =========================================================
+    //  Box Head Renderer (rectangular characters like floppy drive)
+    // =========================================================
+    function drawBoxHead(char, proj, amp, bass) {
+        var box = char.boxDims;
+        var w = box.w, h = box.h, d = box.d;
+
+        // Subtle bass pulse on the enclosure
+        var vibrate = bass * 0.006;
+
+        // 8 corners of the box
+        var ftl = proj(-w, h, d);
+        var ftr = proj(w, h, d);
+        var fbl = proj(-w, -h, d);
+        var fbr = proj(w, -h, d);
+        var btl = proj(-w, h, -d);
+        var btr = proj(w, h, -d);
+        var bbl = proj(-w, -h, -d);
+        var bbr = proj(w, -h, -d);
+
+        wireCtx.shadowBlur = 6 + bass * 10;
+        wireCtx.shadowColor = char.wireColor;
+
+        // --- Front face (main face) ---
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.65)';
+        wireCtx.lineWidth = 1.6;
+        wireCtx.beginPath();
+        wireCtx.moveTo(ftl.x, ftl.y);
+        wireCtx.lineTo(ftr.x, ftr.y);
+        wireCtx.lineTo(fbr.x, fbr.y);
+        wireCtx.lineTo(fbl.x, fbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // --- Back face (dimmer) ---
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.20)';
+        wireCtx.lineWidth = 1.0;
+        wireCtx.beginPath();
+        wireCtx.moveTo(btl.x, btl.y);
+        wireCtx.lineTo(btr.x, btr.y);
+        wireCtx.lineTo(bbr.x, bbr.y);
+        wireCtx.lineTo(bbl.x, bbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // --- Side edges (connect front to back) ---
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
+        wireCtx.lineWidth = 1.0;
+        var frontCorners = [ftl, ftr, fbr, fbl];
+        var backCorners  = [btl, btr, bbr, bbl];
+        for (var i = 0; i < 4; i++) {
+            wireCtx.beginPath();
+            wireCtx.moveTo(frontCorners[i].x, frontCorners[i].y);
+            wireCtx.lineTo(backCorners[i].x, backCorners[i].y);
+            wireCtx.stroke();
+        }
+
+        // --- Horizontal section lines (side detail for wireframe feel) ---
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.18)';
+        wireCtx.lineWidth = 0.7;
+        var sections = 6;
+        for (var si = 1; si < sections; si++) {
+            var frac = si / sections;
+            var yy = -h + 2 * h * frac;
+            // All four side lines at this height
+            var fl = proj(-w, yy, d);
+            var fr = proj(w, yy, d);
+            var bl = proj(-w, yy, -d);
+            var br = proj(w, yy, -d);
+            // Front horizontal
+            wireCtx.beginPath();
+            wireCtx.moveTo(fl.x, fl.y); wireCtx.lineTo(fr.x, fr.y);
+            wireCtx.stroke();
+            // Left side
+            wireCtx.beginPath();
+            wireCtx.moveTo(fl.x, fl.y); wireCtx.lineTo(bl.x, bl.y);
+            wireCtx.stroke();
+            // Right side
+            wireCtx.beginPath();
+            wireCtx.moveTo(fr.x, fr.y); wireCtx.lineTo(br.x, br.y);
+            wireCtx.stroke();
+        }
+
+        // --- Front panel detail: label area ---
+        // A recessed rectangular area in the upper portion (like a floppy label)
+        var labelW = w * 0.65, labelTop = h * 0.80, labelBot = h * 0.45;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.22)';
+        wireCtx.lineWidth = 0.8;
+        var ltl = proj(-labelW, labelTop, d + 0.005);
+        var ltr = proj(labelW, labelTop, d + 0.005);
+        var lbr = proj(labelW, labelBot, d + 0.005);
+        var lbl = proj(-labelW, labelBot, d + 0.005);
+        wireCtx.beginPath();
+        wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
+        wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl.x, lbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Tiny horizontal lines inside label (text lines)
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.12)';
+        wireCtx.lineWidth = 0.5;
+        for (var li = 0; li < 3; li++) {
+            var ly = labelBot + (labelTop - labelBot) * (0.25 + li * 0.25);
+            var ll = proj(-labelW * 0.85, ly, d + 0.005);
+            var lr = proj(labelW * 0.85, ly, d + 0.005);
+            wireCtx.beginPath();
+            wireCtx.moveTo(ll.x, ll.y); wireCtx.lineTo(lr.x, lr.y);
+            wireCtx.stroke();
+        }
+
+        // --- Front panel: eject button (small rectangle below drive slot) ---
+        var ejW = w * 0.12, ejH = h * 0.06;
+        var ejY = -h * 0.65;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
+        wireCtx.lineWidth = 0.8;
+        var etl = proj(-ejW, ejY + ejH, d + 0.005);
+        var etr = proj(ejW, ejY + ejH, d + 0.005);
+        var ebr = proj(ejW, ejY - ejH, d + 0.005);
+        var ebl = proj(-ejW, ejY - ejH, d + 0.005);
+        wireCtx.beginPath();
+        wireCtx.moveTo(etl.x, etl.y); wireCtx.lineTo(etr.x, etr.y);
+        wireCtx.lineTo(ebr.x, ebr.y); wireCtx.lineTo(ebl.x, ebl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+        // Eject button reacts to bass (subtle push)
+        if (bass > 0.4) {
+            wireCtx.fillStyle = 'rgba(' + char.wireRGB + ',' + (bass * 0.15) + ')';
+            wireCtx.fill();
+        }
+    }
+
+    // =========================================================
+    //  Drive Slot Mouth (for floppy drive characters)
+    // =========================================================
+    function drawDriveSlot(proj, char, mth) {
+        var slotOpen = mouthOpen * 0.16;  // wider range than lip mouth
+        var slotHW = mth.hw;
+        var slotY = mth.y;
+        var slotZ = mth.z;
+
+        // Slot rail thickness
+        var railH = 0.018;
+
+        // Top rail (stays mostly in place)
+        var tl = proj(-slotHW, slotY + railH, slotZ);
+        var tr = proj(slotHW, slotY + railH, slotZ);
+        var tl2 = proj(-slotHW, slotY + railH + 0.008, slotZ);
+        var tr2 = proj(slotHW, slotY + railH + 0.008, slotZ);
+
+        // Bottom rail (drops when opening)
+        var drop = slotOpen * 1.8;
+        var bl = proj(-slotHW, slotY - railH - drop, slotZ);
+        var br = proj(slotHW, slotY - railH - drop, slotZ);
+        var bl2 = proj(-slotHW, slotY - railH - drop - 0.008, slotZ);
+        var br2 = proj(slotHW, slotY - railH - drop - 0.008, slotZ);
+
+        // Slot opening glow
+        wireCtx.shadowBlur = 4 + mouthOpen * 18;
+        wireCtx.shadowColor = char.accentColor;
+
+        // Top rail (double line for thickness)
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.6 + mouthOpen * 0.3) + ')';
+        wireCtx.lineWidth = 1.5;
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl.x, tl.y); wireCtx.lineTo(tr.x, tr.y);
+        wireCtx.stroke();
+        wireCtx.lineWidth = 0.8;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.3)';
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl2.x, tl2.y); wireCtx.lineTo(tr2.x, tr2.y);
+        wireCtx.stroke();
+
+        // Bottom rail
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.6 + mouthOpen * 0.3) + ')';
+        wireCtx.lineWidth = 1.5;
+        wireCtx.beginPath();
+        wireCtx.moveTo(bl.x, bl.y); wireCtx.lineTo(br.x, br.y);
+        wireCtx.stroke();
+        wireCtx.lineWidth = 0.8;
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.3)';
+        wireCtx.beginPath();
+        wireCtx.moveTo(bl2.x, bl2.y); wireCtx.lineTo(br2.x, br2.y);
+        wireCtx.stroke();
+
+        // Side rails connecting top to bottom
+        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
+        wireCtx.lineWidth = 0.8;
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl.x, tl.y); wireCtx.lineTo(bl.x, bl.y);
+        wireCtx.stroke();
+        wireCtx.beginPath();
+        wireCtx.moveTo(tr.x, tr.y); wireCtx.lineTo(br.x, br.y);
+        wireCtx.stroke();
+
+        // Internal mechanism visible when slot opens
+        if (slotOpen > 0.006) {
+            var mechAlpha = Math.min(0.55, slotOpen * 4);
+            var mechInnerZ = slotZ - 0.04;
+
+            // Guide rails (two horizontal tracks inside)
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (mechAlpha * 0.5) + ')';
+            wireCtx.lineWidth = 0.6;
+            var railY1 = slotY + railH * 0.3;
+            var railY2 = slotY - railH - drop * 0.4;
+            var gl1l = proj(-slotHW * 0.9, railY1, mechInnerZ);
+            var gl1r = proj(slotHW * 0.9, railY1, mechInnerZ);
+            var gl2l = proj(-slotHW * 0.9, railY2, mechInnerZ);
+            var gl2r = proj(slotHW * 0.9, railY2, mechInnerZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(gl1l.x, gl1l.y); wireCtx.lineTo(gl1r.x, gl1r.y);
+            wireCtx.stroke();
+            wireCtx.beginPath();
+            wireCtx.moveTo(gl2l.x, gl2l.y); wireCtx.lineTo(gl2r.x, gl2r.y);
+            wireCtx.stroke();
+
+            // Read head carriage — slides back and forth with audio
+            var headT = performance.now() * 0.002;
+            var headX = Math.sin(headT) * slotHW * 0.5;
+            var headY = (railY1 + railY2) * 0.5;
+            var headW = 0.06;
+            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + mechAlpha + ')';
+            wireCtx.shadowColor = char.accentColor;
+            wireCtx.shadowBlur = 6 + mouthOpen * 12;
+            wireCtx.lineWidth = 1.2;
+            var hl = proj(headX - headW, headY, mechInnerZ);
+            var hr = proj(headX + headW, headY, mechInnerZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(hl.x, hl.y); wireCtx.lineTo(hr.x, hr.y);
+            wireCtx.stroke();
+
+            // Read head vertical arm
+            wireCtx.lineWidth = 0.6;
+            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (mechAlpha * 0.6) + ')';
+            var hc = proj(headX, railY1, mechInnerZ);
+            var hb = proj(headX, railY2, mechInnerZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(hc.x, hc.y); wireCtx.lineTo(hb.x, hb.y);
+            wireCtx.stroke();
+        }
+
+        // Inner glow when open (the princess pink glow)
+        if (mouthOpen > 0.15) {
+            var glowAlpha = Math.min(0.12, (mouthOpen - 0.15) * 0.3);
+            var gc = proj(0, slotY - drop * 0.4, slotZ - 0.01);
+            var grad = wireCtx.createRadialGradient(
+                gc.x, gc.y, 0,
+                gc.x, gc.y, Math.abs(tr.x - tl.x) * 0.5
+            );
+            grad.addColorStop(0, 'rgba(' + char.accentRGB + ',' + glowAlpha + ')');
+            grad.addColorStop(1, 'rgba(' + char.accentRGB + ',0)');
+            wireCtx.fillStyle = grad;
+            wireCtx.fillRect(tl.x, tl.y, tr.x - tl.x, bl.y - tl.y);
+        }
+    }
+
+    // =========================================================
+    //  Eyelashes (feminine detail with music-reactive flutter)
+    // =========================================================
+    function drawEyelashes(char, proj, amp, bass) {
+        if (!char.eyelashes) return;
+        var lash = char.eyelashes;
+        var eyes = [char.eyes.left, char.eyes.right];
+
+        wireCtx.shadowBlur = 3 + bass * 4;
+        wireCtx.shadowColor = lash.color;
+        wireCtx.lineCap = 'round';
+
+        for (var ei = 0; ei < 2; ei++) {
+            var eye = eyes[ei];
+            var blinkAmt = getEyeBlinkAmount(ei === 0 ? 'left' : 'right');
+
+            // Don't draw lashes when fully blinked
+            if (blinkAmt > 0.8) continue;
+
+            var count = lash.count;
+            for (var i = 0; i < count; i++) {
+                var frac = count > 1 ? (i / (count - 1)) : 0.5;
+
+                // Fan from ~50deg to ~130deg above the eye
+                var baseAngle = (0.28 + frac * 0.44) * Math.PI;
+
+                // High-frequency flutter
+                var flutter = 0;
+                if (lash.reactive && headFreqData.length > 60) {
+                    var fi = Math.min(headFreqData.length - 1,
+                                      50 + Math.floor(i * 4) + ei * 20);
+                    flutter = (headFreqData[fi] || 0) * 0.18;
+                }
+
+                // Alternating flutter direction + breath sway
+                var sway = Math.sin(breathPhase * 1.5 + i * 0.7) * 0.03;
+                var angle = baseAngle + (flutter * (i % 2 === 0 ? 1 : -1)) + sway;
+
+                // Length varies: longest in center
+                var centerBoost = 1 - Math.abs(frac - 0.5) * 1.2;
+                var len = lash.length * (0.7 + centerBoost * 0.6);
+
+                // Blink squishes lash angle toward horizontal
+                angle = angle * (1 - blinkAmt * 0.7) + (Math.PI * 0.5) * blinkAmt * 0.7;
+
+                // Start at eye edge
+                var eyeScaleY = Math.max(0.08, 0.7 - blinkAmt * 0.62);
+                var sx = eye.x + eye.r * Math.cos(angle);
+                var sy = eye.y + eye.r * Math.sin(angle) * eyeScaleY;
+
+                // End extends outward with slight curve
+                var ex = eye.x + (eye.r + len) * Math.cos(angle);
+                var ey = eye.y + (eye.r + len) * Math.sin(angle) * eyeScaleY;
+
+                // Slight upward curl at tip
+                ey += len * 0.15;
+
+                var p1 = proj(sx, sy, eye.z);
+                var p2 = proj(ex, ey, eye.z + 0.01);
+
+                var alpha = 0.5 + flutter * 0.8 + bass * 0.2;
+                wireCtx.strokeStyle = 'rgba(' + lash.rgb + ',' + Math.min(0.9, alpha) + ')';
+                wireCtx.lineWidth = lash.width * (0.8 + centerBoost * 0.4);
+                wireCtx.beginPath();
+                wireCtx.moveTo(p1.x, p1.y);
+                wireCtx.lineTo(p2.x, p2.y);
+                wireCtx.stroke();
+            }
+        }
+    }
+
+    // =========================================================
+    //  LED Indicators (activity/power lights)
+    // =========================================================
+    function drawLEDs(char, proj, amp, bass) {
+        if (!char.ledIndicators) return;
+        var leds = char.ledIndicators;
+        var t = performance.now() * 0.001;
+
+        for (var i = 0; i < leds.length; i++) {
+            var led = leds[i];
+            var z = char.boxDims ? char.boxDims.d + 0.01 : 0.50;
+            var pt = proj(led.x, led.y, z);
+
+            var brightness = 0;
+            if (led.mode === 'power') {
+                // Steady on with subtle pulse
+                brightness = 0.6 + Math.sin(t * 0.5) * 0.08;
+            } else if (led.mode === 'activity') {
+                // Flickers with audio amplitude — like disk access
+                var flicker = amp * 2.5 + bass * 1.5;
+                // Rapid on/off simulation
+                var rapid = Math.sin(t * 18 + amp * 40) > 0 ? 1 : 0.1;
+                brightness = Math.min(1, flicker) * rapid;
+                // Idle: occasional blink
+                if (amp < 0.05) {
+                    brightness = Math.sin(t * 0.3) > 0.95 ? 0.4 : 0.05;
+                }
+            }
+
+            if (brightness < 0.02) continue;
+
+            // LED glow (outer)
+            wireCtx.shadowColor = led.color;
+            wireCtx.shadowBlur = 8 + brightness * 14;
+            wireCtx.fillStyle = 'rgba(' + led.rgb + ',' + (brightness * 0.6) + ')';
+            wireCtx.beginPath();
+            wireCtx.arc(pt.x, pt.y, 3.5 + brightness * 2, 0, Math.PI * 2);
+            wireCtx.fill();
+
+            // LED core (bright center)
+            wireCtx.fillStyle = 'rgba(' + led.rgb + ',' + brightness + ')';
+            wireCtx.beginPath();
+            wireCtx.arc(pt.x, pt.y, 1.5 + brightness, 0, Math.PI * 2);
+            wireCtx.fill();
+
+            // LED outline ring
+            wireCtx.strokeStyle = 'rgba(' + led.rgb + ',' + (brightness * 0.4) + ')';
+            wireCtx.lineWidth = 0.6;
+            wireCtx.beginPath();
+            wireCtx.arc(pt.x, pt.y, 4.5 + brightness * 2, 0, Math.PI * 2);
+            wireCtx.stroke();
         }
     }
 
