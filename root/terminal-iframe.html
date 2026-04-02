@@ -891,6 +891,16 @@
          *  Fix E: 50ms safety-net poll — catches edge cases where
          *         WebSocket ondata doesn't fire (rapid reconnect,
          *         browser throttling, iframe deprioritization).
+         *
+         *  Fix F: Fast-forward on panel unhide.  When the terminal
+         *         panel is hidden by the SPA, all drain/flush work
+         *         is suppressed so data accumulates in the
+         *         WebSocket receive buffer untouched.  On unhide
+         *         the backlog is replayed with canvas contexts
+         *         swapped to off-screen dummies, so the ANSI parser
+         *         updates the cell buffer but no expensive canvas
+         *         draws occur.  Then the real contexts are restored
+         *         and the final screen state is painted in one pass.
          */
         (function patchRenderSpeed(cl) {
             if (!cl) return;
@@ -957,6 +967,77 @@
                 return batchSize;
             }
 
+            /* ---- Fix F: panel-hidden state & fast-forward ---- */
+            var panelHidden = false;
+
+            function fastForwardDrain() {
+                if (!cl._Crt || !cl._Connection) return;
+                var avail = cl._Connection.bytesAvailable;
+                if (avail === 0) { flushNeedsRedraw(); return; }
+
+                console.log('[fTelnet-speed] fast-forward: ' +
+                    avail + 'B backlog');
+                var t0 = performance.now();
+
+                /* Swap canvas contexts to off-screen dummies so
+                   FastWrite / Scroll / ClrScr draw calls are real
+                   canvas-API calls that just hit a throwaway surface.
+                   The _Buffer array is updated normally.  */
+                var realCtx      = cl._Crt._CanvasContext;
+                var realTempC    = cl._Crt._TempCanvas;
+                var realTempCtx  = cl._Crt._TempCanvasContext;
+
+                var w = (cl._Crt._Canvas ? cl._Crt._Canvas.width  : 800);
+                var h = (cl._Crt._Canvas ? cl._Crt._Canvas.height : 600);
+
+                var dumC  = document.createElement('canvas');
+                dumC.width = w; dumC.height = h;
+                var dumCtx = dumC.getContext('2d');
+
+                var dumTC  = document.createElement('canvas');
+                dumTC.width = w; dumTC.height = h;
+                var dumTCtx = dumTC.getContext('2d');
+
+                cl._Crt._CanvasContext = dumCtx;
+                if (realTempC)   cl._Crt._TempCanvas        = dumTC;
+                if (realTempCtx) cl._Crt._TempCanvasContext  = dumTCtx;
+
+                /* Drain everything — ANSI parser runs, buffer
+                   updates, but all canvas ops hit the dummies. */
+                drainBuffer();
+
+                /* Restore real contexts */
+                cl._Crt._CanvasContext = realCtx;
+                if (realTempC)   cl._Crt._TempCanvas        = realTempC;
+                if (realTempCtx) cl._Crt._TempCanvasContext  = realTempCtx;
+
+                /* Mark every cell dirty and paint the final state */
+                var buf = cl._Crt._Buffer;
+                var sz  = cl._Crt._ScreenSize;
+                if (buf && sz) {
+                    for (var Y = 1; Y <= sz.y; Y++) {
+                        for (var X = 1; X <= sz.x; X++) {
+                            if (buf[Y] && buf[Y][X])
+                                buf[Y][X].NeedsRedraw = true;
+                        }
+                    }
+                }
+                flushNeedsRedraw();
+
+                var ms = (performance.now() - t0).toFixed(1);
+                console.log('[fTelnet-speed] fast-forward done: ' +
+                    avail + 'B in ' + ms + 'ms');
+            }
+
+            /* Expose for the message handler outside this IIFE */
+            cl._panelSetHidden = function (hidden) {
+                panelHidden = hidden;
+            };
+            cl._panelFastForward = function () {
+                panelHidden = false;
+                fastForwardDrain();
+            };
+
             /* Use queueMicrotask for continuation (faster than
                MessageChannel and not subject to setTimeout clamping). */
             var continuationPending = false;
@@ -971,12 +1052,14 @@
             }
             function doContinuation() {
                 continuationPending = false;
+                if (panelHidden) return;   /* Fix F */
                 if (cl._Connection && cl._Connection.bytesAvailable > 0) {
                     drainBuffer();
                 }
             }
 
             cl.OnConnectionData = function () {
+                if (panelHidden) return;   /* Fix F: accumulate */
                 drainBuffer();
                 if (cl._Connection && cl._Connection.bytesAvailable > 0) {
                     scheduleContinuation();
@@ -993,13 +1076,15 @@
             function renderTick() {
                 if (rafPaused) { rafRunning = false; return; }
                 rafRunning = true;
-                /* (1) Sweep stranded NeedsRedraw cells */
-                flushNeedsRedraw();
-                /* (2) Safety-net drain: if data is sitting in the buffer
-                       but ondata somehow didn't fire, process it now */
-                if (cl._Connection && cl._Connection.connected &&
-                    cl._Connection.bytesAvailable > 0) {
-                    drainBuffer();
+                if (!panelHidden) {   /* Fix F: skip work while hidden */
+                    /* (1) Sweep stranded NeedsRedraw cells */
+                    flushNeedsRedraw();
+                    /* (2) Safety-net drain: if data is sitting in the buffer
+                           but ondata somehow didn't fire, process it now */
+                    if (cl._Connection && cl._Connection.connected &&
+                        cl._Connection.bytesAvailable > 0) {
+                        drainBuffer();
+                    }
                 }
                 requestAnimationFrame(renderTick);
             }
@@ -1060,6 +1145,7 @@
                This catches edge cases where the WebSocket ondata event
                didn't fire (e.g. rapid reconnect, browser throttling). */
             setInterval(function () {
+                if (panelHidden) return;   /* Fix F */
                 if (cl._Connection && cl._Connection.connected &&
                     cl._Connection.bytesAvailable > 0) {
                     drainBuffer();
@@ -1227,10 +1313,16 @@
                 break;
 
             case 'focus':
+                if (client && client._panelFastForward) {
+                    client._panelFastForward();
+                }
                 focusTerminal();
                 break;
 
             case 'blur':
+                if (client && client._panelSetHidden) {
+                    client._panelSetHidden(true);
+                }
                 blurTerminal();
                 break;
         }
