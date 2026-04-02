@@ -916,6 +916,86 @@
             shutter: null,
             chinGuard: null,
             label: 'iNK$tAiN'
+        },
+
+        karen: {
+            name: 'Karen',
+            profile: [
+                [0.00, -0.79], [0.16, -0.73], [0.30, -0.63],
+                [0.42, -0.50], [0.48, -0.36], [0.50, -0.22],
+                [0.49, -0.08], [0.47,  0.06], [0.45,  0.18],
+                [0.43,  0.30], [0.39,  0.40], [0.33,  0.48],
+                [0.25,  0.55], [0.15,  0.61],
+                [0.00,  0.64]
+            ],
+            ringN: 20,
+            eyes: {
+                left:  { x: -0.16, y: -0.02, z: 0.46, r: 0.074 },
+                right: { x:  0.16, y: -0.02, z: 0.46, r: 0.074 }
+            },
+            eyeColor: { hex: '#3388FF', rgb: '51,136,255' },
+            eyeOutlineColor: { hex: '#88BBFF', rgb: '136,187,255' },
+            eyeShape: 'round',
+            eyeBehavior: null,
+            mascara: true,
+            eyelashes: {
+                count: 6,
+                length: 0.055,
+                color: '#111111',
+                rgb: '17,17,17',
+                width: 1.1,
+                reactive: true,
+                bottom: true
+            },
+            eyebrows: {
+                color: '#AA8833',
+                rgb:   '170,136,51',
+                width: 2.2,
+                innerOff: { dx:  0.00, dy: 0.065, dz: 0.02 },
+                outerOff: { dx:  0.13, dy: 0.08, dz: 0.00 },
+                thickness: 0.018
+            },
+            mouth: { y: -0.50, hw: 0.19, z: 0.46, segs: 10,
+                     teeth: false },
+            nose: {
+                bridge: [[0, -0.13, 0.52], [0, -0.27, 0.56], [0, -0.32, 0.57]],
+                base:   [[-0.05, -0.34, 0.51], [0, -0.32, 0.57], [0.05, -0.34, 0.51]]
+            },
+            wireColor: '#DDAA88',
+            wireRGB:   '221,170,136',
+            accentColor: '#FF7799',
+            accentRGB:   '255,119,153',
+            hair: [
+                { rx: -0.22, ry: 0.62, rz:  0.16, len: 0.40, color: '#EEDD55', width: 2.2, freq: 0.05, dir: { dx: -0.50, dy: -0.20, dz: -0.60 } },
+                { rx: -0.14, ry: 0.66, rz:  0.14, len: 0.38, color: '#FFEE66', width: 2.4, freq: 0.10, dir: { dx: -0.30, dy: -0.15, dz: -0.75 } },
+                { rx: -0.06, ry: 0.68, rz:  0.12, len: 0.36, color: '#FFEE77', width: 2.5, freq: 0.18, dir: { dx: -0.10, dy: -0.10, dz: -0.85 } },
+                { rx:  0.02, ry: 0.68, rz:  0.12, len: 0.36, color: '#FFEE66', width: 2.5, freq: 0.24, dir: { dx:  0.05, dy: -0.10, dz: -0.88 } },
+                { rx:  0.10, ry: 0.67, rz:  0.13, len: 0.38, color: '#EEDD55', width: 2.3, freq: 0.30, dir: { dx:  0.20, dy: -0.12, dz: -0.80 } },
+                { rx:  0.18, ry: 0.64, rz:  0.15, len: 0.42, color: '#DDCC44', width: 2.2, freq: 0.36, dir: { dx:  0.40, dy: -0.18, dz: -0.65 } },
+                { rx: -0.16, ry: 0.66, rz:  0.04, len: 0.55, color: '#FFEE66', width: 2.3, freq: 0.14, dir: { dx: -0.12, dy: -0.10, dz: -0.92 } },
+                { rx:  0.00, ry: 0.69, rz:  0.02, len: 0.58, color: '#FFEE77', width: 2.4, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.95 } },
+                { rx:  0.16, ry: 0.66, rz:  0.04, len: 0.55, color: '#EEDD55', width: 2.3, freq: 0.32, dir: { dx:  0.12, dy: -0.10, dz: -0.92 } },
+                { rx: -0.32, ry: 0.54, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.08, dir: { dx: -0.52, dy: -0.72, dz: -0.15 } },
+                { rx: -0.36, ry: 0.48, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.15, dir: { dx: -0.58, dy: -0.76, dz: -0.08 } },
+                { rx: -0.34, ry: 0.42, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.22, dir: { dx: -0.50, dy: -0.80, dz: -0.02 } },
+                { rx: -0.30, ry: 0.36, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.28, dir: { dx: -0.42, dy: -0.85, dz:  0.05 } },
+                { rx:  0.32, ry: 0.54, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.48, dir: { dx:  0.52, dy: -0.72, dz: -0.15 } },
+                { rx:  0.36, ry: 0.48, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.55, dir: { dx:  0.58, dy: -0.76, dz: -0.08 } },
+                { rx:  0.34, ry: 0.42, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.62, dir: { dx:  0.50, dy: -0.80, dz: -0.02 } },
+                { rx:  0.30, ry: 0.36, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.68, dir: { dx:  0.42, dy: -0.85, dz:  0.05 } },
+                { rx: -0.18, ry: 0.62, rz: -0.10, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.58, dir: { dx: -0.10, dy: -0.58, dz: -0.68 } },
+                { rx:  0.00, ry: 0.66, rz: -0.14, len: 0.80, color: '#FFEE66', width: 2.1, freq: 0.64, dir: { dx:  0.00, dy: -0.60, dz: -0.60 } },
+                { rx:  0.18, ry: 0.62, rz: -0.10, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.72, dir: { dx:  0.10, dy: -0.58, dz: -0.68 } },
+                { rx: -0.26, ry: 0.56, rz: -0.12, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.78, dir: { dx: -0.22, dy: -0.62, dz: -0.55 } },
+                { rx:  0.26, ry: 0.56, rz: -0.12, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.84, dir: { dx:  0.22, dy: -0.62, dz: -0.55 } }
+            ],
+            hairRigid: false,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: 'KAREN'
         }
     };
 
