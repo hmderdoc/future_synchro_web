@@ -996,6 +996,70 @@
             shutter: null,
             chinGuard: null,
             label: 'KAREN'
+        },
+
+        rally: {
+            name: 'Rally',
+            // Strong face — broad forehead, defined cheekbones, squared jaw
+            profile: [
+                [0.00, -0.78], [0.18, -0.71], [0.32, -0.60],
+                [0.44, -0.46], [0.50, -0.32], [0.52, -0.16],
+                [0.51, -0.02], [0.49,  0.10], [0.47,  0.22],
+                [0.44,  0.34], [0.40,  0.44], [0.34,  0.52],
+                [0.24,  0.58], [0.14,  0.63],
+                [0.00,  0.66]
+            ],
+            ringN: 18,
+            eyes: {
+                left:  { x: -0.17, y: -0.03, z: 0.45, r: 0.072 },
+                right: { x:  0.17, y: -0.03, z: 0.45, r: 0.072 }
+            },
+            // Deep brown eyes
+            eyeColor: { hex: '#553311', rgb: '85,51,17' },
+            eyeOutlineColor: { hex: '#AA8855', rgb: '170,136,85' },
+            eyeShape: 'round',
+            eyeBehavior: 'shifty',
+            mascara: false,
+            eyelashes: null,
+            eyebrows: {
+                color: '#332211',
+                rgb:   '51,34,17',
+                width: 2.4,
+                innerOff: { dx:  0.00, dy: 0.06, dz: 0.02 },
+                outerOff: { dx:  0.12, dy: 0.07, dz: 0.00 },
+                thickness: 0.020
+            },
+            mouth: { y: -0.50, hw: 0.22, z: 0.46, segs: 8,
+                     teeth: true },
+            nose: {
+                bridge: [[0, -0.12, 0.52], [0, -0.24, 0.55], [0, -0.30, 0.56]],
+                base:   [[-0.07, -0.33, 0.50], [0, -0.30, 0.56], [0.07, -0.33, 0.50]]
+            },
+            // Rich dark skin tone wireframe
+            wireColor: '#886644',
+            wireRGB:   '136,102,68',
+            accentColor: '#CC8866',
+            accentRGB:   '204,136,102',
+            // Afro hairstyle — rendered as a dome hat with honeycomb ribbing
+            hair: null,
+            hairRigid: false,
+            hat: {
+                type: 'afro',
+                color: '#222222',
+                rgb:   '34,34,34',
+                // Afro dome parameters
+                height: 0.52,       // how tall above the head
+                radiusX: 0.62,      // side-to-side radius
+                radiusZ: 0.50,      // front-to-back radius
+                rings: 7,           // horizontal ring count
+                honeycombSegs: 12,  // segments per ring for honeycomb
+                fluffiness: 0.04    // per-vertex random displacement for texture
+            },
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: 'RALLY'
         }
     };
 
@@ -4110,7 +4174,178 @@
             drawCowboyHat(char, proj, amp, bass);
         } else if (char.hat.type === 'baseballcap') {
             drawBaseballCap(char, proj, amp, bass);
+        } else if (char.hat.type === 'afro') {
+            drawAfro(char, proj, amp, bass);
         }
+    }
+
+    // === Afro hairstyle: dome with honeycomb ribbing ===
+    function drawAfro(char, proj, amp, bass) {
+        var hat = char.hat;
+        var t = performance.now() * 0.001;
+
+        // Find head top from profile
+        var topY = 0.62;
+        if (char.profile) {
+            for (var i = 0; i < char.profile.length; i++) {
+                if (char.profile[i][1] > topY) topY = char.profile[i][1];
+            }
+        }
+
+        var bob = bass * 0.010 + Math.sin(breathPhase) * 0.003;
+        var afroBase = topY - 0.18 + bob;  // sit lower on the head (afro wraps around)
+
+        var afroH   = hat.height || 0.50;
+        var afroRX  = hat.radiusX || 0.60;
+        var afroRZ  = hat.radiusZ || 0.48;
+        var rings   = hat.rings || 7;
+        var hSegs   = hat.honeycombSegs || 12;
+        var fluff   = hat.fluffiness || 0.04;
+
+        // Seeded pseudo-random for consistent fluffiness per vertex
+        function hashRand(a, b) {
+            var h = (a * 2654435761 + b * 340573321) & 0x7FFFFFFF;
+            return ((h % 1000) / 1000) - 0.5;  // -0.5..0.5
+        }
+
+        // Build dome grid: rings from base to top
+        // Each ring is a horizontal circle that tapers toward the top
+        // to form a rounded dome (hemisphere-ish)
+        var grid = [];  // grid[ring][seg] = {x,y,z}
+        for (var r = 0; r <= rings; r++) {
+            var frac = r / rings;  // 0 = base, 1 = top
+
+            // Dome curve: use sine for hemisphere shape
+            var angle = frac * Math.PI * 0.5;  // 0..90 degrees
+            var cy = afroBase + afroH * Math.sin(angle);
+            var taper = Math.cos(angle);  // 1 at base, 0 at top
+            // Don't let taper go to zero — keep small circle at top
+            taper = Math.max(0.08, taper);
+
+            // Slight bass breathing on radius
+            var breathR = 1 + bass * 0.015;
+
+            var row = [];
+            for (var s = 0; s < hSegs; s++) {
+                var a = (s / hSegs) * Math.PI * 2;
+                // Honeycomb offset: odd rows shift by half a segment
+                var offset = (r % 2 === 1) ? (Math.PI / hSegs) : 0;
+                var ax = a + offset;
+
+                // Fluffiness: per-vertex displacement for textured look
+                var fx = hashRand(r, s) * fluff * (1 + bass * 0.5);
+                var fy = hashRand(r + 100, s) * fluff * 0.6;
+                var fz = hashRand(r, s + 100) * fluff * (1 + bass * 0.5);
+
+                // Audio-reactive pulsing — different freq bands per ring
+                var freqSample = getFreqSample(frac);
+                var pulse = freqSample * 0.012;
+
+                row.push({
+                    x: (afroRX * taper * breathR + fx + pulse) * Math.cos(ax),
+                    y: cy + fy,
+                    z: (afroRZ * taper * breathR + fz + pulse) * Math.sin(ax)
+                });
+            }
+            grid.push(row);
+        }
+
+        // Project all points
+        var pts = [];  // pts[ring][seg] = projected point
+        for (var r = 0; r <= rings; r++) {
+            var row = [];
+            for (var s = 0; s < hSegs; s++) {
+                row.push(proj(grid[r][s].x, grid[r][s].y, grid[r][s].z));
+            }
+            pts.push(row);
+        }
+
+        var rgb = hat.rgb;
+        var hex = hat.color;
+
+        // --- Horizontal rings (each ring of the dome) ---
+        wireCtx.shadowBlur = 5 + bass * 8;
+        wireCtx.shadowColor = hex;
+        for (var r = 0; r <= rings; r++) {
+            var frac = r / rings;
+            var alpha = 0.35 + frac * 0.20 + bass * 0.10;
+            var lw = 1.3 + (1 - frac) * 0.5;
+            wireCtx.strokeStyle = 'rgba(' + rgb + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            wireCtx.lineWidth = lw;
+            wireCtx.beginPath();
+            for (var s = 0; s < hSegs; s++) {
+                s === 0 ? wireCtx.moveTo(pts[r][s].x, pts[r][s].y)
+                        : wireCtx.lineTo(pts[r][s].x, pts[r][s].y);
+            }
+            wireCtx.closePath();
+            wireCtx.stroke();
+        }
+
+        // --- Honeycomb diagonal connections ---
+        // Connect each vertex to the two nearest vertices on adjacent rows
+        // Since odd rows are offset by half a segment, this creates hexagonal cells
+        wireCtx.shadowBlur = 3 + bass * 5;
+        for (var r = 0; r < rings; r++) {
+            var frac = r / rings;
+            var freqV = getFreqSample(frac);
+            var alpha = 0.18 + freqV * 0.22 + bass * 0.08;
+            var lw = 0.7 + freqV * 0.4;
+            wireCtx.strokeStyle = 'rgba(' + rgb + ',' + Math.min(1, alpha).toFixed(3) + ')';
+            wireCtx.lineWidth = lw;
+
+            for (var s = 0; s < hSegs; s++) {
+                var p1 = pts[r][s];
+
+                // Connect to next row — two diagonal neighbors
+                // When r is even: connect to s and (s-1) on next row (which is offset)
+                // When r is odd: connect to s and (s+1) on next row
+                if (r % 2 === 0) {
+                    // Even row -> odd row (offset right by half seg)
+                    var s2a = s;
+                    var s2b = (s - 1 + hSegs) % hSegs;
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(p1.x, p1.y);
+                    wireCtx.lineTo(pts[r+1][s2a].x, pts[r+1][s2a].y);
+                    wireCtx.stroke();
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(p1.x, p1.y);
+                    wireCtx.lineTo(pts[r+1][s2b].x, pts[r+1][s2b].y);
+                    wireCtx.stroke();
+                } else {
+                    // Odd row -> even row (no offset)
+                    var s2a = s;
+                    var s2b = (s + 1) % hSegs;
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(p1.x, p1.y);
+                    wireCtx.lineTo(pts[r+1][s2a].x, pts[r+1][s2a].y);
+                    wireCtx.stroke();
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(p1.x, p1.y);
+                    wireCtx.lineTo(pts[r+1][s2b].x, pts[r+1][s2b].y);
+                    wireCtx.stroke();
+                }
+            }
+        }
+
+        // --- Subtle sheen highlight at crown ---
+        var topRow = pts[rings];
+        var cx = 0, cy = 0;
+        for (var s = 0; s < topRow.length; s++) {
+            cx += topRow[s].x; cy += topRow[s].y;
+        }
+        cx /= topRow.length; cy /= topRow.length;
+        var glowR = 8 + bass * 6;
+        wireCtx.shadowBlur = 10 + bass * 12;
+        wireCtx.shadowColor = hex;
+        var grad = wireCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+        grad.addColorStop(0, 'rgba(' + rgb + ',' + (0.12 + bass * 0.08).toFixed(3) + ')');
+        grad.addColorStop(1, 'rgba(' + rgb + ',0)');
+        wireCtx.fillStyle = grad;
+        wireCtx.beginPath();
+        wireCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        wireCtx.shadowBlur = 0;
     }
 
     function drawCowboyHat(char, proj, amp, bass) {
