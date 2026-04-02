@@ -665,6 +665,82 @@
             },
             ledIndicators: null,
             shutter: null
+        },
+        data: {
+            name: 'Data',
+            // Clean, symmetrical android face — slightly narrower than average
+            profile: [
+                [0.00, -0.80], [0.20, -0.72], [0.36, -0.62],
+                [0.46, -0.48], [0.50, -0.34], [0.52, -0.20],
+                [0.50, -0.06], [0.48,  0.08], [0.46,  0.20],
+                [0.43,  0.32], [0.40,  0.42], [0.35,  0.52],
+                [0.26,  0.60], [0.14,  0.64],
+                [0.00,  0.66]
+            ],
+            ringN: 18,
+            // Android eyes — slightly larger, unblinking stare
+            eyes: {
+                left:  { x: -0.17, y: -0.03, z: 0.46, r: 0.075 },
+                right: { x:  0.17, y: -0.03, z: 0.46, r: 0.075 }
+            },
+            // Distinctive bright amber/yellow android eyes
+            eyeColor: { hex: '#DDAA00', rgb: '221,170,0' },
+            eyeOutlineColor: { hex: '#FFCC22', rgb: '255,204,34' },
+            eyeShape: 'round',
+            mascara: false,
+            eyelashes: null,
+            // Neat dark eyebrows — precise, slightly arched
+            eyebrows: {
+                color: '#333333',
+                rgb:   '51,51,51',
+                width: 2.0,
+                innerOff: { dx:  0.00, dy: 0.055, dz: 0.02 },
+                outerOff: { dx:  0.11, dy: 0.07, dz: 0.00 },
+                thickness: 0.016
+            },
+            // Neutral mouth — Data rarely smiles
+            mouth: { y: -0.52, hw: 0.18, z: 0.46, segs: 8,
+                     teeth: false },
+            nose: {
+                bridge: [[0, -0.14, 0.54], [0, -0.28, 0.57], [0, -0.32, 0.58]],
+                base:   [[-0.05, -0.34, 0.52], [0, -0.32, 0.58], [0.05, -0.34, 0.52]]
+            },
+            // Pale golden android skin — the unnatural Soong-type complexion
+            wireColor: '#CCBB77',
+            wireRGB:   '204,187,119',
+            accentColor: '#DDCC88',
+            accentRGB:   '221,204,136',
+            // Slicked-back dark hair — perfectly in place, never moves
+            hairRigid: true,
+            hair: [
+                // Front hairline — swept straight back, tight to skull
+                { rx: -0.20, ry: 0.58, rz:  0.14, len: 0.30, color: '#222222', width: 1.6, freq: 0.10 },
+                { rx: -0.12, ry: 0.62, rz:  0.12, len: 0.32, color: '#1A1A1A', width: 1.7, freq: 0.18 },
+                { rx: -0.04, ry: 0.64, rz:  0.10, len: 0.34, color: '#222222', width: 1.8, freq: 0.25 },
+                { rx:  0.04, ry: 0.64, rz:  0.10, len: 0.34, color: '#1A1A1A', width: 1.8, freq: 0.32 },
+                { rx:  0.12, ry: 0.62, rz:  0.12, len: 0.32, color: '#222222', width: 1.7, freq: 0.40 },
+                { rx:  0.20, ry: 0.58, rz:  0.14, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.48 },
+                // Crown coverage — tight, uniform
+                { rx: -0.16, ry: 0.61, rz:  0.04, len: 0.28, color: '#222222', width: 1.5, freq: 0.22 },
+                { rx: -0.06, ry: 0.64, rz:  0.02, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.30 },
+                { rx:  0.06, ry: 0.64, rz:  0.02, len: 0.30, color: '#222222', width: 1.6, freq: 0.38 },
+                { rx:  0.16, ry: 0.61, rz:  0.04, len: 0.28, color: '#1A1A1A', width: 1.5, freq: 0.45 },
+                // Side partings — neatly combed
+                { rx: -0.28, ry: 0.50, rz:  0.06, len: 0.22, color: '#222222', width: 1.4, freq: 0.12 },
+                { rx:  0.28, ry: 0.50, rz:  0.06, len: 0.22, color: '#222222', width: 1.4, freq: 0.52 },
+                { rx: -0.30, ry: 0.44, rz:  0.00, len: 0.18, color: '#1A1A1A', width: 1.3, freq: 0.08 },
+                { rx:  0.30, ry: 0.44, rz:  0.00, len: 0.18, color: '#1A1A1A', width: 1.3, freq: 0.55 },
+                // Back of head
+                { rx: -0.12, ry: 0.62, rz: -0.08, len: 0.26, color: '#222222', width: 1.4, freq: 0.60 },
+                { rx:  0.00, ry: 0.64, rz: -0.12, len: 0.28, color: '#1A1A1A', width: 1.5, freq: 0.65 },
+                { rx:  0.12, ry: 0.62, rz: -0.08, len: 0.26, color: '#222222', width: 1.4, freq: 0.70 },
+                { rx: -0.20, ry: 0.56, rz: -0.10, len: 0.24, color: '#1A1A1A', width: 1.3, freq: 0.75 },
+                { rx:  0.20, ry: 0.56, rz: -0.10, len: 0.24, color: '#1A1A1A', width: 1.3, freq: 0.80 }
+            ],
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null
         }
     };
 
@@ -1807,7 +1883,7 @@
                 // Base position: hang downward with slight outward drift
                 var baseY = h.ry - h.len * frac;
                 var baseX = h.rx + (h.rx * 0.15 * frac);  // drift outward
-                var baseZ = h.rz + Math.sin(phase * 0.3 + frac) * 0.02;
+                var baseZ = h.rz + (char.hairRigid ? 0 : Math.sin(phase * 0.3 + frac) * 0.02);
 
                 // Frequency-driven waveform displacement
                 // Higher freq strands oscillate faster, lower ones sway bigger
@@ -1819,20 +1895,25 @@
                 // Add bass thump: sharp displacement that decays along length
                 var bassKick = bass * 0.08 * Math.sin(phase * 0.7) * (0.3 + frac * 0.7);
 
+                // Rigid hair: suppress all music-reactive motion (android/helmet hair)
+                if (char.hairRigid) {
+                    wave = 0; bassKick = 0; breathSway = 0;
+                }
+
                 // Combine displacements
                 var dx = wave * outward + bassKick + breathSway * frac;
-                var dz = Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
+                var dz = char.hairRigid ? 0 : Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
 
                 pts.push(proj(baseX + dx, baseY, baseZ + dz));
             }
 
             // Glow intensity scales with frequency energy
-            var glowBoost = freqVal * 12;
+            var glowBoost = char.hairRigid ? 0 : freqVal * 12;
             wireCtx.strokeStyle = h.color;
             wireCtx.shadowColor = h.color;
-            wireCtx.shadowBlur  = 4 + bass * 8 + glowBoost;
-            wireCtx.lineWidth   = (h.width || 1.2) + freqVal * 0.6;
-            wireCtx.globalAlpha = 0.65 + freqVal * 0.35;
+            wireCtx.shadowBlur  = 4 + (char.hairRigid ? 2 : bass * 8 + glowBoost);
+            wireCtx.lineWidth   = (h.width || 1.2) + (char.hairRigid ? 0 : freqVal * 0.6);
+            wireCtx.globalAlpha = char.hairRigid ? 0.80 : 0.65 + freqVal * 0.35;
 
             // Draw smooth curve through all segment points
             wireCtx.beginPath();
