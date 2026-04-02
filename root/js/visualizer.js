@@ -157,6 +157,7 @@
                 right: { x:  0.19, y: -0.03, z: 0.46, r: 0.09 }
             },
             eyeColor: { hex: '#5599FF', rgb: '85,153,255' },
+            eyeShape: 'square',  // 'round' (default) or 'square'
             mouth: { y: -0.50, hw: 0.27, z: 0.45, segs: 10,
                      teeth: true, teethColor: '255,255,255' },
             nose: {
@@ -925,8 +926,18 @@
 
     function drawEye(eye, proj, eyeName, char) {
         char = char || activeChar;
-        var segs = 12, pts = [];
         var blinkAmount = getEyeBlinkAmount(eyeName);
+        var shape = char.eyeShape || 'round';
+
+        if (shape === 'square') {
+            drawSquareEye(eye, proj, eyeName, char, blinkAmount);
+        } else {
+            drawRoundEye(eye, proj, eyeName, char, blinkAmount);
+        }
+    }
+
+    function drawRoundEye(eye, proj, eyeName, char, blinkAmount) {
+        var segs = 12, pts = [];
         var eyeScaleY = Math.max(0.08, 0.7 - blinkAmount * 0.62);
         for (var i = 0; i <= segs; i++) {
             var a  = (i / segs) * Math.PI * 2;
@@ -965,6 +976,89 @@
             wireCtx.lineWidth = 1.1 + eyeGlow * 0.5;
             wireCtx.stroke();
         }
+    }
+
+    function drawSquareEye(eye, proj, eyeName, char, blinkAmount) {
+        var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
+        var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
+        var r = eye.r;
+        var hw = r * 1.15;   // half-width (slightly wider than tall)
+        var hh = r * 0.9;    // half-height
+        var squish = Math.max(0.06, 1 - blinkAmount * 0.92);  // blink squish
+
+        // Outer box — white outline
+        var tl = proj(eye.x - hw, eye.y + hh * squish, eye.z);
+        var tr = proj(eye.x + hw, eye.y + hh * squish, eye.z);
+        var br = proj(eye.x + hw, eye.y - hh * squish, eye.z);
+        var bl = proj(eye.x - hw, eye.y - hh * squish, eye.z);
+
+        wireCtx.shadowBlur  = 8 + eyeGlow * 12;
+        wireCtx.shadowColor = '#FFFFFF';
+        wireCtx.strokeStyle = 'rgba(255,255,255,' + (0.75 + eyeGlow * 0.25) + ')';
+        wireCtx.lineWidth   = 1.4 + eyeGlow * 0.5;
+
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl.x, tl.y);
+        wireCtx.lineTo(tr.x, tr.y);
+        wireCtx.lineTo(br.x, br.y);
+        wireCtx.lineTo(bl.x, bl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        if (blinkAmount >= 0.72) {
+            // Blink: just a horizontal slit
+            var c = proj(eye.x, eye.y, eye.z);
+            wireCtx.beginPath();
+            wireCtx.moveTo(tl.x, c.y);
+            wireCtx.lineTo(tr.x, c.y);
+            wireCtx.strokeStyle = 'rgba(255,255,255,0.85)';
+            wireCtx.lineWidth = 1.2;
+            wireCtx.stroke();
+            return;
+        }
+
+        // Iris — smaller square, colored
+        var irisScale = 0.55;
+        var iw = hw * irisScale;
+        var ih = hh * irisScale * squish;
+        var itl = proj(eye.x - iw, eye.y + ih, eye.z);
+        var itr = proj(eye.x + iw, eye.y + ih, eye.z);
+        var ibr = proj(eye.x + iw, eye.y - ih, eye.z);
+        var ibl = proj(eye.x - iw, eye.y - ih, eye.z);
+
+        wireCtx.shadowBlur  = 10 + eyeGlow * 14;
+        wireCtx.shadowColor = eHex;
+        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
+        wireCtx.lineWidth   = 1.3 + eyeGlow * 0.4;
+
+        wireCtx.beginPath();
+        wireCtx.moveTo(itl.x, itl.y);
+        wireCtx.lineTo(itr.x, itr.y);
+        wireCtx.lineTo(ibr.x, ibr.y);
+        wireCtx.lineTo(ibl.x, ibl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Pupil — smallest square, filled
+        var pupilScale = 0.25;
+        var pw = hw * pupilScale;
+        var ph = hh * pupilScale * squish;
+        var ptl = proj(eye.x - pw, eye.y + ph, eye.z);
+        var ptr = proj(eye.x + pw, eye.y + ph, eye.z);
+        var pbr = proj(eye.x + pw, eye.y - ph, eye.z);
+        var pbl = proj(eye.x - pw, eye.y - ph, eye.z);
+
+        wireCtx.shadowBlur  = 6 + eyeGlow * 8;
+        wireCtx.shadowColor = eHex;
+        wireCtx.fillStyle = 'rgba(' + eRGB + ',' + (0.45 + eyeGlow * 0.55) + ')';
+
+        wireCtx.beginPath();
+        wireCtx.moveTo(ptl.x, ptl.y);
+        wireCtx.lineTo(ptr.x, ptr.y);
+        wireCtx.lineTo(pbr.x, pbr.y);
+        wireCtx.lineTo(pbl.x, pbl.y);
+        wireCtx.closePath();
+        wireCtx.fill();
     }
 
     function drawNose(proj, char) {
