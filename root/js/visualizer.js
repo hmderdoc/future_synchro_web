@@ -308,15 +308,16 @@
             profile: null,
             ringN: 0,
             eyes: {
-                left:  { x: -0.15, y: 0.18, z: 0.28, r: 0.050 },
-                right: { x:  0.15, y: 0.18, z: 0.28, r: 0.050 }
+                left:  { x: -0.15, y: 0.12, z: 0.28, r: 0.075 },
+                right: { x:  0.15, y: 0.12, z: 0.28, r: 0.075 }
             },
+            mascara: true,
             eyeColor: { hex: '#55FF55', rgb: '85,255,85' },
             eyeOutlineColor: { hex: '#FF55FF', rgb: '255,85,255' },
             eyeShape: 'round',
             eyelashes: {
-                count: 5,
-                length: 0.045,
+                count: 6,
+                length: 0.055,
                 color: '#FFFF55',
                 rgb: '255,255,85',
                 width: 1.0,
@@ -1109,13 +1110,62 @@
         wireCtx.shadowBlur  = 10 + eyeGlow * 16;
         wireCtx.shadowColor = oHex;
         wireCtx.strokeStyle = 'rgba(' + oRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
-        wireCtx.lineWidth   = 1.5 + eyeGlow;
 
-        wireCtx.beginPath();
-        for (var i = 0; i < pts.length; i++) {
-            i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y);
+        // Mascara effect: draw upper lid thicker, with winged outer corners
+        if (char.mascara) {
+            // Thicker upper lid arc (top half of the eye outline)
+            wireCtx.lineWidth = 2.8 + eyeGlow * 1.2;
+            wireCtx.beginPath();
+            for (var i = 0; i < pts.length; i++) {
+                // Upper half roughly: indices in top arc
+                var angle01 = i / (pts.length - 1);  // 0..1 around circle
+                if (angle01 <= 0.5) {
+                    // Top half
+                    i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y);
+                }
+            }
+            wireCtx.stroke();
+
+            // Thinner lower lid
+            wireCtx.lineWidth = 1.2 + eyeGlow * 0.4;
+            wireCtx.beginPath();
+            for (var i = 0; i < pts.length; i++) {
+                var angle01b = i / (pts.length - 1);
+                if (angle01b >= 0.45) {
+                    angle01b === 0.45 || (i > 0 && (i-1)/(pts.length-1) < 0.45)
+                        ? wireCtx.moveTo(pts[i].x, pts[i].y)
+                        : wireCtx.lineTo(pts[i].x, pts[i].y);
+                }
+            }
+            wireCtx.lineTo(pts[0].x, pts[0].y);
+            wireCtx.stroke();
+
+            // Wing flick at outer corners (cat-eye)
+            var isLeft = (eyeName === 'left');
+            var outerSign = isLeft ? -1 : 1;
+            var wingStart = proj(
+                eye.x + outerSign * eye.r * 0.95,
+                eye.y + eye.r * eyeScaleY * 0.25,
+                eye.z
+            );
+            var wingEnd = proj(
+                eye.x + outerSign * (eye.r * 1.35),
+                eye.y + eye.r * eyeScaleY * 0.65,
+                eye.z
+            );
+            wireCtx.lineWidth = 2.0 + eyeGlow * 0.6;
+            wireCtx.beginPath();
+            wireCtx.moveTo(wingStart.x, wingStart.y);
+            wireCtx.lineTo(wingEnd.x, wingEnd.y);
+            wireCtx.stroke();
+        } else {
+            wireCtx.lineWidth = 1.5 + eyeGlow;
+            wireCtx.beginPath();
+            for (var i = 0; i < pts.length; i++) {
+                i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y);
+            }
+            wireCtx.stroke();
         }
-        wireCtx.stroke();
 
         // Pupil dot
         var c = proj(eye.x, eye.y, eye.z);
