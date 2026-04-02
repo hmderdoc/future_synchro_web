@@ -683,9 +683,9 @@
                 left:  { x: -0.17, y: -0.03, z: 0.46, r: 0.075 },
                 right: { x:  0.17, y: -0.03, z: 0.46, r: 0.075 }
             },
-            // Distinctive bright amber/yellow android eyes
-            eyeColor: { hex: '#DDAA00', rgb: '221,170,0' },
-            eyeOutlineColor: { hex: '#FFCC22', rgb: '255,204,34' },
+            // Distinctive bright green android eyes
+            eyeColor: { hex: '#33DD33', rgb: '51,221,51' },
+            eyeOutlineColor: { hex: '#55FF55', rgb: '85,255,85' },
             eyeShape: 'round',
             mascara: false,
             eyelashes: null,
@@ -705,37 +705,38 @@
                 bridge: [[0, -0.14, 0.54], [0, -0.28, 0.57], [0, -0.32, 0.58]],
                 base:   [[-0.05, -0.34, 0.52], [0, -0.32, 0.58], [0.05, -0.34, 0.52]]
             },
-            // Pale golden android skin — the unnatural Soong-type complexion
-            wireColor: '#CCBB77',
-            wireRGB:   '204,187,119',
-            accentColor: '#DDCC88',
-            accentRGB:   '221,204,136',
+            // Pale white with a hint of yellow — unnatural Soong-type complexion
+            wireColor: '#E8E0C8',
+            wireRGB:   '232,224,200',
+            accentColor: '#F0E8D0',
+            accentRGB:   '240,232,208',
             // Slicked-back dark hair — perfectly in place, never moves
             hairRigid: true,
             hair: [
-                // Front hairline — swept straight back, tight to skull
-                { rx: -0.20, ry: 0.58, rz:  0.14, len: 0.30, color: '#222222', width: 1.6, freq: 0.10 },
-                { rx: -0.12, ry: 0.62, rz:  0.12, len: 0.32, color: '#1A1A1A', width: 1.7, freq: 0.18 },
-                { rx: -0.04, ry: 0.64, rz:  0.10, len: 0.34, color: '#222222', width: 1.8, freq: 0.25 },
-                { rx:  0.04, ry: 0.64, rz:  0.10, len: 0.34, color: '#1A1A1A', width: 1.8, freq: 0.32 },
-                { rx:  0.12, ry: 0.62, rz:  0.12, len: 0.32, color: '#222222', width: 1.7, freq: 0.40 },
-                { rx:  0.20, ry: 0.58, rz:  0.14, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.48 },
-                // Crown coverage — tight, uniform
-                { rx: -0.16, ry: 0.61, rz:  0.04, len: 0.28, color: '#222222', width: 1.5, freq: 0.22 },
-                { rx: -0.06, ry: 0.64, rz:  0.02, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.30 },
-                { rx:  0.06, ry: 0.64, rz:  0.02, len: 0.30, color: '#222222', width: 1.6, freq: 0.38 },
-                { rx:  0.16, ry: 0.61, rz:  0.04, len: 0.28, color: '#1A1A1A', width: 1.5, freq: 0.45 },
-                // Side partings — neatly combed
-                { rx: -0.28, ry: 0.50, rz:  0.06, len: 0.22, color: '#222222', width: 1.4, freq: 0.12 },
-                { rx:  0.28, ry: 0.50, rz:  0.06, len: 0.22, color: '#222222', width: 1.4, freq: 0.52 },
-                { rx: -0.30, ry: 0.44, rz:  0.00, len: 0.18, color: '#1A1A1A', width: 1.3, freq: 0.08 },
-                { rx:  0.30, ry: 0.44, rz:  0.00, len: 0.18, color: '#1A1A1A', width: 1.3, freq: 0.55 },
-                // Back of head
-                { rx: -0.12, ry: 0.62, rz: -0.08, len: 0.26, color: '#222222', width: 1.4, freq: 0.60 },
-                { rx:  0.00, ry: 0.64, rz: -0.12, len: 0.28, color: '#1A1A1A', width: 1.5, freq: 0.65 },
-                { rx:  0.12, ry: 0.62, rz: -0.08, len: 0.26, color: '#222222', width: 1.4, freq: 0.70 },
-                { rx: -0.20, ry: 0.56, rz: -0.10, len: 0.24, color: '#1A1A1A', width: 1.3, freq: 0.75 },
-                { rx:  0.20, ry: 0.56, rz: -0.10, len: 0.24, color: '#1A1A1A', width: 1.3, freq: 0.80 }
+                // Front hairline — swept straight back over the skull
+                // dir flows backward (-z) with slight downward (-y)
+                { rx: -0.18, ry: 0.58, rz:  0.16, len: 0.38, color: '#222222', width: 1.7, freq: 0.10, dir: { dx: -0.10, dy: -0.20, dz: -0.90 } },
+                { rx: -0.10, ry: 0.62, rz:  0.14, len: 0.40, color: '#1A1A1A', width: 1.8, freq: 0.18, dir: { dx: -0.05, dy: -0.15, dz: -0.95 } },
+                { rx: -0.02, ry: 0.65, rz:  0.12, len: 0.42, color: '#222222', width: 1.9, freq: 0.25, dir: { dx:  0.00, dy: -0.15, dz: -0.95 } },
+                { rx:  0.06, ry: 0.65, rz:  0.12, len: 0.42, color: '#1A1A1A', width: 1.9, freq: 0.32, dir: { dx:  0.02, dy: -0.15, dz: -0.95 } },
+                { rx:  0.14, ry: 0.62, rz:  0.14, len: 0.40, color: '#222222', width: 1.8, freq: 0.40, dir: { dx:  0.08, dy: -0.15, dz: -0.95 } },
+                { rx:  0.22, ry: 0.57, rz:  0.16, len: 0.36, color: '#1A1A1A', width: 1.7, freq: 0.48, dir: { dx:  0.12, dy: -0.20, dz: -0.85 } },
+                // Crown — flowing backward over the top
+                { rx: -0.14, ry: 0.62, rz:  0.04, len: 0.32, color: '#222222', width: 1.6, freq: 0.22, dir: { dx: -0.08, dy: -0.10, dz: -0.90 } },
+                { rx: -0.04, ry: 0.65, rz:  0.02, len: 0.34, color: '#1A1A1A', width: 1.7, freq: 0.30, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
+                { rx:  0.08, ry: 0.65, rz:  0.02, len: 0.34, color: '#222222', width: 1.7, freq: 0.38, dir: { dx:  0.03, dy: -0.10, dz: -0.95 } },
+                { rx:  0.18, ry: 0.60, rz:  0.04, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.45, dir: { dx:  0.10, dy: -0.12, dz: -0.88 } },
+                // Sides — flowing back and down, hugging temples
+                { rx: -0.28, ry: 0.50, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.12, dir: { dx: -0.30, dy: -0.50, dz: -0.60 } },
+                { rx:  0.28, ry: 0.50, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.52, dir: { dx:  0.30, dy: -0.50, dz: -0.60 } },
+                { rx: -0.32, ry: 0.44, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.08, dir: { dx: -0.40, dy: -0.65, dz: -0.40 } },
+                { rx:  0.32, ry: 0.44, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.55, dir: { dx:  0.40, dy: -0.65, dz: -0.40 } },
+                // Back of head — draping straight down
+                { rx: -0.12, ry: 0.60, rz: -0.10, len: 0.28, color: '#222222', width: 1.5, freq: 0.60, dir: { dx: -0.05, dy: -0.60, dz: -0.70 } },
+                { rx:  0.00, ry: 0.62, rz: -0.14, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.65, dir: { dx:  0.00, dy: -0.65, dz: -0.60 } },
+                { rx:  0.12, ry: 0.60, rz: -0.10, len: 0.28, color: '#222222', width: 1.5, freq: 0.70, dir: { dx:  0.05, dy: -0.60, dz: -0.70 } },
+                { rx: -0.22, ry: 0.54, rz: -0.08, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.75, dir: { dx: -0.15, dy: -0.70, dz: -0.50 } },
+                { rx:  0.22, ry: 0.54, rz: -0.08, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.80, dir: { dx:  0.15, dy: -0.70, dz: -0.50 } }
             ],
             hat: null,
             facialHair: null,
@@ -1870,41 +1871,61 @@
             var freqPos = (typeof h.freq === 'number') ? h.freq : (i / char.hair.length);
             var freqVal = getFreqSample(freqPos);
 
-            // Gravity direction: hair hangs down (negative Y) and outward
+            // Flow direction: if strand has dir {dx,dy,dz}, follow that vector.
+            // Otherwise default to hanging down with slight outward drift.
             var outward = (h.rx >= 0) ? 1 : -1;
+            var dirX, dirY, dirZ;
+            if (h.dir) {
+                dirX = h.dir.dx;
+                dirY = h.dir.dy;
+                dirZ = h.dir.dz;
+            } else {
+                // Legacy: hang down, drift outward
+                dirX = h.rx * 0.15;   // outward drift per unit length
+                dirY = -1.0;          // straight down
+                dirZ = 0;
+            }
+            // Normalize direction so len means actual strand length
+            var dirLen = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1;
+            var ndx = dirX / dirLen;
+            var ndy = dirY / dirLen;
+            var ndz = dirZ / dirLen;
+
             var phase = t * 1.5 + i * 0.9;
             var breathSway = Math.sin(breathPhase + i * 0.3) * 0.012;
 
-            // Build segmented strand with frequency-driven waveform displacement
+            // Build segmented strand following the flow direction
             var pts = [root];
             for (var s = 1; s <= HAIR_SEGS; s++) {
                 var frac = s / HAIR_SEGS;  // 0..1 along strand length
 
-                // Base position: hang downward with slight outward drift
-                var baseY = h.ry - h.len * frac;
-                var baseX = h.rx + (h.rx * 0.15 * frac);  // drift outward
-                var baseZ = h.rz + (char.hairRigid ? 0 : Math.sin(phase * 0.3 + frac) * 0.02);
+                // Base position: follow direction vector from root
+                var travel = h.len * frac;
+                // Add gravity pull that increases along the strand
+                var gravityPull = h.dir ? frac * frac * 0.15 : 0;  // directed strands get gentle gravity droop
+                var baseX = h.rx + ndx * travel;
+                var baseY = h.ry + ndy * travel - gravityPull;
+                var baseZ = h.rz + ndz * travel + (char.hairRigid ? 0 : Math.sin(phase * 0.3 + frac) * 0.02);
 
                 // Frequency-driven waveform displacement
-                // Higher freq strands oscillate faster, lower ones sway bigger
-                var waveSpeed = 2.0 + freqPos * 6.0;  // high freq = fast wave
-                var waveAmp = freqVal * (0.06 + (1 - freqPos) * 0.10);  // low freq = bigger
-                var wavePropagation = frac * 3.0;  // wave travels down the strand
+                var waveSpeed = 2.0 + freqPos * 6.0;
+                var waveAmp = freqVal * (0.06 + (1 - freqPos) * 0.10);
+                var wavePropagation = frac * 3.0;
                 var wave = Math.sin(t * waveSpeed + wavePropagation + i * 1.1) * waveAmp;
 
-                // Add bass thump: sharp displacement that decays along length
+                // Bass thump: sharp displacement that decays along length
                 var bassKick = bass * 0.08 * Math.sin(phase * 0.7) * (0.3 + frac * 0.7);
 
-                // Rigid hair: suppress all music-reactive motion (android/helmet hair)
+                // Rigid hair: suppress all music-reactive motion
                 if (char.hairRigid) {
                     wave = 0; bassKick = 0; breathSway = 0;
                 }
 
-                // Combine displacements
-                var dx = wave * outward + bassKick + breathSway * frac;
-                var dz = char.hairRigid ? 0 : Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
+                // Perpendicular displacement (wave mostly sideways relative to strand)
+                var perpX = wave * outward + bassKick + breathSway * frac;
+                var perpZ = char.hairRigid ? 0 : Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
 
-                pts.push(proj(baseX + dx, baseY, baseZ + dz));
+                pts.push(proj(baseX + perpX, baseY, baseZ + perpZ));
             }
 
             // Glow intensity scales with frequency energy
