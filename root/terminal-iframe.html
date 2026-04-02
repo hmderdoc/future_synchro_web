@@ -864,41 +864,67 @@
         window._ftClient = client;
         installTerminalUiBridge();
 
-        /* ── Render-speed fix ──────────────────────────────────────
-         *  fTelnet's OnConnectionData has a BPS rate limiter that reads
-         *  only a few hundred bytes per call, then re-schedules itself
-         *  with setTimeout(fn, 0).  Browsers clamp chained setTimeout
-         *  to >=4 ms (and sometimes much more for iframes/unfocused
-         *  tabs), causing ANSI screens to trickle in visibly.
+        /* ── Render-speed fix v3 ────────────────────────────────────
+         *  fTelnet has a BPS rate limiter in OnConnectionData that reads
+         *  only a few hundred bytes per call and re-schedules via
+         *  setTimeout(fn, 0).  Browsers clamp chained setTimeout to
+         *  >=4 ms (much more for iframes/unfocused tabs), causing ANSI
+         *  screens to render visibly slowly or freeze mid-frame.
          *
-         *  Fix A: override OnConnectionData to drain the entire input
-         *  buffer in one pass.  A MessageChannel continuation is used
-         *  for any overflow (not subject to setTimeout clamping).
+         *  Fix A: Replace OnConnectionData with a full-buffer drain.
+         *         Uses queueMicrotask for continuation (not subject
+         *         to setTimeout clamping).  Post-drain NeedsRedraw
+         *         sweep catches font-load straggler cells.
          *
-         *  Fix B: a lightweight requestAnimationFrame loop forces the
-         *  browser to composite the canvas every frame, even when
-         *  this iframe does not have keyboard focus.
+         *  Fix B: Active rAF render loop (not just keepalive) that
+         *         flushes NeedsRedraw cells AND checks for un-drained
+         *         data every frame — safety net for missed ondata.
+         *         Pauses when document.hidden to save resources.
          *
-         *  Fix C: flush stranded NeedsRedraw cells on the cursor blink
-         *  timer.  During font loads, FastWrite buffers chars to
-         *  NeedsRedraw instead of painting them — this sweeps them up.
+         *  Fix C: NeedsRedraw blink-flush on cursor blink timer.
+         *
+         *  Fix D: visibilitychange handler — when iframe becomes
+         *         visible after being hidden/backgrounded, restarts
+         *         the render loop, flushes NeedsRedraw, and drains
+         *         any data that arrived while throttled.
+         *
+         *  Fix E: 50ms safety-net poll — catches edge cases where
+         *         WebSocket ondata doesn't fire (rapid reconnect,
+         *         browser throttling, iframe deprioritization).
          */
         (function patchRenderSpeed(cl) {
             if (!cl) return;
-            console.log('[fTelnet-speed] Render-speed patch v2 active');
+            console.log('[fTelnet-speed] Render-speed patch v3 active');
 
             /* ---- Fix A: drain-all-data monkey-patch ---- */
-            var mc = (typeof MessageChannel !== 'undefined')
-                     ? new MessageChannel() : null;
-            var drainScheduled = false;
             var totalDrained = 0;
             var drainCalls = 0;
 
+            /* Shared NeedsRedraw sweeper — called from multiple places */
+            function flushNeedsRedraw() {
+                if (!cl._Crt || !cl._Crt._Buffer || !cl._Crt._ScreenSize) return 0;
+                if (cl._Crt._Font && cl._Crt._Font._Loading > 0) return 0;
+                var buf = cl._Crt._Buffer;
+                var sz  = cl._Crt._ScreenSize;
+                var flushed = 0;
+                for (var Y = 1; Y <= sz.y; Y++) {
+                    for (var X = 1; X <= sz.x; X++) {
+                        if (buf[Y] && buf[Y][X] && buf[Y][X].NeedsRedraw) {
+                            cl._Crt.FastWrite(
+                                buf[Y][X].Ch, X, Y,
+                                buf[Y][X], false);
+                            buf[Y][X].NeedsRedraw = false;
+                            flushed++;
+                        }
+                    }
+                }
+                return flushed;
+            }
+
             function drainBuffer() {
-                drainScheduled = false;
-                if (typeof cl._Timer === 'undefined') return;
-                if (typeof cl._Connection === 'undefined') return;
-                if (!cl._Connection.connected) return;
+                if (typeof cl._Timer === 'undefined') return 0;
+                if (typeof cl._Connection === 'undefined') return 0;
+                if (!cl._Connection.connected) return 0;
 
                 var avail = cl._Connection.bytesAvailable;
                 var batchSize = 0;
@@ -914,47 +940,79 @@
                     }
                     avail = cl._Connection.bytesAvailable;
                 }
-                totalDrained += batchSize;
-                drainCalls++;
-                if (batchSize > 500 && drainCalls <= 50) {
-                    console.log('[fTelnet-speed] drained ' + batchSize +
-                        'B (total ' + totalDrained + 'B in ' +
-                        drainCalls + ' calls)');
+                if (batchSize > 0) {
+                    totalDrained += batchSize;
+                    drainCalls++;
+                    if (batchSize > 500 && drainCalls <= 50) {
+                        console.log('[fTelnet-speed] drained ' + batchSize +
+                            'B (total ' + totalDrained + 'B in ' +
+                            drainCalls + ' calls)');
+                    }
+                    cl._LastTimer = new Date().getTime();
+                    /* After draining, sweep any NeedsRedraw cells that
+                       could not be drawn during a font-load window but
+                       whose font has since finished loading. */
+                    flushNeedsRedraw();
                 }
-                cl._LastTimer = new Date().getTime();
+                return batchSize;
             }
 
-            function scheduleDrain() {
-                if (drainScheduled) return;
-                drainScheduled = true;
-                if (mc) {
-                    mc.port1.onmessage = drainBuffer;
-                    mc.port2.postMessage(null);
+            /* Use queueMicrotask for continuation (faster than
+               MessageChannel and not subject to setTimeout clamping). */
+            var continuationPending = false;
+            function scheduleContinuation() {
+                if (continuationPending) return;
+                continuationPending = true;
+                if (typeof queueMicrotask === 'function') {
+                    queueMicrotask(doContinuation);
                 } else {
-                    setTimeout(drainBuffer, 0);
+                    Promise.resolve().then(doContinuation);
+                }
+            }
+            function doContinuation() {
+                continuationPending = false;
+                if (cl._Connection && cl._Connection.bytesAvailable > 0) {
+                    drainBuffer();
                 }
             }
 
             cl.OnConnectionData = function () {
                 drainBuffer();
                 if (cl._Connection && cl._Connection.bytesAvailable > 0) {
-                    scheduleDrain();
+                    scheduleContinuation();
                 }
             };
 
-            /* ---- Fix B: requestAnimationFrame paint-keepalive ---- */
-            var rafActive = false;
-            function paintKeepAlive() {
-                rafActive = true;
-                requestAnimationFrame(paintKeepAlive);
+            /* ---- Fix B: Active rAF render loop ---- */
+            /* Instead of an empty keepalive, the rAF loop now:
+               1. Flushes any NeedsRedraw cells (catches font-load stragglers)
+               2. Checks for un-drained data (safety net if ondata missed)
+               3. Keeps the compositor ticking for canvas updates        */
+            var rafRunning = false;
+            var rafPaused  = false;
+            function renderTick() {
+                if (rafPaused) { rafRunning = false; return; }
+                rafRunning = true;
+                /* (1) Sweep stranded NeedsRedraw cells */
+                flushNeedsRedraw();
+                /* (2) Safety-net drain: if data is sitting in the buffer
+                       but ondata somehow didn't fire, process it now */
+                if (cl._Connection && cl._Connection.connected &&
+                    cl._Connection.bytesAvailable > 0) {
+                    drainBuffer();
+                }
+                requestAnimationFrame(renderTick);
+            }
+            function ensureRAF() {
+                if (!rafRunning && !rafPaused) {
+                    requestAnimationFrame(renderTick);
+                }
             }
             function startRAF() {
                 var c = document.querySelector('#fTelnetContainer canvas');
                 if (c) {
-                    if (!rafActive) {
-                        requestAnimationFrame(paintKeepAlive);
-                        console.log('[fTelnet-speed] rAF paint-keepalive started');
-                    }
+                    ensureRAF();
+                    console.log('[fTelnet-speed] active render loop started');
                     return true;
                 }
                 return false;
@@ -963,38 +1021,53 @@
                 var waitForCanvas = setInterval(function () {
                     if (startRAF()) clearInterval(waitForCanvas);
                 }, 100);
-                /* Give up after 10 s so we don't leak */
                 setTimeout(function () { clearInterval(waitForCanvas); }, 10000);
             }
 
             /* ---- Fix C: NeedsRedraw flush on blink timer ---- */
-            /* When _Loading > 0 (font being fetched), FastWrite buffers
-               chars to NeedsRedraw instead of painting to canvas.  After
-               the font loads, OnFontChanged repaints them — but only
-               once.  Any data arriving during the load window is stranded
-               until the next font event.  Hook into the cursor blink
-               timer to also flush NeedsRedraw chars periodically. */
             if (cl._Crt && cl._Crt._Cursor) {
                 var origOnBlinkShow = cl._Crt.OnBlinkShow.bind(cl._Crt);
                 cl._Crt.OnBlinkShow = function () {
                     origOnBlinkShow();
-                    /* Sweep for any NeedsRedraw cells left over */
-                    var buf = cl._Crt._Buffer;
-                    var sz  = cl._Crt._ScreenSize;
-                    for (var Y = 1; Y <= sz.y; Y++) {
-                        for (var X = 1; X <= sz.x; X++) {
-                            if (buf[Y] && buf[Y][X] &&
-                                buf[Y][X].NeedsRedraw) {
-                                cl._Crt.FastWrite(
-                                    buf[Y][X].Ch, X, Y,
-                                    buf[Y][X], false);
-                                buf[Y][X].NeedsRedraw = false;
-                            }
-                        }
-                    }
+                    flushNeedsRedraw();
                 };
                 console.log('[fTelnet-speed] NeedsRedraw blink-flush installed');
             }
+
+            /* ---- Fix D: Visibility-change handler ---- */
+            /* When the tab/iframe becomes visible after being hidden,
+               the browser may have throttled rAF and compositing.
+               Force a full sweep and restart the render loop. */
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    rafPaused = true;
+                    /* rAF will self-stop on next tick */
+                } else {
+                    rafPaused = false;
+                    /* Restart render loop and force-flush everything */
+                    ensureRAF();
+                    flushNeedsRedraw();
+                    /* Also drain any data that arrived while hidden */
+                    if (cl._Connection && cl._Connection.connected &&
+                        cl._Connection.bytesAvailable > 0) {
+                        drainBuffer();
+                    }
+                }
+            });
+
+            /* ---- Fix E: Safety-net data poll ---- */
+            /* Every 50ms, check if data is stranded in the buffer.
+               This catches edge cases where the WebSocket ondata event
+               didn't fire (e.g. rapid reconnect, browser throttling). */
+            setInterval(function () {
+                if (cl._Connection && cl._Connection.connected &&
+                    cl._Connection.bytesAvailable > 0) {
+                    drainBuffer();
+                }
+                /* Also sweep NeedsRedraw in case font just finished loading */
+                flushNeedsRedraw();
+            }, 50);
+
         })(client);
 
         if (client.OnConnectionConnect) {
