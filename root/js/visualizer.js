@@ -202,6 +202,47 @@
             ],
             hat: null,
             facialHair: null
+        },
+
+        crosswire: {
+            name: 'Crosswire',
+            // Blocky, slightly squarish head — yellow Vectrex vibe
+            profile: [
+                [0.00, -0.78], [0.24, -0.68], [0.40, -0.56],
+                [0.50, -0.40], [0.53, -0.22], [0.52, -0.05],
+                [0.50,  0.10], [0.48,  0.24], [0.46,  0.36],
+                [0.43,  0.46], [0.38,  0.54], [0.28,  0.60],
+                [0.00,  0.63]
+            ],
+            ringN: 16,
+            eyes: {
+                left:  { x: -0.17, y: -0.04, z: 0.46, r: 0.07 },
+                right: { x:  0.17, y: -0.04, z: 0.46, r: 0.07 }
+            },
+            eyeColor: { hex: '#AA8833', rgb: '170,136,51' },
+            eyeShape: 'round',
+            mouth: { y: -0.50, hw: 0.22, z: 0.46, segs: 8, teeth: false },
+            nose: {
+                bridge: [[0, -0.14, 0.54], [0, -0.28, 0.57], [0, -0.32, 0.58]],
+                base:   [[-0.05, -0.34, 0.52], [0, -0.32, 0.58], [0.05, -0.34, 0.52]]
+            },
+            wireColor: '#FFDD33',
+            wireRGB:   '255,221,51',
+            accentColor: '#FFAA00',
+            accentRGB:   '255,170,0',
+            eyebrows: {
+                color: '#996633',
+                rgb:   '153,102,51',
+                width: 2.0,
+                // Brow anchor points relative to each eye center
+                // inner = toward nose, outer = toward temple
+                innerOff: { dx:  0.00, dy: 0.06, dz: 0.02 },
+                outerOff: { dx:  0.12, dy: 0.08, dz: 0.00 },
+                thickness: 0.018   // vertical thickness of brow stroke
+            },
+            hair: null,
+            hat: null,
+            facialHair: null
         }
     };
 
@@ -914,6 +955,9 @@
         drawEye(activeChar.eyes.left, proj, 'left', activeChar);
         drawEye(activeChar.eyes.right, proj, 'right', activeChar);
 
+        // --- Eyebrows ---
+        drawEyebrows(activeChar, proj, amp, bass);
+
         // --- Nose ---
         drawNose(proj, activeChar);
 
@@ -1238,6 +1282,93 @@
             wireCtx.stroke();
         }
         wireCtx.globalAlpha = 1;
+    }
+
+    function drawEyebrows(char, proj, amp, bass) {
+        if (!char.eyebrows) return;
+        var brow = char.eyebrows;
+        var eyes = char.eyes;
+        var t = performance.now() * 0.001;
+
+        // Expressiveness drivers
+        // Bass → brows raise (surprise).  Amp → inner brows dip (intensity).
+        // Vocal presence drives asymmetry for "skeptical" look.
+        var bassLift  = bass * 0.045;            // raise both brows on bass hits
+        var ampFurrow = amp * 0.025;             // inner ends dip with loudness
+        var breathBob = Math.sin(breathPhase) * 0.004;  // subtle idle motion
+
+        // Slow emotional drift — brows cycle through moods over ~8 seconds
+        var mood = Math.sin(t * 0.8) * 0.5 + 0.5;  // 0..1
+        var moodLift  = mood * 0.015;                 // calm → raised
+        var moodInner = (1 - mood) * 0.012;           // intense → furrowed
+
+        // Frequency reactivity: map left brow to low freq, right to mid
+        var freqL = getFreqSample(0.12);  // sub-bass
+        var freqR = getFreqSample(0.45);  // mid
+        var freqLiftL = freqL * 0.02;
+        var freqLiftR = freqR * 0.02;
+
+        // Draw each brow
+        var sides = [
+            { eye: eyes.left,  sign: -1, freqLift: freqLiftL },
+            { eye: eyes.right, sign:  1, freqLift: freqLiftR }
+        ];
+
+        wireCtx.lineCap = 'round';
+
+        for (var si = 0; si < sides.length; si++) {
+            var s = sides[si];
+            var ex = s.eye.x;
+            var ey = s.eye.y;
+            var ez = s.eye.z;
+
+            // Inner anchor (toward nose) — dips with intensity
+            var innerX = ex + brow.innerOff.dx * s.sign;
+            var innerY = ey + brow.innerOff.dy + bassLift + breathBob
+                         + moodLift - ampFurrow - moodInner + s.freqLift;
+            var innerZ = ez + brow.innerOff.dz;
+
+            // Outer anchor (toward temple) — lifts with surprise
+            var outerX = ex + brow.outerOff.dx * s.sign;
+            var outerY = ey + brow.outerOff.dy + bassLift * 1.3 + breathBob
+                         + moodLift * 1.2 + s.freqLift * 1.1;
+            var outerZ = ez + brow.outerOff.dz;
+
+            // Mid control point — arches upward between inner/outer
+            var midX = (innerX + outerX) * 0.5;
+            var midY = Math.max(innerY, outerY) + 0.018 + bass * 0.015;
+            var midZ = (innerZ + outerZ) * 0.5 + 0.01;
+
+            var pInner = proj(innerX, innerY, innerZ);
+            var pMid   = proj(midX,   midY,   midZ);
+            var pOuter = proj(outerX, outerY, outerZ);
+
+            // Main brow stroke
+            wireCtx.shadowBlur  = 5 + bass * 10;
+            wireCtx.shadowColor = brow.color;
+            wireCtx.strokeStyle = 'rgba(' + brow.rgb + ',' + (0.8 + amp * 0.2) + ')';
+            wireCtx.lineWidth   = brow.width || 1.8;
+
+            wireCtx.beginPath();
+            wireCtx.moveTo(pInner.x, pInner.y);
+            wireCtx.quadraticCurveTo(pMid.x, pMid.y, pOuter.x, pOuter.y);
+            wireCtx.stroke();
+
+            // Slight thickness: draw a parallel stroke offset downward
+            if (brow.thickness) {
+                var pInner2 = proj(innerX, innerY - brow.thickness, innerZ);
+                var pMid2   = proj(midX,   midY   - brow.thickness, midZ);
+                var pOuter2 = proj(outerX, outerY - brow.thickness, outerZ);
+
+                wireCtx.globalAlpha = 0.5;
+                wireCtx.lineWidth   = (brow.width || 1.8) * 0.7;
+                wireCtx.beginPath();
+                wireCtx.moveTo(pInner2.x, pInner2.y);
+                wireCtx.quadraticCurveTo(pMid2.x, pMid2.y, pOuter2.x, pOuter2.y);
+                wireCtx.stroke();
+                wireCtx.globalAlpha = 1;
+            }
+        }
     }
 
     function drawHat(char, proj, amp, bass) {
