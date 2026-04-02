@@ -870,6 +870,52 @@
             shutter: null,
             chinGuard: null,
             label: 'METATRON'
+        },
+
+        inkstain: {
+            name: 'iNK\$tAiN',
+            // Standard rotational head (human skull shape) — trapped inside a cage
+            profile: [
+                [0.00, -0.78], [0.20, -0.69], [0.35, -0.56],
+                [0.46, -0.40], [0.51, -0.24], [0.50, -0.06],
+                [0.47,  0.10], [0.45,  0.24], [0.43,  0.36],
+                [0.38,  0.47], [0.30,  0.56], [0.18,  0.63],
+                [0.00,  0.66]
+            ],
+            ringN: 16,
+            eyes: {
+                left:  { x: -0.17, y: -0.04, z: 0.44, r: 0.075 },
+                right: { x:  0.17, y: -0.04, z: 0.44, r: 0.075 }
+            },
+            eyeColor: { hex: '#55FFFF', rgb: '85,255,255' },
+            eyeOutlineColor: { hex: '#FFFFFF', rgb: '255,255,255' },
+            eyeShape: 'round',
+            eyeBehavior: null,
+            mascara: false,
+            eyelashes: null,
+            eyebrows: null,
+            mouth: { y: -0.50, hw: 0.22, z: 0.46, segs: 8, teeth: true },
+            nose: {
+                bridge: [[0, -0.14, 0.52], [0, -0.28, 0.56], [0, -0.32, 0.57]],
+                base:   [[-0.05, -0.34, 0.50], [0, -0.32, 0.57], [0.05, -0.34, 0.50]]
+            },
+            // wireColor/RGB are fallbacks but CGA mode overrides per-line
+            wireColor: '#AAAAAA',
+            wireRGB:   '170,170,170',
+            accentColor: '#FFFFFF',
+            accentRGB:   '255,255,255',
+            // CGA multicolor mode: every wireframe line draws in a cycling CGA color
+            cgaWireframe: true,
+            // Gray cage cube enclosure
+            cage: { w: 0.62, h: 0.82, d: 0.48 },
+            hair: null,
+            hairRigid: false,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: 'iNK$tAiN'
         }
     };
 
@@ -1538,6 +1584,9 @@
             // --- Metatron's Cube sacred geometry ---
             drawMetatronsCube(activeChar, proj, amp, bass);
         } else {
+            // --- Cage cube back layer (drawn behind head) ---
+            if (activeChar.cage) drawCageCube(activeChar, proj, amp, bass);
+
             // --- Rotational profile rings ---
             var rings = [];
             var waveformTime = performance.now() * 0.0065;
@@ -1564,11 +1613,19 @@
 
             // --- Horizontal rings ---
             wireCtx.shadowBlur  = 8 + bass * 14 + (waveHeadEnabled ? 8 : 0);
-            wireCtx.shadowColor = activeChar.wireColor;
-            wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.55)';
-            wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
+            if (activeChar.cgaWireframe) cgaLineIndex = 0;  // reset per frame
 
             for (var r = 0; r < rings.length; r++) {
+                if (activeChar.cgaWireframe) {
+                    var cc = getCgaColor();
+                    wireCtx.shadowColor = cc.hex;
+                    wireCtx.strokeStyle = 'rgba(' + cc.rgb + ',0.70)';
+                    wireCtx.lineWidth   = 1.5;
+                } else {
+                    wireCtx.shadowColor = activeChar.wireColor;
+                    wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.55)';
+                    wireCtx.lineWidth   = waveHeadEnabled ? 1.4 : 1.2;
+                }
                 wireCtx.beginPath();
                 for (var i = 0; i < rings[r].length; i++) {
                     var pt = rings[r][i];
@@ -1579,9 +1636,16 @@
             }
 
             // --- Vertical ribs ---
-            wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.30)';
-            wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
             for (var s = 0; s < activeChar.ringN; s += 2) {
+                if (activeChar.cgaWireframe) {
+                    var cc = getCgaColor();
+                    wireCtx.shadowColor = cc.hex;
+                    wireCtx.strokeStyle = 'rgba(' + cc.rgb + ',0.50)';
+                    wireCtx.lineWidth   = 1.1;
+                } else {
+                    wireCtx.strokeStyle = 'rgba(' + activeChar.wireRGB + ',0.30)';
+                    wireCtx.lineWidth   = waveHeadEnabled ? 0.95 : 0.8;
+                }
                 wireCtx.beginPath();
                 for (var r = 0; r < rings.length; r++) {
                     var pt = rings[r][s];
@@ -1638,6 +1702,45 @@
         drawChinGuard(activeChar, proj, amp, bass);
 
         } // end face features
+
+        // --- Cage cube front overlay (bars in front of face) ---
+        if (activeChar.cage) {
+            var cage = activeChar.cage;
+            var pu = 1 + bass * 0.008;
+            var cw2 = cage.w * pu, ch2 = cage.h * pu, cd2 = cage.d * pu;
+            var barRGB = '150,150,150';
+            var barAlpha = 0.38;
+            wireCtx.lineWidth = 1.0;
+            wireCtx.shadowBlur = 3;
+            wireCtx.shadowColor = '#888888';
+            // Front vertical bars overlay (drawn over face)
+            var vBars = 5;
+            for (var b = 1; b < vBars; b++) {
+                var frac = b / vBars;
+                var xOff = -cw2 + 2 * cw2 * frac;
+                var ft = proj(xOff, ch2, cd2);
+                var fb = proj(xOff, -ch2, cd2);
+                wireCtx.strokeStyle = 'rgba(' + barRGB + ',' + barAlpha + ')';
+                wireCtx.beginPath();
+                wireCtx.moveTo(ft.x, ft.y);
+                wireCtx.lineTo(fb.x, fb.y);
+                wireCtx.stroke();
+            }
+            // Front horizontal bars overlay
+            var hBars = 4;
+            for (var b = 1; b < hBars; b++) {
+                var frac = b / hBars;
+                var yOff = -ch2 + 2 * ch2 * frac;
+                var fl = proj(-cw2, yOff, cd2);
+                var fr = proj(cw2, yOff, cd2);
+                wireCtx.strokeStyle = 'rgba(' + barRGB + ',' + barAlpha + ')';
+                wireCtx.beginPath();
+                wireCtx.moveTo(fl.x, fl.y);
+                wireCtx.lineTo(fr.x, fr.y);
+                wireCtx.stroke();
+            }
+            wireCtx.shadowBlur = 0;
+        }
     }
 
     // Update shifty eye animation state
@@ -1727,6 +1830,11 @@
         // Use separate outline color when defined (e.g. white outline + dark pupil)
         var oHex = (char.eyeOutlineColor ? char.eyeOutlineColor.hex : eHex);
         var oRGB = (char.eyeOutlineColor ? char.eyeOutlineColor.rgb : eRGB);
+        if (char.cgaWireframe) {
+            var ec = getCgaColor();
+            oHex = ec.hex; oRGB = ec.rgb;
+            eHex = ec.hex; eRGB = ec.rgb;
+        }
         wireCtx.shadowBlur  = 10 + eyeGlow * 16;
         wireCtx.shadowColor = oHex;
         wireCtx.strokeStyle = 'rgba(' + oRGB + ',' + (0.7 + eyeGlow * 0.3) + ')';
@@ -1903,8 +2011,14 @@
         char = char || activeChar;
         if (!char.nose) return;
         wireCtx.shadowBlur  = 5;
-        wireCtx.shadowColor = char.wireColor;
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
+        if (char.cgaWireframe) {
+            var nc = getCgaColor();
+            wireCtx.shadowColor = nc.hex;
+            wireCtx.strokeStyle = 'rgba(' + nc.rgb + ',0.55)';
+        } else {
+            wireCtx.shadowColor = char.wireColor;
+            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.35)';
+        }
         wireCtx.lineWidth   = 1;
 
         var nose = char.nose;
@@ -1963,11 +2077,22 @@
         }
 
         wireCtx.shadowBlur  = 6 + mouthOpen * 16;
-        wireCtx.shadowColor = char.accentColor;
-        wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
+        if (char.cgaWireframe) {
+            var mc1 = getCgaColor();
+            wireCtx.shadowColor = mc1.hex;
+            wireCtx.strokeStyle = 'rgba(' + mc1.rgb + ',' + (0.7 + mouthOpen * 0.3) + ')';
+        } else {
+            wireCtx.shadowColor = char.accentColor;
+            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
+        }
         wireCtx.lineWidth   = 1.5 + mouthOpen;
 
         stroke(upper);
+        if (char.cgaWireframe) {
+            var mc2 = getCgaColor();
+            wireCtx.shadowColor = mc2.hex;
+            wireCtx.strokeStyle = 'rgba(' + mc2.rgb + ',' + (0.7 + mouthOpen * 0.3) + ')';
+        }
         stroke(lower);
 
         // Teeth (optional per character)
@@ -2898,7 +3023,158 @@
     // =========================================================
     //  Box Head Renderer (rectangular characters like floppy drive)
     // =========================================================
-    function drawBoxHead(char, proj, amp, bass) {
+    // === 16-color CGA palette for iNK$tAiN ===
+    var CGA_PALETTE_16 = [
+        { hex: '#000000', rgb: '0,0,0' },         // 0: black
+        { hex: '#0000AA', rgb: '0,0,170' },        // 1: blue
+        { hex: '#00AA00', rgb: '0,170,0' },         // 2: green
+        { hex: '#00AAAA', rgb: '0,170,170' },       // 3: cyan
+        { hex: '#AA0000', rgb: '170,0,0' },         // 4: red
+        { hex: '#AA00AA', rgb: '170,0,170' },       // 5: magenta
+        { hex: '#AA5500', rgb: '170,85,0' },        // 6: brown
+        { hex: '#AAAAAA', rgb: '170,170,170' },     // 7: light gray
+        { hex: '#555555', rgb: '85,85,85' },        // 8: dark gray
+        { hex: '#5555FF', rgb: '85,85,255' },       // 9: light blue
+        { hex: '#55FF55', rgb: '85,255,85' },       // 10: light green
+        { hex: '#55FFFF', rgb: '85,255,255' },      // 11: light cyan
+        { hex: '#FF5555', rgb: '255,85,85' },       // 12: light red
+        { hex: '#FF55FF', rgb: '255,85,255' },      // 13: light magenta
+        { hex: '#FFFF55', rgb: '255,255,85' },      // 14: yellow
+        { hex: '#FFFFFF', rgb: '255,255,255' }      // 15: white
+    ];
+
+    // Counter for cycling CGA colors per line drawn
+    var cgaLineIndex = 0;
+
+    function getCgaColor() {
+        // Skip black (index 0) — invisible on dark background
+        var idx = 1 + (cgaLineIndex % 15);
+        cgaLineIndex++;
+        return CGA_PALETTE_16[idx];
+    }
+
+    // === Cage Cube: gray wireframe enclosure for iNK$tAiN ===
+    function drawCageCube(char, proj, amp, bass) {
+        var cage = char.cage;
+        if (!cage) return;
+        var cw = cage.w, ch = cage.h, cd = cage.d;
+
+        // Bass pulse on cage
+        var pulse = 1 + bass * 0.008;
+        cw *= pulse; ch *= pulse; cd *= pulse;
+
+        // 8 corners
+        var ftl = proj(-cw, ch, cd);
+        var ftr = proj(cw, ch, cd);
+        var fbl = proj(-cw, -ch, cd);
+        var fbr = proj(cw, -ch, cd);
+        var btl = proj(-cw, ch, -cd);
+        var btr = proj(cw, ch, -cd);
+        var bbl = proj(-cw, -ch, -cd);
+        var bbr = proj(cw, -ch, -cd);
+
+        // Gray cage style — medium gray, defined edges
+        var cageRGB = '140,140,140';
+        var cageHex = '#8C8C8C';
+        var edgeLw = 1.8;
+
+        wireCtx.shadowBlur = 4 + bass * 6;
+        wireCtx.shadowColor = cageHex;
+
+        // Front face
+        wireCtx.strokeStyle = 'rgba(' + cageRGB + ',0.65)';
+        wireCtx.lineWidth = edgeLw;
+        wireCtx.beginPath();
+        wireCtx.moveTo(ftl.x, ftl.y);
+        wireCtx.lineTo(ftr.x, ftr.y);
+        wireCtx.lineTo(fbr.x, fbr.y);
+        wireCtx.lineTo(fbl.x, fbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Back face
+        wireCtx.strokeStyle = 'rgba(' + cageRGB + ',0.35)';
+        wireCtx.lineWidth = edgeLw;
+        wireCtx.beginPath();
+        wireCtx.moveTo(btl.x, btl.y);
+        wireCtx.lineTo(btr.x, btr.y);
+        wireCtx.lineTo(bbr.x, bbr.y);
+        wireCtx.lineTo(bbl.x, bbl.y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // Side edges (connect front to back)
+        wireCtx.strokeStyle = 'rgba(' + cageRGB + ',0.50)';
+        wireCtx.lineWidth = edgeLw;
+        var fc = [ftl, ftr, fbr, fbl];
+        var bc = [btl, btr, bbr, bbl];
+        for (var i = 0; i < 4; i++) {
+            wireCtx.beginPath();
+            wireCtx.moveTo(fc[i].x, fc[i].y);
+            wireCtx.lineTo(bc[i].x, bc[i].y);
+            wireCtx.stroke();
+        }
+
+        // Internal bars — horizontal and vertical for prison-like effect
+        var barRGB = '120,120,120';
+        var barAlpha = 0.25;
+        var barLw = 0.9;
+        wireCtx.lineWidth = barLw;
+
+        // Vertical bars on front face
+        var vBars = 5;
+        for (var b = 1; b < vBars; b++) {
+            var frac = b / vBars;
+            var xOff = -cw + 2 * cw * frac;
+            var ft = proj(xOff, ch, cd);
+            var fb = proj(xOff, -ch, cd);
+            wireCtx.strokeStyle = 'rgba(' + barRGB + ',' + barAlpha + ')';
+            wireCtx.beginPath();
+            wireCtx.moveTo(ft.x, ft.y);
+            wireCtx.lineTo(fb.x, fb.y);
+            wireCtx.stroke();
+        }
+
+        // Horizontal bars on front face
+        var hBars = 4;
+        for (var b = 1; b < hBars; b++) {
+            var frac = b / hBars;
+            var yOff = -ch + 2 * ch * frac;
+            var fl = proj(-cw, yOff, cd);
+            var fr = proj(cw, yOff, cd);
+            wireCtx.strokeStyle = 'rgba(' + barRGB + ',' + barAlpha + ')';
+            wireCtx.beginPath();
+            wireCtx.moveTo(fl.x, fl.y);
+            wireCtx.lineTo(fr.x, fr.y);
+            wireCtx.stroke();
+        }
+
+        // Vertical bars on side faces
+        var sBars = 3;
+        for (var b = 1; b < sBars; b++) {
+            var frac = b / sBars;
+            var zOff = -cd + 2 * cd * frac;
+            // Left side
+            var lt = proj(-cw, ch, zOff);
+            var lb = proj(-cw, -ch, zOff);
+            wireCtx.strokeStyle = 'rgba(' + barRGB + ',' + (barAlpha * 0.7) + ')';
+            wireCtx.beginPath();
+            wireCtx.moveTo(lt.x, lt.y);
+            wireCtx.lineTo(lb.x, lb.y);
+            wireCtx.stroke();
+            // Right side
+            var rt = proj(cw, ch, zOff);
+            var rb = proj(cw, -ch, zOff);
+            wireCtx.beginPath();
+            wireCtx.moveTo(rt.x, rt.y);
+            wireCtx.lineTo(rb.x, rb.y);
+            wireCtx.stroke();
+        }
+
+        wireCtx.shadowBlur = 0;
+    }
+
+        function drawBoxHead(char, proj, amp, bass) {
         var box = char.boxDims;
         var w = box.w, h = box.h, d = box.d;
 
