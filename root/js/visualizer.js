@@ -74,6 +74,16 @@
     var mouthOpen     = 0;      // 0-1 smoothed
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
+
+    // Shifty eye state — animated pupil offset for 'shifty' eyeBehavior
+    var shiftyState = {
+        targetX: 0, targetY: 0,    // where the pupils want to go
+        currentX: 0, currentY: 0,  // smoothed current position
+        timer: 0,                   // countdown to next shift
+        dartTimer: 0,               // quick dart cooldown
+        sideEyeBias: 0.65,         // probability of looking sideways vs random
+        holdTime: 0                 // how long to hold current position
+    };
     var headAmp       = 0;      // module-level amp for sub-renderers
     var headBass      = 0;      // module-level bass for sub-renderers
     var headWaveform  = [];     // normalized analyser time-domain samples
@@ -743,6 +753,93 @@
             facialHair: null,
             ledIndicators: null,
             shutter: null
+        },
+        cinder: {
+            name: 'Cinder',
+            // Feminine face: softer jawline, high cheekbones, delicate chin
+            profile: [
+                [0.00, -0.80], [0.14, -0.74], [0.28, -0.64],
+                [0.40, -0.52], [0.46, -0.38], [0.48, -0.24],
+                [0.47, -0.10], [0.45,  0.02], [0.44,  0.14],
+                [0.42,  0.26], [0.38,  0.36], [0.32,  0.46],
+                [0.24,  0.56], [0.14,  0.62],
+                [0.00,  0.65]
+            ],
+            ringN: 20,
+            eyes: {
+                left:  { x: -0.16, y: -0.02, z: 0.46, r: 0.072 },
+                right: { x:  0.16, y: -0.02, z: 0.46, r: 0.072 }
+            },
+            // Virtual Boy LIGHTRED — deep red pupils
+            eyeColor: { hex: '#FF3333', rgb: '255,51,51' },
+            eyeOutlineColor: { hex: '#FF6655', rgb: '255,102,85' },
+            eyeShape: 'round',
+            eyeBehavior: 'shifty',   // animated shifty/side-eye pupils
+            mascara: true,           // cat-eye winged liner
+            eyelashes: {
+                count: 5,
+                length: 0.05,
+                color: '#FF4444',
+                rgb: '255,68,68',
+                width: 1.0,
+                reactive: true,
+                bottom: false
+            },
+            // Arched, expressive feminine brows
+            eyebrows: {
+                color: '#CC2222',
+                rgb:   '204,34,34',
+                width: 2.0,
+                innerOff: { dx:  0.00, dy: 0.06, dz: 0.02 },
+                outerOff: { dx:  0.12, dy: 0.075, dz: 0.00 },
+                thickness: 0.016
+            },
+            // Soft mouth, slightly pouty, no teeth
+            mouth: { y: -0.50, hw: 0.18, z: 0.46, segs: 10,
+                     teeth: false },
+            nose: {
+                bridge: [[0, -0.14, 0.52], [0, -0.28, 0.56], [0, -0.33, 0.58]],
+                base:   [[-0.05, -0.35, 0.52], [0, -0.33, 0.58], [0.05, -0.35, 0.52]]
+            },
+            // Virtual Boy LIGHTRED monochrome aesthetic
+            wireColor: '#FF4444',
+            wireRGB:   '255,68,68',
+            accentColor: '#FF6655',
+            accentRGB:   '255,102,85',
+            // Full wavy yellow hair — longer strands with flowing directions
+            hair: [
+                // Front hairline — parted slightly left, flowing to sides
+                { rx: -0.20, ry: 0.60, rz:  0.14, len: 0.55, color: '#DDCC22', width: 1.8, freq: 0.05, dir: { dx: -0.40, dy: -0.30, dz: -0.70 } },
+                { rx: -0.12, ry: 0.64, rz:  0.12, len: 0.60, color: '#EEDD33', width: 1.9, freq: 0.12, dir: { dx: -0.25, dy: -0.20, dz: -0.85 } },
+                { rx: -0.04, ry: 0.66, rz:  0.10, len: 0.62, color: '#FFEE44', width: 2.0, freq: 0.20, dir: { dx: -0.10, dy: -0.15, dz: -0.90 } },
+                { rx:  0.04, ry: 0.66, rz:  0.10, len: 0.60, color: '#EEDD33', width: 2.0, freq: 0.28, dir: { dx:  0.15, dy: -0.15, dz: -0.88 } },
+                { rx:  0.12, ry: 0.64, rz:  0.12, len: 0.55, color: '#DDCC22', width: 1.9, freq: 0.35, dir: { dx:  0.30, dy: -0.20, dz: -0.80 } },
+                { rx:  0.20, ry: 0.60, rz:  0.14, len: 0.50, color: '#CCBB11', width: 1.8, freq: 0.42, dir: { dx:  0.45, dy: -0.30, dz: -0.65 } },
+                // Crown volume — flowing back with body
+                { rx: -0.14, ry: 0.64, rz:  0.04, len: 0.65, color: '#FFEE44', width: 1.7, freq: 0.18, dir: { dx: -0.15, dy: -0.15, dz: -0.90 } },
+                { rx:  0.00, ry: 0.67, rz:  0.02, len: 0.70, color: '#EEDD33', width: 1.8, freq: 0.25, dir: { dx:  0.00, dy: -0.12, dz: -0.95 } },
+                { rx:  0.14, ry: 0.64, rz:  0.04, len: 0.65, color: '#DDCC22', width: 1.7, freq: 0.33, dir: { dx:  0.15, dy: -0.15, dz: -0.90 } },
+                // Long side-flowing strands — cascading down past face
+                { rx: -0.30, ry: 0.54, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.08, dir: { dx: -0.50, dy: -0.70, dz: -0.20 } },
+                { rx: -0.34, ry: 0.48, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.15, dir: { dx: -0.55, dy: -0.75, dz: -0.10 } },
+                { rx: -0.32, ry: 0.42, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.22, dir: { dx: -0.45, dy: -0.80, dz: -0.05 } },
+                { rx:  0.30, ry: 0.54, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.50, dir: { dx:  0.50, dy: -0.70, dz: -0.20 } },
+                { rx:  0.34, ry: 0.48, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.58, dir: { dx:  0.55, dy: -0.75, dz: -0.10 } },
+                { rx:  0.32, ry: 0.42, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.65, dir: { dx:  0.45, dy: -0.80, dz: -0.05 } },
+                // Back cascade — long strands flowing down behind
+                { rx: -0.14, ry: 0.62, rz: -0.08, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.60, dir: { dx: -0.08, dy: -0.60, dz: -0.65 } },
+                { rx:  0.00, ry: 0.64, rz: -0.12, len: 0.75, color: '#FFEE44', width: 1.6, freq: 0.68, dir: { dx:  0.00, dy: -0.65, dz: -0.55 } },
+                { rx:  0.14, ry: 0.62, rz: -0.08, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.75, dir: { dx:  0.08, dy: -0.60, dz: -0.65 } },
+                { rx: -0.22, ry: 0.56, rz: -0.10, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.80, dir: { dx: -0.20, dy: -0.65, dz: -0.50 } },
+                { rx:  0.22, ry: 0.56, rz: -0.10, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.85, dir: { dx:  0.20, dy: -0.65, dz: -0.50 } }
+            ],
+            hairRigid: false,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: 'CINDER'
         }
     };
 
@@ -1465,6 +1562,15 @@
         // --- Hat ---
         drawHat(activeChar, proj, amp, bass);
 
+        // --- Update shifty eyes (if character has that behavior) ---
+        if (activeChar.eyeBehavior === 'shifty') {
+            updateShiftyEyes(0.016);  // ~60fps dt
+        } else {
+            // Reset to center when not shifty
+            shiftyState.currentX *= 0.85;
+            shiftyState.currentY *= 0.85;
+        }
+
         // --- Eyes ---
         drawEye(activeChar.eyes.left, proj, 'left', activeChar);
         drawEye(activeChar.eyes.right, proj, 'right', activeChar);
@@ -1492,6 +1598,59 @@
 
         // --- Chin guard / helmet edge (RoboCop etc.) ---
         drawChinGuard(activeChar, proj, amp, bass);
+    }
+
+    // Update shifty eye animation state
+    function updateShiftyEyes(dt) {
+        var s = shiftyState;
+        s.timer -= dt;
+        s.dartTimer -= dt;
+
+        if (s.timer <= 0) {
+            // Pick a new target gaze direction
+            var r = Math.random();
+            if (r < s.sideEyeBias) {
+                // Side-eye: strong horizontal bias, slight vertical
+                s.targetX = (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 0.40);
+                s.targetY = (Math.random() - 0.5) * 0.25;
+            } else if (r < s.sideEyeBias + 0.15) {
+                // Look down (suspicious)
+                s.targetX = (Math.random() - 0.5) * 0.3;
+                s.targetY = -(0.3 + Math.random() * 0.4);
+            } else {
+                // Random wander
+                s.targetX = (Math.random() - 0.5) * 0.7;
+                s.targetY = (Math.random() - 0.5) * 0.5;
+            }
+            // Hold for a random duration, then shift again
+            s.holdTime = 0.4 + Math.random() * 1.8;
+            s.timer = s.holdTime;
+
+            // Occasional very quick dart (nervous glance)
+            if (s.dartTimer <= 0 && Math.random() < 0.3) {
+                s.dartTimer = 2.5 + Math.random() * 4.0;  // cooldown before next dart
+                s.holdTime = 0.08 + Math.random() * 0.12;  // very brief
+                s.timer = s.holdTime;
+            }
+        }
+
+        // Smooth interpolation — fast dart vs slow drift
+        var isDarting = s.holdTime < 0.2;
+        var lerpSpeed = isDarting ? 0.45 : 0.08;
+        s.currentX += (s.targetX - s.currentX) * lerpSpeed;
+        s.currentY += (s.targetY - s.currentY) * lerpSpeed;
+    }
+
+    // Get the pupil offset for shifty eyes (in eye-radius units)
+    function getShiftyOffset(eyeName) {
+        var s = shiftyState;
+        // Both eyes shift together but the "far" eye leads for side-eye effect
+        var xOff = s.currentX;
+        var yOff = s.currentY;
+        // Slight asymmetry: if looking left, left eye shifts more
+        if (eyeName === 'left' && xOff < 0) xOff *= 1.12;
+        if (eyeName === 'right' && xOff > 0) xOff *= 1.12;
+        return { x: xOff, y: yOff };
     }
 
     function drawEye(eye, proj, eyeName, char) {
@@ -1588,13 +1747,25 @@
             wireCtx.stroke();
         }
 
-        // Pupil dot
-        var c = proj(eye.x, eye.y, eye.z);
+        // Pupil dot — with optional shifty offset
+        var shiftyOff = (char.eyeBehavior === 'shifty') ? getShiftyOffset(eyeName) : { x: 0, y: 0 };
+        var pupilOffX = shiftyOff.x * eye.r * 0.55;  // max offset = 55% of eye radius
+        var pupilOffY = shiftyOff.y * eye.r * 0.40;
+        var c = proj(eye.x + pupilOffX, eye.y + pupilOffY, eye.z);
         if (blinkAmount < 0.72) {
+            // Larger pupil for shifty eyes (more visible, more expressive)
+            var pupilR = (char.eyeBehavior === 'shifty') ? (3.0 + eyeGlow * 3.5) : (2 + eyeGlow * 3);
             wireCtx.beginPath();
-            wireCtx.arc(c.x, c.y, 2 + eyeGlow * 3, 0, Math.PI * 2);
+            wireCtx.arc(c.x, c.y, pupilR, 0, Math.PI * 2);
             wireCtx.fillStyle = 'rgba(' + eRGB + ',' + (0.5 + eyeGlow * 0.5) + ')';
             wireCtx.fill();
+            // Shifty eyes: add a tiny bright highlight dot for life
+            if (char.eyeBehavior === 'shifty') {
+                wireCtx.beginPath();
+                wireCtx.arc(c.x + pupilR * 0.3, c.y - pupilR * 0.3, pupilR * 0.25, 0, Math.PI * 2);
+                wireCtx.fillStyle = 'rgba(255,255,255,0.6)';
+                wireCtx.fill();
+            }
         } else {
             wireCtx.beginPath();
             wireCtx.moveTo(c.x - eye.r * 30 * c.d * 0.22, c.y);
