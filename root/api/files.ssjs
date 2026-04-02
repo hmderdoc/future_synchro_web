@@ -8,6 +8,244 @@ var request = require({}, settings.web_lib + 'request.js', 'request');
 var Filebase = require({}, 'filebase.js', 'OldFileBase');
 
 var CHUNK_SIZE = 1024;
+var TRACK_OVERRIDE_DIR = system.data_dir + 'futureland-records/';
+var TRACK_OVERRIDE_FILE = TRACK_OVERRIDE_DIR + 'track-overrides.ini';
+var TRACK_TAG_FIELDS = ['title', 'artist', 'composer', 'genre', 'year', 'album'];
+var _bodyParams = null;
+
+function trimText(value) {
+	return String(value || '').replace(/^\s+|\s+$/g, '');
+}
+
+function getBodyParams() {
+	var params = {};
+	var pairs;
+	var index;
+	var parts;
+	var key;
+	var value;
+
+	if (_bodyParams !== null) {
+		return _bodyParams;
+	}
+
+	_bodyParams = params;
+
+	if (http_request.method !== 'POST' || typeof http_request.body !== 'string' || !http_request.body.length) {
+		return _bodyParams;
+	}
+
+	pairs = http_request.body.split('&');
+	for (index = 0; index < pairs.length; index += 1) {
+		parts = pairs[index].split('=');
+		key = decodeURIComponent(String(parts.shift() || '').replace(/\+/g, ' '));
+		value = decodeURIComponent(String(parts.join('=') || '').replace(/\+/g, ' '));
+
+		if (!key.length) {
+			continue;
+		}
+
+		if (!Array.isArray(_bodyParams[key])) {
+			_bodyParams[key] = [];
+		}
+		_bodyParams[key].push(value);
+	}
+
+	return _bodyParams;
+}
+
+function hasRequestParam(name) {
+	return (
+		(Array.isArray(http_request.query[name]) && http_request.query[name].length) ||
+		(Array.isArray(getBodyParams()[name]) && getBodyParams()[name].length)
+	);
+}
+
+function getRequestValue(name, fallback) {
+	if (Array.isArray(http_request.query[name]) && http_request.query[name].length) {
+		return String(http_request.query[name][0]);
+	}
+
+	if (Array.isArray(getBodyParams()[name]) && getBodyParams()[name].length) {
+		return String(getBodyParams()[name][0]);
+	}
+
+	return typeof fallback === 'undefined' ? '' : String(fallback);
+}
+
+function ensureTrackOverrideDir() {
+	return file_isdir(TRACK_OVERRIDE_DIR) || mkpath(TRACK_OVERRIDE_DIR);
+}
+
+function trackOverrideSection(filename) {
+	return String(filename || '').toLowerCase();
+}
+
+function copyTags(source) {
+	var result = {};
+	var key;
+
+	if (!source || typeof source !== 'object') {
+		return result;
+	}
+
+	for (key in source) {
+		if (!Object.prototype.hasOwnProperty.call(source, key)) {
+			continue;
+		}
+		result[key] = source[key];
+	}
+
+	return result;
+}
+
+function cleanTrackOverrideTags(tags) {
+	var clean = {};
+	var index;
+	var field;
+	var value;
+
+	if (!tags || typeof tags !== 'object') {
+		return clean;
+	}
+
+	for (index = 0; index < TRACK_TAG_FIELDS.length; index += 1) {
+		field = TRACK_TAG_FIELDS[index];
+		if (typeof tags[field] === 'undefined' || tags[field] === null) {
+			continue;
+		}
+		value = trimText(tags[field]);
+		if (value.length) {
+			clean[field] = value;
+		}
+	}
+
+	return clean;
+}
+
+function hasOwnValues(obj) {
+	var key;
+	if (!obj || typeof obj !== 'object') {
+		return false;
+	}
+	for (key in obj) {
+		if (Object.prototype.hasOwnProperty.call(obj, key)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function loadTrackOverrides() {
+	var overrides = {};
+	var file;
+	var sections;
+	var index;
+	var section;
+
+	if (!file_exists(TRACK_OVERRIDE_FILE)) {
+		return overrides;
+	}
+
+	file = new File(TRACK_OVERRIDE_FILE);
+	if (!file.open('r')) {
+		return overrides;
+	}
+
+	try {
+		sections = file.iniGetSections();
+		for (index = 0; index < sections.length; index += 1) {
+			section = sections[index];
+			overrides[String(section).toLowerCase()] = cleanTrackOverrideTags(file.iniGetObject(section) || {});
+		}
+	} finally {
+		file.close();
+	}
+
+	return overrides;
+}
+
+function writeTrackOverride(filename, tags) {
+	var clean = cleanTrackOverrideTags(tags);
+	var file;
+	var openMode;
+	var section = trackOverrideSection(filename);
+
+	if (!ensureTrackOverrideDir()) {
+		throw new Error('Could not create track override directory');
+	}
+
+	file = new File(TRACK_OVERRIDE_FILE);
+	openMode = file_exists(TRACK_OVERRIDE_FILE) ? 'r+' : 'w+';
+	if (!file.open(openMode)) {
+		throw new Error('Could not open track override file');
+	}
+
+	try {
+		if (hasOwnValues(clean)) {
+			file.iniSetObject(section, clean);
+		} else {
+			file.iniRemoveSection(section);
+		}
+	} finally {
+		file.close();
+	}
+
+	return clean;
+}
+
+function findFileRecord(dirCode, filename) {
+	var lower = String(filename || '').toLowerCase();
+	var fileBase = new OldFileBase(dirCode);
+	var file = null;
+
+	fileBase.some(function (entry) {
+		if (!entry || String(entry.name || '').toLowerCase() !== lower) {
+			return false;
+		}
+		if (entry.path !== undefined) {
+			file = entry;
+			return true;
+		}
+		return false;
+	});
+
+	fileBase = undefined;
+	return file;
+}
+
+function lyricPathFor(filePath) {
+	if (/\.[^\\/]+$/.test(filePath)) {
+		return filePath.replace(/\.[^\\/]+$/, '.lrc');
+	}
+	return filePath + '.lrc';
+}
+
+function writeLyricsFile(trackPath, lyrics) {
+	var normalized = String(lyrics || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	var lyricPath = lyricPathFor(trackPath);
+	var lyricFile;
+
+	if (!normalized.length) {
+		if (file_exists(lyricPath) && !file_remove(lyricPath)) {
+			throw new Error('Could not remove lyrics file');
+		}
+		return false;
+	}
+
+	lyricFile = new File(lyricPath);
+	if (!lyricFile.open('w+')) {
+		throw new Error('Could not open lyrics file for writing');
+	}
+
+	try {
+		lyricFile.write(normalized);
+	} finally {
+		lyricFile.close();
+	}
+
+	return true;
+}
 
 var reply = {};
 if ((http_request.method === 'GET' || http_request.method === 'POST') && request.has_param('call') && user.number > 0) {
@@ -189,13 +427,15 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				var fb = new FileBase(ldir);
 				if (fb.open()) {
 					var flist = fb.get_list('*.mp3', FileBase.DETAIL.NORM, 0, true, FileBase.SORT.DATE_D);
+					var overrides = loadTrackOverrides();
 					fb.close();
 					reply = [];
 					for (var fi = 0; fi < flist.length; fi++) {
 						reply.push({
 							name: flist[fi].name,
 							desc: flist[fi].desc || '',
-							added: flist[fi].added || 0
+							added: flist[fi].added || 0,
+							tags: copyTags(overrides[trackOverrideSection(flist[fi].name)] || {})
 						});
 					}
 				} else {
@@ -203,6 +443,69 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				}
 			} else {
 				reply.error = 'Invalid directory or access denied';
+			}
+			break;
+		case 'update-track-meta':
+			var udir = request.get_param('dir');
+			if (!user.is_sysop) {
+				reply.error = 'Sysop access required';
+				break;
+			}
+			if (http_request.method !== 'POST') {
+				reply.error = 'POST required';
+				break;
+			}
+			if (!validateCsrfToken()) {
+				reply.error = 'Invalid CSRF token';
+				break;
+			}
+			if (udir === undefined
+				|| file_area.dir[udir] === undefined
+				|| !file_area.dir[udir].can_download
+				|| !user.compare_ars(file_area.dir[udir].download_ars)
+			) {
+				reply.error = 'Invalid directory or access denied';
+				break;
+			}
+
+			var updateFile = trimText(getRequestValue('file', ''));
+			var updateArtist = trimText(getRequestValue('artist', ''));
+			var updateLyrics = hasRequestParam('lyrics') ? getRequestValue('lyrics', '') : '';
+			var updateRecord = null;
+			var overrideState = {};
+
+			if (!updateFile.length) {
+				reply.error = 'Track file is required';
+				break;
+			}
+
+			updateRecord = findFileRecord(udir, updateFile);
+			if (!updateRecord || !updateRecord.path) {
+				reply.error = 'File not found';
+				break;
+			}
+
+			overrideState = copyTags(loadTrackOverrides()[trackOverrideSection(updateRecord.name)] || {});
+			if (updateArtist.length) {
+				overrideState.artist = updateArtist;
+			} else {
+				delete overrideState.artist;
+			}
+
+			try {
+				overrideState = writeTrackOverride(updateRecord.name, overrideState);
+				writeLyricsFile(updateRecord.path, updateLyrics);
+				reply = {
+					success: true,
+					file: updateRecord.name,
+					tags: overrideState,
+					has_lyrics: !!String(updateLyrics || '').length
+				};
+			} catch (updateErr) {
+				log(LOG_ERR, 'files.ssjs update-track-meta error: ' + updateErr);
+				reply.error = updateErr && updateErr.message
+					? String(updateErr.message)
+					: 'Could not update track metadata';
 			}
 			break;
 		default:

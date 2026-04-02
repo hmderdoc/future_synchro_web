@@ -494,6 +494,7 @@
         userNumber: <? write(user.number); ?>,
         userPassword: '<? write((user.alias !== settings.guest && user.number > 0) ? user.security.password.replace(/'/g, "\\'" ) : ''); ?>',
         isLoggedIn: <? write(user.alias !== settings.guest && user.number > 0); ?>,
+        isSysop: <? write(user.is_sysop ? true : false); ?>,
         csrfToken: '<? write(getCsrfToken()); ?>',
         sidebarOff: <? write(_sidebarOff()); ?>,
         sidebarLeft: <? write(settings.layout_sidebar_left ? true : false); ?>,

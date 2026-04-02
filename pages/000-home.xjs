@@ -215,6 +215,25 @@
 
     // ── helpers ──
     function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function mergeTrackTags(base, override) {
+        var merged = {};
+        var key;
+
+        base = base || {};
+        override = override || {};
+
+        for (key in base) {
+            if (!Object.prototype.hasOwnProperty.call(base, key)) continue;
+            merged[key] = base[key];
+        }
+        for (key in override) {
+            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
+            if (override[key] === undefined || override[key] === null || override[key] === '') continue;
+            merged[key] = override[key];
+        }
+
+        return merged;
+    }
 
     // ── fetch track list then ID3 for each ──
     function init() {
@@ -260,7 +279,7 @@
             .then(function (r) { return r.arrayBuffer(); })
             .then(function (buf) {
                 if (typeof window.parseID3v2 !== 'function') return null;
-                var tags = window.parseID3v2(buf);
+                var tags = mergeTrackTags(window.parseID3v2(buf), item && item.tags ? item.tags : {});
                 // require at least artist or picture
                 if (!tags.artist && !tags.picture) return null;
                 var artURL = '';

@@ -1529,6 +1529,26 @@
         return String((track.tags && track.tags.genre) || '');
     }
 
+    function mergeTrackTags(base, override) {
+        var merged = {};
+        var key;
+
+        base = base || {};
+        override = override || {};
+
+        for (key in base) {
+            if (!Object.prototype.hasOwnProperty.call(base, key)) continue;
+            merged[key] = base[key];
+        }
+        for (key in override) {
+            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
+            if (override[key] === undefined || override[key] === null || override[key] === '') continue;
+            merged[key] = override[key];
+        }
+
+        return merged;
+    }
+
     function optionLabel(track) {
         var artist = trackArtist(track);
         return artist.length ? (trackTitle(track) + ' - ' + artist) : trackTitle(track);
@@ -1576,6 +1596,7 @@
                 .then(function (buf) {
                     var tags = {};
                     var artURL = '';
+                    var overrideTags = item && item.tags ? item.tags : {};
 
                     if (typeof window.parseID3v2 === 'function') {
                         try {
@@ -1588,6 +1609,8 @@
                     if (tags.picture && tags.picture.blob) {
                         artURL = URL.createObjectURL(tags.picture.blob);
                     }
+
+                    tags = mergeTrackTags(tags, overrideTags);
 
                     return {
                         name: item.name,
@@ -1602,7 +1625,7 @@
                         name: item.name,
                         desc: item.desc || '',
                         added: item.added || 0,
-                        tags: {},
+                        tags: mergeTrackTags({}, item && item.tags ? item.tags : {}),
                         artURL: ''
                     };
                 });

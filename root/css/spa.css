@@ -2635,6 +2635,24 @@ div.message .ansi-canvas-img {
     border-color: rgba(255, 255, 85, 0.5);
 }
 
+.rl-action-edit {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #FFCC66;
+    border-color: rgba(255, 204, 102, 0.32);
+}
+.rl-action-edit:hover {
+    color: #FFE19A;
+    border-color: rgba(255, 204, 102, 0.6);
+    background: rgba(255, 204, 102, 0.12);
+}
+
 /* Add/Added toggle button — fixed width so layout doesn't shift */
 .rl-action-add {
     width: 78px;
@@ -2684,6 +2702,121 @@ div.message .ansi-canvas-img {
     display: flex;
     justify-content: center;
     padding: 12px 0 4px;
+}
+
+.rl-edit-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(3, 6, 18, 0.84);
+    backdrop-filter: blur(6px);
+}
+.rl-edit-modal[hidden] {
+    display: none;
+}
+.rl-edit-card {
+    width: min(100%, 720px);
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    border: 1px solid rgba(85, 255, 255, 0.24);
+    background: linear-gradient(180deg, rgba(10, 15, 34, 0.98), rgba(6, 10, 24, 0.98));
+    box-shadow: 0 22px 50px rgba(0, 0, 0, 0.45);
+}
+.rl-edit-head,
+.rl-edit-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+}
+.rl-edit-head {
+    border-bottom: 1px solid rgba(85, 255, 255, 0.1);
+}
+.rl-edit-actions {
+    justify-content: flex-end;
+    border-top: 1px solid rgba(255, 85, 255, 0.12);
+    background: rgba(8, 12, 28, 0.86);
+}
+.rl-edit-kicker {
+    color: #55FFFF;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.rl-edit-title {
+    color: #FFFFFF;
+    font-size: 1rem;
+    line-height: 1.2;
+}
+.rl-edit-close {
+    flex: 0 0 auto;
+}
+.rl-edit-body {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    overflow-y: auto;
+}
+.rl-edit-track {
+    color: #9AB;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.rl-edit-field {
+    display: grid;
+    gap: 6px;
+}
+.rl-edit-label {
+    color: #55FF55;
+    font-size: 0.76rem;
+    line-height: 1.2;
+}
+.rl-edit-input,
+.rl-edit-textarea {
+    width: 100%;
+    border: 1px solid rgba(85, 255, 255, 0.24);
+    background: rgba(3, 6, 18, 0.96);
+    color: #FFFFFF;
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 0.82rem;
+}
+.rl-edit-input:focus,
+.rl-edit-textarea:focus {
+    outline: none;
+    border-color: rgba(85, 255, 255, 0.65);
+    box-shadow: 0 0 0 1px rgba(85, 255, 255, 0.14);
+}
+.rl-edit-textarea {
+    min-height: 240px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height: 1.45;
+}
+.rl-edit-note {
+    color: #7C8AA5;
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+.rl-edit-note code {
+    color: #55FFFF;
+}
+.rl-edit-status {
+    min-height: 1.2em;
+    color: #55FFFF;
+    font-size: 0.74rem;
+}
+.rl-edit-status.is-error {
+    color: #FF8888;
 }
 
 

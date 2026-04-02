@@ -75,6 +75,11 @@
     var eyeGlow       = 0;      // 0-1 smoothed
     var breathPhase   = 0;      // slow breathing cycle
 
+    // Metatron emanating text particle system
+    var metatronParticles = [];
+    var metatronSpawnTimer = 0;
+    var METATRON_WORDS = ['LIGHT','TRUTH','SACRED','DIVINE','ANGEL','CUBE','UNITY','SPIRIT','FORM','VOID'];
+
     // Shifty eye state — animated pupil offset for 'shifty' eyeBehavior
     var shiftyState = {
         targetX: 0, targetY: 0,    // where the pupils want to go
@@ -840,6 +845,36 @@
             shutter: null,
             chinGuard: null,
             label: 'CINDER'
+        },
+        metatron: {
+            name: 'Metatron',
+            headShape: 'metatronscube',
+            // No face — pure sacred geometry symbol
+            profile: null,
+            ringN: 0,
+            eyes: null,
+            eyeColor: null,
+            eyeOutlineColor: null,
+            eyeShape: null,
+            eyeBehavior: null,
+            mascara: false,
+            eyelashes: null,
+            eyebrows: null,
+            mouth: null,
+            nose: null,
+            // Vectrex CYAN / LIGHT CYAN palette
+            wireColor: '#00CCCC',
+            wireRGB:   '0,204,204',
+            accentColor: '#55FFFF',
+            accentRGB:   '85,255,255',
+            hair: [],
+            hairRigid: false,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: 'METATRON'
         }
     };
 
@@ -1490,9 +1525,11 @@
             return projectHeadPoint(projState, x, y, z, pulse);
         }
 
-        eyeScreenPoints.left = projectHeadPoint(projState, activeChar.eyes.left.x, activeChar.eyes.left.y, activeChar.eyes.left.z, pulse);
-        eyeScreenPoints.right = projectHeadPoint(projState, activeChar.eyes.right.x, activeChar.eyes.right.y, activeChar.eyes.right.z, pulse);
-        eyeScreenPoints.mouth = projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, pulse);
+        if (activeChar.eyes && activeChar.mouth) {
+            eyeScreenPoints.left = projectHeadPoint(projState, activeChar.eyes.left.x, activeChar.eyes.left.y, activeChar.eyes.left.z, pulse);
+            eyeScreenPoints.right = projectHeadPoint(projState, activeChar.eyes.right.x, activeChar.eyes.right.y, activeChar.eyes.right.z, pulse);
+            eyeScreenPoints.mouth = projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, pulse);
+        }
 
         wireCtx.lineCap = wireCtx.lineJoin = 'round';
 
@@ -1502,6 +1539,9 @@
         } else if (activeChar.headShape === 'paperclip') {
             // --- Paperclip wireframe (Clippy) ---
             drawPaperclipBody(activeChar, proj, amp, bass);
+        } else if (activeChar.headShape === 'metatronscube') {
+            // --- Metatron's Cube sacred geometry ---
+            drawMetatronsCube(activeChar, proj, amp, bass);
         } else {
             // --- Rotational profile rings ---
             var rings = [];
@@ -1556,6 +1596,9 @@
             }
         }
 
+        // --- Face features (skip for symbol-based headShapes) ---
+        if (activeChar.headShape !== 'metatronscube') {
+
         // --- Hair (behind/around skull) ---
         drawHair(activeChar, proj, amp, bass);
 
@@ -1598,6 +1641,8 @@
 
         // --- Chin guard / helmet edge (RoboCop etc.) ---
         drawChinGuard(activeChar, proj, amp, bass);
+
+        } // end face features
     }
 
     // Update shifty eye animation state
@@ -2219,6 +2264,230 @@
     // =========================================================
     //  Paperclip Body Renderer (Clippy)
     // =========================================================
+    // ===== Metatron's Cube — Sacred Geometry Renderer =====
+
+    function drawMetatronsCube(char, proj, amp, bass) {
+        var t = performance.now() * 0.001;
+
+        // Slow 2D rotation
+        var spinAngle = t * 0.12;
+
+        // Geometry scale
+        var r1 = 0.30;  // inner hexagon radius (model space)
+        var r2 = 0.60;  // outer hexagon radius
+
+        // Generate 13 base points of Metatron's Cube:
+        // [0] = center, [1-6] = inner hexagon, [7-12] = outer hexagon
+        var raw = [{x: 0, y: 0}];
+        for (var i = 0; i < 6; i++) {
+            var a = (i * 60 + 90) * Math.PI / 180;
+            raw.push({x: r1 * Math.cos(a), y: r1 * Math.sin(a)});
+        }
+        for (var i = 0; i < 6; i++) {
+            var a = (i * 60 + 90) * Math.PI / 180;
+            raw.push({x: r2 * Math.cos(a), y: r2 * Math.sin(a)});
+        }
+
+        // Apply per-point frequency wiggle + bass expansion + 2D spin
+        var pts = [];
+        for (var p = 0; p < raw.length; p++) {
+            var px = raw[p].x, py = raw[p].y;
+
+            // Frequency-responsive wiggle: each node dances to its own band
+            var fpos = p / 13;
+            var fval = getFreqSample(fpos);
+            var wa = t * 2.5 + p * 1.3;
+            px += Math.sin(wa) * fval * 0.015;
+            py += Math.cos(wa * 0.7) * fval * 0.015;
+
+            // Bass expansion: outer ring breathes with the beat
+            if (p >= 7) {
+                var expand = 1 + bass * 0.07;
+                px *= expand; py *= expand;
+            } else if (p >= 1) {
+                var expand = 1 + bass * 0.035;
+                px *= expand; py *= expand;
+            }
+
+            // 2D spin rotation
+            var cs = Math.cos(spinAngle), sn = Math.sin(spinAngle);
+            var rx = px * cs - py * sn;
+            var ry = px * sn + py * cs;
+
+            // Project through 3D head system (z=0.12 for slight depth)
+            pts.push(proj(rx, ry - 0.08, 0.12));
+        }
+
+        var cRGB = char.wireRGB;
+        var aRGB = char.accentRGB;
+        var cHex = char.wireColor;
+        var aHex = char.accentColor;
+
+        wireCtx.lineCap = 'round';
+        wireCtx.lineJoin = 'round';
+
+        // --- Layer 1: All 78 connection lines (the sacred web) ---
+        wireCtx.shadowBlur = 3 + bass * 6;
+        wireCtx.shadowColor = cHex;
+        for (var a = 0; a < 13; a++) {
+            for (var b = a + 1; b < 13; b++) {
+                var shimIdx = (a * 7 + b * 3) % 13;
+                var shimmer = getFreqSample(shimIdx / 13);
+                var alpha = 0.06 + shimmer * 0.14;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + alpha.toFixed(3) + ')';
+                wireCtx.lineWidth = 0.5 + shimmer * 0.3;
+                wireCtx.beginPath();
+                wireCtx.moveTo(pts[a].x, pts[a].y);
+                wireCtx.lineTo(pts[b].x, pts[b].y);
+                wireCtx.stroke();
+            }
+        }
+
+        // --- Layer 2: Inner hexagon (mid-frequency reactive) ---
+        var midFreq = getFreqSample(0.45);
+        wireCtx.shadowBlur = 6 + midFreq * 10;
+        wireCtx.shadowColor = cHex;
+        wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + (0.35 + midFreq * 0.30).toFixed(3) + ')';
+        wireCtx.lineWidth = 1.0 + midFreq * 0.5;
+        wireCtx.beginPath();
+        for (var i = 0; i < 6; i++) {
+            var ia = 1 + i, ib = 1 + (i + 1) % 6;
+            wireCtx.moveTo(pts[ia].x, pts[ia].y);
+            wireCtx.lineTo(pts[ib].x, pts[ib].y);
+        }
+        wireCtx.stroke();
+
+        // --- Layer 3: Outer hexagon (bass-reactive) ---
+        wireCtx.shadowBlur = 8 + bass * 14;
+        wireCtx.shadowColor = aHex;
+        wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + (0.40 + bass * 0.30).toFixed(3) + ')';
+        wireCtx.lineWidth = 1.3 + bass * 0.6;
+        wireCtx.beginPath();
+        for (var i = 0; i < 6; i++) {
+            var ia = 7 + i, ib = 7 + (i + 1) % 6;
+            wireCtx.moveTo(pts[ia].x, pts[ia].y);
+            wireCtx.lineTo(pts[ib].x, pts[ib].y);
+        }
+        wireCtx.stroke();
+
+        // --- Layer 4: Star of David — two interlocking triangles (treble) ---
+        var treble = getFreqSample(0.82);
+        wireCtx.shadowBlur = 10 + treble * 18;
+        wireCtx.shadowColor = aHex;
+        wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + (0.45 + treble * 0.35).toFixed(3) + ')';
+        wireCtx.lineWidth = 1.5 + treble * 0.6;
+        // Triangle 1: outer[0], outer[2], outer[4] → pts[7], pts[9], pts[11]
+        wireCtx.beginPath();
+        wireCtx.moveTo(pts[7].x, pts[7].y);
+        wireCtx.lineTo(pts[9].x, pts[9].y);
+        wireCtx.lineTo(pts[11].x, pts[11].y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+        // Triangle 2: outer[1], outer[3], outer[5] → pts[8], pts[10], pts[12]
+        wireCtx.beginPath();
+        wireCtx.moveTo(pts[8].x, pts[8].y);
+        wireCtx.lineTo(pts[10].x, pts[10].y);
+        wireCtx.lineTo(pts[12].x, pts[12].y);
+        wireCtx.closePath();
+        wireCtx.stroke();
+
+        // --- Layer 5: Center spokes radiating outward ---
+        wireCtx.shadowBlur = 4 + amp * 8;
+        wireCtx.shadowColor = cHex;
+        wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + (0.18 + amp * 0.20).toFixed(3) + ')';
+        wireCtx.lineWidth = 0.7 + amp * 0.4;
+        for (var i = 1; i < 13; i++) {
+            wireCtx.beginPath();
+            wireCtx.moveTo(pts[0].x, pts[0].y);
+            wireCtx.lineTo(pts[i].x, pts[i].y);
+            wireCtx.stroke();
+        }
+
+        // --- Layer 6: Node circles at all 13 vertices ---
+        for (var i = 0; i < 13; i++) {
+            var fval = getFreqSample(i / 13);
+            var isCenter = (i === 0);
+            var isOuter = (i >= 7);
+            var baseR = isCenter ? 7 : (isOuter ? 5.5 : 4);
+            var nodeR = baseR + fval * 3.5 + bass * 2.5;
+            var nodeAlpha = isCenter ? (0.55 + bass * 0.30) : (0.22 + fval * 0.30);
+
+            wireCtx.strokeStyle = 'rgba(' + (isCenter ? aRGB : cRGB) + ',' + nodeAlpha.toFixed(3) + ')';
+            wireCtx.lineWidth = isCenter ? 1.6 : 1.0;
+            wireCtx.shadowBlur = isCenter ? (14 + bass * 18) : (4 + fval * 10);
+            wireCtx.shadowColor = isCenter ? aHex : cHex;
+            wireCtx.beginPath();
+            wireCtx.arc(pts[i].x, pts[i].y, nodeR, 0, Math.PI * 2);
+            wireCtx.stroke();
+        }
+
+        // --- Layer 7: Center glow orb ---
+        wireCtx.shadowBlur = 25 + bass * 30;
+        wireCtx.shadowColor = aHex;
+        var gradient = wireCtx.createRadialGradient(
+            pts[0].x, pts[0].y, 0,
+            pts[0].x, pts[0].y, 18 + bass * 12 + amp * 6
+        );
+        gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.20 + bass * 0.18).toFixed(3) + ')');
+        gradient.addColorStop(0.5, 'rgba(' + cRGB + ',' + (0.08 + bass * 0.08).toFixed(3) + ')');
+        gradient.addColorStop(1, 'rgba(' + cRGB + ',0)');
+        wireCtx.fillStyle = gradient;
+        wireCtx.beginPath();
+        wireCtx.arc(pts[0].x, pts[0].y, 18 + bass * 12 + amp * 6, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        // --- Layer 8: Emanating text from center ---
+        drawMetatronText(char, pts[0], t, amp, bass);
+    }
+
+    function drawMetatronText(char, center, t, amp, bass) {
+        // Spawn new text particles periodically
+        metatronSpawnTimer -= 0.016;
+        if (metatronSpawnTimer <= 0) {
+            metatronSpawnTimer = 1.2 + Math.random() * 2.5;
+            var angle = Math.random() * Math.PI * 2;
+            var speed = 28 + Math.random() * 20;  // pixels per second
+            metatronParticles.push({
+                word: METATRON_WORDS[Math.floor(Math.random() * METATRON_WORDS.length)],
+                x: 0, y: 0,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1.0,
+                decay: 0.18 + Math.random() * 0.12,
+                size: 8 + Math.floor(Math.random() * 4)
+            });
+        }
+
+        // Update and draw particles
+        for (var i = metatronParticles.length - 1; i >= 0; i--) {
+            var p = metatronParticles[i];
+            p.x += p.vx * 0.016;
+            p.y += p.vy * 0.016;
+            p.life -= p.decay * 0.016;
+            // Bass gives a little kick outward
+            var kickMul = 1 + bass * 0.4;
+            p.x *= 1 + (kickMul - 1) * 0.016;
+            p.y *= 1 + (kickMul - 1) * 0.016;
+
+            if (p.life <= 0) {
+                metatronParticles.splice(i, 1);
+                continue;
+            }
+
+            var alpha = p.life * 0.55;
+            wireCtx.font = p.size + 'px monospace';
+            wireCtx.textAlign = 'center';
+            wireCtx.textBaseline = 'middle';
+            wireCtx.shadowBlur = 6 + p.life * 8;
+            wireCtx.shadowColor = char.accentColor;
+            wireCtx.fillStyle = 'rgba(' + char.accentRGB + ',' + alpha.toFixed(3) + ')';
+            wireCtx.fillText(p.word, center.x + p.x, center.y + p.y);
+        }
+
+        // Cap particle count
+        while (metatronParticles.length > 12) metatronParticles.shift();
+    }
+
     function drawPaperclipBody(char, proj, amp, bass) {
         if (!char.wirePath) return;
         var path = char.wirePath;
@@ -3766,10 +4035,81 @@
     // =========================================================
     var META_FETCH_BYTES = 256 * 1024; // read first 256KB for ID3 header
 
+    function copyTrackTags(tags) {
+        var copy = {};
+        var key;
+        if (!tags || typeof tags !== 'object') return copy;
+        for (key in tags) {
+            if (!Object.prototype.hasOwnProperty.call(tags, key)) continue;
+            copy[key] = tags[key];
+        }
+        return copy;
+    }
+
+    function mergeTrackTags(base, override) {
+        var merged = copyTrackTags(base);
+        var key;
+        if (!override || typeof override !== 'object') return merged;
+        for (key in override) {
+            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
+            if (override[key] === undefined || override[key] === null || override[key] === '') continue;
+            merged[key] = override[key];
+        }
+        return merged;
+    }
+
+    function getRadioTrackTags(filename) {
+        var radio = window.sbbsRadio;
+        if (!radio) return {};
+        if (filename && typeof radio.getTrackTagsByFile === 'function') {
+            return copyTrackTags(radio.getTrackTagsByFile(filename) || {});
+        }
+        return copyTrackTags(radio.currentTrackTags || {});
+    }
+
+    function hasUsefulTrackMetadata(tags) {
+        return !!(
+            tags &&
+            (tags.title || tags.artist || tags.composer || tags.album || tags.genre || tags.year || tags.picture)
+        );
+    }
+
+    function applyFetchedMetadata(tags) {
+        var merged = mergeTrackTags(tags, getRadioTrackTags(trackFile));
+
+        trackMeta = merged;
+        setActiveCharacter(getCharacterForArtist(merged.artist));
+        console.log('[viz] metadata ready:', merged.artist || '(none)',
+                    '| genre:', merged.genre || '(none)',
+                    '| SYLT lines:', merged.sylt && merged.sylt.length ? merged.sylt.length : 0,
+                    '| art:', merged.picture ? 'yes' : 'no');
+
+        fetchLyrics()
+            .then(function (loadedExternalLyrics) {
+                if (!loadedExternalLyrics && merged.sylt && merged.sylt.length > 0) {
+                    lrcLines = merged.sylt;
+                    lrcIndex = -1;
+                    console.log('[viz] using SYLT lyrics (' + lrcLines.length + ' lines)');
+                }
+                if (hasUsefulTrackMetadata(merged) && isOpen) {
+                    updateMetaHud(merged);
+                }
+            });
+    }
+
     function fetchMetadata() {
+        var radioTags;
+        var url;
+
         if (!trackFile) {
             var r = window.sbbsRadio;
             if (r && r.currentTrackFile) trackFile = r.currentTrackFile;
+        }
+        radioTags = getRadioTrackTags(trackFile);
+
+        if (hasUsefulTrackMetadata(radioTags) || (radioTags.sylt && radioTags.sylt.length)) {
+            applyFetchedMetadata(radioTags);
+            return;
         }
         if (!trackFile || typeof window.parseID3v2 !== 'function') {
             // No parser available or no track — fall back to LRC
@@ -3777,7 +4117,7 @@
             return;
         }
 
-        var url = './radio-stream/' + encodeURIComponent(trackFile);
+        url = './radio-stream/' + encodeURIComponent(trackFile);
         console.log('[viz] fetching ID3 metadata from', trackFile);
 
         // Range request: only need the first chunk for ID3 header
@@ -3787,34 +4127,15 @@
                 return r.arrayBuffer();
             })
             .then(function (buf) {
-                var tags = window.parseID3v2(buf);
-                trackMeta = tags;
-                setActiveCharacter(getCharacterForArtist(tags.artist));
-                console.log('[viz] ID3 parsed:', tags.artist || '(none)',
-                            '| genre:', tags.genre || '(none)',
-                            '| SYLT lines:', tags.sylt.length,
-                            '| art:', tags.picture ? 'yes' : 'no');
-
-                // Use SYLT synced lyrics if present, otherwise fall back to LRC
-                if (tags.sylt && tags.sylt.length > 0) {
-                    lrcLines = tags.sylt;
-                    lrcIndex = -1;
-                    console.log('[viz] using SYLT lyrics (' + lrcLines.length + ' lines)');
-                } else {
-                    // No embedded lyrics — try external .lrc file
-                    fetchLyrics();
-                }
-
-                // Show metadata HUD if we have any useful data
-                var hasData = tags.artist || tags.composer || tags.genre || tags.year || tags.picture;
-                if (hasData && isOpen) {
-                    updateMetaHud(tags);
-                }
+                applyFetchedMetadata(window.parseID3v2(buf) || {});
             })
             .catch(function (err) {
                 console.warn('[viz] ID3 fetch failed:', err);
+                if (hasUsefulTrackMetadata(radioTags) || (radioTags.sylt && radioTags.sylt.length)) {
+                    applyFetchedMetadata(radioTags);
+                    return;
+                }
                 trackMeta = null;
-                // Fallback to LRC lyrics
                 fetchLyrics();
             });
     }
@@ -3953,19 +4274,23 @@
             var r = window.sbbsRadio;
             if (r && r.currentTrackFile) trackFile = r.currentTrackFile;
         }
-        if (!trackFile) return;
+        if (!trackFile) return Promise.resolve(false);
 
         var lrcName = trackFile.replace(/\.mp3$/i, '.lrc');
-        fetch('./radio-stream/' + encodeURIComponent(lrcName))
+        return fetch('./radio-stream/' + encodeURIComponent(lrcName))
             .then(function (r) { if (!r.ok) throw 0; return r.text(); })
             .then(function (txt) {
                 lrcLines = parseLRC(txt);
                 lrcIndex = -1;
-                console.log('[viz] loaded ' + lrcLines.length + ' lyric lines');
+                if (lrcLines.length) {
+                    console.log('[viz] loaded ' + lrcLines.length + ' lyric lines');
+                }
+                return lrcLines.length > 0;
             })
             .catch(function () {
                 lrcLines = [];
                 lrcIndex = -1;
+                return false;
             });
     }
 
@@ -3981,6 +4306,16 @@
                 var txt = lines[i].replace(/\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]/g,'').trim();
                 if (txt) result.push({ time: t, text: txt });
             }
+        }
+        if (!result.length) {
+            var plainLines = text.split('\n').map(function (line) {
+                return String(line || '').replace(/\r/g, '').trim();
+            }).filter(function (line) {
+                return line.length && !/^\[[a-z]+:.*\]$/i.test(line);
+            });
+            result = plainLines.map(function (line, index) {
+                return { time: index * 4, text: line };
+            });
         }
         return result.sort(function (a, b) { return a.time - b.time; });
     }

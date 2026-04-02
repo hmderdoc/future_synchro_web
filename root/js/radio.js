@@ -14,6 +14,7 @@
     // --- Configuration ---
     var DIR_CODE = 'originalcontent_mp3s';
     var API_URL  = './api/files.ssjs?call=list-files&dir=' + DIR_CODE;
+    var UPDATE_TRACK_META_URL = './api/files.ssjs?call=update-track-meta&dir=' + DIR_CODE;
     var FILE_URL = './radio-stream/';
     var META_RANGE_BYTES = 262144;
     var PANEL_PREFS_KEY = 'sbbs-radio-library-prefs-v1';
@@ -56,6 +57,7 @@
     var trackIndexByName = {};
     var playlistDragPos = -1;
     var panelFrame = { width: 0, height: 0, left: 0, top: 0 };
+    var editorState = { open: false, saving: false, idx: -1 };
 
     // UI mode: 'add' (library browser) or 'playlist' (queue editor)
     var panelMode = 'add';
@@ -81,6 +83,8 @@
     var elModeShuffle, elModeOrdered, elPlayView, elClearFilters, elSortMode;
     var elMainList, elSummary;
     var elCreateBar, elCreateInput, elCreateBtn;
+    var elEditModal, elEditTrack, elEditArtist, elEditLyrics, elEditStatus;
+    var elEditCancel, elEditSave, elEditClose;
     var vizW, vizH, vizCtx;
 
     // =========================================================
@@ -156,15 +160,78 @@
         return artist ? (title + ' - ' + artist) : title;
     }
 
+    function copyTrackTags(tags) {
+        var copy = {};
+        var key;
+
+        if (!tags || typeof tags !== 'object') return copy;
+
+        for (key in tags) {
+            if (!Object.prototype.hasOwnProperty.call(tags, key)) continue;
+            copy[key] = tags[key];
+        }
+
+        return copy;
+    }
+
+    function mergeTrackTags(base, override) {
+        var merged = copyTrackTags(base);
+        var key;
+
+        if (!override || typeof override !== 'object') return merged;
+
+        for (key in override) {
+            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
+            if (override[key] === undefined || override[key] === null || override[key] === '') continue;
+            merged[key] = override[key];
+        }
+
+        return merged;
+    }
+
+    function trimText(value) {
+        return String(value || '').replace(/^\s+|\s+$/g, '');
+    }
+
+    function normalizeLyricsText(value) {
+        return String(value || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    function canEditTrackMeta() {
+        return !!(window.sbbsConfig && window.sbbsConfig.isSysop);
+    }
+
+    function updateTrackOverrides(track, tags) {
+        if (!track) return;
+        track.overrideTags = copyTrackTags(tags);
+        track.tags = mergeTrackTags(track.baseTags, track.overrideTags);
+    }
+
+    function dispatchTrackChange(track) {
+        if (!track) return;
+        var display = trackDisplayLabel(track);
+        document.dispatchEvent(new CustomEvent('radio:trackchange', {
+            detail: {
+                filename: track.name,
+                display: display,
+                tags: copyTrackTags(track.tags)
+            }
+        }));
+    }
+
     function normalizeTrack(item) {
+        var overrideTags = copyTrackTags(item && item.tags ? item.tags : {});
         return {
             name: item && item.name ? String(item.name) : '',
             desc: item && item.desc ? String(item.desc) : '',
             added: item && item.added ? item.added : 0,
-            tags: {},
+            tags: copyTrackTags(overrideTags),
+            baseTags: {},
+            overrideTags: overrideTags,
             artURL: '',
             metaLoaded: false,
-            metaLoading: false
+            metaLoading: false,
+            metaPromise: null
         };
     }
 
@@ -330,6 +397,35 @@
             // === Summary footer (sticky) ===
             '<div class="rl-summary" id="rl-summary"></div>',
 
+            '<div class="rl-edit-modal" id="rl-edit-modal" hidden>',
+              '<div class="rl-edit-card" role="dialog" aria-modal="true" aria-labelledby="rl-edit-title">',
+                '<div class="rl-edit-head">',
+                  '<div>',
+                    '<div class="rl-edit-kicker">Sysop Track Editor</div>',
+                    '<div class="rl-edit-title" id="rl-edit-title">Edit Track Metadata</div>',
+                  '</div>',
+                  '<button type="button" class="rl-close rl-edit-close" id="rl-edit-close" aria-label="Close">\u2715</button>',
+                '</div>',
+                '<div class="rl-edit-body">',
+                  '<div class="rl-edit-track" id="rl-edit-track"></div>',
+                  '<label class="rl-edit-field" for="rl-edit-artist">',
+                    '<span class="rl-edit-label">Artist Name</span>',
+                    '<input type="text" class="rl-edit-input" id="rl-edit-artist" maxlength="160" placeholder="Artist name">',
+                  '</label>',
+                  '<label class="rl-edit-field" for="rl-edit-lyrics">',
+                    '<span class="rl-edit-label">Song Lyrics</span>',
+                    '<textarea class="rl-edit-textarea" id="rl-edit-lyrics" placeholder="[00:00.00]Intro&#10;[00:12.40]Verse line&#10;&#10;Plain text also works if you do not need sync timing."></textarea>',
+                  '</label>',
+                  '<div class="rl-edit-note">Lyrics are saved as the track&apos;s companion <code>.lrc</code> file. Existing timestamps are preserved if you keep them.</div>',
+                  '<div class="rl-edit-status" id="rl-edit-status" aria-live="polite"></div>',
+                '</div>',
+                '<div class="rl-edit-actions">',
+                  '<button type="button" class="rl-btn rl-btn-dim" id="rl-edit-cancel">Cancel</button>',
+                  '<button type="button" class="rl-btn rl-btn-go" id="rl-edit-save">Save</button>',
+                '</div>',
+              '</div>',
+            '</div>',
+
             '<div class="rl-resize-handle" id="rl-resize-handle" aria-hidden="true"></div>',
             '</div>'
         ].join('');
@@ -364,7 +460,30 @@
         elClearFilters   = document.getElementById('rl-clear-filters');
         elSummary        = document.getElementById('rl-summary');
         elMainList       = document.getElementById('rl-list');
+        elEditModal      = document.getElementById('rl-edit-modal');
+        elEditTrack      = document.getElementById('rl-edit-track');
+        elEditArtist     = document.getElementById('rl-edit-artist');
+        elEditLyrics     = document.getElementById('rl-edit-lyrics');
+        elEditStatus     = document.getElementById('rl-edit-status');
+        elEditCancel     = document.getElementById('rl-edit-cancel');
+        elEditSave       = document.getElementById('rl-edit-save');
+        elEditClose      = document.getElementById('rl-edit-close');
         elPanelResizeHandle = document.getElementById('rl-resize-handle');
+
+        if (elEditModal) {
+            elEditModal.addEventListener('click', function (event) {
+                if (event.target === elEditModal) closeTrackEditor();
+            });
+        }
+        if (elEditCancel) {
+            elEditCancel.addEventListener('click', closeTrackEditor);
+        }
+        if (elEditClose) {
+            elEditClose.addEventListener('click', closeTrackEditor);
+        }
+        if (elEditSave) {
+            elEditSave.addEventListener('click', saveTrackEditor);
+        }
 
         ensureLibraryBackdrop();
         applyPanelDimensions();
@@ -579,7 +698,12 @@
             elPanelClose.addEventListener('click', closeLibraryPanel);
         }
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && libraryPanelOpen) closeLibraryPanel();
+            if (e.key !== 'Escape') return;
+            if (editorState.open) {
+                closeTrackEditor();
+                return;
+            }
+            if (libraryPanelOpen) closeLibraryPanel();
         });
         document.addEventListener('radio:togglelibrary', function () {
             toggleLibraryPanel();
@@ -726,8 +850,13 @@
             get audioEl()         { return audio; },
             get currentTrackFile(){ return currentTrack() ? currentTrack().name : ''; },
             get currentTrackTitle(){ return currentTrack() ? trackDisplayLabel(currentTrack()) : ''; },
+            get currentTrackTags(){ return currentTrack() ? copyTrackTags(currentTrack().tags) : {}; },
             get isPlaying()       { return isPlaying; },
             get dirCode()         { return DIR_CODE; },
+            getTrackTagsByFile: function (filename) {
+                var idx = trackIndexByName[filename];
+                return typeof idx === 'number' && playlist[idx] ? copyTrackTags(playlist[idx].tags) : {};
+            },
             playByFile: playByFile,
             toggleLibraryPanel: toggleLibraryPanel,
             openLibraryPanel: openLibraryPanel,
@@ -825,6 +954,17 @@
     // =========================================================
     //  Playlist fetch
     // =========================================================
+    function syncTrackFromApiItem(track, item) {
+        if (!track || !item) return;
+        track.desc = item.desc ? String(item.desc) : track.desc;
+        track.added = item.added || track.added || 0;
+        updateTrackOverrides(track, item.tags || {});
+        if (currentTrack() && currentTrack().name === track.name) {
+            lcdUpdate(trackDisplayLabel(track), false);
+            updateMediaSession(track);
+        }
+    }
+
     function fetchPlaylist() {
         fetch(API_URL)
             .then(function (r) { return r.json(); })
@@ -868,6 +1008,8 @@
                     if (!known[data[j].name]) {
                         playlist.push(normalizeTrack(data[j]));
                         added++;
+                    } else if (typeof trackIndexByName[data[j].name] === 'number') {
+                        syncTrackFromApiItem(playlist[trackIndexByName[data[j].name]], data[j]);
                     }
                 }
                 if (added > 0) {
@@ -879,6 +1021,7 @@
                         lcdUpdate('INSERT DISC', true);
                     }
                 } else {
+                    renderPanel();
                     console.log('[radio] refresh: no new tracks');
                 }
             })
@@ -1144,6 +1287,7 @@
         onPanelDragEnd();
         onPanelResizeEnd();
         savePanelPlacement();
+        closeTrackEditor();
 
         if (!elPanel) return;
         libraryPanelOpen = false;
@@ -1274,19 +1418,19 @@
     //  Metadata hydration
     // =========================================================
     function applyTrackTags(track, tags) {
-        track.tags = tags || {};
+        track.baseTags = copyTrackTags(tags);
+        track.tags = mergeTrackTags(track.baseTags, track.overrideTags);
         track.metaLoaded = true;
         track.metaLoading = false;
-        if (!track.artURL && tags && tags.picture && tags.picture.blob) {
-            track.artURL = URL.createObjectURL(tags.picture.blob);
+        track.metaPromise = null;
+        if (!track.artURL && track.tags && track.tags.picture && track.tags.picture.blob) {
+            track.artURL = URL.createObjectURL(track.tags.picture.blob);
         }
         if (currentTrack() && currentTrack().name === track.name) {
             var display = trackDisplayLabel(track);
             lcdUpdate(display, false);
             updateMediaSession(track);
-            document.dispatchEvent(new CustomEvent('radio:trackchange', {
-                detail: { filename: track.name, display: display }
-            }));
+            dispatchTrackChange(track);
         }
     }
 
@@ -1295,6 +1439,45 @@
         metadataHydrateTimer = setTimeout(function () {
             renderPanel();
         }, 40);
+    }
+
+    function fetchTrackMetadata(track) {
+        if (!track || !track.name) return Promise.resolve({});
+        if (typeof window.parseID3v2 !== 'function') {
+            track.metaLoaded = true;
+            track.metaLoading = false;
+            return Promise.resolve(track.tags || {});
+        }
+        if (track.metaLoading && track.metaPromise) return track.metaPromise;
+        if (track.metaLoaded && !track.metaLoading) return Promise.resolve(track.tags || {});
+
+        track.metaLoading = true;
+        track.metaPromise = fetch(FILE_URL + encodeURIComponent(track.name), {
+            headers: { Range: 'bytes=0-' + (META_RANGE_BYTES - 1) }
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.arrayBuffer();
+            })
+            .then(function (buffer) {
+                var tags = {};
+                try { tags = window.parseID3v2(buffer) || {}; } catch (_) { tags = {}; }
+                applyTrackTags(track, tags);
+                return track.tags || {};
+            })
+            .catch(function () {
+                track.metaLoaded = true;
+                track.metaLoading = false;
+                track.metaPromise = null;
+                return track.tags || {};
+            })
+            .then(function (result) {
+                track.metaPromise = null;
+                scheduleLibraryRender();
+                return result;
+            });
+
+        return track.metaPromise;
     }
 
     function hydrateTrackMetadata() {
@@ -1307,30 +1490,172 @@
         function nextFetch() {
             var track = pending.shift();
             if (!track || token !== metadataHydrateToken) return Promise.resolve();
-            track.metaLoading = true;
-            return fetch(FILE_URL + encodeURIComponent(track.name), {
-                headers: { Range: 'bytes=0-' + (META_RANGE_BYTES - 1) }
-            })
-                .then(function (response) {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    return response.arrayBuffer();
-                })
-                .then(function (buffer) {
-                    var tags = {};
-                    try { tags = window.parseID3v2(buffer) || {}; } catch (_) { tags = {}; }
-                    applyTrackTags(track, tags);
-                })
-                .catch(function () {
-                    track.metaLoaded = true;
-                    track.metaLoading = false;
-                })
+            return fetchTrackMetadata(track)
                 .then(function () {
-                    scheduleLibraryRender();
                     return nextFetch();
                 });
         }
         if (!workers) return;
         while (workers-- > 0) nextFetch();
+    }
+
+    function formatLrcTime(seconds) {
+        var total = Math.max(0, Number(seconds) || 0);
+        var mins = Math.floor(total / 60);
+        var secs = Math.floor(total % 60);
+        var hundredths = Math.floor((total - Math.floor(total)) * 100);
+
+        function pad2(value) {
+            return value < 10 ? ('0' + value) : String(value);
+        }
+
+        return '[' + pad2(mins) + ':' + pad2(secs) + '.' + pad2(hundredths) + ']';
+    }
+
+    function syltToLrcText(lines) {
+        if (!Array.isArray(lines) || !lines.length) return '';
+        return lines.map(function (line) {
+            return formatLrcTime(line.time) + String(line.text || '').trim();
+        }).filter(Boolean).join('\n');
+    }
+
+    function loadTrackLyricsText(track) {
+        var lrcName;
+
+        if (!track || !track.name) return Promise.resolve('');
+        lrcName = track.name.replace(/\.mp3$/i, '.lrc');
+
+        return fetch(FILE_URL + encodeURIComponent(lrcName))
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.text();
+            })
+            .then(function (text) {
+                return normalizeLyricsText(text);
+            })
+            .catch(function () {
+                if (track.tags && Array.isArray(track.tags.sylt) && track.tags.sylt.length) {
+                    return syltToLrcText(track.tags.sylt);
+                }
+                return '';
+            });
+    }
+
+    function setTrackEditorBusy(isBusy) {
+        editorState.saving = !!isBusy;
+        if (elEditArtist) elEditArtist.disabled = !!isBusy;
+        if (elEditLyrics) elEditLyrics.disabled = !!isBusy;
+        if (elEditCancel) elEditCancel.disabled = !!isBusy;
+        if (elEditClose) elEditClose.disabled = !!isBusy;
+        if (elEditSave) {
+            elEditSave.disabled = !!isBusy;
+            elEditSave.textContent = isBusy ? 'Saving…' : 'Save';
+        }
+    }
+
+    function setTrackEditorStatus(message, isError) {
+        if (!elEditStatus) return;
+        elEditStatus.textContent = message || '';
+        elEditStatus.classList.toggle('is-error', !!isError);
+    }
+
+    function closeTrackEditor() {
+        editorState.open = false;
+        editorState.saving = false;
+        editorState.idx = -1;
+        if (elEditModal) elEditModal.hidden = true;
+        setTrackEditorBusy(false);
+        setTrackEditorStatus('', false);
+    }
+
+    function openTrackEditor(idx) {
+        var track = playlist[idx];
+
+        if (!canEditTrackMeta() || !track || !elEditModal) return;
+
+        editorState.open = true;
+        editorState.idx = idx;
+        editorState.saving = false;
+        elEditModal.hidden = false;
+        if (elEditTrack) {
+            elEditTrack.textContent = trackTitle(track) + ' [' + track.name + ']';
+        }
+        if (elEditArtist) elEditArtist.value = trackArtist(track);
+        if (elEditLyrics) elEditLyrics.value = '';
+        setTrackEditorBusy(true);
+        setTrackEditorStatus('Loading current metadata…', false);
+
+        fetchTrackMetadata(track)
+            .then(function () {
+                return loadTrackLyricsText(track);
+            })
+            .then(function (lyricsText) {
+                if (!editorState.open || editorState.idx !== idx) return;
+                if (elEditArtist) elEditArtist.value = trackArtist(track);
+                if (elEditLyrics) elEditLyrics.value = lyricsText || '';
+                setTrackEditorBusy(false);
+                setTrackEditorStatus('', false);
+                if (elEditArtist) {
+                    elEditArtist.focus();
+                    elEditArtist.select();
+                }
+            })
+            .catch(function () {
+                if (!editorState.open || editorState.idx !== idx) return;
+                if (elEditArtist) elEditArtist.value = trackArtist(track);
+                setTrackEditorBusy(false);
+                setTrackEditorStatus('Could not load the current track metadata.', true);
+            });
+    }
+
+    function saveTrackEditor() {
+        var idx = editorState.idx;
+        var track = playlist[idx];
+        var body;
+        var csrfToken;
+
+        if (!editorState.open || editorState.saving || !track) return;
+
+        body = new URLSearchParams();
+        body.set('file', track.name);
+        body.set('artist', trimText(elEditArtist ? elEditArtist.value : ''));
+        body.set('lyrics', normalizeLyricsText(elEditLyrics ? elEditLyrics.value : ''));
+        csrfToken = window.sbbsConfig && window.sbbsConfig.csrfToken
+            ? String(window.sbbsConfig.csrfToken)
+            : '';
+
+        setTrackEditorBusy(true);
+        setTrackEditorStatus('Saving changes…', false);
+
+        fetch(UPDATE_TRACK_META_URL, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                if (!data || data.error) {
+                    throw new Error(data && data.error ? data.error : 'Could not save track metadata.');
+                }
+                updateTrackOverrides(track, data.tags || {});
+                if (currentTrack() && currentTrack().name === track.name) {
+                    lcdUpdate(trackDisplayLabel(track), false);
+                    updateMediaSession(track);
+                    dispatchTrackChange(track);
+                }
+                renderPanel();
+                closeTrackEditor();
+            })
+            .catch(function (error) {
+                setTrackEditorBusy(false);
+                setTrackEditorStatus(error && error.message ? error.message : 'Could not save track metadata.', true);
+            });
     }
 
     // =========================================================
@@ -1519,9 +1844,7 @@
                 updateMediaSession(t);
 
                 try {
-                    document.dispatchEvent(new CustomEvent('radio:trackchange', {
-                        detail: { filename: t.name, display: display }
-                    }));
+                    dispatchTrackChange(t);
                 } catch(e) {}
 
                 if (_pendingPlay) _startBufferPlayback();
@@ -1867,6 +2190,17 @@
             }
 
             // Play button (secondary, small — at end)
+            if (canEditTrackMeta()) {
+                var editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'rl-action rl-action-edit';
+                editBtn.setAttribute('data-action', 'edit');
+                editBtn.setAttribute('data-idx', String(idx));
+                editBtn.textContent = '\u270E';
+                editBtn.title = 'Edit track metadata';
+                actions.appendChild(editBtn);
+            }
+
             var playBtn = document.createElement('button');
             playBtn.type = 'button';
             playBtn.className = 'rl-action rl-action-play';
@@ -1969,6 +2303,17 @@
             var actions = document.createElement('div');
             actions.className = 'rl-track-actions';
 
+            if (canEditTrackMeta()) {
+                var editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'rl-action rl-action-edit';
+                editBtn.setAttribute('data-action', 'edit');
+                editBtn.setAttribute('data-idx', String(idx));
+                editBtn.textContent = '\u270E';
+                editBtn.title = 'Edit track metadata';
+                actions.appendChild(editBtn);
+            }
+
             var playBtn = document.createElement('button');
             playBtn.type = 'button';
             playBtn.className = 'rl-action rl-action-play';
@@ -2049,7 +2394,11 @@
                 removeTrackByNameFromSelectedPlaylist(playlist[idx].name);
             }
             return;
-        
+        case 'edit':
+            if (!isNaN(idx) && playlist[idx]) {
+                openTrackEditor(idx);
+            }
+            return;
         case 'play-pl':
             if (!isNaN(idx) && playlist[idx]) {
                 playTrackByIndex(idx, true, getSelectedPlaylistFilteredIndices());
