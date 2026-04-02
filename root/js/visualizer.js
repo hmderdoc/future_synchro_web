@@ -182,35 +182,35 @@
             accentRGB:   '204,85,255',
             hair: [
                 // Left side — long flowing strands (low→mid freq)
-                { rx: -0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.05 },
-                { rx: -0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.10 },
-                { rx: -0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.18 },
-                { rx: -0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.25 },
-                { rx: -0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.35 },
-                { rx: -0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.07 },
-                { rx: -0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.42 },
+                { rx: -0.48, ry: 0.20, rz:    0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.05 },
+                { rx: -0.50, ry: 0.10, rz:    0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.10 },
+                { rx: -0.48, ry: 0.16, rz:    0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.18 },
+                { rx: -0.28, ry: 0.28, rz:    0.40, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.25 },
+                { rx: -0.22, ry: 0.30, rz:    0.42, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.35 },
+                { rx: -0.50, ry: 0.04, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.07 },
+                { rx: -0.18, ry: 0.30, rz:    0.42, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.42 },
                 // Right side — mirror (mid→high freq)
-                { rx:  0.33, ry: 0.56, rz:  0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.50 },
-                { rx:  0.40, ry: 0.48, rz:  0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.58 },
-                { rx:  0.35, ry: 0.52, rz:  0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.65 },
-                { rx:  0.28, ry: 0.58, rz:  0.15, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.72 },
-                { rx:  0.22, ry: 0.60, rz:  0.20, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.80 },
-                { rx:  0.42, ry: 0.40, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.55 },
-                { rx:  0.18, ry: 0.61, rz:  0.08, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.88 },
+                { rx:    0.48, ry: 0.20, rz:    0.00, len: 1.10, color: '#FF55FF', width: 1.8, freq: 0.50 },
+                { rx:    0.50, ry: 0.10, rz:    0.05, len: 1.25, color: '#55FFFF', width: 1.5, freq: 0.58 },
+                { rx:    0.48, ry: 0.16, rz:    0.10, len: 1.15, color: '#AA55FF', width: 1.6, freq: 0.65 },
+                { rx:    0.28, ry: 0.28, rz:    0.40, len: 1.00, color: '#55FF55', width: 1.4, freq: 0.72 },
+                { rx:    0.22, ry: 0.30, rz:    0.42, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.80 },
+                { rx:    0.50, ry: 0.04, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.55 },
+                { rx:    0.18, ry: 0.30, rz:    0.42, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.88 },
                 // Top / crown — tighter coverage
-                { rx: -0.08, ry: 0.64, rz:  0.05, len: 0.65, color: '#FF55FF', width: 1.3, freq: 0.30 },
-                { rx:  0.08, ry: 0.64, rz:  0.05, len: 0.65, color: '#55FFFF', width: 1.3, freq: 0.38 },
-                { rx:  0.00, ry: 0.65, rz:  0.02, len: 0.55, color: '#AA55FF', width: 1.4, freq: 0.45 },
-                { rx: -0.15, ry: 0.62, rz:  0.00, len: 0.75, color: '#FFFF55', width: 1.2, freq: 0.22 },
-                { rx:  0.15, ry: 0.62, rz:  0.00, len: 0.75, color: '#55FF55', width: 1.2, freq: 0.68 },
-                { rx: -0.05, ry: 0.65, rz: -0.05, len: 0.50, color: '#FF55AA', width: 1.3, freq: 0.15 },
-                { rx:  0.05, ry: 0.65, rz: -0.05, len: 0.50, color: '#55AAFF', width: 1.3, freq: 0.75 },
+                { rx: -0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#FF55FF', width: 1.3, freq: 0.30 },
+                { rx:  0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#55FFFF', width: 1.3, freq: 0.38 },
+                { rx:  0.00, ry: 0.52, rz:  0.02, len: 0.55, color: '#AA55FF', width: 1.4, freq: 0.45 },
+                { rx: -0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#FFFF55', width: 1.2, freq: 0.22 },
+                { rx:  0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#55FF55', width: 1.2, freq: 0.68 },
+                { rx: -0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#FF55AA', width: 1.3, freq: 0.15 },
+                { rx:  0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#55AAFF', width: 1.3, freq: 0.75 },
                 // Back — draping down behind
-                { rx: -0.12, ry: 0.63, rz: -0.12, len: 0.80, color: '#FF55FF', width: 1.2, freq: 0.12 },
-                { rx:  0.12, ry: 0.63, rz: -0.12, len: 0.80, color: '#55FFFF', width: 1.2, freq: 0.62 },
-                { rx:  0.00, ry: 0.65, rz: -0.15, len: 0.70, color: '#AA55FF', width: 1.3, freq: 0.40 },
-                { rx: -0.20, ry: 0.58, rz: -0.18, len: 0.90, color: '#FFFF55', width: 1.3, freq: 0.08 },
-                { rx:  0.20, ry: 0.58, rz: -0.18, len: 0.90, color: '#55FF55', width: 1.3, freq: 0.85 }
+                { rx: -0.12, ry: 0.36, rz: -0.38, len: 0.80, color: '#FF55FF', width: 1.2, freq: 0.12 },
+                { rx:  0.12, ry: 0.36, rz: -0.38, len: 0.80, color: '#55FFFF', width: 1.2, freq: 0.62 },
+                { rx:  0.00, ry: 0.40, rz: -0.42, len: 0.70, color: '#AA55FF', width: 1.3, freq: 0.40 },
+                { rx: -0.20, ry: 0.28, rz: -0.36, len: 0.90, color: '#FFFF55', width: 1.3, freq: 0.08 },
+                { rx:  0.20, ry: 0.28, rz: -0.36, len: 0.90, color: '#55FF55', width: 1.3, freq: 0.85 }
             ],
             hat: null,
             facialHair: null
@@ -516,28 +516,28 @@
             // Slicked-back hair — swept backward from forehead, silver/gray
             // Short-to-medium strands originating at top/front, flowing toward -z
             hair: [
-                // Front hairline — swept back (the signature slicked look)
+                // Front hairline — swept back from the forehead
                 // dir flows strongly backward (-z) with slight lift then settling
-                { rx: -0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.08, dir: { dx: -0.10, dy: -0.10, dz: -0.95 } },
-                { rx: -0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.15, dir: { dx: -0.05, dy: -0.08, dz: -0.95 } },
-                { rx:  0.00, ry: 0.66, rz:  0.08, len: 0.52, color: '#888888', width: 1.7, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.97 } },
-                { rx:  0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.30, dir: { dx:  0.05, dy: -0.08, dz: -0.95 } },
-                { rx:  0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.38, dir: { dx:  0.10, dy: -0.10, dz: -0.95 } },
+                { rx: -0.16, ry: 0.28, rz:  0.44, len: 0.45, color: '#999999', width: 1.5, freq: 0.08, dir: { dx: -0.10, dy: -0.10, dz: -0.95 } },
+                { rx: -0.08, ry: 0.32, rz:  0.46, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.15, dir: { dx: -0.05, dy: -0.08, dz: -0.95 } },
+                { rx:  0.00, ry: 0.34, rz:  0.46, len: 0.52, color: '#888888', width: 1.7, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.97 } },
+                { rx:  0.08, ry: 0.32, rz:  0.46, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.30, dir: { dx:  0.05, dy: -0.08, dz: -0.95 } },
+                { rx:  0.16, ry: 0.28, rz:  0.44, len: 0.45, color: '#999999', width: 1.5, freq: 0.38, dir: { dx:  0.10, dy: -0.10, dz: -0.95 } },
                 // Mid-crown — slightly longer, flowing back over the top
-                { rx: -0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.20, dir: { dx: -0.06, dy: -0.08, dz: -0.95 } },
-                { rx:  0.00, ry: 0.65, rz:  0.00, len: 0.58, color: '#888888', width: 1.5, freq: 0.28, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
-                { rx:  0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.35, dir: { dx:  0.06, dy: -0.08, dz: -0.95 } },
+                { rx: -0.12, ry: 0.48, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.20, dir: { dx: -0.06, dy: -0.08, dz: -0.95 } },
+                { rx:  0.00, ry: 0.52, rz:  0.00, len: 0.58, color: '#888888', width: 1.5, freq: 0.28, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
+                { rx:  0.12, ry: 0.48, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.35, dir: { dx:  0.06, dy: -0.08, dz: -0.95 } },
                 // Side sweeps — temples, flowing back and slightly down
-                { rx: -0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.42, dir: { dx: -0.25, dy: -0.40, dz: -0.70 } },
-                { rx:  0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50, dir: { dx:  0.25, dy: -0.40, dz: -0.70 } },
-                { rx: -0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55, dir: { dx: -0.35, dy: -0.55, dz: -0.50 } },
-                { rx:  0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60, dir: { dx:  0.35, dy: -0.55, dz: -0.50 } },
+                { rx: -0.46, ry: 0.18, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.42, dir: { dx: -0.25, dy: -0.40, dz: -0.70 } },
+                { rx:  0.46, ry: 0.18, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50, dir: { dx:  0.25, dy: -0.40, dz: -0.70 } },
+                { rx: -0.48, ry: 0.10, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55, dir: { dx: -0.35, dy: -0.55, dz: -0.50 } },
+                { rx:  0.48, ry: 0.10, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60, dir: { dx:  0.35, dy: -0.55, dz: -0.50 } },
                 // Back strands — drape down behind the skull
-                { rx: -0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.65, dir: { dx: -0.05, dy: -0.55, dz: -0.75 } },
-                { rx:  0.00, ry: 0.64, rz: -0.14, len: 0.42, color: '#888888', width: 1.4, freq: 0.70, dir: { dx:  0.00, dy: -0.60, dz: -0.65 } },
-                { rx:  0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.75, dir: { dx:  0.05, dy: -0.55, dz: -0.75 } },
-                { rx: -0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.80, dir: { dx: -0.12, dy: -0.65, dz: -0.55 } },
-                { rx:  0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.85, dir: { dx:  0.12, dy: -0.65, dz: -0.55 } }
+                { rx: -0.10, ry: 0.36, rz: -0.40, len: 0.40, color: '#777777', width: 1.3, freq: 0.65, dir: { dx: -0.05, dy: -0.55, dz: -0.75 } },
+                { rx:  0.00, ry: 0.40, rz: -0.42, len: 0.42, color: '#888888', width: 1.4, freq: 0.70, dir: { dx:  0.00, dy: -0.60, dz: -0.65 } },
+                { rx:  0.10, ry: 0.36, rz: -0.40, len: 0.40, color: '#777777', width: 1.3, freq: 0.75, dir: { dx:  0.05, dy: -0.55, dz: -0.75 } },
+                { rx: -0.18, ry: 0.28, rz: -0.36, len: 0.38, color: '#666666', width: 1.2, freq: 0.80, dir: { dx: -0.12, dy: -0.65, dz: -0.55 } },
+                { rx:  0.18, ry: 0.28, rz: -0.36, len: 0.38, color: '#666666', width: 1.2, freq: 0.85, dir: { dx:  0.12, dy: -0.65, dz: -0.55 } }
             ],
             hat: null,
             facialHair: null,
@@ -589,29 +589,29 @@
             accentRGB:   '255,170,68',
             // Combover hair — wispy blonde/golden strands swept from left to right
             hair: [
-                // Combover: originates from left side, sweeps across top to right
-                // These are long, thin strands that flow from left crown over the top
-                { rx: -0.30, ry: 0.52, rz:  0.05, len: 0.60, color: '#DDBB55', width: 1.5, freq: 0.05 },
-                { rx: -0.28, ry: 0.56, rz:  0.08, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.10 },
-                { rx: -0.24, ry: 0.58, rz:  0.10, len: 0.70, color: '#DDCC66', width: 1.7, freq: 0.15 },
-                { rx: -0.18, ry: 0.60, rz:  0.12, len: 0.72, color: '#EEDD77', width: 1.8, freq: 0.20 },
-                { rx: -0.12, ry: 0.62, rz:  0.10, len: 0.68, color: '#DDBB55', width: 1.7, freq: 0.25 },
-                { rx: -0.06, ry: 0.63, rz:  0.08, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.30 },
+                // Combover: originates from left temple/forehead, sweeps across to right
+                // Hair peeks out from under the MAGA cap at the forehead and sides
+                { rx: -0.44, ry: 0.18, rz:  0.05, len: 0.60, color: '#DDBB55', width: 1.5, freq: 0.05 },
+                { rx: -0.28, ry: 0.26, rz:  0.44, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.10 },
+                { rx: -0.24, ry: 0.28, rz:  0.46, len: 0.70, color: '#DDCC66', width: 1.7, freq: 0.15 },
+                { rx: -0.18, ry: 0.30, rz:  0.48, len: 0.72, color: '#EEDD77', width: 1.8, freq: 0.20 },
+                { rx: -0.12, ry: 0.32, rz:  0.48, len: 0.68, color: '#DDBB55', width: 1.7, freq: 0.25 },
+                { rx: -0.06, ry: 0.34, rz:  0.48, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.30 },
                 // Over the top and right — the swept part
-                { rx:  0.00, ry: 0.64, rz:  0.06, len: 0.60, color: '#DDCC66', width: 1.5, freq: 0.35 },
-                { rx:  0.08, ry: 0.63, rz:  0.08, len: 0.55, color: '#EEDD77', width: 1.4, freq: 0.40 },
-                { rx:  0.14, ry: 0.61, rz:  0.10, len: 0.50, color: '#DDBB55', width: 1.3, freq: 0.45 },
-                { rx:  0.20, ry: 0.58, rz:  0.08, len: 0.45, color: '#CCAA44', width: 1.2, freq: 0.50 },
-                // Wispy flyaways that stick out (the wind-blown effect)
-                { rx: -0.32, ry: 0.48, rz:  0.02, len: 0.50, color: '#BBAA55', width: 1.1, freq: 0.55 },
-                { rx:  0.26, ry: 0.55, rz:  0.04, len: 0.40, color: '#CCBB66', width: 1.0, freq: 0.60 },
-                { rx: -0.08, ry: 0.64, rz: -0.04, len: 0.45, color: '#AA9944', width: 1.1, freq: 0.65 },
-                { rx:  0.04, ry: 0.65, rz: -0.06, len: 0.42, color: '#BB9944', width: 1.0, freq: 0.70 },
+                { rx:  0.00, ry: 0.36, rz:  0.46, len: 0.60, color: '#DDCC66', width: 1.5, freq: 0.35 },
+                { rx:  0.08, ry: 0.34, rz:  0.46, len: 0.55, color: '#EEDD77', width: 1.4, freq: 0.40 },
+                { rx:  0.14, ry: 0.30, rz:  0.44, len: 0.50, color: '#DDBB55', width: 1.3, freq: 0.45 },
+                { rx:  0.20, ry: 0.26, rz:  0.42, len: 0.45, color: '#CCAA44', width: 1.2, freq: 0.50 },
+                // Wispy flyaways that stick out from under the cap
+                { rx: -0.48, ry: 0.12, rz:  0.02, len: 0.50, color: '#BBAA55', width: 1.1, freq: 0.55 },
+                { rx:  0.44, ry: 0.18, rz:  0.04, len: 0.40, color: '#CCBB66', width: 1.0, freq: 0.60 },
+                { rx: -0.08, ry: 0.50, rz: -0.04, len: 0.45, color: '#AA9944', width: 1.1, freq: 0.65 },
+                { rx:  0.04, ry: 0.52, rz: -0.06, len: 0.42, color: '#BB9944', width: 1.0, freq: 0.70 },
                 // Back strands peeking out from under the cap
-                { rx: -0.20, ry: 0.55, rz: -0.10, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.75 },
-                { rx:  0.20, ry: 0.55, rz: -0.10, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.80 },
-                { rx: -0.10, ry: 0.60, rz: -0.14, len: 0.30, color: '#998833', width: 1.1, freq: 0.85 },
-                { rx:  0.10, ry: 0.60, rz: -0.14, len: 0.30, color: '#998833', width: 1.1, freq: 0.90 }
+                { rx: -0.20, ry: 0.28, rz: -0.36, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.75 },
+                { rx:  0.20, ry: 0.28, rz: -0.36, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.80 },
+                { rx: -0.10, ry: 0.34, rz: -0.40, len: 0.30, color: '#998833', width: 1.1, freq: 0.85 },
+                { rx:  0.10, ry: 0.34, rz: -0.40, len: 0.30, color: '#998833', width: 1.1, freq: 0.90 }
             ],
             hat: {
                 type: 'baseballcap',
@@ -724,30 +724,30 @@
             // Slicked-back dark hair — perfectly in place, never moves
             hairRigid: true,
             hair: [
-                // Front hairline — swept straight back over the skull
+                // Front hairline — swept straight back from the forehead
                 // dir flows backward (-z) with slight downward (-y)
-                { rx: -0.18, ry: 0.58, rz:  0.16, len: 0.38, color: '#222222', width: 1.7, freq: 0.10, dir: { dx: -0.10, dy: -0.20, dz: -0.90 } },
-                { rx: -0.10, ry: 0.62, rz:  0.14, len: 0.40, color: '#1A1A1A', width: 1.8, freq: 0.18, dir: { dx: -0.05, dy: -0.15, dz: -0.95 } },
-                { rx: -0.02, ry: 0.65, rz:  0.12, len: 0.42, color: '#222222', width: 1.9, freq: 0.25, dir: { dx:  0.00, dy: -0.15, dz: -0.95 } },
-                { rx:  0.06, ry: 0.65, rz:  0.12, len: 0.42, color: '#1A1A1A', width: 1.9, freq: 0.32, dir: { dx:  0.02, dy: -0.15, dz: -0.95 } },
-                { rx:  0.14, ry: 0.62, rz:  0.14, len: 0.40, color: '#222222', width: 1.8, freq: 0.40, dir: { dx:  0.08, dy: -0.15, dz: -0.95 } },
-                { rx:  0.22, ry: 0.57, rz:  0.16, len: 0.36, color: '#1A1A1A', width: 1.7, freq: 0.48, dir: { dx:  0.12, dy: -0.20, dz: -0.85 } },
+                { rx: -0.18, ry: 0.26, rz:  0.42, len: 0.38, color: '#222222', width: 1.7, freq: 0.10, dir: { dx: -0.10, dy: -0.20, dz: -0.90 } },
+                { rx: -0.10, ry: 0.30, rz:  0.44, len: 0.40, color: '#1A1A1A', width: 1.8, freq: 0.18, dir: { dx: -0.05, dy: -0.15, dz: -0.95 } },
+                { rx: -0.02, ry: 0.34, rz:  0.44, len: 0.42, color: '#222222', width: 1.9, freq: 0.25, dir: { dx:  0.00, dy: -0.15, dz: -0.95 } },
+                { rx:  0.06, ry: 0.34, rz:  0.44, len: 0.42, color: '#1A1A1A', width: 1.9, freq: 0.32, dir: { dx:  0.02, dy: -0.15, dz: -0.95 } },
+                { rx:  0.14, ry: 0.30, rz:  0.44, len: 0.40, color: '#222222', width: 1.8, freq: 0.40, dir: { dx:  0.08, dy: -0.15, dz: -0.95 } },
+                { rx:  0.22, ry: 0.26, rz:  0.42, len: 0.36, color: '#1A1A1A', width: 1.7, freq: 0.48, dir: { dx:  0.12, dy: -0.20, dz: -0.85 } },
                 // Crown — flowing backward over the top
-                { rx: -0.14, ry: 0.62, rz:  0.04, len: 0.32, color: '#222222', width: 1.6, freq: 0.22, dir: { dx: -0.08, dy: -0.10, dz: -0.90 } },
-                { rx: -0.04, ry: 0.65, rz:  0.02, len: 0.34, color: '#1A1A1A', width: 1.7, freq: 0.30, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
-                { rx:  0.08, ry: 0.65, rz:  0.02, len: 0.34, color: '#222222', width: 1.7, freq: 0.38, dir: { dx:  0.03, dy: -0.10, dz: -0.95 } },
-                { rx:  0.18, ry: 0.60, rz:  0.04, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.45, dir: { dx:  0.10, dy: -0.12, dz: -0.88 } },
-                // Sides — flowing back and down, hugging temples
-                { rx: -0.28, ry: 0.50, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.12, dir: { dx: -0.30, dy: -0.50, dz: -0.60 } },
-                { rx:  0.28, ry: 0.50, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.52, dir: { dx:  0.30, dy: -0.50, dz: -0.60 } },
-                { rx: -0.32, ry: 0.44, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.08, dir: { dx: -0.40, dy: -0.65, dz: -0.40 } },
-                { rx:  0.32, ry: 0.44, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.55, dir: { dx:  0.40, dy: -0.65, dz: -0.40 } },
+                { rx: -0.14, ry: 0.48, rz:  0.04, len: 0.32, color: '#222222', width: 1.6, freq: 0.22, dir: { dx: -0.08, dy: -0.10, dz: -0.90 } },
+                { rx: -0.04, ry: 0.52, rz:  0.02, len: 0.34, color: '#1A1A1A', width: 1.7, freq: 0.30, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
+                { rx:  0.08, ry: 0.52, rz:  0.02, len: 0.34, color: '#222222', width: 1.7, freq: 0.38, dir: { dx:  0.03, dy: -0.10, dz: -0.95 } },
+                { rx:  0.18, ry: 0.46, rz:  0.04, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.45, dir: { dx:  0.10, dy: -0.12, dz: -0.88 } },
+                // Sides — flowing back and down from temples
+                { rx: -0.44, ry: 0.16, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.12, dir: { dx: -0.30, dy: -0.50, dz: -0.60 } },
+                { rx:  0.44, ry: 0.16, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.52, dir: { dx:  0.30, dy: -0.50, dz: -0.60 } },
+                { rx: -0.46, ry: 0.08, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.08, dir: { dx: -0.40, dy: -0.65, dz: -0.40 } },
+                { rx:  0.46, ry: 0.08, rz:  0.02, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.55, dir: { dx:  0.40, dy: -0.65, dz: -0.40 } },
                 // Back of head — draping straight down
-                { rx: -0.12, ry: 0.60, rz: -0.10, len: 0.28, color: '#222222', width: 1.5, freq: 0.60, dir: { dx: -0.05, dy: -0.60, dz: -0.70 } },
-                { rx:  0.00, ry: 0.62, rz: -0.14, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.65, dir: { dx:  0.00, dy: -0.65, dz: -0.60 } },
-                { rx:  0.12, ry: 0.60, rz: -0.10, len: 0.28, color: '#222222', width: 1.5, freq: 0.70, dir: { dx:  0.05, dy: -0.60, dz: -0.70 } },
-                { rx: -0.22, ry: 0.54, rz: -0.08, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.75, dir: { dx: -0.15, dy: -0.70, dz: -0.50 } },
-                { rx:  0.22, ry: 0.54, rz: -0.08, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.80, dir: { dx:  0.15, dy: -0.70, dz: -0.50 } }
+                { rx: -0.12, ry: 0.34, rz: -0.38, len: 0.28, color: '#222222', width: 1.5, freq: 0.60, dir: { dx: -0.05, dy: -0.60, dz: -0.70 } },
+                { rx:  0.00, ry: 0.38, rz: -0.42, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.65, dir: { dx:  0.00, dy: -0.65, dz: -0.60 } },
+                { rx:  0.12, ry: 0.34, rz: -0.38, len: 0.28, color: '#222222', width: 1.5, freq: 0.70, dir: { dx:  0.05, dy: -0.60, dz: -0.70 } },
+                { rx: -0.34, ry: 0.24, rz: -0.30, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.75, dir: { dx: -0.15, dy: -0.70, dz: -0.50 } },
+                { rx:  0.34, ry: 0.24, rz: -0.30, len: 0.26, color: '#1A1A1A', width: 1.4, freq: 0.80, dir: { dx:  0.15, dy: -0.70, dz: -0.50 } }
             ],
             hat: null,
             facialHair: null,
@@ -808,30 +808,30 @@
             accentRGB:   '255,102,85',
             // Full wavy yellow hair — longer strands with flowing directions
             hair: [
-                // Front hairline — parted slightly left, flowing to sides
-                { rx: -0.20, ry: 0.60, rz:  0.14, len: 0.55, color: '#DDCC22', width: 1.8, freq: 0.05, dir: { dx: -0.40, dy: -0.30, dz: -0.70 } },
-                { rx: -0.12, ry: 0.64, rz:  0.12, len: 0.60, color: '#EEDD33', width: 1.9, freq: 0.12, dir: { dx: -0.25, dy: -0.20, dz: -0.85 } },
-                { rx: -0.04, ry: 0.66, rz:  0.10, len: 0.62, color: '#FFEE44', width: 2.0, freq: 0.20, dir: { dx: -0.10, dy: -0.15, dz: -0.90 } },
-                { rx:  0.04, ry: 0.66, rz:  0.10, len: 0.60, color: '#EEDD33', width: 2.0, freq: 0.28, dir: { dx:  0.15, dy: -0.15, dz: -0.88 } },
-                { rx:  0.12, ry: 0.64, rz:  0.12, len: 0.55, color: '#DDCC22', width: 1.9, freq: 0.35, dir: { dx:  0.30, dy: -0.20, dz: -0.80 } },
-                { rx:  0.20, ry: 0.60, rz:  0.14, len: 0.50, color: '#CCBB11', width: 1.8, freq: 0.42, dir: { dx:  0.45, dy: -0.30, dz: -0.65 } },
+                // Front hairline — parted slightly left, rooted at forehead
+                { rx: -0.20, ry: 0.28, rz:  0.42, len: 0.55, color: '#DDCC22', width: 1.8, freq: 0.05, dir: { dx: -0.40, dy: -0.30, dz: -0.70 } },
+                { rx: -0.12, ry: 0.32, rz:  0.44, len: 0.60, color: '#EEDD33', width: 1.9, freq: 0.12, dir: { dx: -0.25, dy: -0.20, dz: -0.85 } },
+                { rx: -0.04, ry: 0.34, rz:  0.44, len: 0.62, color: '#FFEE44', width: 2.0, freq: 0.20, dir: { dx: -0.10, dy: -0.15, dz: -0.90 } },
+                { rx:  0.04, ry: 0.34, rz:  0.44, len: 0.60, color: '#EEDD33', width: 2.0, freq: 0.28, dir: { dx:  0.15, dy: -0.15, dz: -0.88 } },
+                { rx:  0.12, ry: 0.32, rz:  0.44, len: 0.55, color: '#DDCC22', width: 1.9, freq: 0.35, dir: { dx:  0.30, dy: -0.20, dz: -0.80 } },
+                { rx:  0.20, ry: 0.28, rz:  0.42, len: 0.50, color: '#CCBB11', width: 1.8, freq: 0.42, dir: { dx:  0.45, dy: -0.30, dz: -0.65 } },
                 // Crown volume — flowing back with body
-                { rx: -0.14, ry: 0.64, rz:  0.04, len: 0.65, color: '#FFEE44', width: 1.7, freq: 0.18, dir: { dx: -0.15, dy: -0.15, dz: -0.90 } },
-                { rx:  0.00, ry: 0.67, rz:  0.02, len: 0.70, color: '#EEDD33', width: 1.8, freq: 0.25, dir: { dx:  0.00, dy: -0.12, dz: -0.95 } },
-                { rx:  0.14, ry: 0.64, rz:  0.04, len: 0.65, color: '#DDCC22', width: 1.7, freq: 0.33, dir: { dx:  0.15, dy: -0.15, dz: -0.90 } },
-                // Long side-flowing strands — cascading down past face
-                { rx: -0.30, ry: 0.54, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.08, dir: { dx: -0.50, dy: -0.70, dz: -0.20 } },
-                { rx: -0.34, ry: 0.48, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.15, dir: { dx: -0.55, dy: -0.75, dz: -0.10 } },
-                { rx: -0.32, ry: 0.42, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.22, dir: { dx: -0.45, dy: -0.80, dz: -0.05 } },
-                { rx:  0.30, ry: 0.54, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.50, dir: { dx:  0.50, dy: -0.70, dz: -0.20 } },
-                { rx:  0.34, ry: 0.48, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.58, dir: { dx:  0.55, dy: -0.75, dz: -0.10 } },
-                { rx:  0.32, ry: 0.42, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.65, dir: { dx:  0.45, dy: -0.80, dz: -0.05 } },
-                // Back cascade — long strands flowing down behind
-                { rx: -0.14, ry: 0.62, rz: -0.08, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.60, dir: { dx: -0.08, dy: -0.60, dz: -0.65 } },
-                { rx:  0.00, ry: 0.64, rz: -0.12, len: 0.75, color: '#FFEE44', width: 1.6, freq: 0.68, dir: { dx:  0.00, dy: -0.65, dz: -0.55 } },
-                { rx:  0.14, ry: 0.62, rz: -0.08, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.75, dir: { dx:  0.08, dy: -0.60, dz: -0.65 } },
-                { rx: -0.22, ry: 0.56, rz: -0.10, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.80, dir: { dx: -0.20, dy: -0.65, dz: -0.50 } },
-                { rx:  0.22, ry: 0.56, rz: -0.10, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.85, dir: { dx:  0.20, dy: -0.65, dz: -0.50 } }
+                { rx: -0.14, ry: 0.48, rz:  0.04, len: 0.65, color: '#FFEE44', width: 1.7, freq: 0.18, dir: { dx: -0.15, dy: -0.15, dz: -0.90 } },
+                { rx:  0.00, ry: 0.52, rz:  0.02, len: 0.70, color: '#EEDD33', width: 1.8, freq: 0.25, dir: { dx:  0.00, dy: -0.12, dz: -0.95 } },
+                { rx:  0.14, ry: 0.48, rz:  0.04, len: 0.65, color: '#DDCC22', width: 1.7, freq: 0.33, dir: { dx:  0.15, dy: -0.15, dz: -0.90 } },
+                // Long side-flowing strands — rooted at temples, cascading down
+                { rx: -0.44, ry: 0.20, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.08, dir: { dx: -0.50, dy: -0.70, dz: -0.20 } },
+                { rx: -0.46, ry: 0.12, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.15, dir: { dx: -0.55, dy: -0.75, dz: -0.10 } },
+                { rx: -0.46, ry: 0.04, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.22, dir: { dx: -0.45, dy: -0.80, dz: -0.05 } },
+                { rx:  0.44, ry: 0.20, rz:  0.10, len: 0.75, color: '#EEDD33', width: 1.6, freq: 0.50, dir: { dx:  0.50, dy: -0.70, dz: -0.20 } },
+                { rx:  0.46, ry: 0.12, rz:  0.06, len: 0.80, color: '#CCBB11', width: 1.5, freq: 0.58, dir: { dx:  0.55, dy: -0.75, dz: -0.10 } },
+                { rx:  0.46, ry: 0.04, rz:  0.00, len: 0.70, color: '#DDCC22', width: 1.4, freq: 0.65, dir: { dx:  0.45, dy: -0.80, dz: -0.05 } },
+                // Back cascade — rooted behind the skull
+                { rx: -0.14, ry: 0.34, rz: -0.38, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.60, dir: { dx: -0.08, dy: -0.60, dz: -0.65 } },
+                { rx:  0.00, ry: 0.38, rz: -0.42, len: 0.75, color: '#FFEE44', width: 1.6, freq: 0.68, dir: { dx:  0.00, dy: -0.65, dz: -0.55 } },
+                { rx:  0.14, ry: 0.34, rz: -0.38, len: 0.70, color: '#EEDD33', width: 1.5, freq: 0.75, dir: { dx:  0.08, dy: -0.60, dz: -0.65 } },
+                { rx: -0.34, ry: 0.24, rz: -0.32, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.80, dir: { dx: -0.20, dy: -0.65, dz: -0.50 } },
+                { rx:  0.34, ry: 0.24, rz: -0.32, len: 0.65, color: '#DDCC22', width: 1.4, freq: 0.85, dir: { dx:  0.20, dy: -0.65, dz: -0.50 } }
             ],
             hairRigid: false,
             hat: null,
@@ -966,28 +966,28 @@
             accentColor: '#FF7799',
             accentRGB:   '255,119,153',
             hair: [
-                { rx: -0.22, ry: 0.62, rz:  0.16, len: 0.40, color: '#EEDD55', width: 2.2, freq: 0.05, dir: { dx: -0.50, dy: -0.20, dz: -0.60 } },
-                { rx: -0.14, ry: 0.66, rz:  0.14, len: 0.38, color: '#FFEE66', width: 2.4, freq: 0.10, dir: { dx: -0.30, dy: -0.15, dz: -0.75 } },
-                { rx: -0.06, ry: 0.68, rz:  0.12, len: 0.36, color: '#FFEE77', width: 2.5, freq: 0.18, dir: { dx: -0.10, dy: -0.10, dz: -0.85 } },
-                { rx:  0.02, ry: 0.68, rz:  0.12, len: 0.36, color: '#FFEE66', width: 2.5, freq: 0.24, dir: { dx:  0.05, dy: -0.10, dz: -0.88 } },
-                { rx:  0.10, ry: 0.67, rz:  0.13, len: 0.38, color: '#EEDD55', width: 2.3, freq: 0.30, dir: { dx:  0.20, dy: -0.12, dz: -0.80 } },
-                { rx:  0.18, ry: 0.64, rz:  0.15, len: 0.42, color: '#DDCC44', width: 2.2, freq: 0.36, dir: { dx:  0.40, dy: -0.18, dz: -0.65 } },
-                { rx: -0.16, ry: 0.66, rz:  0.04, len: 0.55, color: '#FFEE66', width: 2.3, freq: 0.14, dir: { dx: -0.12, dy: -0.10, dz: -0.92 } },
-                { rx:  0.00, ry: 0.69, rz:  0.02, len: 0.58, color: '#FFEE77', width: 2.4, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.95 } },
-                { rx:  0.16, ry: 0.66, rz:  0.04, len: 0.55, color: '#EEDD55', width: 2.3, freq: 0.32, dir: { dx:  0.12, dy: -0.10, dz: -0.92 } },
-                { rx: -0.32, ry: 0.54, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.08, dir: { dx: -0.52, dy: -0.72, dz: -0.15 } },
-                { rx: -0.36, ry: 0.48, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.15, dir: { dx: -0.58, dy: -0.76, dz: -0.08 } },
-                { rx: -0.34, ry: 0.42, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.22, dir: { dx: -0.50, dy: -0.80, dz: -0.02 } },
-                { rx: -0.30, ry: 0.36, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.28, dir: { dx: -0.42, dy: -0.85, dz:  0.05 } },
-                { rx:  0.32, ry: 0.54, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.48, dir: { dx:  0.52, dy: -0.72, dz: -0.15 } },
-                { rx:  0.36, ry: 0.48, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.55, dir: { dx:  0.58, dy: -0.76, dz: -0.08 } },
-                { rx:  0.34, ry: 0.42, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.62, dir: { dx:  0.50, dy: -0.80, dz: -0.02 } },
-                { rx:  0.30, ry: 0.36, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.68, dir: { dx:  0.42, dy: -0.85, dz:  0.05 } },
-                { rx: -0.18, ry: 0.62, rz: -0.10, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.58, dir: { dx: -0.10, dy: -0.58, dz: -0.68 } },
-                { rx:  0.00, ry: 0.66, rz: -0.14, len: 0.80, color: '#FFEE66', width: 2.1, freq: 0.64, dir: { dx:  0.00, dy: -0.60, dz: -0.60 } },
-                { rx:  0.18, ry: 0.62, rz: -0.10, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.72, dir: { dx:  0.10, dy: -0.58, dz: -0.68 } },
-                { rx: -0.26, ry: 0.56, rz: -0.12, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.78, dir: { dx: -0.22, dy: -0.62, dz: -0.55 } },
-                { rx:  0.26, ry: 0.56, rz: -0.12, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.84, dir: { dx:  0.22, dy: -0.62, dz: -0.55 } }
+                { rx: -0.22, ry: 0.28, rz:    0.44, len: 0.40, color: '#EEDD55', width: 2.2, freq: 0.05, dir: { dx: -0.50, dy: -0.20, dz: -0.60 } },
+                { rx: -0.14, ry: 0.32, rz:    0.46, len: 0.38, color: '#FFEE66', width: 2.4, freq: 0.10, dir: { dx: -0.30, dy: -0.15, dz: -0.75 } },
+                { rx: -0.06, ry: 0.34, rz:    0.46, len: 0.36, color: '#FFEE77', width: 2.5, freq: 0.18, dir: { dx: -0.10, dy: -0.10, dz: -0.85 } },
+                { rx:  0.02, ry: 0.34, rz:    0.46, len: 0.36, color: '#FFEE66', width: 2.5, freq: 0.24, dir: { dx:  0.05, dy: -0.10, dz: -0.88 } },
+                { rx:  0.10, ry: 0.32, rz:    0.45, len: 0.38, color: '#EEDD55', width: 2.3, freq: 0.30, dir: { dx:  0.20, dy: -0.12, dz: -0.80 } },
+                { rx:  0.18, ry: 0.28, rz:    0.44, len: 0.42, color: '#DDCC44', width: 2.2, freq: 0.36, dir: { dx:  0.40, dy: -0.18, dz: -0.65 } },
+                { rx: -0.16, ry: 0.50, rz:  0.04, len: 0.55, color: '#FFEE66', width: 2.3, freq: 0.14, dir: { dx: -0.12, dy: -0.10, dz: -0.92 } },
+                { rx:  0.00, ry: 0.54, rz:  0.02, len: 0.58, color: '#FFEE77', width: 2.4, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.95 } },
+                { rx:  0.16, ry: 0.50, rz:  0.04, len: 0.55, color: '#EEDD55', width: 2.3, freq: 0.32, dir: { dx:  0.12, dy: -0.10, dz: -0.92 } },
+                { rx: -0.46, ry: 0.22, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.08, dir: { dx: -0.52, dy: -0.72, dz: -0.15 } },
+                { rx: -0.48, ry: 0.14, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.15, dir: { dx: -0.58, dy: -0.76, dz: -0.08 } },
+                { rx: -0.48, ry: 0.06, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.22, dir: { dx: -0.50, dy: -0.80, dz: -0.02 } },
+                { rx: -0.46, ry: -0.02, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.28, dir: { dx: -0.42, dy: -0.85, dz:  0.05 } },
+                { rx:    0.46, ry: 0.22, rz:  0.10, len: 0.80, color: '#EEDD55', width: 2.0, freq: 0.48, dir: { dx:  0.52, dy: -0.72, dz: -0.15 } },
+                { rx:    0.48, ry: 0.14, rz:  0.06, len: 0.90, color: '#DDCC44', width: 1.9, freq: 0.55, dir: { dx:  0.58, dy: -0.76, dz: -0.08 } },
+                { rx:    0.48, ry: 0.06, rz:  0.00, len: 0.85, color: '#CCBB33', width: 1.8, freq: 0.62, dir: { dx:  0.50, dy: -0.80, dz: -0.02 } },
+                { rx:    0.46, ry: -0.02, rz: -0.04, len: 0.78, color: '#EEDD55', width: 1.7, freq: 0.68, dir: { dx:  0.42, dy: -0.85, dz:  0.05 } },
+                { rx: -0.18, ry: 0.34, rz: -0.40, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.58, dir: { dx: -0.10, dy: -0.58, dz: -0.68 } },
+                { rx:  0.00, ry: 0.40, rz: -0.42, len: 0.80, color: '#FFEE66', width: 2.1, freq: 0.64, dir: { dx:  0.00, dy: -0.60, dz: -0.60 } },
+                { rx:  0.18, ry: 0.34, rz: -0.40, len: 0.75, color: '#EEDD55', width: 2.0, freq: 0.72, dir: { dx:  0.10, dy: -0.58, dz: -0.68 } },
+                { rx: -0.36, ry: 0.26, rz: -0.34, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.78, dir: { dx: -0.22, dy: -0.62, dz: -0.55 } },
+                { rx:    0.36, ry: 0.26, rz: -0.34, len: 0.72, color: '#DDCC44', width: 1.8, freq: 0.84, dir: { dx:  0.22, dy: -0.62, dz: -0.55 } }
             ],
             hairRigid: false,
             hat: null,
@@ -1048,12 +1048,12 @@
                 color: '#222222',
                 rgb:   '34,34,34',
                 // Afro dome parameters
-                height: 0.52,       // how tall above the head
-                radiusX: 0.62,      // side-to-side radius
-                radiusZ: 0.50,      // front-to-back radius
-                rings: 7,           // horizontal ring count
-                honeycombSegs: 12,  // segments per ring for honeycomb
-                fluffiness: 0.04    // per-vertex random displacement for texture
+                height: 0.62,       // dome height above hairline base
+                radiusX: 0.68,      // side-to-side radius (wider than skull)
+                radiusZ: 0.56,      // front-to-back radius
+                rings: 8,           // horizontal ring count
+                honeycombSegs: 14,  // segments per ring for honeycomb
+                fluffiness: 0.05    // per-vertex random displacement for texture
             },
             facialHair: null,
             ledIndicators: null,
@@ -4193,7 +4193,7 @@
         }
 
         var bob = bass * 0.010 + Math.sin(breathPhase) * 0.003;
-        var afroBase = topY - 0.18 + bob;  // sit lower on the head (afro wraps around)
+        var afroBase = 0.16 + bob;  // start at hairline level (forehead), dome grows UP from here
 
         var afroH   = hat.height || 0.50;
         var afroRX  = hat.radiusX || 0.60;
