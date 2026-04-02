@@ -506,27 +506,28 @@
             // Slicked-back hair — swept backward from forehead, silver/gray
             // Short-to-medium strands originating at top/front, flowing toward -z
             hair: [
-                // Front hairline — swept back (the signature look)
-                { rx: -0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.08 },
-                { rx: -0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.15 },
-                { rx:  0.00, ry: 0.66, rz:  0.08, len: 0.52, color: '#888888', width: 1.7, freq: 0.22 },
-                { rx:  0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.30 },
-                { rx:  0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.38 },
-                // Mid-crown — slightly longer, flowing back
-                { rx: -0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.20 },
-                { rx:  0.00, ry: 0.65, rz:  0.00, len: 0.58, color: '#888888', width: 1.5, freq: 0.28 },
-                { rx:  0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.35 },
-                // Side sweeps — temples
-                { rx: -0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.42 },
-                { rx:  0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50 },
-                { rx: -0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55 },
-                { rx:  0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60 },
-                // Back strands — drape down behind
-                { rx: -0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.65 },
-                { rx:  0.00, ry: 0.64, rz: -0.14, len: 0.42, color: '#888888', width: 1.4, freq: 0.70 },
-                { rx:  0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.75 },
-                { rx: -0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.80 },
-                { rx:  0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.85 }
+                // Front hairline — swept back (the signature slicked look)
+                // dir flows strongly backward (-z) with slight lift then settling
+                { rx: -0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.08, dir: { dx: -0.10, dy: -0.10, dz: -0.95 } },
+                { rx: -0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.15, dir: { dx: -0.05, dy: -0.08, dz: -0.95 } },
+                { rx:  0.00, ry: 0.66, rz:  0.08, len: 0.52, color: '#888888', width: 1.7, freq: 0.22, dir: { dx:  0.00, dy: -0.08, dz: -0.97 } },
+                { rx:  0.08, ry: 0.64, rz:  0.10, len: 0.50, color: '#AAAAAA', width: 1.6, freq: 0.30, dir: { dx:  0.05, dy: -0.08, dz: -0.95 } },
+                { rx:  0.16, ry: 0.60, rz:  0.12, len: 0.45, color: '#999999', width: 1.5, freq: 0.38, dir: { dx:  0.10, dy: -0.10, dz: -0.95 } },
+                // Mid-crown — slightly longer, flowing back over the top
+                { rx: -0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.20, dir: { dx: -0.06, dy: -0.08, dz: -0.95 } },
+                { rx:  0.00, ry: 0.65, rz:  0.00, len: 0.58, color: '#888888', width: 1.5, freq: 0.28, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
+                { rx:  0.12, ry: 0.63, rz:  0.02, len: 0.55, color: '#777777', width: 1.4, freq: 0.35, dir: { dx:  0.06, dy: -0.08, dz: -0.95 } },
+                // Side sweeps — temples, flowing back and slightly down
+                { rx: -0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.42, dir: { dx: -0.25, dy: -0.40, dz: -0.70 } },
+                { rx:  0.26, ry: 0.54, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50, dir: { dx:  0.25, dy: -0.40, dz: -0.70 } },
+                { rx: -0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55, dir: { dx: -0.35, dy: -0.55, dz: -0.50 } },
+                { rx:  0.30, ry: 0.48, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60, dir: { dx:  0.35, dy: -0.55, dz: -0.50 } },
+                // Back strands — drape down behind the skull
+                { rx: -0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.65, dir: { dx: -0.05, dy: -0.55, dz: -0.75 } },
+                { rx:  0.00, ry: 0.64, rz: -0.14, len: 0.42, color: '#888888', width: 1.4, freq: 0.70, dir: { dx:  0.00, dy: -0.60, dz: -0.65 } },
+                { rx:  0.10, ry: 0.62, rz: -0.10, len: 0.40, color: '#777777', width: 1.3, freq: 0.75, dir: { dx:  0.05, dy: -0.55, dz: -0.75 } },
+                { rx: -0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.80, dir: { dx: -0.12, dy: -0.65, dz: -0.55 } },
+                { rx:  0.18, ry: 0.58, rz: -0.12, len: 0.38, color: '#666666', width: 1.2, freq: 0.85, dir: { dx:  0.12, dy: -0.65, dz: -0.55 } }
             ],
             hat: null,
             facialHair: null,
