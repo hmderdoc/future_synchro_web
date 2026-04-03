@@ -187,7 +187,9 @@
                 ],
                 lineWidth: 1.8,
                 glowWidth: 6,
-                scanSpeed: 0.003     // beam scan speed for phosphor trail
+                scanSpeed: 0.003,    // beam scan speed for phosphor trail
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch',
+                         'robot', 'raise_the_roof', 'shuffle', 'disco_point']
             }
         },
 
@@ -4720,18 +4722,512 @@
 
     // =========================================================
     //  Body Renderer — Vectrex / laser-scan neon wireframe
-    //  2D skeleton with Z-wobble phosphor trail effect
+    //  Beat-synced dance system with move library
     // =========================================================
-    var bodyDancePhase = 0;
-    var bodyBeamPhase  = 0;
+
+    // ---------------------------------------------------------
+    //  Beat Detector — bass-onset BPM estimation
+    // ---------------------------------------------------------
+    var beatDetector = {
+        history:      [],       // recent bass values (ring buffer)
+        histLen:      12,       // frames of history to keep
+        histIdx:      0,
+        prevBass:     0,
+        threshold:    0.12,     // minimum bass delta to count as onset
+        lastOnsetT:   0,        // timestamp of last detected onset
+        onsetTimes:   [],       // recent onset timestamps for BPM calc
+        maxOnsets:    16,       // keep last N onsets for averaging
+        bpm:          120,      // estimated BPM (fallback default)
+        beatPhase:    0,        // 0..1 = position within current beat
+        beatCount:    0,        // total beats counted
+        lastBeatInt:  0,        // integer beat count last frame (for edge detect)
+        confidence:   0,        // 0..1 how confident in BPM estimate
+        lastT:        0         // last update timestamp
+    };
+
+    function updateBeatDetector(bass, nowSec) {
+        var bd = beatDetector;
+        var dt = bd.lastT > 0 ? (nowSec - bd.lastT) : (1/60);
+        bd.lastT = nowSec;
+        if (dt <= 0 || dt > 0.5) dt = 1/60;
+        var delta = bass - bd.prevBass;
+        bd.prevBass = bass;
+        bd.history[bd.histIdx % bd.histLen] = Math.abs(delta);
+        bd.histIdx++;
+        var avgDelta = 0;
+        var hCount = Math.min(bd.histIdx, bd.histLen);
+        for (var i = 0; i < hCount; i++) avgDelta += bd.history[i];
+        avgDelta = hCount > 0 ? avgDelta / hCount : 0;
+        var adaptiveThresh = Math.max(bd.threshold, avgDelta * 1.3);
+        var minOnsetGap = 0.18;
+        if (delta > adaptiveThresh && bass > 0.08 &&
+            (nowSec - bd.lastOnsetT) > minOnsetGap) {
+            bd.lastOnsetT = nowSec;
+            bd.onsetTimes.push(nowSec);
+            if (bd.onsetTimes.length > bd.maxOnsets)
+                bd.onsetTimes.shift();
+            if (bd.onsetTimes.length >= 3) {
+                var intervals = [];
+                for (var j = 1; j < bd.onsetTimes.length; j++) {
+                    var iv = bd.onsetTimes[j] - bd.onsetTimes[j-1];
+                    if (iv > 0.2 && iv < 2.0) intervals.push(iv);
+                }
+                if (intervals.length >= 2) {
+                    intervals.sort(function(a,b) { return a - b; });
+                    var medianIv = intervals[Math.floor(intervals.length / 2)];
+                    var rawBPM = 60 / medianIv;
+                    var snapped = rawBPM;
+                    var common = [80,85,90,95,100,105,110,115,120,125,128,130,135,140,145,150,155,160,170,180];
+                    for (var c = 0; c < common.length; c++) {
+                        if (Math.abs(rawBPM - common[c]) / common[c] < 0.05) {
+                            snapped = common[c]; break;
+                        }
+                    }
+                    bd.bpm = bd.bpm * 0.7 + snapped * 0.3;
+                    bd.confidence = Math.min(1, intervals.length / 8);
+                }
+            }
+        }
+        var beatsPerSec = bd.bpm / 60;
+        bd.beatPhase += beatsPerSec * dt;
+        var newBeatInt = Math.floor(bd.beatPhase);
+        if (newBeatInt !== bd.lastBeatInt) {
+            bd.beatCount += (newBeatInt - bd.lastBeatInt);
+        }
+        bd.lastBeatInt = newBeatInt;
+        if (bd.beatPhase > 1000) bd.beatPhase -= 1000;
+    }
+
+    // ---------------------------------------------------------
+    //  Dance Move Library — keyframe-based poses
+    //  Keyframe joints are OFFSETS from rest skeleton position
+    // ---------------------------------------------------------
+    var DANCE_MOVES = {
+        idle_sway: {
+            name: 'Idle Sway', beatsPerCycle: 2, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: -0.04, dy: 0}, hipL: {dx: -0.04, dy: 0}, hipR: {dx: -0.04, dy: 0},
+                    shoulderL: {dx: 0.02, dy: 0}, shoulderR: {dx: 0.02, dy: 0},
+                    kneeL: {dx: -0.02, dy: 0}, kneeR: {dx: -0.02, dy: 0},
+                    footL: {dx: -0.01, dy: 0}, footR: {dx: -0.01, dy: 0},
+                    elbowL: {dx: 0.02, dy: 0.01}, elbowR: {dx: 0.03, dy: -0.01},
+                    handL: {dx: 0.03, dy: 0.02}, handR: {dx: 0.04, dy: -0.02}
+                }},
+                { beat: 1.0, joints: {
+                    hip: {dx: 0.04, dy: 0}, hipL: {dx: 0.04, dy: 0}, hipR: {dx: 0.04, dy: 0},
+                    shoulderL: {dx: -0.02, dy: 0}, shoulderR: {dx: -0.02, dy: 0},
+                    kneeL: {dx: 0.02, dy: 0}, kneeR: {dx: 0.02, dy: 0},
+                    footL: {dx: 0.01, dy: 0}, footR: {dx: 0.01, dy: 0},
+                    elbowL: {dx: -0.03, dy: -0.01}, elbowR: {dx: -0.02, dy: 0.01},
+                    handL: {dx: -0.04, dy: -0.02}, handR: {dx: -0.03, dy: 0.02}
+                }}
+            ]
+        },
+        two_step: {
+            name: 'Two-Step', beatsPerCycle: 2, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: -0.03, dy: -0.02}, hipL: {dx: -0.03, dy: -0.02}, hipR: {dx: -0.03, dy: -0.02},
+                    kneeL: {dx: -0.05, dy: -0.04}, kneeR: {dx: 0, dy: 0.01},
+                    footL: {dx: -0.08, dy: -0.02}, footR: {dx: 0.02, dy: 0},
+                    shoulderL: {dx: -0.01, dy: -0.01}, shoulderR: {dx: 0.01, dy: -0.01},
+                    elbowL: {dx: -0.03, dy: -0.02}, elbowR: {dx: 0.02, dy: 0.02},
+                    handL: {dx: -0.04, dy: -0.04}, handR: {dx: 0.03, dy: 0.03}
+                }},
+                { beat: 0.5, joints: {
+                    hip: {dx: 0, dy: -0.04}, hipL: {dx: 0, dy: -0.04}, hipR: {dx: 0, dy: -0.04},
+                    kneeL: {dx: 0, dy: -0.03}, kneeR: {dx: 0, dy: -0.03},
+                    footL: {dx: 0.01, dy: -0.01}, footR: {dx: -0.01, dy: -0.01},
+                    neck: {dx: 0, dy: -0.02}
+                }},
+                { beat: 1.0, joints: {
+                    hip: {dx: 0.03, dy: -0.02}, hipL: {dx: 0.03, dy: -0.02}, hipR: {dx: 0.03, dy: -0.02},
+                    kneeL: {dx: 0, dy: 0.01}, kneeR: {dx: 0.05, dy: -0.04},
+                    footL: {dx: -0.02, dy: 0}, footR: {dx: 0.08, dy: -0.02},
+                    shoulderL: {dx: 0.01, dy: -0.01}, shoulderR: {dx: -0.01, dy: -0.01},
+                    elbowL: {dx: 0.02, dy: 0.02}, elbowR: {dx: -0.03, dy: -0.02},
+                    handL: {dx: 0.03, dy: 0.03}, handR: {dx: -0.04, dy: -0.04}
+                }},
+                { beat: 1.5, joints: {
+                    hip: {dx: 0, dy: -0.04}, hipL: {dx: 0, dy: -0.04}, hipR: {dx: 0, dy: -0.04},
+                    kneeL: {dx: 0, dy: -0.03}, kneeR: {dx: 0, dy: -0.03},
+                    footL: {dx: -0.01, dy: -0.01}, footR: {dx: 0.01, dy: -0.01},
+                    neck: {dx: 0, dy: -0.02}
+                }}
+            ]
+        },
+        running_man: {
+            name: 'Running Man', beatsPerCycle: 2, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: 0.02, dy: -0.03}, hipR: {dx: -0.01, dy: -0.03},
+                    kneeL: {dx: 0.04, dy: -0.12}, kneeR: {dx: -0.03, dy: 0.03},
+                    footL: {dx: 0.03, dy: -0.10}, footR: {dx: -0.06, dy: 0.04},
+                    shoulderL: {dx: 0.02, dy: -0.01}, shoulderR: {dx: -0.02, dy: -0.01},
+                    elbowL: {dx: 0.06, dy: -0.05}, elbowR: {dx: -0.04, dy: 0.04},
+                    handL: {dx: 0.08, dy: -0.10}, handR: {dx: -0.05, dy: 0.06},
+                    neck: {dx: 0, dy: -0.02}
+                }},
+                { beat: 0.5, joints: {
+                    hip: {dx: 0, dy: -0.05}, hipL: {dx: 0, dy: -0.05}, hipR: {dx: 0, dy: -0.05},
+                    kneeL: {dx: 0, dy: -0.03}, kneeR: {dx: 0, dy: -0.03},
+                    footL: {dx: 0, dy: 0}, footR: {dx: 0, dy: 0}, neck: {dx: 0, dy: -0.03}
+                }},
+                { beat: 1.0, joints: {
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: -0.01, dy: -0.03}, hipR: {dx: 0.02, dy: -0.03},
+                    kneeL: {dx: -0.03, dy: 0.03}, kneeR: {dx: 0.04, dy: -0.12},
+                    footL: {dx: -0.06, dy: 0.04}, footR: {dx: 0.03, dy: -0.10},
+                    shoulderL: {dx: -0.02, dy: -0.01}, shoulderR: {dx: 0.02, dy: -0.01},
+                    elbowL: {dx: -0.04, dy: 0.04}, elbowR: {dx: 0.06, dy: -0.05},
+                    handL: {dx: -0.05, dy: 0.06}, handR: {dx: 0.08, dy: -0.10},
+                    neck: {dx: 0, dy: -0.02}
+                }},
+                { beat: 1.5, joints: {
+                    hip: {dx: 0, dy: -0.05}, hipL: {dx: 0, dy: -0.05}, hipR: {dx: 0, dy: -0.05},
+                    kneeL: {dx: 0, dy: -0.03}, kneeR: {dx: 0, dy: -0.03},
+                    footL: {dx: 0, dy: 0}, footR: {dx: 0, dy: 0}, neck: {dx: 0, dy: -0.03}
+                }}
+            ]
+        },
+        cabbage_patch: {
+            name: 'Cabbage Patch', beatsPerCycle: 4, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: 0.04, dy: 0}, hipL: {dx: 0.04, dy: 0}, hipR: {dx: 0.04, dy: 0},
+                    elbowL: {dx: 0.06, dy: -0.04}, elbowR: {dx: 0.08, dy: -0.03},
+                    handL: {dx: 0.10, dy: -0.08}, handR: {dx: 0.12, dy: -0.06},
+                    shoulderL: {dx: 0.02, dy: 0}, shoulderR: {dx: 0.02, dy: 0},
+                    kneeL: {dx: 0.02, dy: -0.01}, kneeR: {dx: 0.02, dy: 0}
+                }},
+                { beat: 1.0, joints: {
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: 0, dy: -0.03}, hipR: {dx: 0, dy: -0.03},
+                    elbowL: {dx: 0.03, dy: -0.09}, elbowR: {dx: -0.03, dy: -0.09},
+                    handL: {dx: 0.05, dy: -0.15}, handR: {dx: -0.05, dy: -0.15},
+                    shoulderL: {dx: 0, dy: -0.02}, shoulderR: {dx: 0, dy: -0.02},
+                    kneeL: {dx: 0, dy: -0.02}, kneeR: {dx: 0, dy: -0.02}, neck: {dx: 0, dy: -0.01}
+                }},
+                { beat: 2.0, joints: {
+                    hip: {dx: -0.04, dy: 0}, hipL: {dx: -0.04, dy: 0}, hipR: {dx: -0.04, dy: 0},
+                    elbowL: {dx: -0.08, dy: -0.03}, elbowR: {dx: -0.06, dy: -0.04},
+                    handL: {dx: -0.12, dy: -0.06}, handR: {dx: -0.10, dy: -0.08},
+                    shoulderL: {dx: -0.02, dy: 0}, shoulderR: {dx: -0.02, dy: 0},
+                    kneeL: {dx: -0.02, dy: 0}, kneeR: {dx: -0.02, dy: -0.01}
+                }},
+                { beat: 3.0, joints: {
+                    hip: {dx: 0, dy: 0.01}, hipL: {dx: 0, dy: 0.01}, hipR: {dx: 0, dy: 0.01},
+                    elbowL: {dx: -0.03, dy: 0.03}, elbowR: {dx: 0.03, dy: 0.03},
+                    handL: {dx: -0.04, dy: 0.05}, handR: {dx: 0.04, dy: 0.05},
+                    shoulderL: {dx: 0, dy: 0.01}, shoulderR: {dx: 0, dy: 0.01},
+                    kneeL: {dx: 0, dy: 0.01}, kneeR: {dx: 0, dy: 0.01}
+                }}
+            ]
+        },
+        robot: {
+            name: 'Robot', beatsPerCycle: 4, interp: 'stepped',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: 0, dy: 0}, elbowL: {dx: 0, dy: 0}, elbowR: {dx: 0, dy: 0},
+                    handL: {dx: 0, dy: 0}, handR: {dx: 0, dy: 0}
+                }},
+                { beat: 1.0, joints: {
+                    elbowR: {dx: 0.06, dy: -0.12}, handR: {dx: 0.12, dy: -0.12},
+                    elbowL: {dx: -0.02, dy: 0.02}, handL: {dx: -0.02, dy: 0.04},
+                    neck: {dx: 0.02, dy: 0}, hip: {dx: -0.02, dy: 0}
+                }},
+                { beat: 2.0, joints: {
+                    elbowR: {dx: 0.08, dy: -0.06}, handR: {dx: 0.14, dy: -0.02},
+                    elbowL: {dx: -0.08, dy: -0.06}, handL: {dx: -0.14, dy: -0.02},
+                    hip: {dx: 0, dy: -0.02}, hipL: {dx: 0, dy: -0.02}, hipR: {dx: 0, dy: -0.02},
+                    neck: {dx: -0.02, dy: -0.01}
+                }},
+                { beat: 3.0, joints: {
+                    elbowL: {dx: -0.06, dy: -0.12}, handL: {dx: -0.12, dy: -0.12},
+                    elbowR: {dx: 0.02, dy: 0.02}, handR: {dx: 0.02, dy: 0.04},
+                    neck: {dx: -0.02, dy: 0}, hip: {dx: 0.02, dy: 0}
+                }}
+            ]
+        },
+        raise_the_roof: {
+            name: 'Raise the Roof', beatsPerCycle: 2, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    elbowL: {dx: -0.06, dy: -0.14}, elbowR: {dx: 0.06, dy: -0.14},
+                    handL: {dx: -0.08, dy: -0.22}, handR: {dx: 0.08, dy: -0.22},
+                    shoulderL: {dx: -0.01, dy: -0.02}, shoulderR: {dx: 0.01, dy: -0.02},
+                    hip: {dx: 0, dy: 0.02}, hipL: {dx: 0, dy: 0.02}, hipR: {dx: 0, dy: 0.02},
+                    kneeL: {dx: 0, dy: 0.03}, kneeR: {dx: 0, dy: 0.03}, neck: {dx: 0, dy: 0.01}
+                }},
+                { beat: 0.5, joints: {
+                    elbowL: {dx: -0.07, dy: -0.18}, elbowR: {dx: 0.07, dy: -0.18},
+                    handL: {dx: -0.09, dy: -0.28}, handR: {dx: 0.09, dy: -0.28},
+                    shoulderL: {dx: -0.02, dy: -0.04}, shoulderR: {dx: 0.02, dy: -0.04},
+                    hip: {dx: 0, dy: -0.04}, hipL: {dx: 0, dy: -0.04}, hipR: {dx: 0, dy: -0.04},
+                    kneeL: {dx: 0, dy: -0.02}, kneeR: {dx: 0, dy: -0.02}, neck: {dx: 0, dy: -0.03}
+                }},
+                { beat: 1.0, joints: {
+                    elbowL: {dx: -0.06, dy: -0.14}, elbowR: {dx: 0.06, dy: -0.14},
+                    handL: {dx: -0.08, dy: -0.22}, handR: {dx: 0.08, dy: -0.22},
+                    shoulderL: {dx: -0.01, dy: -0.02}, shoulderR: {dx: 0.01, dy: -0.02},
+                    hip: {dx: 0, dy: 0.02}, hipL: {dx: 0, dy: 0.02}, hipR: {dx: 0, dy: 0.02},
+                    kneeL: {dx: 0, dy: 0.03}, kneeR: {dx: 0, dy: 0.03}, neck: {dx: 0, dy: 0.01}
+                }},
+                { beat: 1.5, joints: {
+                    elbowL: {dx: -0.07, dy: -0.18}, elbowR: {dx: 0.07, dy: -0.18},
+                    handL: {dx: -0.09, dy: -0.28}, handR: {dx: 0.09, dy: -0.28},
+                    shoulderL: {dx: -0.02, dy: -0.04}, shoulderR: {dx: 0.02, dy: -0.04},
+                    hip: {dx: 0, dy: -0.04}, hipL: {dx: 0, dy: -0.04}, hipR: {dx: 0, dy: -0.04},
+                    kneeL: {dx: 0, dy: -0.02}, kneeR: {dx: 0, dy: -0.02}, neck: {dx: 0, dy: -0.03}
+                }}
+            ]
+        },
+        shuffle: {
+            name: 'Shuffle', beatsPerCycle: 2, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    hip: {dx: -0.05, dy: 0.02}, hipL: {dx: -0.05, dy: 0.02}, hipR: {dx: -0.05, dy: 0.02},
+                    kneeL: {dx: -0.07, dy: 0.01}, kneeR: {dx: -0.03, dy: 0.02},
+                    footL: {dx: -0.10, dy: 0}, footR: {dx: -0.02, dy: 0.01},
+                    shoulderL: {dx: -0.02, dy: 0}, shoulderR: {dx: -0.02, dy: 0},
+                    elbowL: {dx: -0.04, dy: 0.02}, elbowR: {dx: 0, dy: 0.02},
+                    handL: {dx: -0.05, dy: 0.03}, handR: {dx: 0.01, dy: 0.03}, neck: {dx: -0.01, dy: 0.01}
+                }},
+                { beat: 0.5, joints: {
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: 0, dy: -0.03}, hipR: {dx: 0, dy: -0.03},
+                    kneeL: {dx: 0, dy: -0.01}, kneeR: {dx: 0, dy: -0.01},
+                    footL: {dx: 0, dy: 0}, footR: {dx: 0, dy: 0}, neck: {dx: 0, dy: -0.02}
+                }},
+                { beat: 1.0, joints: {
+                    hip: {dx: 0.05, dy: 0.02}, hipL: {dx: 0.05, dy: 0.02}, hipR: {dx: 0.05, dy: 0.02},
+                    kneeL: {dx: 0.03, dy: 0.02}, kneeR: {dx: 0.07, dy: 0.01},
+                    footL: {dx: 0.02, dy: 0.01}, footR: {dx: 0.10, dy: 0},
+                    shoulderL: {dx: 0.02, dy: 0}, shoulderR: {dx: 0.02, dy: 0},
+                    elbowL: {dx: 0, dy: 0.02}, elbowR: {dx: 0.04, dy: 0.02},
+                    handL: {dx: -0.01, dy: 0.03}, handR: {dx: 0.05, dy: 0.03}, neck: {dx: 0.01, dy: 0.01}
+                }},
+                { beat: 1.5, joints: {
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: 0, dy: -0.03}, hipR: {dx: 0, dy: -0.03},
+                    kneeL: {dx: 0, dy: -0.01}, kneeR: {dx: 0, dy: -0.01},
+                    footL: {dx: 0, dy: 0}, footR: {dx: 0, dy: 0}, neck: {dx: 0, dy: -0.02}
+                }}
+            ]
+        },
+        disco_point: {
+            name: 'Disco Point', beatsPerCycle: 4, interp: 'smooth',
+            keyframes: [
+                { beat: 0.0, joints: {
+                    elbowR: {dx: -0.04, dy: -0.14}, handR: {dx: -0.08, dy: -0.24},
+                    elbowL: {dx: -0.02, dy: 0.03}, handL: {dx: -0.01, dy: 0.05},
+                    hip: {dx: 0.03, dy: -0.02}, hipL: {dx: 0.03, dy: -0.02}, hipR: {dx: 0.03, dy: -0.02},
+                    kneeL: {dx: 0.02, dy: -0.01}, kneeR: {dx: 0.02, dy: 0}, neck: {dx: -0.01, dy: -0.01}
+                }},
+                { beat: 1.0, joints: {
+                    elbowL: {dx: 0.04, dy: -0.14}, handL: {dx: 0.08, dy: -0.24},
+                    elbowR: {dx: 0.02, dy: 0.03}, handR: {dx: 0.01, dy: 0.05},
+                    hip: {dx: -0.03, dy: -0.02}, hipL: {dx: -0.03, dy: -0.02}, hipR: {dx: -0.03, dy: -0.02},
+                    kneeL: {dx: -0.02, dy: 0}, kneeR: {dx: -0.02, dy: -0.01}, neck: {dx: 0.01, dy: -0.01}
+                }},
+                { beat: 2.0, joints: {
+                    elbowR: {dx: 0.08, dy: 0.02}, handR: {dx: 0.14, dy: 0.06},
+                    elbowL: {dx: -0.02, dy: 0.01}, handL: {dx: -0.02, dy: 0.02},
+                    hip: {dx: -0.02, dy: 0}, hipL: {dx: -0.02, dy: 0}, hipR: {dx: -0.02, dy: 0},
+                    kneeL: {dx: -0.01, dy: 0.01}, kneeR: {dx: 0.01, dy: 0}, neck: {dx: 0.02, dy: 0}
+                }},
+                { beat: 3.0, joints: {
+                    elbowL: {dx: -0.06, dy: -0.12}, handL: {dx: -0.10, dy: -0.20},
+                    elbowR: {dx: 0.06, dy: -0.12}, handR: {dx: 0.10, dy: -0.20},
+                    hip: {dx: 0, dy: -0.03}, hipL: {dx: 0, dy: -0.03}, hipR: {dx: 0, dy: -0.03},
+                    kneeL: {dx: 0, dy: -0.02}, kneeR: {dx: 0, dy: -0.02}, neck: {dx: 0, dy: -0.02}
+                }}
+            ]
+        }
+    };
+
+    // ---------------------------------------------------------
+    //  Pose Evaluator — interpolate between keyframes
+    // ---------------------------------------------------------
+    function evaluatePose(move, phase) {
+        var kf = move.keyframes;
+        var n = kf.length;
+        if (n === 0) return {};
+        var cyc = move.beatsPerCycle;
+        phase = ((phase % cyc) + cyc) % cyc;
+        var idxA = 0, idxB = 0;
+        for (var i = 0; i < n; i++) {
+            if (kf[i].beat <= phase) idxA = i;
+        }
+        idxB = (idxA + 1) % n;
+        var beatA = kf[idxA].beat;
+        var beatB = kf[idxB].beat;
+        if (idxB <= idxA) beatB += cyc;
+        var span = beatB - beatA;
+        if (span <= 0) span = 1;
+        var localPhase = phase - beatA;
+        if (localPhase < 0) localPhase += cyc;
+        var t;
+        if (move.interp === 'stepped') {
+            t = 0;
+        } else {
+            var raw = localPhase / span;
+            raw = Math.max(0, Math.min(1, raw));
+            t = 0.5 - 0.5 * Math.cos(raw * Math.PI);
+        }
+        var jointsA = kf[idxA].joints;
+        var jointsB = kf[idxB].joints;
+        var result = {};
+        var allJoints = {};
+        var jn;
+        for (jn in jointsA) allJoints[jn] = true;
+        for (jn in jointsB) allJoints[jn] = true;
+        for (jn in allJoints) {
+            var a = jointsA[jn] || { dx: 0, dy: 0 };
+            var b = jointsB[jn] || { dx: 0, dy: 0 };
+            result[jn] = {
+                dx: a.dx + (b.dx - a.dx) * t,
+                dy: a.dy + (b.dy - a.dy) * t
+            };
+        }
+        return result;
+    }
+
+    // ---------------------------------------------------------
+    //  Dance Sequencer — manages move rotation & transitions
+    // ---------------------------------------------------------
+    var danceState = {
+        currentMove:    'idle_sway',
+        nextMove:       null,
+        movePhase:      0,
+        beatsInMove:    0,
+        beatsUntilSwitch: 16,
+        crossfade:      0,
+        crossfadeDur:   1.0,
+        crossfading:    false,
+        lastLrcIdx:     -1,
+        lastSpitIdx:    -1,
+        movePool:       null
+    };
+
+    function updateDanceSequencer(bass, amp) {
+        var ds = danceState;
+        var bd = beatDetector;
+        var shouldSwitch = false;
+        var lyricChanged = false;
+        if (typeof lyricMode !== 'undefined') {
+            if (lyricMode === LYRIC_MODE_SPITTING) {
+                if (spitLineIdx !== ds.lastSpitIdx && spitLineIdx >= 0) {
+                    lyricChanged = true;
+                    ds.lastSpitIdx = spitLineIdx;
+                }
+            } else {
+                if (lrcIndex !== ds.lastLrcIdx && lrcIndex >= 0) {
+                    lyricChanged = true;
+                    ds.lastLrcIdx = lrcIndex;
+                }
+            }
+        }
+        ds.beatsInMove = bd.beatCount - (ds._beatStart || 0);
+        if (ds.beatsInMove >= ds.beatsUntilSwitch) {
+            shouldSwitch = true;
+        } else if (lyricChanged && ds.beatsInMove >= 4) {
+            shouldSwitch = true;
+        }
+        if (shouldSwitch && !ds.crossfading && ds.movePool && ds.movePool.length > 1) {
+            var candidates = [];
+            for (var i = 0; i < ds.movePool.length; i++) {
+                if (ds.movePool[i] !== ds.currentMove) candidates.push(ds.movePool[i]);
+            }
+            ds.nextMove = candidates[Math.floor(Math.random() * candidates.length)];
+            ds.crossfading = true;
+            ds.crossfade = 0;
+            ds.beatsUntilSwitch = 8 + Math.floor(Math.random() * 9);
+            var nextMoveObj = DANCE_MOVES[ds.nextMove];
+            var currMoveObj = DANCE_MOVES[ds.currentMove];
+            if ((nextMoveObj && nextMoveObj.interp === 'stepped') ||
+                (currMoveObj && currMoveObj.interp === 'stepped')) {
+                ds.crossfadeDur = 0.08;
+            } else {
+                ds.crossfadeDur = 1.0;
+            }
+        }
+        if (ds.crossfading) {
+            var beatsPerSec = bd.bpm / 60;
+            var fadeRate = beatsPerSec > 0 ? (1 / (ds.crossfadeDur * beatsPerSec)) : 0.02;
+            ds.crossfade += fadeRate;
+            if (ds.crossfade >= 1) {
+                ds.crossfade = 0;
+                ds.crossfading = false;
+                ds.currentMove = ds.nextMove;
+                ds.nextMove = null;
+                ds._beatStart = bd.beatCount;
+            }
+        }
+        var beatsPerSec2 = bd.bpm / 60;
+        ds.movePhase += beatsPerSec2 * (1/60);
+    }
+
+    // ---------------------------------------------------------
+    //  drawBody — Vectrex wireframe with dance moves
+    // ---------------------------------------------------------
+    var bodyBeamPhase = 0;
 
     function drawBody(char, projState, amp, bass) {
         var body = char.body;
         if (!body || !body.skeleton || !body.bones) return;
 
         var t = performance.now() * 0.001;
-        bodyDancePhase += 0.035;
-        bodyBeamPhase  += body.scanSpeed || 0.003;
+        bodyBeamPhase += body.scanSpeed || 0.003;
+
+        // --- Update beat detector ---
+        updateBeatDetector(bass, t);
+
+        // --- Set up move pool from character config ---
+        var ds = danceState;
+        var charMoves = body.moves || ['idle_sway'];
+        if (ds.movePool !== charMoves) {
+            ds.movePool = charMoves;
+            var inPool = false;
+            for (var mi = 0; mi < charMoves.length; mi++) {
+                if (charMoves[mi] === ds.currentMove) { inPool = true; break; }
+            }
+            if (!inPool) {
+                ds.currentMove = charMoves[0];
+                ds._beatStart = beatDetector.beatCount;
+            }
+        }
+
+        // --- Update dance sequencer ---
+        updateDanceSequencer(bass, amp);
+
+        // --- Evaluate current pose ---
+        var currentMoveObj = DANCE_MOVES[ds.currentMove];
+        if (!currentMoveObj) currentMoveObj = DANCE_MOVES.idle_sway;
+        var pose = evaluatePose(currentMoveObj, ds.movePhase);
+
+        // If crossfading, blend with next move's pose
+        if (ds.crossfading && ds.nextMove) {
+            var nextMoveObj = DANCE_MOVES[ds.nextMove];
+            if (nextMoveObj) {
+                var poseB = evaluatePose(nextMoveObj, ds.movePhase);
+                var cf = ds.crossfade;
+                var allJ = {};
+                var jj;
+                for (jj in pose) allJ[jj] = true;
+                for (jj in poseB) allJ[jj] = true;
+                var blended = {};
+                for (jj in allJ) {
+                    var pa = pose[jj] || { dx: 0, dy: 0 };
+                    var pb = poseB[jj] || { dx: 0, dy: 0 };
+                    blended[jj] = {
+                        dx: pa.dx + (pb.dx - pa.dx) * cf,
+                        dy: pa.dy + (pb.dy - pa.dy) * cf
+                    };
+                }
+                pose = blended;
+            }
+        }
+
+        // --- Audio intensity scaling ---
+        var energy = Math.max(0.3, Math.min(1.2, 0.5 + amp * 0.5 + bass * 0.5));
 
         var skel = body.skeleton;
         var color = body.color || char.wireColor || '#33FF33';
@@ -4740,75 +5236,33 @@
         var glowW     = body.glowWidth || 6;
 
         // Body origin: directly below the chin
-        // Head chin is at profile y = -0.80, projected through proj()
-        // We'll position the body neck at the chin screen position
         var chinY = -0.80;
         var neckScreen = projectHeadPoint(projState, 0, chinY, 0, projState.pulse || 1);
         var bodyOriginX = neckScreen.x;
         var bodyOriginY = neckScreen.y;
-
-        // Scale: body coords are in head-units, scale to screen pixels
-        // Use the same scale as the head projection but smaller (chibi)
         var bodyScale = projState.scale * (projState.pulse || 1) * 0.52;
 
-        // Dance animation: compute offsets per joint based on audio
-        // Simple dance: sway hips, bounce knees, swing arms
-        var sway     = Math.sin(bodyDancePhase) * (0.03 + bass * 0.06);
-        var bounce   = Math.abs(Math.sin(bodyDancePhase * 2)) * (0.01 + bass * 0.03);
-        var armSwing = Math.sin(bodyDancePhase * 1.0) * (0.04 + amp * 0.08);
-        var legPump  = Math.sin(bodyDancePhase * 2.0) * (0.02 + bass * 0.04);
-
-        // Compute animated joint positions (body-local, 2D)
+        // --- Apply pose offsets to skeleton ---
         var joints = {};
         for (var name in skel) {
             var j = skel[name];
             var x = j.x;
             var y = j.y;
-
-            // Apply dance motion per body region
-            if (name === 'hip' || name === 'hipL' || name === 'hipR') {
-                x += sway;
-                y -= bounce * 0.3;
-            } else if (name === 'kneeL') {
-                x += sway * 0.5;
-                y -= bounce * 0.5 + legPump * 0.5;
-            } else if (name === 'kneeR') {
-                x += sway * 0.5;
-                y -= bounce * 0.5 - legPump * 0.5;
-            } else if (name === 'footL') {
-                x += sway * 0.3;
-                y -= bounce + legPump * 0.8;
-            } else if (name === 'footR') {
-                x += sway * 0.3;
-                y -= bounce - legPump * 0.8;
-            } else if (name === 'elbowL' || name === 'handL') {
-                x -= armSwing * (name === 'handL' ? 1.2 : 0.6);
-                y += armSwing * 0.3;
-            } else if (name === 'elbowR' || name === 'handR') {
-                x += armSwing * (name === 'handR' ? 1.2 : 0.6);
-                y -= armSwing * 0.3;
-            } else if (name === 'shoulderL' || name === 'shoulderR') {
-                y -= bounce * 0.15;
-            } else if (name === 'neck') {
-                y -= bounce * 0.1;
+            var off = pose[name];
+            if (off) {
+                x += off.dx * energy;
+                y += off.dy * energy;
             }
-
-            // Project to screen: body is 2D but with Z-wobble for depth shimmer
             var zWobble = Math.sin(t * 1.5 + y * 4.0) * 0.06;
             var screenX = bodyOriginX + x * bodyScale;
             var screenY = bodyOriginY + y * bodyScale;
-            // Z-wobble shifts screen X slightly for phosphor depth effect
             screenX += zWobble * bodyScale * 0.4;
-
             joints[name] = { x: screenX, y: screenY, localY: j.y };
         }
 
-        // Draw the body using Vectrex phosphor beam aesthetic:
-        // Each bone segment is drawn as a glowing neon line with
-        // a scanning beam trail that fades along its length.
+        // --- Vectrex phosphor beam rendering ---
         var bones = body.bones;
         var totalBones = bones.length;
-
         wireCtx.lineCap = 'round';
         wireCtx.lineJoin = 'round';
 
@@ -4816,22 +5270,13 @@
             var j0 = joints[bones[b][0]];
             var j1 = joints[bones[b][1]];
             if (!j0 || !j1) continue;
-
-            // Beam scan phase: each bone lights up sequentially
-            // creating the classic Vectrex "beam drawing" effect
             var bonePhase = (bodyBeamPhase + b / totalBones) % 1.0;
-
-            // Phosphor persistence: recently-scanned bones glow bright,
-            // older ones fade to a dim afterglow
-            var timeSinceScan = bonePhase; // 0 = just scanned, 1 = about to be scanned again
+            var timeSinceScan = bonePhase;
             var brightness = Math.max(0.15, 1.0 - timeSinceScan * 0.85);
             var glowBrightness = Math.max(0, 1.0 - timeSinceScan * 1.5);
-
-            // Audio reactivity: bass pumps brightness
             brightness = Math.min(1, brightness + bass * 0.15);
             glowBrightness = Math.min(1, glowBrightness + bass * 0.2);
 
-            // Outer glow layer (wide, soft)
             if (glowBrightness > 0.05) {
                 wireCtx.strokeStyle = 'rgba(' + rgb + ',' + (glowBrightness * 0.25).toFixed(3) + ')';
                 wireCtx.lineWidth = glowW + bass * 3;
@@ -4842,8 +5287,6 @@
                 wireCtx.lineTo(j1.x, j1.y);
                 wireCtx.stroke();
             }
-
-            // Core line (thin, bright)
             wireCtx.strokeStyle = 'rgba(' + rgb + ',' + brightness.toFixed(3) + ')';
             wireCtx.lineWidth = baseLineW;
             wireCtx.shadowBlur = 4 + glowBrightness * 6;
@@ -4854,10 +5297,9 @@
             wireCtx.stroke();
         }
 
-        // Draw joints as small glowing dots (Vectrex vertex flare)
+        // Joint vertex flares
         for (var name in joints) {
             var jt = joints[name];
-            // Joint brightness based on nearest bone scan
             var jBright = 0.3 + bass * 0.2;
             wireCtx.fillStyle = 'rgba(' + rgb + ',' + jBright.toFixed(3) + ')';
             wireCtx.shadowBlur = 6;
@@ -4866,7 +5308,6 @@
             wireCtx.arc(jt.x, jt.y, 1.5 + bass * 1.0, 0, Math.PI * 2);
             wireCtx.fill();
         }
-
         wireCtx.shadowBlur = 0;
     }
 
