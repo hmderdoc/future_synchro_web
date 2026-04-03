@@ -3572,7 +3572,6 @@
         // === Accordion easing ===
         var accEased = ms.accordionPhase * ms.accordionPhase * (3 - 2 * ms.accordionPhase);
         var accordionSep = accEased * 2.0;
-        var stretchZ = 1.0 + accordionSep;  // multiplicative Z elongation (1→3): smooth orb stretch
 
         // === Scale: bass/amp pulsing + accordion boost ===
         var beatPulse = 1.0 + bass * 0.6 + amp * 0.3;
@@ -3688,8 +3687,8 @@
             var nd = nodes[p];
             var px = nd.x, py = nd.y, pz = nd.z;
 
-            // Accordion: stretch Z smoothly — orb elongation, not a slice
-            pz *= stretchZ;
+            // Accordion: push front/back hemispheres apart (rigid body)
+            pz += nodeZBase[p] * accordionSep * S;
 
             // Per-node freq wiggle (subtle)
             var fpos = (p % 13) / 13;
@@ -3791,10 +3790,102 @@
             }
         }
 
-        // Cross connections: corresponding front↔back nodes
-        // During accordion these become the stretched "ribs"
-        for (var i = 0; i < 13; i++) {
-            drawLine(i, 13 + i, 'cross');
+        // === Cross connections + barrel mesh (fills the gap during accordion) ===
+        // When expanding, interpolate 3D points between front/back nodes to
+        // create hexagonal latitude rings in the barrel region — like the inside
+        // of a capsule/pill, not a cracked egg.
+        var nBarrelRings = accEased > 0.05 ? Math.floor(accEased * 4) + 1 : 0;
+
+        if (nBarrelRings > 0) {
+            // Compute 3D interpolated barrel points: barrelPts[level][ci]
+            var barrelPts = [];
+            for (var bl = 0; bl < nBarrelRings; bl++) {
+                var bf = (bl + 1) / (nBarrelRings + 1);
+                var bLevel = [];
+                for (var ci = 0; ci < 13; ci++) {
+                    var fNd = nodes[ci], bNd = nodes[13 + ci];
+                    // Lerp xyz; front gets +sep, back gets -sep
+                    var bpx = fNd.x + (bNd.x - fNd.x) * bf;
+                    var bpy = fNd.y + (bNd.y - fNd.y) * bf;
+                    var bpz = (fNd.z + accordionSep * S) * (1 - bf)
+                            + (bNd.z - accordionSep * S) * bf;
+                    // Same freq wiggle as main nodes
+                    var fpos = (ci % 13) / 13;
+                    var fval = getFreqSample(fpos);
+                    var wa = t * 1.8 + ci * 1.1;
+                    bpx += Math.sin(wa) * fval * 0.008 * ms.scalePulse;
+                    bpy += Math.cos(wa * 0.7) * fval * 0.008 * ms.scalePulse;
+                    var br = rot3d(bpx, bpy, bpz);
+                    bLevel.push(proj(br.x, br.y - 0.06, br.z + 0.10));
+                }
+                barrelPts.push(bLevel);
+            }
+
+            // Meridian lines: segmented front → barrel → back paths
+            for (var ci = 0; ci < 13; ci++) {
+                var shimmer = getFreqSample(((ci * 7 + (13 + ci) * 3) % 13) / 13);
+                var crossBoost = 1.0 + accEased * 1.5;
+                var mAlpha = (0.08 + shimmer * 0.12) * crossBoost;
+                var mLw = (0.4 + shimmer * 0.2 + accEased * 0.8) * crossBoost;
+                wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, mAlpha).toFixed(3) + ')';
+                wireCtx.lineWidth = mLw;
+                wireCtx.shadowBlur = (2 + shimmer * 4) * crossBoost;
+                wireCtx.shadowColor = aHex;
+                wireCtx.beginPath();
+                wireCtx.moveTo(pts[ci].x, pts[ci].y);
+                for (var bl = 0; bl < nBarrelRings; bl++) {
+                    wireCtx.lineTo(barrelPts[bl][ci].x, barrelPts[bl][ci].y);
+                }
+                wireCtx.lineTo(pts[13 + ci].x, pts[13 + ci].y);
+                wireCtx.stroke();
+            }
+
+            // Latitude rings at each barrel level (hex rings + spokes)
+            for (var bl = 0; bl < nBarrelRings; bl++) {
+                var lp = barrelPts[bl];
+                var lFrac = (bl + 1) / (nBarrelRings + 1);
+                var latAlpha = accEased * (0.12 + getFreqSample(lFrac) * 0.18);
+                var latLw = 0.5 + accEased * 0.6;
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, latAlpha).toFixed(3) + ')';
+                wireCtx.lineWidth = latLw;
+                wireCtx.shadowBlur = 3 + accEased * 6;
+                wireCtx.shadowColor = cHex;
+
+                // Outer hexagonal ring (interpolated from nodes 7-12)
+                wireCtx.beginPath();
+                wireCtx.moveTo(lp[7].x, lp[7].y);
+                for (var j = 8; j <= 12; j++) wireCtx.lineTo(lp[j].x, lp[j].y);
+                wireCtx.closePath();
+                wireCtx.stroke();
+
+                // Inner hexagonal ring (interpolated from nodes 1-6)
+                wireCtx.beginPath();
+                wireCtx.moveTo(lp[1].x, lp[1].y);
+                for (var j = 2; j <= 6; j++) wireCtx.lineTo(lp[j].x, lp[j].y);
+                wireCtx.closePath();
+                wireCtx.stroke();
+
+                // Radial spokes: inner ring ↔ outer ring
+                for (var j = 0; j < 6; j++) {
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(lp[1 + j].x, lp[1 + j].y);
+                    wireCtx.lineTo(lp[7 + j].x, lp[7 + j].y);
+                    wireCtx.stroke();
+                }
+
+                // Center spokes: pole interpolation → inner ring
+                for (var j = 0; j < 6; j++) {
+                    wireCtx.beginPath();
+                    wireCtx.moveTo(lp[0].x, lp[0].y);
+                    wireCtx.lineTo(lp[1 + j].x, lp[1 + j].y);
+                    wireCtx.stroke();
+                }
+            }
+        } else {
+            // Non-expanding: simple cross connections
+            for (var i = 0; i < 13; i++) {
+                drawLine(i, 13 + i, 'cross');
+            }
         }
 
         // === Circles on all 26 nodes ===
@@ -3807,8 +3898,9 @@
             var isPole = (ni === 0 || ni === 13);
 
             var nx = nd.x, ny = nd.y, nz = nd.z;
-            // Stretch Z for smooth orb elongation
-            nz *= stretchZ;
+            // Accordion offset for normal computation
+            var accZ = nodeZBase[ni] * accordionSep * S;
+            nz += accZ;
 
             var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
             nx /= nl; ny /= nl; nz /= nl;
@@ -3829,7 +3921,7 @@
                 var cosA = Math.cos(ca), sinA = Math.sin(ca);
                 var cpx = nd.x + circleR * (cosA * ux + sinA * vx);
                 var cpy = nd.y + circleR * (cosA * uy + sinA * vy);
-                var cpz = nd.z * stretchZ + circleR * (cosA * uz + sinA * vz);
+                var cpz = nd.z + circleR * (cosA * uz + sinA * vz) + accZ;
 
                 var wa2 = t * 1.8 + ni * 1.1;
                 cpx += Math.sin(wa2) * fval * 0.008 * ms.scalePulse;
@@ -3872,35 +3964,6 @@
         wireCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
         wireCtx.fill();
 
-        // --- During accordion: draw energy "spine" between the two poles ---
-        if (accEased > 0.05) {
-            var spineAlpha = accEased * (0.3 + bass * 0.3);
-            var spineLw = accEased * (2.0 + bass * 2.0);
-            wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, spineAlpha).toFixed(3) + ')';
-            wireCtx.lineWidth = spineLw;
-            wireCtx.shadowBlur = 12 + accEased * 20;
-            wireCtx.shadowColor = aHex;
-            wireCtx.beginPath();
-            wireCtx.moveTo(pts[0].x, pts[0].y);
-            wireCtx.lineTo(pts[13].x, pts[13].y);
-            wireCtx.stroke();
-
-            // Draw intermediate "accordion ring" lines at intervals along the spine
-            var ringCount = Math.floor(accEased * 4) + 1; // 1-5 intermediate rings
-            for (var ri = 1; ri <= ringCount; ri++) {
-                var rf = ri / (ringCount + 1);
-                var ringCx = pts[0].x + (pts[13].x - pts[0].x) * rf;
-                var ringCy = pts[0].y + (pts[13].y - pts[0].y) * rf;
-                var ringR = (6 + bass * 4) * ms.scalePulse * (1 - Math.abs(rf - 0.5) * 1.2);
-                var ringAlpha = accEased * (0.15 + getFreqSample(rf) * 0.2);
-                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, ringAlpha).toFixed(3) + ')';
-                wireCtx.lineWidth = 0.6 + accEased * 0.4;
-                wireCtx.shadowBlur = 4 + accEased * 8;
-                wireCtx.beginPath();
-                wireCtx.arc(ringCx, ringCy, ringR, 0, Math.PI * 2);
-                wireCtx.stroke();
-            }
-        }
 
         // === Set eyeScreenPoints for lyrics + lasers ===
         var rightmostIdx = 7, leftmostIdx = 7;
