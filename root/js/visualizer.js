@@ -1744,6 +1744,15 @@
         if (ch === activeChar) return;
         activeChar = ch;
         console.log('[visualizer] character: ' + ch.name);
+
+        // Spit lyrics only for Vektrax and Metatron; bouncing ball for everyone else
+        if (key === '_default' || key === 'metatron') {
+            lyricMode = LYRIC_MODE_SPITTING;
+        } else {
+            lyricMode = LYRIC_MODE_BOUNCING;
+        }
+        resetLyricFxState();
+        updateFxHud();
     }
 
     function getCharacterForArtist(artist) {
@@ -3537,6 +3546,7 @@
         }
         // Shift hue toward warmer during expansion
         var dynHue = (hue + accEased * 0.08) % 1.0;
+        ms.currentHue = dynHue;  // expose for laser contrast
         var pri = hsl2rgb(dynHue, 0.88, 0.42 + bass * 0.12);
         var acc = hsl2rgb(dynHue, 0.78, 0.62 + amp * 0.10);
         var cRGB = pri.r + ',' + pri.g + ',' + pri.b;
@@ -7306,6 +7316,21 @@
             }
         }
 
+        // Use contrasting color for Metatron, red for everyone else
+        var flashColor = LASER_RED;
+        if (activeChar && activeChar.headShape === 'metatronscube' && metatronState.currentHue !== undefined) {
+            var fh = (metatronState.currentHue + 0.5) % 1.0;
+            var fc = 0.88, fx = fc * (1 - Math.abs((fh * 6) % 2 - 1)), fm = 0.50 - fc / 2;
+            var fr, fg, fb;
+            if      (fh < 1/6) { fr=fc; fg=fx; fb=0; }
+            else if (fh < 2/6) { fr=fx; fg=fc; fb=0; }
+            else if (fh < 3/6) { fr=0; fg=fc; fb=fx; }
+            else if (fh < 4/6) { fr=0; fg=fx; fb=fc; }
+            else if (fh < 5/6) { fr=fx; fg=0; fb=fc; }
+            else                { fr=fc; fg=0; fb=fx; }
+            flashColor = 'rgb(' + Math.round((fr+fm)*255) + ',' + Math.round((fg+fm)*255) + ',' + Math.round((fb+fm)*255) + ')';
+        }
+
         wordExplosions.push({
             kind: 'flash',
             x: target.x,
@@ -7313,12 +7338,50 @@
             spawnTime: now,
             life: 0.22,
             radius: Math.max(28, fontSize * 0.9),
-            color: LASER_RED
+            color: flashColor
         });
     }
 
     function renderEyeLasers(now) {
         if (!karaokeCtx || !eyeLasers.length) return;
+
+        // --- Determine laser color (contrast Metatron's skeleton hue) ---
+        var laserR = 255, laserG = 85, laserB = 85;  // default red
+        var laserGlowR = 255, laserGlowG = 170, laserGlowB = 170;
+        var laserShadow = LASER_RED;
+
+        if (activeChar && activeChar.headShape === 'metatronscube' && metatronState.currentHue !== undefined) {
+            // Complementary hue: offset by 0.5 on the color wheel
+            var contrastHue = (metatronState.currentHue + 0.5) % 1.0;
+            // Convert to RGB at high saturation + moderate lightness for a vivid laser
+            var c = 0.88 * 1.0;  // saturation * chroma factor
+            var x = c * (1 - Math.abs((contrastHue * 6) % 2 - 1));
+            var m = 0.50 - c / 2;  // lightness offset
+            var cr, cg, cb;
+            if      (contrastHue < 1/6) { cr=c; cg=x; cb=0; }
+            else if (contrastHue < 2/6) { cr=x; cg=c; cb=0; }
+            else if (contrastHue < 3/6) { cr=0; cg=c; cb=x; }
+            else if (contrastHue < 4/6) { cr=0; cg=x; cb=c; }
+            else if (contrastHue < 5/6) { cr=x; cg=0; cb=c; }
+            else                        { cr=c; cg=0; cb=x; }
+            laserR = Math.round((cr + m) * 255);
+            laserG = Math.round((cg + m) * 255);
+            laserB = Math.round((cb + m) * 255);
+            // Brighter glow version
+            var gm = 0.70 - c / 2;
+            var gc = 0.78;
+            var gx = gc * (1 - Math.abs((contrastHue * 6) % 2 - 1));
+            if      (contrastHue < 1/6) { cr=gc; cg=gx; cb=0; }
+            else if (contrastHue < 2/6) { cr=gx; cg=gc; cb=0; }
+            else if (contrastHue < 3/6) { cr=0; cg=gc; cb=gx; }
+            else if (contrastHue < 4/6) { cr=0; cg=gx; cb=gc; }
+            else if (contrastHue < 5/6) { cr=gx; cg=0; cb=gc; }
+            else                        { cr=gc; cg=0; cb=gx; }
+            laserGlowR = Math.round((cr + gm) * 255);
+            laserGlowG = Math.round((cg + gm) * 255);
+            laserGlowB = Math.round((cb + gm) * 255);
+            laserShadow = 'rgb(' + laserR + ',' + laserG + ',' + laserB + ')';
+        }
 
         var activeLasers = [];
         for (var i = 0; i < eyeLasers.length; i++) {
@@ -7339,10 +7402,10 @@
             karaokeCtx.save();
             karaokeCtx.globalAlpha = 0.92 - progress * 0.25;
             karaokeCtx.lineCap = 'round';
-            karaokeCtx.shadowColor = LASER_RED;
+            karaokeCtx.shadowColor = laserShadow;
             karaokeCtx.shadowBlur = 16;
 
-            karaokeCtx.strokeStyle = 'rgba(255,85,85,0.95)';
+            karaokeCtx.strokeStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
             karaokeCtx.lineWidth = 3.2;
             karaokeCtx.beginPath();
             karaokeCtx.moveTo(laser.originX, laser.originY);
@@ -7358,7 +7421,7 @@
             karaokeCtx.stroke();
 
             karaokeCtx.beginPath();
-            karaokeCtx.fillStyle = 'rgba(255,170,170,0.8)';
+            karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.8)';
             karaokeCtx.arc(laser.originX, laser.originY, 3, 0, Math.PI * 2);
             karaokeCtx.fill();
             karaokeCtx.restore();
