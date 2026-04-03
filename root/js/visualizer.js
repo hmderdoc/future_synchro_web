@@ -532,6 +532,13 @@
             body: {
                 color: '#AAAAAA',
                 rgb: '170,170,170',
+                // Cable neck: draws a connector from box bottom to body neck
+                neckBridge: {
+                    color: '#AAAAAA',
+                    rgb: '170,170,170',
+                    width: 2.5,
+                    style: 'cable'   // 'cable' = ribbed connector line
+                },
                 skeleton: {
                     neck:       { x:  0.00, y: 0.00 },
                     shoulderL:  { x: -0.16, y: 0.06 },
@@ -5750,6 +5757,69 @@
             var screenY = bodyOriginY + y * bodyScale;
             screenX += zWobble * bodyScale * 0.4;
             joints[name] = { x: screenX, y: screenY, localY: j.y };
+        }
+
+        // --- Neck bridge (cable from box-head bottom to spine neck joint) ---
+        if (body.neckBridge && char.boxDims) {
+            var nb = body.neckBridge;
+            var nbColor = nb.color || color;
+            var nbRgb   = nb.rgb   || rgb;
+            var nbWidth  = nb.width || 2.0;
+
+            // Bottom-center of the box head in screen coords
+            var boxBot = projectHeadPoint(projState, 0, -char.boxDims.h, 0, projState.pulse || 1);
+
+            // Target: the actual rendered neck joint (top of spine bone)
+            var neckJoint = joints.neck;
+            if (neckJoint) {
+                var cX0 = boxBot.x;
+                var cY0 = boxBot.y;
+                var cX1 = neckJoint.x;
+                var cY1 = neckJoint.y;
+
+                // Main cable line
+                wireCtx.lineCap = 'round';
+                wireCtx.strokeStyle = 'rgba(' + nbRgb + ',0.7)';
+                wireCtx.lineWidth = nbWidth;
+                wireCtx.shadowBlur = 4;
+                wireCtx.shadowColor = nbColor;
+                wireCtx.beginPath();
+                wireCtx.moveTo(cX0, cY0);
+                wireCtx.lineTo(cX1, cY1);
+                wireCtx.stroke();
+
+                // Cable ribs (horizontal bands for that ribbon-cable look)
+                if (nb.style === 'cable') {
+                    var ribCount = 4;
+                    wireCtx.lineWidth = nbWidth + 2.5;
+                    for (var ri = 1; ri <= ribCount; ri++) {
+                        var frac = ri / (ribCount + 1);
+                        var rx = cX0 + (cX1 - cX0) * frac;
+                        var ry = cY0 + (cY1 - cY0) * frac;
+                        var ribAlpha = 0.25 + bass * 0.1;
+                        wireCtx.strokeStyle = 'rgba(' + nbRgb + ',' + ribAlpha.toFixed(3) + ')';
+                        wireCtx.beginPath();
+                        wireCtx.moveTo(rx - 3.5, ry);
+                        wireCtx.lineTo(rx + 3.5, ry);
+                        wireCtx.stroke();
+                    }
+                }
+
+                // Port connector at box bottom (small rectangle)
+                var ps = 3;
+                wireCtx.strokeStyle = 'rgba(' + nbRgb + ',0.55)';
+                wireCtx.lineWidth = 1.2;
+                wireCtx.shadowBlur = 2;
+                wireCtx.strokeRect(cX0 - ps, cY0 - 1, ps * 2, ps);
+
+                // Port dot at body neck (merges into spine)
+                wireCtx.fillStyle = 'rgba(' + nbRgb + ',0.6)';
+                wireCtx.beginPath();
+                wireCtx.arc(cX1, cY1, 2.5, 0, Math.PI * 2);
+                wireCtx.fill();
+
+                wireCtx.shadowBlur = 0;
+            }
         }
 
         // --- Clothing zone map ---
