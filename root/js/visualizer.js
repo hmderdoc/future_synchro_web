@@ -1601,7 +1601,7 @@
             }
         },
 
-        oxffl1n3: {
+        '0xffl1n3': {
             name: '0xFFL1N3',
             // Masculine face — angular jaw, flat brow
             profile: [
