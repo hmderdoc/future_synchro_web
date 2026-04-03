@@ -3571,7 +3571,8 @@
 
         // === Accordion easing ===
         var accEased = ms.accordionPhase * ms.accordionPhase * (3 - 2 * ms.accordionPhase);
-        var accordionSep = accEased * 2.0; // max separation = 2x sphere radius
+        var accordionSep = accEased * 2.0;
+        var stretchZ = 1.0 + accordionSep;  // multiplicative Z elongation (1→3): smooth orb stretch
 
         // === Scale: bass/amp pulsing + accordion boost ===
         var beatPulse = 1.0 + bass * 0.6 + amp * 0.3;
@@ -3687,8 +3688,8 @@
             var nd = nodes[p];
             var px = nd.x, py = nd.y, pz = nd.z;
 
-            // Accordion: push front nodes forward, back nodes backward along Z
-            pz += nodeZBase[p] * accordionSep * S;
+            // Accordion: stretch Z smoothly — orb elongation, not a slice
+            pz *= stretchZ;
 
             // Per-node freq wiggle (subtle)
             var fpos = (p % 13) / 13;
@@ -3806,9 +3807,8 @@
             var isPole = (ni === 0 || ni === 13);
 
             var nx = nd.x, ny = nd.y, nz = nd.z;
-            // Add accordion offset to the normal computation
-            var accZ = nodeZBase[ni] * accordionSep * S;
-            nz += accZ;
+            // Stretch Z for smooth orb elongation
+            nz *= stretchZ;
 
             var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
             nx /= nl; ny /= nl; nz /= nl;
@@ -3829,7 +3829,7 @@
                 var cosA = Math.cos(ca), sinA = Math.sin(ca);
                 var cpx = nd.x + circleR * (cosA * ux + sinA * vx);
                 var cpy = nd.y + circleR * (cosA * uy + sinA * vy);
-                var cpz = nd.z + circleR * (cosA * uz + sinA * vz) + accZ;
+                var cpz = nd.z * stretchZ + circleR * (cosA * uz + sinA * vz);
 
                 var wa2 = t * 1.8 + ni * 1.1;
                 cpx += Math.sin(wa2) * fval * 0.008 * ms.scalePulse;
