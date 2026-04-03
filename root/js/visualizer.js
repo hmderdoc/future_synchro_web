@@ -1599,6 +1599,125 @@
                     feet : { color: '#AA8844', rgb: '170,136,68' }
                 },
             }
+        },
+
+        oxffl1n3: {
+            name: '0xFFL1N3',
+            // Masculine face — angular jaw, flat brow
+            profile: [
+                [0.00, -0.78], [0.17, -0.72], [0.31, -0.62],
+                [0.43, -0.48], [0.49, -0.34], [0.51, -0.18],
+                [0.50, -0.04], [0.48,  0.08], [0.46,  0.20],
+                [0.44,  0.32], [0.41,  0.42], [0.36,  0.50],
+                [0.28,  0.56], [0.16,  0.61],
+                [0.00,  0.64]
+            ],
+            ringN: 18,
+            eyes: {
+                left:  { x: -0.17, y: -0.02, z: 0.46, r: 0.08 },
+                right: { x:  0.17, y: -0.02, z: 0.46, r: 0.08 }
+            },
+            // Bright cyan X-eyes
+            eyeColor: { hex: '#00FFFF', rgb: '0,255,255' },
+            eyeOutlineColor: { hex: '#00FFFF', rgb: '0,255,255' },
+            eyeShape: 'xeye',
+            eyeBehavior: null,
+            mascara: false,
+            eyelashes: null,
+            eyebrows: null,
+            mouth: { y: -0.50, hw: 0.16, z: 0.46, segs: 8,
+                     teeth: false },
+            nose: {
+                bridge: [[0, -0.14, 0.52], [0, -0.27, 0.56], [0, -0.31, 0.58]],
+                base:   [[-0.06, -0.33, 0.52], [0, -0.31, 0.58], [0.06, -0.33, 0.52]]
+            },
+            // Bright blue skin
+            wireColor: '#2266FF',
+            wireRGB:   '34,102,255',
+            accentColor: '#55AAFF',
+            accentRGB:   '85,170,255',
+            // Blush config: red glow on cheeks, fades in/out periodically
+            blush: {
+                color: '#FF3333',
+                rgb: '255,51,51',
+                radius: 0.07,
+                y: -0.22,
+                z: 0.42,
+                xOffset: 0.22,
+                cycleSec: 8,
+                holdSec: 3
+            },
+            // Bright red mohawk — tall central spikes
+            hair: [
+                // Center spikes — tallest
+                { rx:  0.00, ry: 0.56, rz:  0.02, len: 0.55, color: '#FF2222', width: 2.8, freq: 0.15 },
+                { rx:  0.00, ry: 0.60, rz: -0.02, len: 0.50, color: '#FF3333', width: 2.6, freq: 0.25 },
+                { rx:  0.00, ry: 0.54, rz:  0.06, len: 0.48, color: '#EE1111', width: 2.5, freq: 0.10 },
+                // Slightly offset center — fills out the ridge
+                { rx: -0.04, ry: 0.54, rz:  0.00, len: 0.45, color: '#FF4444', width: 2.4, freq: 0.20 },
+                { rx:  0.04, ry: 0.54, rz:  0.00, len: 0.45, color: '#FF4444', width: 2.4, freq: 0.30 },
+                { rx: -0.03, ry: 0.58, rz: -0.04, len: 0.42, color: '#DD0000', width: 2.3, freq: 0.35 },
+                { rx:  0.03, ry: 0.58, rz: -0.04, len: 0.42, color: '#DD0000', width: 2.3, freq: 0.40 },
+                // Forward lean spikes
+                { rx:  0.00, ry: 0.50, rz:  0.10, len: 0.38, color: '#FF5555', width: 2.2, freq: 0.05 },
+                { rx:  0.00, ry: 0.48, rz:  0.14, len: 0.30, color: '#FF3333', width: 2.0, freq: 0.45 },
+                // Back lean spikes
+                { rx:  0.00, ry: 0.52, rz: -0.10, len: 0.40, color: '#EE2222', width: 2.3, freq: 0.50 },
+                { rx:  0.00, ry: 0.48, rz: -0.16, len: 0.35, color: '#DD1111', width: 2.1, freq: 0.55 },
+                // Shorter side fuzz (narrow — it's a mohawk, not wide)
+                { rx: -0.06, ry: 0.48, rz:  0.04, len: 0.20, color: '#CC0000', width: 1.8, freq: 0.60 },
+                { rx:  0.06, ry: 0.48, rz:  0.04, len: 0.20, color: '#CC0000', width: 1.8, freq: 0.65 }
+            ],
+            hairRigid: true,
+            hat: null,
+            facialHair: null,
+            ledIndicators: null,
+            shutter: null,
+            chinGuard: null,
+            label: '0xFFL1N3',
+            // Blue body with lightning flash effect
+            body: {
+                color: '#2266FF',
+                rgb: '34,102,255',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 7,
+                scanSpeed: 0.003,
+                lightning: true,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothing: {
+                    upper: { color: '#2255DD', rgb: '34,85,221' },
+                    skin:  { color: '#3388FF', rgb: '51,136,255' },
+                    torso: { color: '#1144BB', rgb: '17,68,187' },
+                    lower: { color: '#2255DD', rgb: '34,85,221' },
+                    feet:  { color: '#1133AA', rgb: '17,51,170' }
+                },
+            }
         }
     };
 
@@ -2372,6 +2491,9 @@
         // --- Mouth ---
         drawMouth(proj, activeChar);
 
+        // --- Blush (periodic red glow on cheeks) ---
+        if (activeChar.blush) drawBlush(activeChar, proj);
+
         // --- LEDs ---
         drawLEDs(activeChar, proj, amp, bass);
 
@@ -2484,6 +2606,61 @@
         return { x: xOff, y: yOff };
     }
 
+    // Periodic blush — soft red glow on cheeks that fades in/out
+    function drawBlush(char, proj) {
+        var bl = char.blush;
+        if (!bl) return;
+        var t = performance.now() * 0.001;
+        var cycle = bl.cycleSec || 8;
+        var hold  = bl.holdSec || 3;
+        // Sawtooth phase: ramp up for hold seconds, then off
+        var phase = (t % cycle) / cycle;
+        var alpha;
+        var onFrac = hold / cycle;
+        if (phase < onFrac * 0.2) {
+            // Fade in
+            alpha = phase / (onFrac * 0.2);
+        } else if (phase < onFrac * 0.8) {
+            // Hold
+            alpha = 1.0;
+        } else if (phase < onFrac) {
+            // Fade out
+            alpha = 1.0 - (phase - onFrac * 0.8) / (onFrac * 0.2);
+        } else {
+            alpha = 0;
+        }
+        if (alpha < 0.02) return;
+        alpha *= 0.35;  // max blush opacity
+
+        var blRgb = bl.rgb || '255,51,51';
+        var blColor = bl.color || '#FF3333';
+        var rad = bl.radius || 0.07;
+        var by = bl.y || -0.22;
+        var bz = bl.z || 0.42;
+        var bxOff = bl.xOffset || 0.22;
+
+        // Left cheek
+        var cL = proj(-bxOff, by, bz);
+        // Right cheek
+        var cR = proj(bxOff, by, bz);
+
+        var screenRad = rad * 30 * cL.d;  // approximate screen radius
+
+        wireCtx.shadowBlur = screenRad * 1.5;
+        wireCtx.shadowColor = blColor;
+        wireCtx.fillStyle = 'rgba(' + blRgb + ',' + alpha.toFixed(3) + ')';
+
+        wireCtx.beginPath();
+        wireCtx.arc(cL.x, cL.y, screenRad, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        wireCtx.beginPath();
+        wireCtx.arc(cR.x, cR.y, screenRad, 0, Math.PI * 2);
+        wireCtx.fill();
+
+        wireCtx.shadowBlur = 0;
+    }
+
     function drawEye(eye, proj, eyeName, char) {
         char = char || activeChar;
         var blinkAmount = getEyeBlinkAmount(eyeName);
@@ -2496,6 +2673,8 @@
         } else if (shape === 'visor') {
             // Visor is drawn once spanning both eyes — only draw on 'left' call
             if (eyeName === 'left') drawVisor(char, proj);
+        } else if (shape === 'xeye') {
+            drawXEye(eye, proj, eyeName, char, blinkAmount);
         } else {
             drawRoundEye(eye, proj, eyeName, char, blinkAmount);
         }
@@ -2610,6 +2789,91 @@
             wireCtx.lineWidth = 1.1 + eyeGlow * 0.5;
             wireCtx.stroke();
         }
+    }
+
+    // X-shaped stitched eyes — bright X with stitch marks
+    function drawXEye(eye, proj, eyeName, char, blinkAmount) {
+        var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
+        var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
+        var r = eye.r;
+        var squish = Math.max(0.1, 1 - blinkAmount * 0.9);
+
+        // X diagonal size
+        var xr = r * 1.1;
+        var yr = r * 1.0 * squish;
+
+        // Four endpoints of the X
+        var tl = proj(eye.x - xr, eye.y + yr, eye.z);
+        var tr = proj(eye.x + xr, eye.y + yr, eye.z);
+        var bl = proj(eye.x - xr, eye.y - yr, eye.z);
+        var br = proj(eye.x + xr, eye.y - yr, eye.z);
+        var center = proj(eye.x, eye.y, eye.z);
+
+        // Glow
+        wireCtx.shadowBlur = 12 + eyeGlow * 18;
+        wireCtx.shadowColor = eHex;
+        wireCtx.lineCap = 'round';
+
+        if (blinkAmount >= 0.72) {
+            // Blink: just a horizontal slit
+            wireCtx.strokeStyle = 'rgba(' + eRGB + ',0.8)';
+            wireCtx.lineWidth = 1.5;
+            wireCtx.beginPath();
+            wireCtx.moveTo(tl.x, center.y);
+            wireCtx.lineTo(tr.x, center.y);
+            wireCtx.stroke();
+            return;
+        }
+
+        // Main X strokes — bright
+        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.8 + eyeGlow * 0.2) + ')';
+        wireCtx.lineWidth = 2.2 + eyeGlow * 0.8;
+
+        // Diagonal 1: top-left to bottom-right
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl.x, tl.y);
+        wireCtx.lineTo(br.x, br.y);
+        wireCtx.stroke();
+
+        // Diagonal 2: top-right to bottom-left
+        wireCtx.beginPath();
+        wireCtx.moveTo(tr.x, tr.y);
+        wireCtx.lineTo(bl.x, bl.y);
+        wireCtx.stroke();
+
+        // Stitch marks — small perpendicular dashes along each diagonal
+        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.4 + eyeGlow * 0.2) + ')';
+        wireCtx.lineWidth = 1.0;
+        var stitchCount = 3;
+        for (var s = 1; s <= stitchCount; s++) {
+            var f = s / (stitchCount + 1);
+            // Along diagonal 1 (TL→BR)
+            var sx1 = tl.x + (br.x - tl.x) * f;
+            var sy1 = tl.y + (br.y - tl.y) * f;
+            // Perpendicular to diagonal 1
+            var dx1 = -(br.y - tl.y);
+            var dy1 = (br.x - tl.x);
+            var len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
+            dx1 /= len1; dy1 /= len1;
+            var stLen = 3.0;
+            wireCtx.beginPath();
+            wireCtx.moveTo(sx1 - dx1 * stLen, sy1 - dy1 * stLen);
+            wireCtx.lineTo(sx1 + dx1 * stLen, sy1 + dy1 * stLen);
+            wireCtx.stroke();
+
+            // Along diagonal 2 (TR→BL)
+            var sx2 = tr.x + (bl.x - tr.x) * f;
+            var sy2 = tr.y + (bl.y - tr.y) * f;
+            var dx2 = -(bl.y - tr.y);
+            var dy2 = (bl.x - tr.x);
+            var len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 1;
+            dx2 /= len2; dy2 /= len2;
+            wireCtx.beginPath();
+            wireCtx.moveTo(sx2 - dx2 * stLen, sy2 - dy2 * stLen);
+            wireCtx.lineTo(sx2 + dx2 * stLen, sy2 + dy2 * stLen);
+            wireCtx.stroke();
+        }
+        wireCtx.shadowBlur = 0;
     }
 
     function drawSquareEye(eye, proj, eyeName, char, blinkAmount) {
@@ -5898,6 +6162,30 @@
                 var fc = hsl2rgb(fh, fs, fl);
                 var fhex = '#' + ((1 << 24) + (fc.r << 16) + (fc.g << 8) + fc.b).toString(16).slice(1);
                 return { c: fhex, r: fc.r + ',' + fc.g + ',' + fc.b };
+            }
+
+            // Lightning flash — base blue with sudden bright yellow strikes
+            if (body.lightning) {
+                // Multi-frequency sin to create irregular "strike" moments
+                var strike = Math.sin(t * 17.3) * Math.sin(t * 23.7) * Math.sin(t * 5.1);
+                // Only flash when multiple waves align (>0.7 = ~15% of the time)
+                var isStriking = strike > 0.7;
+                // Bass hits can also trigger mini flashes
+                var bassStrike = bass > 0.6;
+                if (isStriking || bassStrike) {
+                    // YELLOW lightning flash — all zones go bright yellow-white
+                    var flashIntensity = isStriking ? (strike - 0.7) / 0.3 : bass * 0.8;
+                    flashIntensity = Math.min(1, flashIntensity);
+                    // Zone-stagger: each zone flashes at slightly different times
+                    var zoneDelay = (ZONE_HUE_OFFSET[zoneName] || 0) * 0.001;
+                    var zStrike = Math.sin(t * 17.3 + zoneDelay) * Math.sin(t * 23.7 + zoneDelay);
+                    if (zStrike > 0.5 || bassStrike) {
+                        var lum = 0.7 + flashIntensity * 0.3;
+                        var lc = hsl2rgb(55, 0.95, lum);  // bright yellow
+                        var lhex = '#' + ((1 << 24) + (lc.r << 16) + (lc.g << 8) + lc.b).toString(16).slice(1);
+                        return { c: lhex, r: lc.r + ',' + lc.g + ',' + lc.b };
+                    }
+                }
             }
 
             if (clothing && clothing[zoneName]) {
