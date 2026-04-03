@@ -294,7 +294,43 @@
             },
             hair: null,
             hat: null,
-            facialHair: null
+            facialHair: null,
+            // Chibi body: blue t-shirt, gray shorts, white tennis shoes
+            body: {
+                color: '#FFDD33',
+                rgb: '255,221,51',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothingNote: 'blue_tshirt_gray_shorts_white_tennisshoes'
+            }
         },
 
         cowboy: {
@@ -350,6 +386,46 @@
                 spread: 0.22,   // how far out from center the ends reach
                 droop:  0.06,   // how far below nose the ends hang
                 curl:   0.02    // upward curl at tips (0 = straight down)
+            },
+            // Chibi body: plaid long-sleeve shirt, blue jeans, cowboy boots
+            body: {
+                color: '#FFDD33',
+                rgb: '255,221,51',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                // Clothing zones for future rendering:
+                // shirt: plaid pattern, red/brown tones, long sleeves, collar
+                // pants: blue jeans
+                // boots: brown cowboy boots with slight heel
+                clothingNote: 'plaid_shirt_jeans_cowboy_boots'
             }
         },
 
@@ -582,7 +658,43 @@
             hat: null,
             facialHair: null,
             ledIndicators: null,
-            shutter: null
+            shutter: null,
+            // Chibi body: slim build, dark gray suit, white shirt, dark gray tie
+            body: {
+                color: '#BB55CC',
+                rgb: '187,85,204',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.16, y: 0.06 },
+                    shoulderR:  { x:  0.16, y: 0.06 },
+                    elbowL:     { x: -0.22, y: 0.21 },
+                    elbowR:     { x:  0.22, y: 0.21 },
+                    handL:      { x: -0.18, y: 0.34 },
+                    handR:      { x:  0.18, y: 0.34 },
+                    hip:        { x:  0.00, y: 0.33 },
+                    hipL:       { x: -0.08, y: 0.33 },
+                    hipR:       { x:  0.08, y: 0.33 },
+                    kneeL:      { x: -0.10, y: 0.48 },
+                    kneeR:      { x:  0.10, y: 0.48 },
+                    footL:      { x: -0.11, y: 0.60 },
+                    footR:      { x:  0.11, y: 0.60 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.6,
+                glowWidth: 5,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothingNote: 'dark_gray_suit_white_shirt_gray_tie_slim'
+            }
         },
         donaldtrump: {
             name: 'Donald Trump',
@@ -664,7 +776,43 @@
             },
             facialHair: null,
             ledIndicators: null,
-            shutter: null
+            shutter: null,
+            // Chibi body: stocky build, blue suit, white shirt, red tie, brown shoes
+            body: {
+                color: '#FF8833',
+                rgb: '255,136,51',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.22, y: 0.06 },
+                    shoulderR:  { x:  0.22, y: 0.06 },
+                    elbowL:     { x: -0.28, y: 0.20 },
+                    elbowR:     { x:  0.28, y: 0.20 },
+                    handL:      { x: -0.24, y: 0.33 },
+                    handR:      { x:  0.24, y: 0.33 },
+                    hip:        { x:  0.00, y: 0.34 },
+                    hipL:       { x: -0.14, y: 0.34 },
+                    hipR:       { x:  0.14, y: 0.34 },
+                    kneeL:      { x: -0.14, y: 0.48 },
+                    kneeR:      { x:  0.14, y: 0.48 },
+                    footL:      { x: -0.15, y: 0.60 },
+                    footR:      { x:  0.15, y: 0.60 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 2.0,
+                glowWidth: 7,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothingNote: 'blue_suit_white_shirt_red_tie_brown_shoes_stocky'
+            }
         },
         robocop: {
             name: 'RoboCop',
@@ -715,7 +863,43 @@
                 rgb: '102,102,119'
             },
             ledIndicators: null,
-            shutter: null
+            shutter: null,
+            // Chibi body: metallic armor plating, bulky mechanical build
+            body: {
+                color: '#8866AA',
+                rgb: '136,102,170',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.22, y: 0.05 },
+                    shoulderR:  { x:  0.22, y: 0.05 },
+                    elbowL:     { x: -0.28, y: 0.18 },
+                    elbowR:     { x:  0.28, y: 0.18 },
+                    handL:      { x: -0.24, y: 0.30 },
+                    handR:      { x:  0.24, y: 0.30 },
+                    hip:        { x:  0.00, y: 0.30 },
+                    hipL:       { x: -0.12, y: 0.30 },
+                    hipR:       { x:  0.12, y: 0.30 },
+                    kneeL:      { x: -0.13, y: 0.44 },
+                    kneeR:      { x:  0.13, y: 0.44 },
+                    footL:      { x: -0.14, y: 0.56 },
+                    footR:      { x:  0.14, y: 0.56 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 2.2,
+                glowWidth: 8,
+                scanSpeed: 0.002,
+                moves: ['robot', 'two_step', 'shuffle', 'raise_the_roof'],
+                clothingNote: 'metallic_armor_plating_mechanical'
+            }
         },
         data: {
             name: 'Data',
@@ -792,7 +976,43 @@
             hat: null,
             facialHair: null,
             ledIndicators: null,
-            shutter: null
+            shutter: null,
+            // Chibi body: TNG-era Starfleet uniform (gold/black ops division)
+            body: {
+                color: '#E8E0C8',
+                rgb: '232,224,200',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothingNote: 'starfleet_tng_gold_black_uniform'
+            }
         },
         cinder: {
             name: 'Cinder',
@@ -1099,7 +1319,43 @@
             ledIndicators: null,
             shutter: null,
             chinGuard: null,
-            label: 'RALLY'
+            label: 'RALLY',
+            // Chibi body: African style shirt (red/green/yellow), baggy tan shorts, sandals
+            body: {
+                color: '#886644',
+                rgb: '136,102,68',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.18, y: 0.06 },
+                    shoulderR:  { x:  0.18, y: 0.06 },
+                    elbowL:     { x: -0.24, y: 0.20 },
+                    elbowR:     { x:  0.24, y: 0.20 },
+                    handL:      { x: -0.20, y: 0.32 },
+                    handR:      { x:  0.20, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.32 },
+                    hipL:       { x: -0.10, y: 0.32 },
+                    hipR:       { x:  0.10, y: 0.32 },
+                    kneeL:      { x: -0.12, y: 0.46 },
+                    kneeR:      { x:  0.12, y: 0.46 },
+                    footL:      { x: -0.14, y: 0.58 },
+                    footR:      { x:  0.14, y: 0.58 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothingNote: 'african_shirt_red_green_yellow_baggy_tan_shorts_sandals'
+            }
         }
     };
 
