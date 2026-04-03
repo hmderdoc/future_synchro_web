@@ -253,7 +253,57 @@
                 { rx:  0.20, ry: 0.28, rz: -0.36, len: 0.90, color: '#55FF55', width: 1.3, freq: 0.85 }
             ],
             hat: null,
-            facialHair: null
+            facialHair: null,
+            // Chibi body: rainbow cycling outfit — all zones animate through spectrum
+            body: {
+                color: '#9999BB',
+                rgb: '153,153,187',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.16, y: 0.06 },
+                    shoulderR:  { x:  0.16, y: 0.06 },
+                    elbowL:     { x: -0.22, y: 0.20 },
+                    elbowR:     { x:  0.22, y: 0.20 },
+                    handL:      { x: -0.18, y: 0.32 },
+                    handR:      { x:  0.18, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.30 },
+                    hipL:       { x: -0.09, y: 0.30 },
+                    hipR:       { x:  0.09, y: 0.30 },
+                    kneeL:      { x: -0.10, y: 0.44 },
+                    kneeR:      { x:  0.10, y: 0.44 },
+                    footL:      { x: -0.11, y: 0.56 },
+                    footR:      { x:  0.11, y: 0.56 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                skirt: {
+                    hemPoints: 5,
+                    hemY: 0.46,
+                    hemSpread: 0.18,
+                    sway: 0.03,
+                    zone: 'lower'
+                },
+                lineWidth: 1.8,
+                glowWidth: 7,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                rainbow: true,
+                clothing: {
+                    upper: { color: '#FF0000', rgb: '255,0,0' },
+                    skin:  { color: '#FFCC88', rgb: '255,204,136' },
+                    torso: { color: '#00FF00', rgb: '0,255,0' },
+                    lower: { color: '#0000FF', rgb: '0,0,255' },
+                    feet:  { color: '#FF00FF', rgb: '255,0,255' }
+                },
+            }
         },
 
         crosswire: {
@@ -477,7 +527,56 @@
                   mode: 'activity' },
                 { x: 0.34, y: 0.30, color: '#FFAA00', rgb: '255,170,0',
                   mode: 'power' }
-            ]
+            ],
+            // Chibi body: metallic exoskeleton, pink accents
+            body: {
+                color: '#AAAAAA',
+                rgb: '170,170,170',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.16, y: 0.06 },
+                    shoulderR:  { x:  0.16, y: 0.06 },
+                    elbowL:     { x: -0.22, y: 0.20 },
+                    elbowR:     { x:  0.22, y: 0.20 },
+                    handL:      { x: -0.18, y: 0.32 },
+                    handR:      { x:  0.18, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.30 },
+                    hipL:       { x: -0.09, y: 0.30 },
+                    hipR:       { x:  0.09, y: 0.30 },
+                    kneeL:      { x: -0.10, y: 0.44 },
+                    kneeR:      { x:  0.10, y: 0.44 },
+                    footL:      { x: -0.11, y: 0.56 },
+                    footR:      { x:  0.11, y: 0.56 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                skirt: {
+                    hemPoints: 5,
+                    hemY: 0.46,
+                    hemSpread: 0.18,
+                    sway: 0.03,
+                    zone: 'lower'
+                },
+                lineWidth: 1.8,
+                glowWidth: 6,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothing: {
+                    upper: { color: '#BBBBCC', rgb: '187,187,204' },
+                    skin:  { color: '#AAAAAA', rgb: '170,170,170' },
+                    torso: { color: '#FF55FF', rgb: '255,85,255' },
+                    lower: { color: '#BBBBCC', rgb: '187,187,204' },
+                    feet:  { color: '#FF55FF', rgb: '255,85,255' }
+                },
+            }
         },
 
         diskmchardy: {
@@ -1131,7 +1230,57 @@
             ledIndicators: null,
             shutter: null,
             chinGuard: null,
-            label: 'CINDER'
+            label: 'CINDER',
+            // Chibi body: living flame — red/yellow/white flickering glow
+            body: {
+                color: '#FF4444',
+                rgb: '255,68,68',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.16, y: 0.06 },
+                    shoulderR:  { x:  0.16, y: 0.06 },
+                    elbowL:     { x: -0.22, y: 0.20 },
+                    elbowR:     { x:  0.22, y: 0.20 },
+                    handL:      { x: -0.18, y: 0.32 },
+                    handR:      { x:  0.18, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.30 },
+                    hipL:       { x: -0.09, y: 0.30 },
+                    hipR:       { x:  0.09, y: 0.30 },
+                    kneeL:      { x: -0.10, y: 0.44 },
+                    kneeR:      { x:  0.10, y: 0.44 },
+                    footL:      { x: -0.11, y: 0.56 },
+                    footR:      { x:  0.11, y: 0.56 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                skirt: {
+                    hemPoints: 5,
+                    hemY: 0.46,
+                    hemSpread: 0.18,
+                    sway: 0.03,
+                    zone: 'lower'
+                },
+                lineWidth: 2.0,
+                glowWidth: 10,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                flame: true,
+                clothing: {
+                    upper: { color: '#FFCC22', rgb: '255,204,34' },
+                    skin:  { color: '#FFEE88', rgb: '255,238,136' },
+                    torso: { color: '#FFFFFF', rgb: '255,255,255' },
+                    lower: { color: '#FF4422', rgb: '255,68,34' },
+                    feet:  { color: '#FF2200', rgb: '255,34,0' }
+                },
+            }
         },
         metatron: {
             name: 'Metatron',
@@ -1287,7 +1436,56 @@
             ledIndicators: null,
             shutter: null,
             chinGuard: null,
-            label: 'KAREN'
+            label: 'KAREN',
+            // Chibi body: white blouse, tan skirt, white high heels
+            body: {
+                color: '#DDAA88',
+                rgb: '221,170,136',
+                skeleton: {
+                    neck:       { x:  0.00, y: 0.00 },
+                    shoulderL:  { x: -0.16, y: 0.06 },
+                    shoulderR:  { x:  0.16, y: 0.06 },
+                    elbowL:     { x: -0.22, y: 0.20 },
+                    elbowR:     { x:  0.22, y: 0.20 },
+                    handL:      { x: -0.18, y: 0.32 },
+                    handR:      { x:  0.18, y: 0.32 },
+                    hip:        { x:  0.00, y: 0.30 },
+                    hipL:       { x: -0.09, y: 0.30 },
+                    hipR:       { x:  0.09, y: 0.30 },
+                    kneeL:      { x: -0.10, y: 0.44 },
+                    kneeR:      { x:  0.10, y: 0.44 },
+                    footL:      { x: -0.11, y: 0.56 },
+                    footR:      { x:  0.11, y: 0.56 }
+                },
+                bones: [
+                    ['neck', 'shoulderL'], ['neck', 'shoulderR'],
+                    ['shoulderL', 'shoulderR'],
+                    ['shoulderL', 'elbowL'], ['shoulderR', 'elbowR'],
+                    ['elbowL', 'handL'], ['elbowR', 'handR'],
+                    ['neck', 'hip'],
+                    ['hip', 'hipL'], ['hip', 'hipR'],
+                    ['hipL', 'kneeL'], ['hipR', 'kneeR'],
+                    ['kneeL', 'footL'], ['kneeR', 'footR']
+                ],
+                skirt: {
+                    hemPoints: 5,
+                    hemY: 0.46,
+                    hemSpread: 0.18,
+                    sway: 0.03,
+                    zone: 'lower'
+                },
+                lineWidth: 1.6,
+                glowWidth: 5,
+                scanSpeed: 0.003,
+                moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
+                clothing: {
+                    upper: { color: '#EEEEFF', rgb: '238,238,255' },
+                    skin:  { color: '#DDBB99', rgb: '221,187,153' },
+                    torso: { color: '#EEEEFF', rgb: '238,238,255' },
+                    lower: { color: '#CCAA77', rgb: '204,170,119' },
+                    feet:  { color: '#EEEEFF', rgb: '238,238,255' }
+                },
+            }
         },
 
         rally: {
@@ -5572,8 +5770,66 @@
 
         var clothing = body.clothing || null;
 
+        // --- HSL→RGB utility for rainbow/flame effects ---
+        function hsl2rgb(h, s, l) {
+            h = ((h % 360) + 360) % 360;
+            s = Math.max(0, Math.min(1, s));
+            l = Math.max(0, Math.min(1, l));
+            var c = (1 - Math.abs(2 * l - 1)) * s;
+            var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+            var m = l - c / 2;
+            var r1, g1, b1;
+            if (h < 60)       { r1 = c; g1 = x; b1 = 0; }
+            else if (h < 120) { r1 = x; g1 = c; b1 = 0; }
+            else if (h < 180) { r1 = 0; g1 = c; b1 = x; }
+            else if (h < 240) { r1 = 0; g1 = x; b1 = c; }
+            else if (h < 300) { r1 = x; g1 = 0; b1 = c; }
+            else              { r1 = c; g1 = 0; b1 = x; }
+            var R = Math.round((r1 + m) * 255);
+            var G = Math.round((g1 + m) * 255);
+            var B = Math.round((b1 + m) * 255);
+            return { r: R, g: G, b: B };
+        }
+
+        // Zone offsets for rainbow spread (each zone gets a different hue phase)
+        var ZONE_HUE_OFFSET = { upper: 0, skin: 72, torso: 144, lower: 216, feet: 288 };
+
         // Resolve zone color: returns {c: hexColor, r: rgbString}
         function zoneColor(zoneName) {
+            // Rainbow cycling mode — hue rotates with time, each zone offset
+            if (body.rainbow) {
+                var baseHue = (t * 60) % 360;  // full cycle every 6 seconds
+                var offset = ZONE_HUE_OFFSET[zoneName] || 0;
+                // Add bass pulse to saturation and brightness
+                var sat = 0.9 + bass * 0.1;
+                var lit = 0.55 + bass * 0.15;
+                var hue = (baseHue + offset) % 360;
+                var rc = hsl2rgb(hue, sat, lit);
+                var hex = '#' + ((1 << 24) + (rc.r << 16) + (rc.g << 8) + rc.b).toString(16).slice(1);
+                return { c: hex, r: rc.r + ',' + rc.g + ',' + rc.b };
+            }
+
+            // Flame flickering mode — base colors shift with fire-like noise
+            if (body.flame) {
+                // Fire palette: feet=deep red, lower=red, torso=white-hot, upper=yellow, skin=bright yellow
+                var fireHues = { feet: 10, lower: 20, torso: 45, upper: 40, skin: 50 };
+                var fireLit  = { feet: 0.40, lower: 0.50, torso: 0.90, upper: 0.65, skin: 0.75 };
+                var fireSat  = { feet: 1.0, lower: 1.0, torso: 0.3, upper: 0.95, skin: 0.8 };
+                var fh = fireHues[zoneName] || 30;
+                var fl = fireLit[zoneName] || 0.6;
+                var fs = fireSat[zoneName] || 0.9;
+                // Flicker: random-ish variation using sin waves at different freqs
+                var flicker = Math.sin(t * 12.3 + (ZONE_HUE_OFFSET[zoneName] || 0) * 0.1) * 0.5
+                            + Math.sin(t * 7.7 + (ZONE_HUE_OFFSET[zoneName] || 0) * 0.2) * 0.3
+                            + Math.sin(t * 19.1) * 0.2;
+                fh += flicker * 12;
+                fl += flicker * 0.12 + bass * 0.1;
+                fl = Math.min(0.95, Math.max(0.3, fl));
+                var fc = hsl2rgb(fh, fs, fl);
+                var fhex = '#' + ((1 << 24) + (fc.r << 16) + (fc.g << 8) + fc.b).toString(16).slice(1);
+                return { c: fhex, r: fc.r + ',' + fc.g + ',' + fc.b };
+            }
+
             if (clothing && clothing[zoneName]) {
                 return { c: clothing[zoneName].color, r: clothing[zoneName].rgb };
             }
@@ -5641,6 +5897,69 @@
             wireCtx.arc(jt.x, jt.y, 1.5 + bass * 1.0, 0, Math.PI * 2);
             wireCtx.fill();
         }
+
+        // --- Skirt rendering ---
+        // Draws a wireframe fan/trapezoid skirt from hipL/hipR to hem points
+        if (body.skirt && joints.hipL && joints.hipR && joints.hip) {
+            var sk = body.skirt;
+            var hemN = sk.hemPoints || 5;
+            var hemY_local = sk.hemY || 0.46;
+            var hemSpread = sk.hemSpread || 0.18;
+            var skSway = sk.sway || 0.03;
+            var skZone = sk.zone || 'lower';
+            var skZc = zoneColor(skZone);
+            var skRgb = skZc.r;
+            var skCol = skZc.c;
+
+            // Generate hem points along the bottom of the skirt
+            var hemPts = [];
+            for (var h = 0; h < hemN; h++) {
+                var frac = hemN > 1 ? h / (hemN - 1) : 0.5;
+                var hx = -hemSpread + frac * hemSpread * 2;
+                // Sway with music and slight wave
+                var sway = Math.sin(t * 2.5 + frac * 3.0) * skSway * (1 + bass * 0.5);
+                hx += sway;
+                var zWob = Math.sin(t * 1.5 + hemY_local * 4.0) * 0.06;
+                var sx = bodyOriginX + hx * bodyScale + zWob * bodyScale * 0.4;
+                var sy = bodyOriginY + hemY_local * bodyScale;
+                hemPts.push({ x: sx, y: sy });
+            }
+
+            // Draw lines from hipL → each hem point and hipR → each hem point
+            var hL = joints.hipL;
+            var hR = joints.hipR;
+            var hipC = joints.hip;
+
+            // Waistband: hipL to hipR (already drawn as bone, but reinforce)
+            // Hem line connecting all hem points
+            wireCtx.strokeStyle = 'rgba(' + skRgb + ',0.6)';
+            wireCtx.lineWidth = baseLineW;
+            wireCtx.shadowBlur = 4;
+            wireCtx.shadowColor = skCol;
+            wireCtx.beginPath();
+            for (var h = 0; h < hemPts.length; h++) {
+                h === 0 ? wireCtx.moveTo(hemPts[h].x, hemPts[h].y)
+                        : wireCtx.lineTo(hemPts[h].x, hemPts[h].y);
+            }
+            wireCtx.stroke();
+
+            // Vertical ribs from waist to hem
+            for (var h = 0; h < hemPts.length; h++) {
+                var anchor = (h < hemPts.length / 2) ? hL : hR;
+                // Center ribs come from hip center
+                if (h === Math.floor(hemPts.length / 2)) anchor = hipC;
+                var ribBright = 0.3 + bass * 0.15;
+                wireCtx.strokeStyle = 'rgba(' + skRgb + ',' + ribBright.toFixed(3) + ')';
+                wireCtx.lineWidth = baseLineW * 0.8;
+                wireCtx.shadowBlur = 3;
+                wireCtx.shadowColor = skCol;
+                wireCtx.beginPath();
+                wireCtx.moveTo(anchor.x, anchor.y);
+                wireCtx.lineTo(hemPts[h].x, hemPts[h].y);
+                wireCtx.stroke();
+            }
+        }
+
         wireCtx.shadowBlur = 0;
     }
 
