@@ -1824,6 +1824,17 @@
         eyeBlinkState.right.start = eyeBlinkState.right.fire = eyeBlinkState.right.end = -1;
     }
 
+    function resetDanceTimestamps() {
+        beatDetector.lastT = 0;
+        beatDetector.onsetTimes = [];
+        beatDetector.prevBass = 0;
+        beatDetector.history = [];
+        beatDetector.histIdx = 0;
+        danceState.lastT = 0;
+        danceState.wallMoveStart = performance.now() * 0.001;
+        danceState._beatStart = beatDetector.beatCount;
+    }
+
     function getEyeBlinkAmount(name) {
         var state = eyeBlinkState[name];
         if (!state || state.start < 0 || state.end <= state.start) return 0;
@@ -2003,6 +2014,7 @@
         // Retry Butterchurn init if audioCtx not ready yet
         if (!initButterchurn()) { scheduleButterchurnRetry(); }
         resetLyricFxState();
+        resetDanceTimestamps();
         updateFxHud();
         startAnim();
         fetchMetadata();
@@ -5822,7 +5834,8 @@
         beatCount:    0,        // total beats counted
         lastBeatInt:  0,        // integer beat count last frame (for edge detect)
         confidence:   0,        // 0..1 how confident in BPM estimate
-        lastT:        0         // last update timestamp
+        lastT:        0,        // last update timestamp
+        effectiveBPM: 120       // octave-corrected BPM for dance (85-170 range)
     };
 
     function updateBeatDetector(bass, nowSec) {
@@ -5868,7 +5881,13 @@
                 }
             }
         }
-        var beatsPerSec = bd.bpm / 60;
+        // Octave-correct BPM into a comfortable dance range (85-170)
+        var danceBPM = bd.bpm;
+        while (danceBPM < 85)  danceBPM *= 2;
+        while (danceBPM > 170) danceBPM /= 2;
+        bd.effectiveBPM = danceBPM;
+
+        var beatsPerSec = bd.effectiveBPM / 60;
         bd.beatPhase += beatsPerSec * dt;
         var newBeatInt = Math.floor(bd.beatPhase);
         if (newBeatInt !== bd.lastBeatInt) {
@@ -6184,12 +6203,21 @@
         crossfading:    false,
         lastLrcIdx:     -1,
         lastSpitIdx:    -1,
-        movePool:       null
+        movePool:       null,
+        lastT:          0,         // real timestamp for dt calc
+        wallMoveStart:  0          // wall-clock time when current move began
     };
 
     function updateDanceSequencer(bass, amp) {
         var ds = danceState;
         var bd = beatDetector;
+
+        // Real delta-time instead of assuming 60fps
+        var now = performance.now() * 0.001;
+        var dt = ds.lastT > 0 ? (now - ds.lastT) : (1/60);
+        ds.lastT = now;
+        if (dt <= 0 || dt > 0.5) dt = 1/60;  // clamp on hide/show gaps
+
         var shouldSwitch = false;
         var lyricChanged = false;
         if (typeof lyricMode !== 'undefined') {
@@ -6211,6 +6239,15 @@
         } else if (lyricChanged && ds.beatsInMove >= 4) {
             shouldSwitch = true;
         }
+        // Wall-clock timeout: if no beat-driven switch has happened in N
+        // seconds, force a switch so we never get stuck on one move forever.
+        // Uses wall time so silence / low-energy sections still rotate moves.
+        var wallAge = now - (ds.wallMoveStart || now);
+        var maxWallSec = (ds.beatsUntilSwitch / Math.max(1, bd.effectiveBPM / 60)) + 4;
+        if (wallAge > maxWallSec && !ds.crossfading) {
+            shouldSwitch = true;
+        }
+
         if (shouldSwitch && !ds.crossfading && ds.movePool && ds.movePool.length > 1) {
             var candidates = [];
             for (var i = 0; i < ds.movePool.length; i++) {
@@ -6230,19 +6267,22 @@
             }
         }
         if (ds.crossfading) {
-            var beatsPerSec = bd.bpm / 60;
-            var fadeRate = beatsPerSec > 0 ? (1 / (ds.crossfadeDur * beatsPerSec)) : 0.02;
-            ds.crossfade += fadeRate;
+            var beatsPerSec = bd.effectiveBPM / 60;
+            // Use real dt so crossfade isn't frame-rate dependent
+            var fadePerSec = beatsPerSec > 0 ? (1 / ds.crossfadeDur) : 1;
+            ds.crossfade += fadePerSec * dt;
             if (ds.crossfade >= 1) {
                 ds.crossfade = 0;
                 ds.crossfading = false;
                 ds.currentMove = ds.nextMove;
                 ds.nextMove = null;
                 ds._beatStart = bd.beatCount;
+                ds.wallMoveStart = now;
             }
         }
-        var beatsPerSec2 = bd.bpm / 60;
-        ds.movePhase += beatsPerSec2 * (1/60);
+        // Advance dance phase using real dt and octave-corrected BPM
+        var beatsPerSec2 = bd.effectiveBPM / 60;
+        ds.movePhase += beatsPerSec2 * dt;
     }
 
     // ---------------------------------------------------------
@@ -6272,6 +6312,7 @@
             if (!inPool) {
                 ds.currentMove = charMoves[0];
                 ds._beatStart = beatDetector.beatCount;
+                ds.wallMoveStart = performance.now() * 0.001;
             }
         }
 
