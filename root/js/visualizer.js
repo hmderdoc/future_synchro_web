@@ -104,6 +104,14 @@
         right: { start: -1, fire: -1, end: -1 }
     };
 
+    // Rhythm blink (snare-driven) — for non-spit characters
+    var rhythmBlink = {
+        prevSnare: 0,           // previous frame snare energy
+        lastBlinkT: 0,          // timestamp of last rhythm blink
+        minGap: 0.22,           // minimum seconds between blinks
+        threshold: 0.08         // minimum delta to trigger
+    };
+
     // Lyric display modes
     var LYRIC_MODE_BOUNCING = 0;
     var LYRIC_MODE_SPITTING = 1;
@@ -2340,6 +2348,36 @@
 
         // Skip rendering when tab is hidden or panel is not visible
         if (bcViz && !document.hidden) bcViz.render();
+        // --- Rhythm blink: detect snare-like transients for non-spit characters ---
+        if (lyricMode !== LYRIC_MODE_SPITTING &&
+            activeChar.headShape !== 'metatronscube' &&
+            headFreqData.length > 0) {
+            // Sample the snare band (~2-8kHz, roughly freqPos 0.15-0.35)
+            var snareE = 0;
+            var s1 = Math.floor(0.15 * headFreqData.length);
+            var s2 = Math.min(headFreqData.length - 1, Math.floor(0.35 * headFreqData.length));
+            for (var si = s1; si <= s2; si++) snareE += headFreqData[si];
+            snareE /= Math.max(1, s2 - s1 + 1);
+
+            var snareDelta = snareE - rhythmBlink.prevSnare;
+            rhythmBlink.prevSnare = snareE;
+
+            if (snareDelta > rhythmBlink.threshold &&
+                snareE > 0.12 &&
+                (vizTime - rhythmBlink.lastBlinkT) > rhythmBlink.minGap) {
+                rhythmBlink.lastBlinkT = vizTime;
+                // Trigger both-eye blink (quick close + open)
+                var blinkClose = 0.04;
+                var blinkOpen  = 0.10;
+                eyeBlinkState.left.start  = vizTime;
+                eyeBlinkState.left.fire   = vizTime + blinkClose;
+                eyeBlinkState.left.end    = vizTime + blinkClose + blinkOpen;
+                eyeBlinkState.right.start = vizTime;
+                eyeBlinkState.right.fire  = vizTime + blinkClose;
+                eyeBlinkState.right.end   = vizTime + blinkClose + blinkOpen;
+            }
+        }
+
         drawHead(amp, bass, vocalPresence, getLyricMouthState(vizTime));
         if (lyricMode === LYRIC_MODE_SPITTING) {
             syncLyricsSpitting();
