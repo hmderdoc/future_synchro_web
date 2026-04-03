@@ -119,6 +119,7 @@
 
     // Spitting lyrics particle system
     var spitParticles = [];  // [{text, x, y, z, vx, vy, vz, spawnTime, alpha, scale}]
+    var smokeParticles = []; // [{text, x, y, puffs[], spawnTime, ...}] cigar smoke words
     var lastSpitWord = -1;   // index of last word spit out
     var spitLineIdx = -1;    // current line being spit
 
@@ -703,6 +704,8 @@
             // Small mouth between/below eyes
             mouth: { y: 0.50, hw: 0.030, z: 0.06, segs: 6,
                      teeth: false, smiley: true },
+            spitStyle: 'smoke',  // cigar smoke words instead of laser spit
+            spitFont: '"Comfortaa", "Arial Rounded MT Bold", sans-serif',  // rounded/bubbly for smoke
             nose: null,
             hair: null,
             hat: null,
@@ -1754,7 +1757,7 @@
         console.log('[visualizer] character: ' + ch.name);
 
         // Spit lyrics only for Vektrax and Metatron; bouncing ball for everyone else
-        if (key === '_default' || key === 'metatron') {
+        if (key === '_default' || key === 'metatron' || ch.spitStyle) {
             lyricMode = LYRIC_MODE_SPITTING;
         } else {
             lyricMode = LYRIC_MODE_BOUNCING;
@@ -1809,6 +1812,7 @@
 
     function resetLyricFxState() {
         spitParticles = [];
+        smokeParticles = [];
         lastSpitWord = -1;
         spitLineIdx = -1;
         wordPositions = [];
@@ -3984,7 +3988,61 @@
         wireCtx.beginPath();
         wireCtx.arc(pts[pts.length-1].x, pts[pts.length-1].y, endRadius, 0, Math.PI * 2);
         wireCtx.fill();
+
+        // === Clippy's Cigar ===
+        // Cigar juts out from right side of mouth, angled down-right
+        var mouthPt = proj(0.03, 0.48, 0.07);  // right of mouth, slightly forward
+        var cigarTip = proj(0.14, 0.44, 0.10);  // tip extends out to the right and down
+        var cigarLen = Math.sqrt(Math.pow(cigarTip.x - mouthPt.x, 2) + Math.pow(cigarTip.y - mouthPt.y, 2));
+
+        // Cigar body — brown cylinder
+        wireCtx.save();
+        wireCtx.lineCap = 'round';
+        wireCtx.strokeStyle = 'rgba(139,90,43,0.85)';
+        wireCtx.lineWidth = 5.5;
+        wireCtx.shadowBlur = 0;
+        wireCtx.shadowColor = 'transparent';
+        wireCtx.beginPath();
+        wireCtx.moveTo(mouthPt.x, mouthPt.y);
+        wireCtx.lineTo(cigarTip.x, cigarTip.y);
+        wireCtx.stroke();
+
+        // Lighter wrapper band near mouth
+        var bandX = mouthPt.x + (cigarTip.x - mouthPt.x) * 0.25;
+        var bandY = mouthPt.y + (cigarTip.y - mouthPt.y) * 0.25;
+        wireCtx.strokeStyle = 'rgba(180,140,80,0.7)';
+        wireCtx.lineWidth = 6;
+        wireCtx.beginPath();
+        wireCtx.moveTo(bandX - (cigarTip.x - mouthPt.x) * 0.06, bandY - (cigarTip.y - mouthPt.y) * 0.06);
+        wireCtx.lineTo(bandX + (cigarTip.x - mouthPt.x) * 0.06, bandY + (cigarTip.y - mouthPt.y) * 0.06);
+        wireCtx.stroke();
+
+        // Ash tip — light gray at the end
+        wireCtx.strokeStyle = 'rgba(180,180,175,0.8)';
+        wireCtx.lineWidth = 5;
+        var ashStart = 0.82;
+        var ashX1 = mouthPt.x + (cigarTip.x - mouthPt.x) * ashStart;
+        var ashY1 = mouthPt.y + (cigarTip.y - mouthPt.y) * ashStart;
+        wireCtx.beginPath();
+        wireCtx.moveTo(ashX1, ashY1);
+        wireCtx.lineTo(cigarTip.x, cigarTip.y);
+        wireCtx.stroke();
+
+        // Ember glow at the very tip
+        var emberPulse = 0.5 + bass * 0.4 + Math.sin(t * 3) * 0.1;
+        wireCtx.fillStyle = 'rgba(255,' + Math.round(120 + bass * 80) + ',30,' + emberPulse.toFixed(2) + ')';
+        wireCtx.shadowBlur = 8 + bass * 10;
+        wireCtx.shadowColor = 'rgba(255,140,30,0.6)';
+        wireCtx.beginPath();
+        wireCtx.arc(cigarTip.x, cigarTip.y, 3.2, 0, Math.PI * 2);
+        wireCtx.fill();
+        wireCtx.restore();
+
+        // Store cigar tip position for smoke particle spawning
+        clippyCigarTip = { x: cigarTip.x, y: cigarTip.y };
     }
+
+    var clippyCigarTip = null;  // updated each frame by drawPaperclipBody
 
     // =========================================================
     //  Googly Eye Renderer (Clippy-style big white circles with rolling pupil)
@@ -7178,12 +7236,23 @@
         }
 
         // Render all particles
-        renderSpitParticles(now, w, h, fontFamily, scheme);
-        renderEyeLasers(now);
-        renderWordExplosions(now);
+        if (activeChar.spitStyle === 'smoke') {
+            renderSmokeParticles(now, w, h, fontFamily, scheme);
+            // No lasers or word explosions for smoke style
+        } else {
+            renderSpitParticles(now, w, h, fontFamily, scheme);
+            renderEyeLasers(now);
+            renderWordExplosions(now);
+        }
     }
 
     function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
+        // --- Smoke style: cigar smoke words for Clippy etc. ---
+        if (activeChar.spitStyle === 'smoke') {
+            spawnSmokeWord(text, scheme, fontFamily, time, w, h, secondsPerWord);
+            return;
+        }
+
         var projState = headProjectionState || buildProjectionState(w, h);
         var mouthPoint = eyeScreenPoints.mouth || (activeChar.mouth ? projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, projState.pulse || 1) : { x: w / 2, y: h / 2, d: 1 });
         var spawnX = mouthPoint.x;
@@ -7217,6 +7286,59 @@
             secondsPerWord: secondsPerWord,
             laserTriggered: false,
             laserHitTime: 0
+        });
+    }
+
+    // === Cigar Smoke Word Spawner ===
+    function spawnSmokeWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
+        // Spawn from cigar tip if available, otherwise mouth
+        var spawnX, spawnY;
+        if (clippyCigarTip) {
+            spawnX = clippyCigarTip.x;
+            spawnY = clippyCigarTip.y;
+        } else {
+            var projState = headProjectionState || buildProjectionState(w, h);
+            var mp = eyeScreenPoints.mouth || { x: w / 2, y: h / 2 };
+            spawnX = mp.x + 30;
+            spawnY = mp.y;
+        }
+
+        // Use character's spitFont if available, otherwise default
+        var smokeFont = (activeChar && activeChar.spitFont) ? activeChar.spitFont : fontFamily;
+
+        // Smoke shoots UP-RIGHT away from face quickly, then decelerates
+        var driftAngle = -Math.PI * 0.35 + (Math.random() - 0.5) * 0.5;  // up-right (~55 deg)
+        var speed = 70 + Math.random() * 50;  // fast initial burst
+
+        // Pre-compute per-letter scatter seeds for dispersal effect
+        var letters = text.split('');
+        var scatterSeeds = [];
+        for (var i = 0; i < letters.length; i++) {
+            scatterSeeds.push({
+                dx: (Math.random() - 0.5) * 2,   // lateral scatter direction
+                dy: (Math.random() - 0.5) * 2,   // vertical scatter direction
+                rot: (Math.random() - 0.5) * 0.8, // per-letter rotation
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        smokeParticles.push({
+            id: ++spitParticleSeq,
+            text: text,
+            letters: letters,
+            scatterSeeds: scatterSeeds,
+            x: spawnX + (Math.random() - 0.5) * 4,
+            y: spawnY + (Math.random() - 0.5) * 3,
+            vx: Math.cos(driftAngle) * speed,
+            vy: Math.sin(driftAngle) * speed,
+            wanderPhase: Math.random() * Math.PI * 2,
+            wanderSpeed: 1.0 + Math.random() * 1.0,
+            wanderAmp: 10 + Math.random() * 15,
+            spawnTime: time,
+            lifetime: 2.8 + Math.random() * 0.8,  // shorter than before
+            maxScale: 0.9 + Math.random() * 0.4,
+            fontFamily: smokeFont,
+            scheme: scheme
         });
     }
 
@@ -7532,6 +7654,202 @@
         wordExplosions = activeExplosions;
     }
 
+
+    // =========================================================
+    //  Cigar Smoke Lyric Renderer
+    //  Per-letter dispersal: letters scatter apart like real smoke
+    // =========================================================
+    function renderSmokeParticles(now, w, h, defaultFontFamily, defaultScheme) {
+        if (!karaokeCtx) return;
+
+        var active = [];
+        var dt = 1 / 60;
+
+        for (var i = 0; i < smokeParticles.length; i++) {
+            var p = smokeParticles[i];
+            var age = now - p.spawnTime;
+            if (age > p.lifetime) continue;
+
+            var progress = age / p.lifetime;  // 0..1
+
+            // Physics: fast initial burst, strong deceleration (smoke drag)
+            p.x += p.vx * dt + Math.sin(p.wanderPhase + age * p.wanderSpeed) * p.wanderAmp * dt;
+            p.y += p.vy * dt;
+            // Heavy drag so words clear the face fast then slow down
+            p.vx *= 0.975;
+            p.vy *= 0.978;
+
+            // Skip if off screen
+            if (p.x < -200 || p.x > w + 200 || p.y < -200 || p.y > h + 200) continue;
+
+            active.push(p);
+
+            // === Smoke scale ===
+            var scaleRamp;
+            if (progress < 0.10) {
+                scaleRamp = progress / 0.10;  // quick materialize
+            } else if (progress < 0.4) {
+                scaleRamp = 1.0 + (progress - 0.10) * 0.3;
+            } else {
+                scaleRamp = 1.09 + (progress - 0.4) * 0.8;  // gentle expand
+            }
+            var scale = scaleRamp * p.maxScale;
+
+            // === Alpha: quick fade in, brief hold, then dissolve ===
+            var alpha;
+            if (progress < 0.06) {
+                alpha = progress / 0.06;
+            } else if (progress < 0.35) {
+                alpha = 1.0;
+            } else {
+                alpha = 1.0 - (progress - 0.35) / 0.65;
+            }
+            alpha = Math.max(0, Math.min(1, alpha));
+
+            // Font size
+            var baseSize = Math.min(42, Math.max(20, h * 0.05));
+            var fontSize = baseSize * scale;
+
+            // Smoke color: warm gray-white
+            var warmth = Math.sin(age * 0.8) * 0.1;
+            var gray = Math.round(195 + warmth * 25);
+            var smokeR = Math.min(255, gray + 12);
+            var smokeG = gray;
+            var smokeB = Math.max(175, gray - 8);
+
+            // Per-letter scatter intensity: 0 at birth, ramps up as smoke disperses
+            var scatter = 0;
+            if (progress > 0.2) {
+                scatter = (progress - 0.2) / 0.8;  // 0..1 ramp after 20% life
+                scatter = scatter * scatter;        // ease-in (quadratic)
+            }
+            var scatterPx = scatter * 35;  // max scatter distance in pixels
+            var blurExtra = scatter * 18;   // extra blur as letters drift
+
+            // Overall word rotation drift
+            var wordRot = Math.sin(p.wanderPhase + age * 0.35) * 0.05 * (1 + scatter);
+
+            karaokeCtx.save();
+            karaokeCtx.translate(p.x, p.y);
+            karaokeCtx.rotate(wordRot);
+
+            var font = Math.round(fontSize) + 'px ' + (p.fontFamily || defaultFontFamily);
+            karaokeCtx.font = font;
+            karaokeCtx.textBaseline = 'middle';
+
+            // Measure total width for centering
+            var letters = p.letters || p.text.split('');
+            var seeds = p.scatterSeeds || [];
+            var charWidths = [];
+            var totalW = 0;
+            for (var li = 0; li < letters.length; li++) {
+                var cw = karaokeCtx.measureText(letters[li]).width;
+                charWidths.push(cw);
+                totalW += cw;
+            }
+            // Add scatter-based letter spacing expansion
+            var extraSpacing = scatter * 6;  // pixels between letters grows
+            totalW += extraSpacing * (letters.length - 1);
+
+            var cx = -totalW / 2;  // start x (centered)
+
+            for (var li = 0; li < letters.length; li++) {
+                var seed = seeds[li] || { dx: 0, dy: 0, rot: 0, phase: 0 };
+                // Per-letter offset: grows with scatter
+                var lx = cx + charWidths[li] / 2;
+                var ox = seed.dx * scatterPx + Math.sin(seed.phase + age * 1.5) * scatter * 3;
+                var oy = seed.dy * scatterPx + Math.cos(seed.phase + age * 1.2) * scatter * 2;
+                var lr = seed.rot * scatter;  // per-letter rotation
+
+                // Per-letter alpha: slight variation for organic feel
+                var la = alpha * (1.0 - scatter * 0.3 * Math.abs(seed.dx));
+                la = Math.max(0, la);
+
+                karaokeCtx.save();
+                karaokeCtx.translate(lx + ox, oy);
+                karaokeCtx.rotate(lr);
+
+                // Smoky glow shadow
+                karaokeCtx.shadowColor = 'rgba(' + smokeR + ',' + smokeG + ',' + smokeB + ',' + (la * 0.4).toFixed(2) + ')';
+                karaokeCtx.shadowBlur = 14 + blurExtra + progress * 12;
+
+                // Main fill
+                karaokeCtx.globalAlpha = la * 0.85;
+                karaokeCtx.fillStyle = 'rgba(' + smokeR + ',' + smokeG + ',' + smokeB + ',' + la.toFixed(2) + ')';
+                karaokeCtx.textAlign = 'center';
+                karaokeCtx.fillText(letters[li], 0, 0);
+
+                // Faint volume/thickness pass
+                if (la > 0.15) {
+                    karaokeCtx.globalAlpha = la * 0.22;
+                    karaokeCtx.shadowBlur = 20 + blurExtra + progress * 15;
+                    karaokeCtx.fillText(letters[li], 1.2, -0.8);
+                }
+
+                karaokeCtx.restore();
+
+                cx += charWidths[li] + extraSpacing;
+            }
+
+            karaokeCtx.restore();
+        }
+
+        smokeParticles = active;
+
+        // Draw ambient smoke wisps rising from cigar (even when no lyrics)
+        if (clippyCigarTip) {
+            drawCigarWisps(now);
+        }
+    }
+
+    // Ambient smoke wisps — tiny non-text puffs that always rise from the cigar
+    var cigarWisps = [];
+    function drawCigarWisps(now) {
+        if (!karaokeCtx || !clippyCigarTip) return;
+
+        // Spawn new wisps periodically
+        if (cigarWisps.length < 6 && Math.random() < 0.08) {
+            cigarWisps.push({
+                x: clippyCigarTip.x + (Math.random() - 0.5) * 4,
+                y: clippyCigarTip.y,
+                vx: (Math.random() - 0.5) * 8,
+                vy: -12 - Math.random() * 18,
+                size: 2 + Math.random() * 3,
+                spawnTime: now,
+                lifetime: 1.2 + Math.random() * 1.0,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        var active = [];
+        for (var i = 0; i < cigarWisps.length; i++) {
+            var w = cigarWisps[i];
+            var age = now - w.spawnTime;
+            if (age > w.lifetime) continue;
+
+            var progress = age / w.lifetime;
+            w.x += w.vx * (1/60) + Math.sin(w.phase + age * 2.5) * 0.4;
+            w.y += w.vy * (1/60);
+            w.vy *= 0.99;
+            w.size += 0.03;
+
+            var alpha = progress < 0.1 ? progress / 0.1 : (1 - (progress - 0.1) / 0.9);
+            alpha = Math.max(0, alpha) * 0.35;
+
+            karaokeCtx.save();
+            karaokeCtx.globalAlpha = alpha;
+            karaokeCtx.fillStyle = 'rgba(200,200,195,0.5)';
+            karaokeCtx.shadowBlur = 6;
+            karaokeCtx.shadowColor = 'rgba(200,200,195,0.3)';
+            karaokeCtx.beginPath();
+            karaokeCtx.arc(w.x, w.y, w.size * (1 + progress * 1.5), 0, Math.PI * 2);
+            karaokeCtx.fill();
+            karaokeCtx.restore();
+
+            active.push(w);
+        }
+        cigarWisps = active;
+    }
 
     function renderSpitParticles(now, w, h, defaultFontFamily, defaultScheme) {
         var PARTICLE_LIFETIME = 3.0;  // seconds
