@@ -441,6 +441,29 @@ async function getMailBody(id) {
         tgt.hidden = false;
         if (typeof renderAllBinIcons === 'function') renderAllBinIcons(tgt);
         if (typeof renderAnsiCanvases === 'function') renderAnsiCanvases(tgt);
+
+        // Mark as read: update list item styling + decrement navbar badge
+        if (data.was_unread) {
+            var li = document.getElementById('li-' + id);
+            if (li) {
+                li.classList.remove('unread');
+                li.classList.add('read');
+                var newBadge = li.querySelector('.badge.new');
+                if (newBadge) newBadge.remove();
+            }
+            // Decrement navbar unread mail badges immediately
+            ['badge-unread-mail', 'badge-unread-mail-inner'].forEach(function (bid) {
+                var el = document.getElementById(bid);
+                if (!el) return;
+                var c = parseInt(el.textContent, 10);
+                if (isNaN(c) || c <= 1) {
+                    el.textContent = '';
+                    el.style.display = 'none';
+                } else {
+                    el.textContent = String(c - 1);
+                }
+            });
+        }
     }
 }
 
