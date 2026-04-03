@@ -329,7 +329,13 @@
                 glowWidth: 6,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                clothingNote: 'blue_tshirt_gray_shorts_white_tennisshoes'
+                clothing: {
+                    upper: { color: '#4499FF', rgb: '68,153,255' },
+                    skin : { color: '#FFCC88', rgb: '255,204,136' },
+                    torso: { color: '#4499FF', rgb: '68,153,255' },
+                    lower: { color: '#8899AA', rgb: '136,153,170' },
+                    feet : { color: '#CCDDFF', rgb: '204,221,255' }
+                },
             }
         },
 
@@ -421,11 +427,13 @@
                 glowWidth: 6,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                // Clothing zones for future rendering:
-                // shirt: plaid pattern, red/brown tones, long sleeves, collar
-                // pants: blue jeans
-                // boots: brown cowboy boots with slight heel
-                clothingNote: 'plaid_shirt_jeans_cowboy_boots'
+                clothing: {
+                    upper: { color: '#CC6633', rgb: '204,102,51' },
+                    skin:  { color: '#CC6633', rgb: '204,102,51' },
+                    torso: { color: '#CC6633', rgb: '204,102,51' },
+                    lower: { color: '#4477BB', rgb: '68,119,187' },
+                    feet:  { color: '#AA7733', rgb: '170,119,51' }
+                },
             }
         },
 
@@ -693,7 +701,13 @@
                 glowWidth: 5,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                clothingNote: 'dark_gray_suit_white_shirt_gray_tie_slim'
+                clothing: {
+                    upper: { color: '#556677', rgb: '85,102,119' },
+                    skin : { color: '#DDBB99', rgb: '221,187,153' },
+                    torso: { color: '#BBCCDD', rgb: '187,204,221' },
+                    lower: { color: '#556677', rgb: '85,102,119' },
+                    feet : { color: '#334455', rgb: '51,68,85' }
+                },
             }
         },
         donaldtrump: {
@@ -811,7 +825,13 @@
                 glowWidth: 7,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                clothingNote: 'blue_suit_white_shirt_red_tie_brown_shoes_stocky'
+                clothing: {
+                    upper: { color: '#3355AA', rgb: '51,85,170' },
+                    skin : { color: '#FFBB88', rgb: '255,187,136' },
+                    torso: { color: '#CC2222', rgb: '204,34,34' },
+                    lower: { color: '#3355AA', rgb: '51,85,170' },
+                    feet : { color: '#886633', rgb: '136,102,51' }
+                },
             }
         },
         robocop: {
@@ -898,7 +918,13 @@
                 glowWidth: 8,
                 scanSpeed: 0.002,
                 moves: ['robot', 'two_step', 'shuffle', 'raise_the_roof'],
-                clothingNote: 'metallic_armor_plating_mechanical'
+                clothing: {
+                    upper: { color: '#99AACC', rgb: '153,170,204' },
+                    skin : { color: '#99AACC', rgb: '153,170,204' },
+                    torso: { color: '#7788BB', rgb: '119,136,187' },
+                    lower: { color: '#7788AA', rgb: '119,136,170' },
+                    feet : { color: '#667799', rgb: '102,119,153' }
+                },
             }
         },
         data: {
@@ -1011,7 +1037,13 @@
                 glowWidth: 6,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                clothingNote: 'starfleet_tng_gold_black_uniform'
+                clothing: {
+                    upper: { color: '#FFCC33', rgb: '255,204,51' },
+                    skin : { color: '#E8DDB8', rgb: '232,221,184' },
+                    torso: { color: '#FFCC33', rgb: '255,204,51' },
+                    lower: { color: '#2A2A3A', rgb: '42,42,58' },
+                    feet : { color: '#2A2A3A', rgb: '42,42,58' }
+                },
             }
         },
         cinder: {
@@ -1354,7 +1386,13 @@
                 glowWidth: 6,
                 scanSpeed: 0.003,
                 moves: ['idle_sway', 'two_step', 'running_man', 'cabbage_patch', 'robot', 'raise_the_roof', 'shuffle', 'disco_point'],
-                clothingNote: 'african_shirt_red_green_yellow_baggy_tan_shorts_sandals'
+                clothing: {
+                    upper: { color: '#CC3322', rgb: '204,51,34' },
+                    skin : { color: '#AA7744', rgb: '170,119,68' },
+                    torso: { color: '#33AA44', rgb: '51,170,68' },
+                    lower: { color: '#CCAA66', rgb: '204,170,102' },
+                    feet : { color: '#AA8844', rgb: '170,136,68' }
+                },
             }
         }
     };
@@ -5516,6 +5554,36 @@
             joints[name] = { x: screenX, y: screenY, localY: j.y };
         }
 
+        // --- Clothing zone map ---
+        // Maps each bone index to a clothing zone for per-segment coloring.
+        // Bones: 0-1 neck-shoulders, 2 chest, 3-4 upper arms, 5-6 forearms,
+        //        7 torso center, 8-9 waist, 10-11 thighs, 12-13 shins/feet
+        var BONE_ZONES = ['upper','upper','upper','upper','upper','skin','skin',
+                          'torso','lower','lower','lower','lower','feet','feet'];
+        // Joint-to-zone map for vertex flares
+        var JOINT_ZONES = {
+            neck: 'upper', shoulderL: 'upper', shoulderR: 'upper',
+            elbowL: 'upper', elbowR: 'upper',
+            handL: 'skin', handR: 'skin',
+            hip: 'lower', hipL: 'lower', hipR: 'lower',
+            kneeL: 'lower', kneeR: 'lower',
+            footL: 'feet', footR: 'feet'
+        };
+
+        var clothing = body.clothing || null;
+
+        // Resolve zone color: returns {c: hexColor, r: rgbString}
+        function zoneColor(zoneName) {
+            if (clothing && clothing[zoneName]) {
+                return { c: clothing[zoneName].color, r: clothing[zoneName].rgb };
+            }
+            // 'torso' falls back to 'upper' if not defined
+            if (zoneName === 'torso' && clothing && clothing.upper) {
+                return { c: clothing.upper.color, r: clothing.upper.rgb };
+            }
+            return { c: color, r: rgb };
+        }
+
         // --- Vectrex phosphor beam rendering ---
         var bones = body.bones;
         var totalBones = bones.length;
@@ -5526,6 +5594,13 @@
             var j0 = joints[bones[b][0]];
             var j1 = joints[bones[b][1]];
             if (!j0 || !j1) continue;
+
+            // Per-bone clothing zone color
+            var zone = BONE_ZONES[b] || 'upper';
+            var zc = zoneColor(zone);
+            var boneColor = zc.c;
+            var boneRgb   = zc.r;
+
             var bonePhase = (bodyBeamPhase + b / totalBones) % 1.0;
             var timeSinceScan = bonePhase;
             var brightness = Math.max(0.15, 1.0 - timeSinceScan * 0.85);
@@ -5534,32 +5609,34 @@
             glowBrightness = Math.min(1, glowBrightness + bass * 0.2);
 
             if (glowBrightness > 0.05) {
-                wireCtx.strokeStyle = 'rgba(' + rgb + ',' + (glowBrightness * 0.25).toFixed(3) + ')';
+                wireCtx.strokeStyle = 'rgba(' + boneRgb + ',' + (glowBrightness * 0.25).toFixed(3) + ')';
                 wireCtx.lineWidth = glowW + bass * 3;
                 wireCtx.shadowBlur = 12 + bass * 8;
-                wireCtx.shadowColor = color;
+                wireCtx.shadowColor = boneColor;
                 wireCtx.beginPath();
                 wireCtx.moveTo(j0.x, j0.y);
                 wireCtx.lineTo(j1.x, j1.y);
                 wireCtx.stroke();
             }
-            wireCtx.strokeStyle = 'rgba(' + rgb + ',' + brightness.toFixed(3) + ')';
+            wireCtx.strokeStyle = 'rgba(' + boneRgb + ',' + brightness.toFixed(3) + ')';
             wireCtx.lineWidth = baseLineW;
             wireCtx.shadowBlur = 4 + glowBrightness * 6;
-            wireCtx.shadowColor = color;
+            wireCtx.shadowColor = boneColor;
             wireCtx.beginPath();
             wireCtx.moveTo(j0.x, j0.y);
             wireCtx.lineTo(j1.x, j1.y);
             wireCtx.stroke();
         }
 
-        // Joint vertex flares
+        // Joint vertex flares (colored by zone)
         for (var name in joints) {
             var jt = joints[name];
+            var jZone = JOINT_ZONES[name] || 'upper';
+            var jzc = zoneColor(jZone);
             var jBright = 0.3 + bass * 0.2;
-            wireCtx.fillStyle = 'rgba(' + rgb + ',' + jBright.toFixed(3) + ')';
+            wireCtx.fillStyle = 'rgba(' + jzc.r + ',' + jBright.toFixed(3) + ')';
             wireCtx.shadowBlur = 6;
-            wireCtx.shadowColor = color;
+            wireCtx.shadowColor = jzc.c;
             wireCtx.beginPath();
             wireCtx.arc(jt.x, jt.y, 1.5 + bass * 1.0, 0, Math.PI * 2);
             wireCtx.fill();
