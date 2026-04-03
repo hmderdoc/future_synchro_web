@@ -3407,9 +3407,114 @@
     //  Paperclip Body Renderer (Clippy)
     // =========================================================
     // ===== Metatron's Cube — Sacred Geometry Renderer =====
+    // Dynamic accordion expansion, random rotation targets, beat-reactive scale
+
+    // --- Persistent state for Metatron animations ---
+    var metatronState = {
+        // Rotation: current angles and target angles
+        rotX: 0.12, rotY: 0, rotZ: 0,
+        targetRotX: 0.3, targetRotY: 1.0, targetRotZ: 0,
+        rotSpeed: 0.15,           // radians/sec toward target
+        // State machine: 'idle' -> 'expanding' -> 'frozen' -> 'shrinking' -> 'idle'
+        phase: 'idle',
+        phaseTimer: 0,            // seconds spent in current phase
+        // Accordion
+        accordionPhase: 0,        // 0 = collapsed (sphere), 1 = fully expanded
+        // Phase durations (seconds)
+        idleDuration: 8.0,        // long spherical rotation period
+        expandDuration: 0.35,     // quick snap open
+        frozenDuration: 0.8,      // brief hold at full expansion
+        shrinkDuration: 2.0,      // moderate collapse back
+        // Scale
+        scalePulse: 1.0,
+        // Rotation target scheduling
+        lastRotChangeBeat: -99,
+        rotChangeCooldown: 4,     // beats between rotation target changes during idle
+        // Time tracking
+        lastT: 0
+    };
 
     function drawMetatronsCube(char, proj, amp, bass) {
         var t = performance.now() * 0.001;
+        var ms = metatronState;
+        var bd = beatDetector;
+        var dt = ms.lastT > 0 ? Math.min(t - ms.lastT, 0.1) : (1/60);
+        ms.lastT = t;
+
+        // === State machine: idle -> expanding -> frozen -> shrinking -> idle ===
+        var currentBeat = bd.beatCount;
+        var beatFrac = bd.beatPhase % 1;
+        ms.phaseTimer += dt;
+
+        if (ms.phase === 'idle') {
+            // Sphere mode: accordion stays at 0, rotation happens
+            ms.accordionPhase = Math.max(0, ms.accordionPhase - 3.0 * dt);
+
+            // Random rotation target changes during idle
+            if (currentBeat - ms.lastRotChangeBeat >= ms.rotChangeCooldown) {
+                if (beatFrac < 0.15) {
+                    ms.targetRotX = (Math.random() - 0.5) * 1.2;
+                    ms.targetRotY = ms.rotY + (Math.random() * 2.5 + 1.0) * (Math.random() < 0.5 ? 1 : -1);
+                    ms.targetRotZ = (Math.random() - 0.5) * 0.6;
+                    ms.lastRotChangeBeat = currentBeat;
+                    ms.rotSpeed = 0.3 + amp * 0.8 + bass * 0.5;
+                }
+            }
+
+            // Transition to expanding after idle duration
+            if (ms.phaseTimer >= ms.idleDuration) {
+                ms.phase = 'expanding';
+                ms.phaseTimer = 0;
+            }
+        } else if (ms.phase === 'expanding') {
+            // Quick snap open
+            ms.accordionPhase = Math.min(1, ms.accordionPhase + dt / ms.expandDuration);
+
+            if (ms.accordionPhase >= 0.99) {
+                ms.accordionPhase = 1.0;
+                ms.phase = 'frozen';
+                ms.phaseTimer = 0;
+            }
+        } else if (ms.phase === 'frozen') {
+            // Hold at full expansion briefly
+            ms.accordionPhase = 1.0;
+
+            if (ms.phaseTimer >= ms.frozenDuration) {
+                ms.phase = 'shrinking';
+                ms.phaseTimer = 0;
+            }
+        } else if (ms.phase === 'shrinking') {
+            // Collapse back to sphere
+            ms.accordionPhase = Math.max(0, ms.accordionPhase - dt / ms.shrinkDuration);
+
+            if (ms.accordionPhase <= 0.01) {
+                ms.accordionPhase = 0;
+                ms.phase = 'idle';
+                ms.phaseTimer = 0;
+                // Pick a fresh rotation target for the new idle period
+                ms.targetRotX = (Math.random() - 0.5) * 1.2;
+                ms.targetRotY = ms.rotY + (Math.random() * 3.0 + 1.5) * (Math.random() < 0.5 ? 1 : -1);
+                ms.targetRotZ = (Math.random() - 0.5) * 0.6;
+                ms.rotSpeed = 0.25 + Math.random() * 0.4;
+                ms.lastRotChangeBeat = currentBeat;
+            }
+        }
+
+        // === Animate rotation toward target (linear interpolation) ===
+        var rotLerp = Math.min(1, ms.rotSpeed * dt);
+        ms.rotX += (ms.targetRotX - ms.rotX) * rotLerp;
+        ms.rotY += (ms.targetRotY - ms.rotY) * rotLerp;
+        ms.rotZ += (ms.targetRotZ - ms.rotZ) * rotLerp;
+
+        // === Accordion easing ===
+        var accEased = ms.accordionPhase * ms.accordionPhase * (3 - 2 * ms.accordionPhase);
+        var accordionSep = accEased * 2.0; // max separation = 2x sphere radius
+
+        // === Scale: bass/amp pulsing + accordion boost ===
+        var beatPulse = 1.0 + bass * 0.6 + amp * 0.3;
+        var accordionScale = 1.0 + accEased * 0.8;
+        var totalScale = beatPulse * accordionScale;
+        ms.scalePulse += (totalScale - ms.scalePulse) * Math.min(1, 4.0 * dt);
 
         // === Color cycling: slow hue rotation ===
         var hue = (t * 0.035) % 1.0;
@@ -3430,26 +3535,26 @@
                 b: Math.round((b + m) * 255)
             };
         }
-        var pri = hsl2rgb(hue, 0.88, 0.48);
-        var acc = hsl2rgb(hue, 0.78, 0.68);
+        // Shift hue toward warmer during expansion
+        var dynHue = (hue + accEased * 0.08) % 1.0;
+        var pri = hsl2rgb(dynHue, 0.88, 0.42 + bass * 0.12);
+        var acc = hsl2rgb(dynHue, 0.78, 0.62 + amp * 0.10);
         var cRGB = pri.r + ',' + pri.g + ',' + pri.b;
         var aRGB = acc.r + ',' + acc.g + ',' + acc.b;
         var cHex = 'rgb(' + cRGB + ')';
         var aHex = 'rgb(' + aRGB + ')';
 
-        // === Full 3D Metatron's Cube: mirrored front + back ===
-        // 26 nodes total on a sphere surface:
-        //   [0] = front pole, [1-6] = inner front, [7-12] = outer front
-        //   [13] = back pole, [14-19] = inner back, [20-25] = outer back
-        // Front and back are mirror images -> looks the same from any angle.
-
-        var S = 0.40;  // sphere radius
-        var colatInner = 38 * Math.PI / 180;  // inner ring ~38° from poles
-        var colatOuter = 64 * Math.PI / 180;  // outer ring ~64° from poles
+        // === 3D Geometry: 26 nodes on sphere ===
+        var S = 0.40 * ms.scalePulse;  // sphere radius (dynamic)
+        var colatInner = 38 * Math.PI / 180;
+        var colatOuter = 64 * Math.PI / 180;
 
         var nodes = [];
+        var nodeZBase = []; // store original z for accordion offset
+
         // Front pole
         nodes.push({x: 0, y: 0, z: S});
+        nodeZBase.push(1);  // front = positive z
         // Inner front ring
         for (var i = 0; i < 6; i++) {
             var phi = (i * 60 + 90) * Math.PI / 180;
@@ -3458,6 +3563,7 @@
                 y: S * Math.sin(colatInner) * Math.sin(phi),
                 z: S * Math.cos(colatInner)
             });
+            nodeZBase.push(1); // front hemisphere
         }
         // Outer front ring
         for (var i = 0; i < 6; i++) {
@@ -3467,10 +3573,12 @@
                 y: S * Math.sin(colatOuter) * Math.sin(phi),
                 z: S * Math.cos(colatOuter)
             });
+            nodeZBase.push(1); // front hemisphere
         }
         // Back pole (mirror)
         nodes.push({x: 0, y: 0, z: -S});
-        // Inner back ring (mirror z)
+        nodeZBase.push(-1); // back hemisphere
+        // Inner back ring
         for (var i = 0; i < 6; i++) {
             var phi = (i * 60 + 90) * Math.PI / 180;
             nodes.push({
@@ -3478,8 +3586,9 @@
                 y: S * Math.sin(colatInner) * Math.sin(phi),
                 z: -S * Math.cos(colatInner)
             });
+            nodeZBase.push(-1);
         }
-        // Outer back ring (mirror z)
+        // Outer back ring
         for (var i = 0; i < 6; i++) {
             var phi = (i * 60 + 90) * Math.PI / 180;
             nodes.push({
@@ -3487,38 +3596,42 @@
                 y: S * Math.sin(colatOuter) * Math.sin(phi),
                 z: -S * Math.cos(colatOuter)
             });
+            nodeZBase.push(-1);
         }
 
-        // 3D rotation: steady Y spin + gentle X wobble
-        var rotY = t * 0.15;
-        var rotX = Math.sin(t * 0.07) * 0.25 + 0.12;
-        var cosRY = Math.cos(rotY), sinRY = Math.sin(rotY);
-        var cosRX = Math.cos(rotX), sinRX = Math.sin(rotX);
+        // === 3D Rotation ===
+        var cosRY = Math.cos(ms.rotY), sinRY = Math.sin(ms.rotY);
+        var cosRX = Math.cos(ms.rotX), sinRX = Math.sin(ms.rotX);
+        var cosRZ = Math.cos(ms.rotZ), sinRZ = Math.sin(ms.rotZ);
 
         function rot3d(px, py, pz) {
-            var x1 = px * cosRY + pz * sinRY;
-            var z1 = -px * sinRY + pz * cosRY;
-            var y2 = py * cosRX - z1 * sinRX;
-            var z2 = py * sinRX + z1 * cosRX;
+            // Z rotation
+            var x0 = px * cosRZ - py * sinRZ;
+            var y0 = px * sinRZ + py * cosRZ;
+            // Y rotation
+            var x1 = x0 * cosRY + pz * sinRY;
+            var z1 = -x0 * sinRY + pz * cosRY;
+            // X rotation
+            var y2 = y0 * cosRX - z1 * sinRX;
+            var z2 = y0 * sinRX + z1 * cosRX;
             return { x: x1, y: y2, z: z2 };
         }
 
-        var breathe = 1 + bass * 0.05;
-
-        // Project all 26 nodes
+        // === Project all 26 nodes with accordion separation ===
         var pts = [];
         for (var p = 0; p < nodes.length; p++) {
             var nd = nodes[p];
             var px = nd.x, py = nd.y, pz = nd.z;
 
-            // Per-node freq wiggle
+            // Accordion: push front nodes forward, back nodes backward along Z
+            pz += nodeZBase[p] * accordionSep * S;
+
+            // Per-node freq wiggle (subtle)
             var fpos = (p % 13) / 13;
             var fval = getFreqSample(fpos);
             var wa = t * 1.8 + p * 1.1;
-            px += Math.sin(wa) * fval * 0.005;
-            py += Math.cos(wa * 0.7) * fval * 0.005;
-
-            px *= breathe; py *= breathe; pz *= breathe;
+            px += Math.sin(wa) * fval * 0.008 * ms.scalePulse;
+            py += Math.cos(wa * 0.7) * fval * 0.008 * ms.scalePulse;
 
             var r = rot3d(px, py, pz);
             pts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
@@ -3527,15 +3640,8 @@
         wireCtx.lineCap = 'round';
         wireCtx.lineJoin = 'round';
 
-        // === Build connection list ===
-        // Front face: all 78 pairs among [0..12]
-        // Back face: all 78 pairs among [13..25]
-        // Cross connections: pole-pole + corresponding ring nodes
-        // We batch by visual category for performance.
-
-        // Helper: classify a pair within a 13-node face
+        // === Connection classification ===
         function classifyFacePair(a, b) {
-            // a, b are local indices 0-12 within one face
             if (a > b) { var tmp = a; a = b; b = tmp; }
             var isOuterEdge = (a >= 7 && b >= 7 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
             var isInnerEdge = (a >= 1 && a <= 6 && b >= 1 && b <= 6 && (Math.abs(a - b) === 1 || Math.abs(a - b) === 5));
@@ -3551,46 +3657,51 @@
             return 'web';
         }
 
+        // Intensity multiplier during accordion expansion — everything glows brighter
+        var expandGlow = 1.0 + accEased * 0.6;
+
         function drawLine(ai, bi, cls) {
             var shimmer = getFreqSample(((ai * 7 + bi * 3) % 13) / 13);
             var alpha, lw;
 
             if (cls === 'star') {
                 var treble = getFreqSample(0.82);
-                alpha = 0.32 + treble * 0.32;
-                lw = 1.3 + treble * 0.5;
-                wireCtx.shadowBlur = 7 + treble * 12;
+                alpha = (0.32 + treble * 0.32) * expandGlow;
+                lw = (1.3 + treble * 0.5) * (1 + accEased * 0.3);
+                wireCtx.shadowBlur = (7 + treble * 12) * expandGlow;
                 wireCtx.shadowColor = aHex;
                 wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             } else if (cls === 'outer') {
-                alpha = 0.28 + bass * 0.28;
-                lw = 1.1 + bass * 0.4;
-                wireCtx.shadowBlur = 5 + bass * 9;
+                alpha = (0.28 + bass * 0.28) * expandGlow;
+                lw = (1.1 + bass * 0.4) * (1 + accEased * 0.25);
+                wireCtx.shadowBlur = (5 + bass * 9) * expandGlow;
                 wireCtx.shadowColor = aHex;
                 wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             } else if (cls === 'inner') {
                 var midF = getFreqSample(0.45);
-                alpha = 0.22 + midF * 0.28;
-                lw = 0.9 + midF * 0.35;
-                wireCtx.shadowBlur = 4 + midF * 7;
+                alpha = (0.22 + midF * 0.28) * expandGlow;
+                lw = (0.9 + midF * 0.35) * (1 + accEased * 0.2);
+                wireCtx.shadowBlur = (4 + midF * 7) * expandGlow;
                 wireCtx.shadowColor = cHex;
                 wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             } else if (cls === 'spoke') {
-                alpha = 0.10 + amp * 0.12 + shimmer * 0.06;
-                lw = 0.5 + amp * 0.25;
-                wireCtx.shadowBlur = 2 + amp * 5;
+                alpha = (0.10 + amp * 0.12 + shimmer * 0.06) * expandGlow;
+                lw = (0.5 + amp * 0.25) * (1 + accEased * 0.15);
+                wireCtx.shadowBlur = (2 + amp * 5) * expandGlow;
                 wireCtx.shadowColor = cHex;
                 wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             } else if (cls === 'cross') {
-                alpha = 0.08 + shimmer * 0.12;
-                lw = 0.4 + shimmer * 0.2;
-                wireCtx.shadowBlur = 2 + shimmer * 4;
-                wireCtx.shadowColor = cHex;
-                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
+                // Cross connections glow MORE during accordion (the stretched part)
+                var crossBoost = 1.0 + accEased * 1.5;
+                alpha = (0.08 + shimmer * 0.12) * crossBoost;
+                lw = (0.4 + shimmer * 0.2 + accEased * 0.8) * crossBoost;
+                wireCtx.shadowBlur = (2 + shimmer * 4) * crossBoost;
+                wireCtx.shadowColor = aHex;
+                wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             } else {
-                alpha = 0.03 + shimmer * 0.08;
-                lw = 0.3 + shimmer * 0.2;
-                wireCtx.shadowBlur = 1 + shimmer * 3;
+                alpha = (0.03 + shimmer * 0.08) * expandGlow;
+                lw = (0.3 + shimmer * 0.2) * (1 + accEased * 0.1);
+                wireCtx.shadowBlur = (1 + shimmer * 3) * expandGlow;
                 wireCtx.shadowColor = cHex;
                 wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, alpha).toFixed(3) + ')';
             }
@@ -3616,12 +3727,12 @@
         }
 
         // Cross connections: corresponding front↔back nodes
+        // During accordion these become the stretched "ribs"
         for (var i = 0; i < 13; i++) {
             drawLine(i, 13 + i, 'cross');
         }
 
-        // === Circles: draw on all 26 nodes ===
-        // Sacred circle radius (chord length) = inner ring chord
+        // === Circles on all 26 nodes ===
         var circleR = 2 * S * Math.sin(colatInner / 2);
         var CSEGS = 36;
 
@@ -3630,8 +3741,11 @@
             var fval = getFreqSample((ni % 13) / 13);
             var isPole = (ni === 0 || ni === 13);
 
-            // Compute tangent frame at this node on the sphere
             var nx = nd.x, ny = nd.y, nz = nd.z;
+            // Add accordion offset to the normal computation
+            var accZ = nodeZBase[ni] * accordionSep * S;
+            nz += accZ;
+
             var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
             nx /= nl; ny /= nl; nz /= nl;
             var upx = 0, upy = 1, upz = 0;
@@ -3649,26 +3763,27 @@
             for (var s = 0; s <= CSEGS; s++) {
                 var ca = (s / CSEGS) * Math.PI * 2;
                 var cosA = Math.cos(ca), sinA = Math.sin(ca);
-                var cpx = (nd.x + circleR * (cosA * ux + sinA * vx)) * breathe;
-                var cpy = (nd.y + circleR * (cosA * uy + sinA * vy)) * breathe;
-                var cpz = (nd.z + circleR * (cosA * uz + sinA * vz)) * breathe;
+                var cpx = nd.x + circleR * (cosA * ux + sinA * vx);
+                var cpy = nd.y + circleR * (cosA * uy + sinA * vy);
+                var cpz = nd.z + circleR * (cosA * uz + sinA * vz) + accZ;
 
-                // Same per-node wiggle
                 var wa2 = t * 1.8 + ni * 1.1;
-                cpx += Math.sin(wa2) * fval * 0.005;
-                cpy += Math.cos(wa2 * 0.7) * fval * 0.005;
+                cpx += Math.sin(wa2) * fval * 0.008 * ms.scalePulse;
+                cpy += Math.cos(wa2 * 0.7) * fval * 0.008 * ms.scalePulse;
 
-                var r = rot3d(cpx, cpy, cpz);
-                cpts.push(proj(r.x, r.y - 0.06, r.z + 0.10));
+                var rr = rot3d(cpx, cpy, cpz);
+                cpts.push(proj(rr.x, rr.y - 0.06, rr.z + 0.10));
             }
 
             var cAlpha = isPole ? (0.32 + bass * 0.22 + fval * 0.12)
                                 : (0.12 + fval * 0.22 + bass * 0.06);
+            cAlpha *= expandGlow;
             var cLw = isPole ? (1.3 + bass * 0.4) : (0.7 + fval * 0.3);
+            cLw *= (1 + accEased * 0.2);
 
             wireCtx.strokeStyle = 'rgba(' + (isPole ? aRGB : cRGB) + ',' + Math.min(1, cAlpha).toFixed(3) + ')';
             wireCtx.lineWidth = cLw;
-            wireCtx.shadowBlur = isPole ? (8 + bass * 12) : (2 + fval * 6);
+            wireCtx.shadowBlur = (isPole ? (8 + bass * 12) : (2 + fval * 6)) * expandGlow;
             wireCtx.shadowColor = isPole ? aHex : cHex;
 
             wireCtx.beginPath();
@@ -3678,11 +3793,11 @@
             wireCtx.stroke();
         }
 
-        // --- Center glow ---
+        // --- Center glow (expands with accordion) ---
         var cx = (pts[0].x + pts[13].x) / 2;
         var cy = (pts[0].y + pts[13].y) / 2;
-        var glowR = 10 + bass * 8 + amp * 4;
-        wireCtx.shadowBlur = 18 + bass * 22;
+        var glowR = (10 + bass * 8 + amp * 4) * ms.scalePulse;
+        wireCtx.shadowBlur = (18 + bass * 22) * expandGlow;
         wireCtx.shadowColor = aHex;
         var gradient = wireCtx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
         gradient.addColorStop(0, 'rgba(' + aRGB + ',' + (0.18 + bass * 0.14).toFixed(3) + ')');
@@ -3693,16 +3808,42 @@
         wireCtx.arc(cx, cy, glowR, 0, Math.PI * 2);
         wireCtx.fill();
 
+        // --- During accordion: draw energy "spine" between the two poles ---
+        if (accEased > 0.05) {
+            var spineAlpha = accEased * (0.3 + bass * 0.3);
+            var spineLw = accEased * (2.0 + bass * 2.0);
+            wireCtx.strokeStyle = 'rgba(' + aRGB + ',' + Math.min(1, spineAlpha).toFixed(3) + ')';
+            wireCtx.lineWidth = spineLw;
+            wireCtx.shadowBlur = 12 + accEased * 20;
+            wireCtx.shadowColor = aHex;
+            wireCtx.beginPath();
+            wireCtx.moveTo(pts[0].x, pts[0].y);
+            wireCtx.lineTo(pts[13].x, pts[13].y);
+            wireCtx.stroke();
+
+            // Draw intermediate "accordion ring" lines at intervals along the spine
+            var ringCount = Math.floor(accEased * 4) + 1; // 1-5 intermediate rings
+            for (var ri = 1; ri <= ringCount; ri++) {
+                var rf = ri / (ringCount + 1);
+                var ringCx = pts[0].x + (pts[13].x - pts[0].x) * rf;
+                var ringCy = pts[0].y + (pts[13].y - pts[0].y) * rf;
+                var ringR = (6 + bass * 4) * ms.scalePulse * (1 - Math.abs(rf - 0.5) * 1.2);
+                var ringAlpha = accEased * (0.15 + getFreqSample(rf) * 0.2);
+                wireCtx.strokeStyle = 'rgba(' + cRGB + ',' + Math.min(1, ringAlpha).toFixed(3) + ')';
+                wireCtx.lineWidth = 0.6 + accEased * 0.4;
+                wireCtx.shadowBlur = 4 + accEased * 8;
+                wireCtx.beginPath();
+                wireCtx.arc(ringCx, ringCy, ringR, 0, Math.PI * 2);
+                wireCtx.stroke();
+            }
+        }
+
         // === Set eyeScreenPoints for lyrics + lasers ===
-        // Words emit from the geometric center (between front and back poles)
-        // Lasers fire from two outer nodes on opposite sides
-        // Use the rightmost and leftmost outer nodes as "eyes"
         var rightmostIdx = 7, leftmostIdx = 7;
         for (var i = 7; i < 13; i++) {
             if (pts[i].x > pts[rightmostIdx].x) rightmostIdx = i;
             if (pts[i].x < pts[leftmostIdx].x) leftmostIdx = i;
         }
-        // Also check back outer ring
         for (var i = 20; i < 26; i++) {
             if (pts[i].x > pts[rightmostIdx].x) rightmostIdx = i;
             if (pts[i].x < pts[leftmostIdx].x) leftmostIdx = i;
