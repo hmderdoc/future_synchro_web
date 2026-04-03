@@ -237,14 +237,14 @@
                 { rx:    0.22, ry: 0.30, rz:    0.42, len: 0.90, color: '#FF55AA', width: 1.3, freq: 0.80 },
                 { rx:    0.50, ry: 0.04, rz: -0.08, len: 1.30, color: '#FFFF55', width: 1.5, freq: 0.55 },
                 { rx:    0.18, ry: 0.30, rz:    0.42, len: 0.85, color: '#55AAFF', width: 1.4, freq: 0.88 },
-                // Top / crown — tighter coverage
-                { rx: -0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#FF55FF', width: 1.3, freq: 0.30 },
-                { rx:  0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#55FFFF', width: 1.3, freq: 0.38 },
-                { rx:  0.00, ry: 0.52, rz:  0.02, len: 0.55, color: '#AA55FF', width: 1.4, freq: 0.45 },
-                { rx: -0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#FFFF55', width: 1.2, freq: 0.22 },
-                { rx:  0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#55FF55', width: 1.2, freq: 0.68 },
-                { rx: -0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#FF55AA', width: 1.3, freq: 0.15 },
-                { rx:  0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#55AAFF', width: 1.3, freq: 0.75 },
+                // Top / crown — flowing outward and down from scalp
+                { rx: -0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#FF55FF', width: 1.3, freq: 0.30, dir: { dx: -0.30, dy: -0.60, dz:  0.50 } },
+                { rx:  0.08, ry: 0.50, rz:  0.05, len: 0.65, color: '#55FFFF', width: 1.3, freq: 0.38, dir: { dx:  0.30, dy: -0.60, dz:  0.50 } },
+                { rx:  0.00, ry: 0.52, rz:  0.02, len: 0.55, color: '#AA55FF', width: 1.4, freq: 0.45, dir: { dx:  0.00, dy: -0.50, dz:  0.70 } },
+                { rx: -0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#FFFF55', width: 1.2, freq: 0.22, dir: { dx: -0.55, dy: -0.65, dz:  0.10 } },
+                { rx:  0.15, ry: 0.46, rz:  0.00, len: 0.75, color: '#55FF55', width: 1.2, freq: 0.68, dir: { dx:  0.55, dy: -0.65, dz:  0.10 } },
+                { rx: -0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#FF55AA', width: 1.3, freq: 0.15, dir: { dx: -0.15, dy: -0.60, dz: -0.60 } },
+                { rx:  0.05, ry: 0.52, rz: -0.05, len: 0.50, color: '#55AAFF', width: 1.3, freq: 0.75, dir: { dx:  0.15, dy: -0.60, dz: -0.60 } },
                 // Back — draping down behind
                 { rx: -0.12, ry: 0.36, rz: -0.38, len: 0.80, color: '#FF55FF', width: 1.2, freq: 0.12 },
                 { rx:  0.12, ry: 0.36, rz: -0.38, len: 0.80, color: '#55FFFF', width: 1.2, freq: 0.62 },
@@ -762,6 +762,11 @@
                 { rx:  0.46, ry: 0.18, rz:  0.06, len: 0.35, color: '#666666', width: 1.3, freq: 0.50, dir: { dx:  0.25, dy: -0.40, dz: -0.70 } },
                 { rx: -0.48, ry: 0.10, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.55, dir: { dx: -0.35, dy: -0.55, dz: -0.50 } },
                 { rx:  0.48, ry: 0.10, rz:  0.00, len: 0.30, color: '#555555', width: 1.2, freq: 0.60, dir: { dx:  0.35, dy: -0.55, dz: -0.50 } },
+                // Extra fill — between front and crown for fullness
+                { rx: -0.10, ry: 0.40, rz:  0.36, len: 0.48, color: '#888888', width: 1.5, freq: 0.16, dir: { dx: -0.06, dy: -0.10, dz: -0.94 } },
+                { rx:  0.10, ry: 0.40, rz:  0.36, len: 0.48, color: '#888888', width: 1.5, freq: 0.32, dir: { dx:  0.06, dy: -0.10, dz: -0.94 } },
+                { rx: -0.24, ry: 0.34, rz:  0.32, len: 0.42, color: '#777777', width: 1.4, freq: 0.44, dir: { dx: -0.18, dy: -0.22, dz: -0.88 } },
+                { rx:  0.24, ry: 0.34, rz:  0.32, len: 0.42, color: '#777777', width: 1.4, freq: 0.47, dir: { dx:  0.18, dy: -0.22, dz: -0.88 } },
                 // Back strands — drape down behind the skull
                 { rx: -0.10, ry: 0.36, rz: -0.40, len: 0.40, color: '#777777', width: 1.3, freq: 0.65, dir: { dx: -0.05, dy: -0.55, dz: -0.75 } },
                 { rx:  0.00, ry: 0.40, rz: -0.42, len: 0.42, color: '#888888', width: 1.4, freq: 0.70, dir: { dx:  0.00, dy: -0.60, dz: -0.65 } },
@@ -870,15 +875,15 @@
                 { rx: -0.12, ry: 0.32, rz:  0.48, len: 0.68, color: '#DDBB55', width: 1.7, freq: 0.25 },
                 { rx: -0.06, ry: 0.34, rz:  0.48, len: 0.65, color: '#CCAA44', width: 1.6, freq: 0.30 },
                 // Over the top and right — the swept part
-                { rx:  0.00, ry: 0.36, rz:  0.46, len: 0.60, color: '#DDCC66', width: 1.5, freq: 0.35 },
-                { rx:  0.08, ry: 0.34, rz:  0.46, len: 0.55, color: '#EEDD77', width: 1.4, freq: 0.40 },
-                { rx:  0.14, ry: 0.30, rz:  0.44, len: 0.50, color: '#DDBB55', width: 1.3, freq: 0.45 },
-                { rx:  0.20, ry: 0.26, rz:  0.42, len: 0.45, color: '#CCAA44', width: 1.2, freq: 0.50 },
+                { rx:  0.00, ry: 0.36, rz:  0.46, len: 0.60, color: '#DDCC66', width: 1.5, freq: 0.35, dir: { dx:  0.30, dy: -0.20, dz: -0.85 } },
+                { rx:  0.08, ry: 0.34, rz:  0.46, len: 0.55, color: '#EEDD77', width: 1.4, freq: 0.40, dir: { dx:  0.35, dy: -0.25, dz: -0.80 } },
+                { rx:  0.14, ry: 0.30, rz:  0.44, len: 0.50, color: '#DDBB55', width: 1.3, freq: 0.45, dir: { dx:  0.45, dy: -0.35, dz: -0.65 } },
+                { rx:  0.20, ry: 0.26, rz:  0.42, len: 0.45, color: '#CCAA44', width: 1.2, freq: 0.50, dir: { dx:  0.55, dy: -0.45, dz: -0.50 } },
                 // Wispy flyaways that stick out from under the cap
-                { rx: -0.48, ry: 0.12, rz:  0.02, len: 0.50, color: '#BBAA55', width: 1.1, freq: 0.55 },
-                { rx:  0.44, ry: 0.18, rz:  0.04, len: 0.40, color: '#CCBB66', width: 1.0, freq: 0.60 },
-                { rx: -0.08, ry: 0.50, rz: -0.04, len: 0.45, color: '#AA9944', width: 1.1, freq: 0.65 },
-                { rx:  0.04, ry: 0.52, rz: -0.06, len: 0.42, color: '#BB9944', width: 1.0, freq: 0.70 },
+                { rx: -0.48, ry: 0.12, rz:  0.02, len: 0.50, color: '#BBAA55', width: 1.1, freq: 0.55, dir: { dx: -0.60, dy: -0.75, dz: -0.05 } },
+                { rx:  0.44, ry: 0.18, rz:  0.04, len: 0.40, color: '#CCBB66', width: 1.0, freq: 0.60, dir: { dx:  0.60, dy: -0.75, dz: -0.05 } },
+                { rx: -0.08, ry: 0.50, rz: -0.04, len: 0.45, color: '#AA9944', width: 1.1, freq: 0.65, dir: { dx: -0.15, dy: -0.55, dz: -0.75 } },
+                { rx:  0.04, ry: 0.52, rz: -0.06, len: 0.42, color: '#BB9944', width: 1.0, freq: 0.70, dir: { dx:  0.10, dy: -0.55, dz: -0.75 } },
                 // Back strands peeking out from under the cap
                 { rx: -0.20, ry: 0.28, rz: -0.36, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.75 },
                 { rx:  0.20, ry: 0.28, rz: -0.36, len: 0.35, color: '#AA8833', width: 1.2, freq: 0.80 },
@@ -1093,6 +1098,10 @@
                 { rx: -0.04, ry: 0.52, rz:  0.02, len: 0.34, color: '#1A1A1A', width: 1.7, freq: 0.30, dir: { dx:  0.00, dy: -0.10, dz: -0.95 } },
                 { rx:  0.08, ry: 0.52, rz:  0.02, len: 0.34, color: '#222222', width: 1.7, freq: 0.38, dir: { dx:  0.03, dy: -0.10, dz: -0.95 } },
                 { rx:  0.18, ry: 0.46, rz:  0.04, len: 0.30, color: '#1A1A1A', width: 1.6, freq: 0.45, dir: { dx:  0.10, dy: -0.12, dz: -0.88 } },
+                // Fill between front hairline and crown
+                { rx: -0.08, ry: 0.38, rz:  0.34, len: 0.36, color: '#1A1A1A', width: 1.6, freq: 0.26, dir: { dx: -0.04, dy: -0.12, dz: -0.92 } },
+                { rx:  0.04, ry: 0.40, rz:  0.34, len: 0.38, color: '#222222', width: 1.7, freq: 0.34, dir: { dx:  0.02, dy: -0.12, dz: -0.93 } },
+                { rx:  0.16, ry: 0.36, rz:  0.30, len: 0.34, color: '#1A1A1A', width: 1.5, freq: 0.42, dir: { dx:  0.08, dy: -0.14, dz: -0.90 } },
                 // Sides — flowing back and down from temples
                 { rx: -0.44, ry: 0.16, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.12, dir: { dx: -0.30, dy: -0.50, dz: -0.60 } },
                 { rx:  0.44, ry: 0.16, rz:  0.08, len: 0.30, color: '#222222', width: 1.5, freq: 0.52, dir: { dx:  0.30, dy: -0.50, dz: -0.60 } },
@@ -1647,26 +1656,33 @@
                 cycleSec: 8,
                 holdSec: 3
             },
-            // Bright red mohawk — tall central spikes
+            // Bright red mohawk — tall spikes along the center ridge of the skull
+            // Roots sit on the scalp surface; dir points UP (positive dy)
             hair: [
-                // Center spikes — tallest
-                { rx:  0.00, ry: 0.56, rz:  0.02, len: 0.55, color: '#FF2222', width: 2.8, freq: 0.15 },
-                { rx:  0.00, ry: 0.60, rz: -0.02, len: 0.50, color: '#FF3333', width: 2.6, freq: 0.25 },
-                { rx:  0.00, ry: 0.54, rz:  0.06, len: 0.48, color: '#EE1111', width: 2.5, freq: 0.10 },
-                // Slightly offset center — fills out the ridge
-                { rx: -0.04, ry: 0.54, rz:  0.00, len: 0.45, color: '#FF4444', width: 2.4, freq: 0.20 },
-                { rx:  0.04, ry: 0.54, rz:  0.00, len: 0.45, color: '#FF4444', width: 2.4, freq: 0.30 },
-                { rx: -0.03, ry: 0.58, rz: -0.04, len: 0.42, color: '#DD0000', width: 2.3, freq: 0.35 },
-                { rx:  0.03, ry: 0.58, rz: -0.04, len: 0.42, color: '#DD0000', width: 2.3, freq: 0.40 },
-                // Forward lean spikes
-                { rx:  0.00, ry: 0.50, rz:  0.10, len: 0.38, color: '#FF5555', width: 2.2, freq: 0.05 },
-                { rx:  0.00, ry: 0.48, rz:  0.14, len: 0.30, color: '#FF3333', width: 2.0, freq: 0.45 },
-                // Back lean spikes
-                { rx:  0.00, ry: 0.52, rz: -0.10, len: 0.40, color: '#EE2222', width: 2.3, freq: 0.50 },
-                { rx:  0.00, ry: 0.48, rz: -0.16, len: 0.35, color: '#DD1111', width: 2.1, freq: 0.55 },
-                // Shorter side fuzz (narrow — it's a mohawk, not wide)
-                { rx: -0.06, ry: 0.48, rz:  0.04, len: 0.20, color: '#CC0000', width: 1.8, freq: 0.60 },
-                { rx:  0.06, ry: 0.48, rz:  0.04, len: 0.20, color: '#CC0000', width: 1.8, freq: 0.65 }
+                // === Front forehead spikes — lean forward ===
+                { rx:  0.00, ry: 0.20, rz:  0.44, len: 0.35, color: '#FF3333', width: 2.8, freq: 0.05, dir: { dx: 0, dy: 0.85, dz:  0.40 } },
+                { rx:  0.00, ry: 0.26, rz:  0.44, len: 0.40, color: '#FF2222', width: 3.0, freq: 0.10, dir: { dx: 0, dy: 0.88, dz:  0.30 } },
+                { rx:  0.00, ry: 0.32, rz:  0.44, len: 0.48, color: '#EE1111', width: 3.2, freq: 0.15, dir: { dx: 0, dy: 0.90, dz:  0.20 } },
+                // === Crown spikes — tallest, straight up ===
+                { rx:  0.00, ry: 0.38, rz:  0.42, len: 0.55, color: '#FF2222', width: 3.4, freq: 0.20, dir: { dx: 0, dy: 0.97, dz:  0.10 } },
+                { rx:  0.00, ry: 0.42, rz:  0.38, len: 0.60, color: '#FF1111', width: 3.6, freq: 0.25, dir: { dx: 0, dy: 1.00, dz:  0.00 } },
+                { rx:  0.00, ry: 0.46, rz:  0.32, len: 0.58, color: '#FF2222', width: 3.5, freq: 0.30, dir: { dx: 0, dy: 1.00, dz: -0.05 } },
+                { rx:  0.00, ry: 0.50, rz:  0.24, len: 0.55, color: '#EE1111', width: 3.3, freq: 0.35, dir: { dx: 0, dy: 0.98, dz: -0.10 } },
+                // === Back-crown spikes — lean backward ===
+                { rx:  0.00, ry: 0.52, rz:  0.14, len: 0.50, color: '#FF3333', width: 3.0, freq: 0.40, dir: { dx: 0, dy: 0.90, dz: -0.25 } },
+                { rx:  0.00, ry: 0.52, rz:  0.00, len: 0.45, color: '#DD0000', width: 2.8, freq: 0.45, dir: { dx: 0, dy: 0.85, dz: -0.40 } },
+                { rx:  0.00, ry: 0.48, rz: -0.14, len: 0.40, color: '#CC0000', width: 2.6, freq: 0.50, dir: { dx: 0, dy: 0.80, dz: -0.50 } },
+                // === Fill spikes — between the main ones for density ===
+                { rx:  0.00, ry: 0.24, rz:  0.44, len: 0.37, color: '#DD2222', width: 2.5, freq: 0.12, dir: { dx: 0, dy: 0.87, dz:  0.35 } },
+                { rx:  0.00, ry: 0.35, rz:  0.43, len: 0.50, color: '#EE2222', width: 2.8, freq: 0.22, dir: { dx: 0, dy: 0.95, dz:  0.15 } },
+                { rx:  0.00, ry: 0.44, rz:  0.35, len: 0.56, color: '#FF0000', width: 3.1, freq: 0.28, dir: { dx: 0, dy: 0.99, dz: -0.02 } },
+                { rx:  0.00, ry: 0.48, rz:  0.28, len: 0.52, color: '#EE1111', width: 3.0, freq: 0.33, dir: { dx: 0, dy: 0.96, dz: -0.12 } },
+                { rx:  0.00, ry: 0.51, rz:  0.07, len: 0.42, color: '#DD1111', width: 2.7, freq: 0.42, dir: { dx: 0, dy: 0.88, dz: -0.32 } },
+                // === Slight side-splay for width (narrow — still a mohawk) ===
+                { rx: -0.04, ry: 0.40, rz:  0.40, len: 0.42, color: '#FF4444', width: 2.4, freq: 0.55, dir: { dx: -0.12, dy: 0.95, dz:  0.08 } },
+                { rx:  0.04, ry: 0.40, rz:  0.40, len: 0.42, color: '#FF4444', width: 2.4, freq: 0.60, dir: { dx:  0.12, dy: 0.95, dz:  0.08 } },
+                { rx: -0.04, ry: 0.48, rz:  0.20, len: 0.40, color: '#EE3333', width: 2.3, freq: 0.65, dir: { dx: -0.10, dy: 0.96, dz: -0.08 } },
+                { rx:  0.04, ry: 0.48, rz:  0.20, len: 0.40, color: '#EE3333', width: 2.3, freq: 0.70, dir: { dx:  0.10, dy: 0.96, dz: -0.08 } }
             ],
             hairRigid: true,
             hat: null,
@@ -3147,14 +3163,58 @@
         return headFreqData[idx] || 0;
     }
 
+    // === Head surface radius interpolation ===
+    // The profile is an array of [radius, y] pairs from chin (lowest y) to
+    // crown (highest y), forming a surface of revolution around the Y axis.
+    // Given a y-coordinate, return the head radius at that height.
+    function getHeadRadius(profile, y) {
+        if (!profile || profile.length < 2) return 0;
+        // Profile is ordered chin→crown (ascending y)
+        var first = profile[0], last = profile[profile.length - 1];
+        if (y <= first[1]) return first[0];
+        if (y >= last[1])  return last[0];
+        // Find the two bracketing profile points
+        for (var i = 0; i < profile.length - 1; i++) {
+            var ay = profile[i][1], by = profile[i + 1][1];
+            if (y >= ay && y <= by) {
+                var f = (by === ay) ? 0 : (y - ay) / (by - ay);
+                return profile[i][0] + (profile[i + 1][0] - profile[i][0]) * f;
+            }
+        }
+        return 0;
+    }
+
+    // Push a 3D point (x, y, z) outward so it sits on or outside the head
+    // surface defined by the profile.  Returns {x, y, z} (possibly unchanged).
+    var HAIR_SURFACE_MARGIN = 0.025;  // hair floats slightly above the surface
+    function clampOutsideHead(profile, x, y, z) {
+        var headR = getHeadRadius(profile, y);
+        if (headR <= 0) return { x: x, y: y, z: z };
+        var radial = Math.sqrt(x * x + z * z);
+        var minR = headR + HAIR_SURFACE_MARGIN;
+        if (radial >= minR) return { x: x, y: y, z: z };
+        // Point is inside the head — push outward along the radial direction
+        if (radial < 0.001) {
+            // Exactly on center axis — push toward +z (front of head) by default
+            return { x: x, y: y, z: minR };
+        }
+        var scale = minR / radial;
+        return { x: x * scale, y: y, z: z * scale };
+    }
+
     function drawHair(char, proj, amp, bass) {
         if (!char.hair || !char.hair.length) return;
         var t = performance.now() * 0.001;
+        var profile = char.profile;
         wireCtx.lineCap = 'round';
 
         for (var i = 0; i < char.hair.length; i++) {
             var h = char.hair[i];
-            var root = proj(h.rx, h.ry, h.rz);
+
+            // Clamp root to head surface — hair can never start inside the skull
+            var clampedRoot = clampOutsideHead(profile, h.rx, h.ry, h.rz);
+            var rootX = clampedRoot.x, rootY = clampedRoot.y, rootZ = clampedRoot.z;
+            var root = proj(rootX, rootY, rootZ);
 
             // Each strand maps to a frequency band (or defaults to spread)
             var freqPos = (typeof h.freq === 'number') ? h.freq : (i / char.hair.length);
@@ -3162,7 +3222,7 @@
 
             // Flow direction: if strand has dir {dx,dy,dz}, follow that vector.
             // Otherwise default to hanging down with slight outward drift.
-            var outward = (h.rx >= 0) ? 1 : -1;
+            var outward = (rootX >= 0) ? 1 : -1;
             var dirX, dirY, dirZ;
             if (h.dir) {
                 dirX = h.dir.dx;
@@ -3170,8 +3230,8 @@
                 dirZ = h.dir.dz;
             } else {
                 // Legacy: hang down, drift outward
-                dirX = h.rx * 0.15;   // outward drift per unit length
-                dirY = -1.0;          // straight down
+                dirX = rootX * 0.15;   // outward drift per unit length
+                dirY = -1.0;           // straight down
                 dirZ = 0;
             }
             // Normalize direction so len means actual strand length
@@ -3188,13 +3248,13 @@
             for (var s = 1; s <= HAIR_SEGS; s++) {
                 var frac = s / HAIR_SEGS;  // 0..1 along strand length
 
-                // Base position: follow direction vector from root
+                // Base position: follow direction vector from clamped root
                 var travel = h.len * frac;
                 // Add gravity pull that increases along the strand
                 var gravityPull = h.dir ? frac * frac * 0.15 : 0;  // directed strands get gentle gravity droop
-                var baseX = h.rx + ndx * travel;
-                var baseY = h.ry + ndy * travel - gravityPull;
-                var baseZ = h.rz + ndz * travel + (char.hairRigid ? 0 : Math.sin(phase * 0.3 + frac) * 0.02);
+                var baseX = rootX + ndx * travel;
+                var baseY = rootY + ndy * travel - gravityPull;
+                var baseZ = rootZ + ndz * travel + (char.hairRigid ? 0 : Math.sin(phase * 0.3 + frac) * 0.02);
 
                 // Frequency-driven waveform displacement
                 var waveSpeed = 2.0 + freqPos * 6.0;
@@ -3214,7 +3274,17 @@
                 var perpX = wave * outward + bassKick + breathSway * frac;
                 var perpZ = char.hairRigid ? 0 : Math.cos(t * waveSpeed * 0.7 + wavePropagation) * waveAmp * 0.4;
 
-                pts.push(proj(baseX + perpX, baseY, baseZ + perpZ));
+                // Final point — clamp early segments to head surface
+                // (first ~30% of strand hugs the scalp, rest flows freely)
+                var fx = baseX + perpX;
+                var fy = baseY;
+                var fz = baseZ + perpZ;
+                if (frac < 0.35 && profile) {
+                    var clamped = clampOutsideHead(profile, fx, fy, fz);
+                    fx = clamped.x; fy = clamped.y; fz = clamped.z;
+                }
+
+                pts.push(proj(fx, fy, fz));
             }
 
             // Glow intensity scales with frequency energy
