@@ -485,16 +485,6 @@
     </div>
 </div>
 
-<!-- Webring -->
-<div class="container" style="margin-top:1em;margin-bottom:1em;display:flex;justify-content:center;">
-    <div style="width:fit-content;border:2px outset;text-align:center">
-        <p style="margin:0;padding:0.1em;border:2px inset">This site is a member of Creative Retrocomputing.</p>
-        <div style="margin:0;padding:0.1em;border:2px inset">
-            <a href="https://webri.ng/webring/creative_retrocomputing/random">Random Site</a>
-        </div>
-    </div>
-</div>
-
 <!-- Config passed to client JS -->
 <script>
     window.sbbsConfig = {
