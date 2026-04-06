@@ -9,27 +9,101 @@
 ?>
 
 <style>
-    .fTelnetStatusBar { display : none !important; }                       /* Don't show the status bar, we only want to use fTelnet for display purposes not connect purposes */
-    div.active { background-color: #ddd; padding-bottom: 15px; }           /* Highlight the div that has keyboard focus */
-    label.normal { font-weight: normal !important; margin-bottom: 0 !important; } /* Sanely format the label elements */
-    
-    /* Introduce a col-xl-6 to display two columns on large screens -- allows seeing all 4 of my nodes at once */
-    .col-xl-6 {
-        position: relative;
-        min-height: 1px;
-        padding-right: 15px;
-        padding-left: 15px;
+    .fTelnetStatusBar { display: none !important; } /* Display-only spy terminals do not need the embedded status bar */
+    label.normal { font-weight: normal !important; margin-bottom: 0 !important; }
+
+    #ClientsWrapper {
+        display: grid;
+        gap: 1.25rem;
+        margin-top: 1.5rem;
     }
-    .visible-xl-block {
+
+    .node-spy-hidden {
         display: none !important;
     }
+
+    .node-spy-card {
+        background: rgba(7, 12, 24, 0.96);
+        border: 1px solid rgba(84, 201, 132, 0.4);
+        border-radius: 18px;
+        box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+    }
+
+    .node-spy-item.active .node-spy-card {
+        border-color: rgba(156, 255, 153, 0.9);
+        box-shadow: 0 0 0 1px rgba(156, 255, 153, 0.22), 0 18px 38px rgba(0, 0, 0, 0.35);
+    }
+
+    .node-spy-card-header {
+        align-items: center;
+        background: linear-gradient(180deg, rgba(14, 23, 41, 0.96), rgba(10, 17, 31, 0.96));
+        border-bottom: 1px solid rgba(84, 201, 132, 0.22);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        justify-content: space-between;
+        padding: 0.95rem 1.15rem;
+    }
+
+    .node-spy-heading {
+        align-items: baseline;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.8rem;
+        min-width: 0;
+    }
+
+    .node-spy-title {
+        color: #f7fbff;
+        font-size: 1.15rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .node-spy-title:hover,
+    .node-spy-title:focus {
+        color: #9cff99;
+        text-decoration: none;
+    }
+
+    .node-spy-status {
+        color: #96c9ff;
+        font-size: 0.95rem;
+    }
+
+    .node-spy-keyboard {
+        align-items: center;
+        color: #dbe7ff;
+        display: inline-flex;
+        gap: 0.55rem;
+        white-space: nowrap;
+    }
+
+    .node-spy-keyboard input {
+        margin: 0;
+    }
+
+    .node-spy-card-body {
+        overflow: auto;
+        padding: 1rem;
+    }
+
+    .fTelnetContainer {
+        background: #000;
+        border-radius: 14px;
+        min-height: 1px;
+        padding: 0.85rem;
+    }
+
+    .fTelnetContainer canvas {
+        display: block;
+        margin: 0 auto;
+    }
+
     @media (min-width: 1600px) {
-        .col-xl-6 { 
-            float: left;
-            width: 50%; 
-        }
-        .visible-xl-block {
-            display: block !important;
+        #ClientsWrapper {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
 </style>

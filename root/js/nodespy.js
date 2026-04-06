@@ -4,6 +4,45 @@ var spy_nodes = [];
 var urlParams = new URLSearchParams(window.location.search);
 var targetNode = parseInt(urlParams.get('node'), 10);
 
+function get_node_element(node) {
+    return document.getElementById('Client' + node);
+}
+
+function is_waiting_for_connection(status) {
+    return /waiting\s+for\s+connection/i.test(status || '');
+}
+
+function set_node_hidden(node, hidden) {
+    var nodeEl = get_node_element(node);
+    if (!nodeEl) return;
+
+    nodeEl.classList.toggle('node-spy-hidden', hidden);
+    if (!hidden) return;
+
+    nodeEl.classList.remove('active');
+    var chk = document.getElementById('chkKeyboard' + node);
+    if (chk) chk.checked = false;
+}
+
+function mute_terminal_audio(nodeState) {
+    if (!nodeState || nodeState.audioMuted || !nodeState.ftelnet) return;
+
+    var didMute = false;
+    if (nodeState.ftelnet._Crt) {
+        nodeState.ftelnet._Crt.Beep = function() {};
+        didMute = true;
+    }
+    if (nodeState.ftelnet._Ansi && nodeState.ftelnet._Ansi._Crt) {
+        nodeState.ftelnet._Ansi._Crt.Beep = function() {};
+        didMute = true;
+    }
+    nodeState.audioMuted = didMute;
+}
+
+function strip_terminal_bells(str) {
+    return str.indexOf('\x07') === -1 ? str : str.replace(/\x07/g, '');
+}
+
 // Create an fTelnet instance for each node
 function create_ftelnet_instances() {
     var wrapper = document.getElementById('ClientsWrapper');
@@ -13,33 +52,30 @@ function create_ftelnet_instances() {
     for (var node = 1; node <= system_nodes; node++) {
         if (!targetNode || (targetNode === node)) {
             // Build a node-specific link
-            var nodeUrl = location.href;
-            if (!nodeUrl.includes("&node=")) {
-                nodeUrl += '&node=' + node;
-            }
+            var nodeUrl = new URL(location.href);
+            nodeUrl.searchParams.set('node', node);
             
-            // Build a div containing the node status, keyboard checkbox, and fTelnet instance
+            // Build a card containing the node status, keyboard checkbox, and fTelnet instance
             var div = document.createElement('div');
             div.id = 'Client' + node;
-            div.className = targetNode ? '' : 'col-xl-6';
+            div.className = 'node-spy-item node-spy-hidden';
             div.innerHTML =
-                '<h4 style="text-align: center;">' +
-                    '<a href="' + nodeUrl + '">Node ' + node + '</a> - ' +
-                    '<span id="Status' + node + '">Status Unknown</span> &nbsp; &nbsp; ' +
-                    '<span style="white-space: nowrap;">' +
-                    '<input type="checkbox" class="keyboard-input" id="chkKeyboard' + node + '" value="' + node + '" /> ' +
-                    '<label class="normal" for="chkKeyboard' + node + '">Enable Keyboard Input</label>' +
-                    '</span>' +
-                '</h4>' +
-                '<div id="fTelnetContainer' + node + '" class="fTelnetContainer"></div>';
+                '<div class="card node-spy-card">' +
+                    '<div class="card-header node-spy-card-header">' +
+                        '<div class="node-spy-heading">' +
+                            '<a class="node-spy-title" href="' + nodeUrl.toString() + '">Node ' + node + '</a>' +
+                            '<span class="node-spy-status" id="Status' + node + '">Status Unknown</span>' +
+                        '</div>' +
+                        '<label class="normal node-spy-keyboard" for="chkKeyboard' + node + '">' +
+                            '<input type="checkbox" class="keyboard-input" id="chkKeyboard' + node + '" value="' + node + '" />' +
+                            '<span>Enable Keyboard Input</span>' +
+                        '</label>' +
+                    '</div>' +
+                    '<div class="card-body node-spy-card-body">' +
+                        '<div id="fTelnetContainer' + node + '" class="fTelnetContainer"></div>' +
+                    '</div>' +
+                '</div>';
             wrapper.appendChild(div);
-
-            // Apply a clearfix after every other node div
-            if (node % 2 == 0) {
-                var clearfix = document.createElement('div');
-                clearfix.className = 'clearfix visible-xl-block';
-                wrapper.appendChild(clearfix);
-            }
 
             // And initialize a new fTelnet instance
             var Options = new fTelnetOptions();
@@ -60,7 +96,9 @@ function create_ftelnet_instances() {
             spy_nodes[node] = {
                 charset: 'CP437',
                 ftelnet: new fTelnetClient('fTelnetContainer' + node, Options),
+                audioMuted: false,
             };
+            mute_terminal_audio(spy_nodes[node]);
         }
     }
 }
@@ -172,8 +210,10 @@ function mqtt_message(topic, message, packet) {
     switch (messageType) {
         case undefined:
             // message contains the node's current activity
+            var status = message.toString();
             var statusEl = document.getElementById('Status' + node);
-            if (statusEl) statusEl.innerHTML = message.toString();
+            if (statusEl) statusEl.textContent = status;
+            set_node_hidden(node, is_waiting_for_connection(status));
             break;
         
         case '/output':
@@ -190,12 +230,16 @@ function mqtt_message(topic, message, packet) {
                 str = utf8_cp437(str);
             }
 
+            mute_terminal_audio(spy_nodes[node]);
+            set_node_hidden(node, false);
+            str = strip_terminal_bells(str);
             spy_nodes[node].ftelnet._Ansi.Write(str);
             break;
         
         case '/terminal':
             // message contains tab-separated terminal information
             var arr = message.toString().split('\t');
+            mute_terminal_audio(spy_nodes[node]);
             spy_nodes[node].ftelnet._Crt.SetScreenSize(parseInt(arr[0], 10), parseInt(arr[1], 10));
             spy_nodes[node].ftelnet._Crt.SetFont(spy_nodes[node].ftelnet._Crt.Font.Name);
             spy_nodes[node].charset = arr[4];

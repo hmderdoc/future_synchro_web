@@ -8,9 +8,19 @@ var request = require({}, settings.web_lib + 'request.js', 'request');
 var Filebase = require({}, 'filebase.js', 'OldFileBase');
 
 var CHUNK_SIZE = 1024;
+var TRACK_META_READ_BYTES = 262144;
 var TRACK_OVERRIDE_DIR = system.data_dir + 'futureland-records/';
 var TRACK_OVERRIDE_FILE = TRACK_OVERRIDE_DIR + 'track-overrides.ini';
 var TRACK_TAG_FIELDS = ['title', 'artist', 'composer', 'genre', 'year', 'album'];
+var ID3_TEXT_FRAME_FIELDS = {
+	TIT2: 'title',
+	TPE1: 'artist',
+	TCOM: 'composer',
+	TCON: 'genre',
+	TDRC: 'year',
+	TYER: 'year',
+	TALB: 'album'
+};
 var _bodyParams = null;
 
 function trimText(value) {
@@ -246,6 +256,277 @@ function writeLyricsFile(trackPath, lyrics) {
 
 	return true;
 }
+function charPathFor(filePath) {
+	if (/\.[^\\/]+$/.test(filePath)) {
+		return filePath.replace(/\.[^\\/]+$/, '.char.json');
+	}
+	return filePath + '.char.json';
+}
+
+function loadCharOverride(filePath) {
+	var charPath = charPathFor(filePath);
+	var file;
+	if (!file_exists(charPath)) return '';
+	file = new File(charPath);
+	if (!file.open('r')) return '';
+	try {
+		return trimText(file.read() || '');
+	} finally {
+		file.close();
+	}
+}
+
+function writeCharOverride(filePath, charJson) {
+	var charPath = charPathFor(filePath);
+	var normalized = trimText(charJson || '');
+	var file;
+	if (!normalized.length) {
+		if (file_exists(charPath) && !file_remove(charPath)) {
+			throw new Error('Could not remove character file');
+		}
+		return false;
+	}
+	file = new File(charPath);
+	if (!file.open('w+')) {
+		throw new Error('Could not open character file for writing');
+	}
+	try {
+		file.write(normalized);
+	} finally {
+		file.close();
+	}
+	return true;
+}
+
+
+function binaryByteAt(data, offset) {
+	return String(data || '').charCodeAt(offset) & 0xff;
+}
+
+function readSynchsafe(data, offset) {
+	return ((binaryByteAt(data, offset) & 0x7f) << 21)
+		| ((binaryByteAt(data, offset + 1) & 0x7f) << 14)
+		| ((binaryByteAt(data, offset + 2) & 0x7f) << 7)
+		| (binaryByteAt(data, offset + 3) & 0x7f);
+}
+
+function readBigEndian32(data, offset) {
+	return (binaryByteAt(data, offset) << 24)
+		| (binaryByteAt(data, offset + 1) << 16)
+		| (binaryByteAt(data, offset + 2) << 8)
+		| binaryByteAt(data, offset + 3);
+}
+
+function decodeBinaryLatin1(data, start, end) {
+	var out = '';
+	var index;
+	var code;
+
+	for (index = start; index < end; index += 1) {
+		code = binaryByteAt(data, index);
+		if (code === 0) break;
+		out += String.fromCharCode(code);
+	}
+
+	return out;
+}
+
+function decodeBinaryUtf8(data, start, end) {
+	var raw = '';
+	var index;
+	var code;
+
+	for (index = start; index < end; index += 1) {
+		code = binaryByteAt(data, index);
+		if (code === 0) break;
+		raw += String.fromCharCode(code);
+	}
+
+	if (typeof utf8_decode === 'function') {
+		try {
+			return utf8_decode(raw);
+		} catch (_) {}
+	}
+
+	return raw;
+}
+
+function decodeBinaryUtf16(data, start, end, defaultEndian) {
+	var out = '';
+	var little = defaultEndian !== 'be';
+	var byte1;
+	var byte2;
+	var code;
+	var index;
+
+	if (end - start >= 2) {
+		byte1 = binaryByteAt(data, start);
+		byte2 = binaryByteAt(data, start + 1);
+		if (byte1 === 0xff && byte2 === 0xfe) {
+			little = true;
+			start += 2;
+		} else if (byte1 === 0xfe && byte2 === 0xff) {
+			little = false;
+			start += 2;
+		}
+	}
+
+	for (index = start; index + 1 < end; index += 2) {
+		byte1 = binaryByteAt(data, index);
+		byte2 = binaryByteAt(data, index + 1);
+		code = little ? (byte1 | (byte2 << 8)) : ((byte1 << 8) | byte2);
+		if (code === 0) break;
+		out += String.fromCharCode(code);
+	}
+
+	return out;
+}
+
+function decodeId3TextFrame(frameData) {
+	var encoding;
+
+	if (!frameData || frameData.length < 2) {
+		return '';
+	}
+
+	encoding = binaryByteAt(frameData, 0);
+	switch (encoding) {
+		case 1:
+			return trimText(decodeBinaryUtf16(frameData, 1, frameData.length, 'le'));
+		case 2:
+			return trimText(decodeBinaryUtf16(frameData, 1, frameData.length, 'be'));
+		case 3:
+			return trimText(decodeBinaryUtf8(frameData, 1, frameData.length));
+		case 0:
+		default:
+			return trimText(decodeBinaryLatin1(frameData, 1, frameData.length));
+	}
+}
+
+function readTrackId3Tags(trackPath) {
+	var file;
+	var data;
+	var result = {};
+	var majorVer;
+	var flags;
+	var tagSize;
+	var frameSizeReader;
+	var tagEnd;
+	var pos = 10;
+	var extSize;
+	var frameId;
+	var frameSize;
+	var field;
+
+	if (!trackPath) {
+		return result;
+	}
+
+	file = new File(trackPath);
+	if (!file.open('rb')) {
+		return result;
+	}
+
+	try {
+		data = file.read(Math.min(file.length || TRACK_META_READ_BYTES, TRACK_META_READ_BYTES));
+	} finally {
+		file.close();
+	}
+
+	if (!data || data.length < 10 || data.substr(0, 3) !== 'ID3') {
+		return result;
+	}
+
+	majorVer = binaryByteAt(data, 3);
+	flags = binaryByteAt(data, 5);
+	tagSize = readSynchsafe(data, 6);
+	frameSizeReader = majorVer >= 4 ? readSynchsafe : readBigEndian32;
+
+	if (flags & 0x40) {
+		if (pos + 4 > data.length) {
+			return result;
+		}
+		extSize = majorVer >= 4 ? readSynchsafe(data, pos) : readBigEndian32(data, pos);
+		pos += extSize;
+	}
+
+	tagEnd = Math.min(10 + tagSize, data.length);
+	while (pos + 10 <= tagEnd) {
+		frameId = data.substr(pos, 4);
+		if (!frameId.length || frameId.charCodeAt(0) === 0) {
+			break;
+		}
+
+		frameSize = frameSizeReader(data, pos + 4);
+		pos += 10;
+		if (frameSize <= 0 || pos + frameSize > tagEnd) {
+			break;
+		}
+
+		field = ID3_TEXT_FRAME_FIELDS[frameId];
+		if (field && !result[field]) {
+			result[field] = decodeId3TextFrame(data.substr(pos, frameSize));
+		}
+
+		pos += frameSize;
+	}
+
+	return cleanTrackOverrideTags(result);
+}
+
+function normalizeContributorName(value) {
+	return trimText(value).replace(/\s+/g, ' ').toLowerCase();
+}
+
+function splitContributorNames(value) {
+	return trimText(value)
+		.split(/\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*/i)
+		.map(function (entry) {
+			return trimText(entry);
+		})
+		.filter(function (entry) {
+			return entry.length > 0;
+		});
+}
+
+function contributorListContainsAlias(value, alias) {
+	var target = normalizeContributorName(alias);
+	var parts;
+	var index;
+
+	if (!target.length) {
+		return false;
+	}
+
+	parts = splitContributorNames(value);
+	for (index = 0; index < parts.length; index += 1) {
+		if (normalizeContributorName(parts[index]) === target) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function canUserEditTrackMeta(trackRecord, overrideTags) {
+	var baseTags;
+	var composer = trimText((overrideTags && overrideTags.composer) || '');
+
+	if (user.is_sysop) {
+		return true;
+	}
+
+	if (user.number < 1 || !trimText(user.alias).length) {
+		return false;
+	}
+
+	if (!composer.length && trackRecord && trackRecord.path) {
+		baseTags = readTrackId3Tags(trackRecord.path);
+		composer = trimText(baseTags.composer || '');
+	}
+
+	return contributorListContainsAlias(composer, user.alias);
+}
 
 var reply = {};
 if ((http_request.method === 'GET' || http_request.method === 'POST') && request.has_param('call') && user.number > 0) {
@@ -435,7 +716,7 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 							name: flist[fi].name,
 							desc: flist[fi].desc || '',
 							added: flist[fi].added || 0,
-							tags: copyTags(overrides[trackOverrideSection(flist[fi].name)] || {})
+							tags: (function(t, e) { var c = loadCharOverride(file_area.dir[ldir].path + e.name); if (c) t.character = c; return t; })(copyTags(overrides[trackOverrideSection(flist[fi].name)] || {}), flist[fi])
 						});
 					}
 				} else {
@@ -447,10 +728,6 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 			break;
 		case 'update-track-meta':
 			var udir = request.get_param('dir');
-			if (!user.is_sysop) {
-				reply.error = 'Sysop access required';
-				break;
-			}
 			if (http_request.method !== 'POST') {
 				reply.error = 'POST required';
 				break;
@@ -469,8 +746,8 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 			}
 
 			var updateFile = trimText(getRequestValue('file', ''));
-			var updateArtist = trimText(getRequestValue('artist', ''));
-			var updateLyrics = hasRequestParam('lyrics') ? getRequestValue('lyrics', '') : '';
+			var updateLyricsPresent = hasRequestParam('lyrics');
+                        var updateLyrics = updateLyricsPresent ? getRequestValue('lyrics', '') : '';
 			var updateRecord = null;
 			var overrideState = {};
 
@@ -486,20 +763,44 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 			}
 
 			overrideState = copyTags(loadTrackOverrides()[trackOverrideSection(updateRecord.name)] || {});
-			if (updateArtist.length) {
-				overrideState.artist = updateArtist;
-			} else {
-				delete overrideState.artist;
+			if (!canUserEditTrackMeta(updateRecord, overrideState)) {
+				reply.error = 'Composer or sysop access required';
+				break;
 			}
 
+			if (!user.is_sysop && hasRequestParam('composer')) {
+				reply.error = 'Only sysops can change composer metadata';
+				break;
+			}
+
+			TRACK_TAG_FIELDS.forEach(function (field) {
+				var value;
+				if (field === 'composer' && !user.is_sysop) {
+					return;
+				}
+				if (!hasRequestParam(field)) {
+					return;
+				}
+				value = trimText(getRequestValue(field, ''));
+				if (value.length) {
+					overrideState[field] = value;
+				} else {
+					delete overrideState[field];
+				}
+			});
+
 			try {
+				if (hasRequestParam('character')) {
+					writeCharOverride(updateRecord.path, getRequestValue('character', ''));
+				}
+				delete overrideState.character;
 				overrideState = writeTrackOverride(updateRecord.name, overrideState);
-				writeLyricsFile(updateRecord.path, updateLyrics);
+				if (updateLyricsPresent) writeLyricsFile(updateRecord.path, updateLyrics);
 				reply = {
 					success: true,
 					file: updateRecord.name,
-					tags: overrideState,
-					has_lyrics: !!String(updateLyrics || '').length
+					tags: (function(t) { var c = loadCharOverride(updateRecord.path); if (c) t.character = c; return t; })(overrideState),
+					has_lyrics: updateLyricsPresent ? !!String(updateLyrics || '').length : file_exists(lyricPathFor(updateRecord.path))
 				};
 			} catch (updateErr) {
 				log(LOG_ERR, 'files.ssjs update-track-meta error: ' + updateErr);

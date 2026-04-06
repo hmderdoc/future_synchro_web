@@ -6,7 +6,7 @@
 .ae-modal-overlay {
     position: fixed;
     inset: 0;
-    z-index: 10000;
+    z-index: 10030;
     background: rgba(0, 0, 0, 0.55);
 }
 
@@ -21,7 +21,7 @@
     box-shadow: 0 0 24px rgba(85, 255, 255, 0.25),
                 0 8px 40px rgba(0, 0, 0, 0.6);
     overflow: hidden;
-    z-index: 10001;
+    z-index: 10031;
     min-width: 480px;
     min-height: 360px;
 }

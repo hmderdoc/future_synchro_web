@@ -8,12 +8,6 @@
     var MIN_EDITOR_ZOOM = 2;
     var MAX_EDITOR_ZOOM = 10;
 
-    function binaryStringToUint8Array(bin) {
-        var bytes = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
-        return bytes;
-    }
-
     function editorToAvatarBase64(editor) {
         var doc = editor && editor.doc ? editor.doc : null;
         var out = '';
@@ -38,6 +32,47 @@
         } catch (err) {
             return '';
         }
+    }
+
+    function loadAvatarIntoEditor(editor, bin) {
+        var grid = [];
+        var i;
+        var attr;
+
+        if (!editor || !editor.doc || typeof editor.doc.replaceAll !== 'function') return false;
+
+        if (bin && bin.length === AVATAR_BYTES) {
+            for (i = 0; i < AVATAR_BYTES; i += 2) {
+                attr = bin.charCodeAt(i + 1) & 0xff;
+                grid.push({
+                    code: bin.charCodeAt(i) & 0xff,
+                    fg: attr & 0x0f,
+                    bg: (attr >> 4) & 0x07
+                });
+            }
+        } else {
+            for (i = 0; i < AVATAR_COLUMNS * AVATAR_ROWS; i++) {
+                grid.push({ code: 32, fg: 7, bg: 0 });
+            }
+        }
+
+        editor.doc.replaceAll(grid, AVATAR_COLUMNS, AVATAR_ROWS);
+        editor.columns = AVATAR_COLUMNS;
+        editor.rows = AVATAR_ROWS;
+        if (editor._rebuildCanvas) editor._rebuildCanvas();
+        if (editor._moveCursor) editor._moveCursor(0, 0);
+        if (editor._updateStatusBar) editor._updateStatusBar();
+        return true;
+    }
+
+    function primeAvatarEditor(editor, bin) {
+        if (!editor) return false;
+        loadAvatarIntoEditor(editor, bin);
+        if (typeof editor._selectTool === 'function') editor._selectTool('brush');
+        if (typeof editor._setBrushMode === 'function') editor._setBrushMode('custom_block');
+        if (typeof editor._setFg === 'function') editor._setFg(15);
+        if (typeof editor._setBg === 'function') editor._setBg(0);
+        return true;
     }
 
     function clearNode(node) {
@@ -404,8 +439,14 @@
                 return;
             }
 
+            // Safari appears more sensitive to stacked fixed overlays than Chromium.
+            // Ensure the page-owned avatar library modal is fully out of the way
+            // before we open the separate ANSI editor modal.
+            closeModal();
+
             var currentBase64 = state.current && state.current.data ? state.current.data : '';
             var currentBin = decodeBase64(currentBase64);
+            var seedBin = state.mode === 'account' ? '' : currentBin;
 
             AnsiEditorModal.open({
                 title: 'Avatar Editor',
@@ -419,13 +460,7 @@
                 fontUrl: './fonts/ansi-editor/IBM VGA.F16',
                 onReady: function (editor) {
                     var modalEl = document.querySelector('.ae-modal-window.ae-modal-avatar');
-                    if (editor && editor.setCanvasSize) editor.setCanvasSize(AVATAR_COLUMNS, AVATAR_ROWS);
-                    if (currentBin && editor && editor.loadBytes) {
-                        editor.loadBytes(binaryStringToUint8Array(currentBin), 'avatar.bin');
-                        if (editor.setCanvasSize && (editor.columns !== AVATAR_COLUMNS || editor.rows !== AVATAR_ROWS)) {
-                            editor.setCanvasSize(AVATAR_COLUMNS, AVATAR_ROWS);
-                        }
-                    }
+                    primeAvatarEditor(editor, seedBin);
                     createEditorZoomControls(editor, modalEl);
                 },
                 onDone: function (editor) {

@@ -41,6 +41,15 @@
     var metaAltTimer  = null;  // alternation timer for mini bar text
     var metaAltState  = 0;     // 0 = artist, 1 = title
     var metaToggleAt  = 0;
+    var lyricEditorState = {
+        lineIndex: -1,
+        dirty: false,
+        saving: false,
+        followLive: true,
+        statusTimer: 0,
+        skipBlurSave: false,
+        drag: null
+    };
 
     // Karaoke system state
     var karaokeCanvas = null;
@@ -50,6 +59,7 @@
     var ballX         = 0;
     var ballTrail     = [];     // [{x, y, alpha}, ...] phosphor trail
     var wordPositions = [];     // [{x, width, word}, ...] for current line
+    var currentLyricLayout = null;
 
     // CGA-inspired color schemes (fg, highlight, glow)
     var LYRIC_SCHEMES = [
@@ -115,6 +125,7 @@
     // Lyric display modes
     var LYRIC_MODE_BOUNCING = 0;
     var LYRIC_MODE_SPITTING = 1;
+    var LYRIC_EDITOR_HINT = 'Enter saves. Shift+Enter inserts. Space resumes.';
     var lyricMode = LYRIC_MODE_SPITTING;  // default mode
 
     // Spitting lyrics particle system
@@ -128,6 +139,8 @@
     var elFxLyrics, elFxLasers, elFxWave;
     var elMetaHud, elMetaArt, elMetaTitle;
     var elMetaArtist, elMetaComposer, elMetaAlbum, elMetaYear, elMetaGenre;
+    var elLyricEditor, elLyricEditorBall, elLyricEditorTime, elLyricEditorInsert;
+    var elLyricEditorInput, elLyricEditorStatus;
 
     // --- Character system ------------------------------------------------
     // Each character defines head geometry, colors, and optional features
@@ -1783,7 +1796,7 @@
     var LASER_RED = '#FF5555';
 
     function isEditableTarget(target) {
-        return !!(target && target.closest && target.closest('input, textarea, select, [contenteditable="true"]'));
+        return !!(target && target.closest && target.closest('input, textarea, select, button, a, [contenteditable="true"]'));
     }
 
     function setFxValue(el, text, modeClass) {
@@ -1917,12 +1930,79 @@
         elMetaAlbum    = document.getElementById('viz-meta-album-val');
         elMetaYear     = document.getElementById('viz-meta-year-val');
         elMetaGenre    = document.getElementById('viz-meta-genre-val');
+        elLyricEditor  = document.getElementById('viz-lyric-editor');
+        elLyricEditorBall = document.getElementById('viz-lyric-editor-ball');
+        elLyricEditorTime = document.getElementById('viz-lyric-editor-time');
+        elLyricEditorInsert = document.getElementById('viz-lyric-editor-insert');
+        elLyricEditorInput = document.getElementById('viz-lyric-editor-input');
+        elLyricEditorStatus = document.getElementById('viz-lyric-editor-status');
 
         // Click/tap HUD to toggle minimize/expand
         if (elMetaHud) {
             elMetaHud.addEventListener('pointerup', onMetaHudActivate);
             elMetaHud.addEventListener('click', onMetaHudActivate);
         }
+        if (elLyricEditorInput) {
+            elLyricEditorInput.title = LYRIC_EDITOR_HINT;
+            elLyricEditorInput.addEventListener('focus', function () {
+                lyricEditorState.followLive = false;
+                setLyricEditorStatus(LYRIC_EDITOR_HINT, false, false);
+            });
+            elLyricEditorInput.addEventListener('input', function () {
+                lyricEditorState.dirty = true;
+                lyricEditorState.followLive = false;
+                updateLyricEditorStateClass();
+            });
+            elLyricEditorInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && e.shiftKey) {
+                    e.preventDefault();
+                    insertLyricEditorLine();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveLyricEditorLine({ blurAfter: true });
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    lyricEditorState.skipBlurSave = true;
+                    revertLyricEditorInput();
+                    elLyricEditorInput.blur();
+                }
+            });
+            elLyricEditorInput.addEventListener('blur', function () {
+                var line;
+                if (lyricEditorState.skipBlurSave) {
+                    lyricEditorState.skipBlurSave = false;
+                    return;
+                }
+                if (lyricEditorState.dirty) {
+                    saveLyricEditorLine();
+                    return;
+                }
+                line = getLyricEditorLine();
+                if (isPendingLyricInsertLine(line) && !normalizeLyricLineText(elLyricEditorInput.value)) {
+                    discardPendingLyricInsertLine();
+                }
+            });
+        }
+        if (elLyricEditor) {
+            elLyricEditor.addEventListener('pointerdown', function (e) {
+                if (!isOpen) return;
+                if (e.target === elLyricEditorInput || e.target === elLyricEditorBall) return;
+                focusLyricEditorInput(false);
+            });
+        }
+        if (elLyricEditorBall) {
+            elLyricEditorBall.addEventListener('pointerdown', function (e) {
+                beginLyricEditorDrag(e);
+            });
+        }
+        if (elLyricEditorInsert) {
+            elLyricEditorInsert.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                insertLyricEditorLine();
+            });
+        }
+        setLyricEditorStatus('', false, true);
         elFxLasers = document.getElementById('viz-fx-lasers');
         elFxWave = document.getElementById('viz-fx-wave');
         updateFxHud();
@@ -1964,12 +2044,30 @@
 
         // Allow external components to request opening the visualizer
         document.addEventListener('viz:open', function () { show(); });
+        document.addEventListener('pointermove', onLyricEditorDragMove);
+        document.addEventListener('pointerup', endLyricEditorDrag);
+        document.addEventListener('pointercancel', endLyricEditorDrag);
 
         // Keyboard shortcuts for visualizer FX when open
         document.addEventListener('keydown', function(e) {
             if (!isOpen) return;
             if (isEditableTarget(e.target)) return;
-            if (e.key === 'l' || e.key === 'L') {
+            if ((e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') && !e.repeat) {
+                if (window.sbbsRadio && typeof window.sbbsRadio.togglePlay === 'function') {
+                    e.preventDefault();
+                    discardPendingLyricInsertLine();
+                    window.sbbsRadio.togglePlay();
+                }
+            } else if ((e.code === 'Enter' || e.key === 'Enter') && e.shiftKey && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                if (shouldShowInlineLyricEditor(getCurrentPlaybackTime())) {
+                    e.preventDefault();
+                    insertLyricEditorLine();
+                }
+            } else if ((e.code === 'Enter' || e.key === 'Enter') && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                if (focusLyricEditorInput(true)) {
+                    e.preventDefault();
+                }
+            } else if (e.key === 'l' || e.key === 'L') {
                 e.preventDefault();
                 toggleLyricMode();
             } else if (e.key === 'e' || e.key === 'E') {
@@ -2015,6 +2113,7 @@
         if (!initButterchurn()) { scheduleButterchurnRetry(); }
         resetLyricFxState();
         resetDanceTimestamps();
+        resetLyricEditorState(true);
         updateFxHud();
         startAnim();
         fetchMetadata();
@@ -2065,6 +2164,7 @@
         lastCanvasH = 0;
         if (presetTimer) { clearInterval(presetTimer); presetTimer = null; }
 
+        resetLyricEditorState();
         hideMetaHud();
         console.log('[viz] closed');
     }
@@ -2394,12 +2494,15 @@
             }
         }
 
+        var inlineEditorVisible = shouldShowInlineLyricEditor(vizTime);
+
         drawHead(amp, bass, vocalPresence, getLyricMouthState(vizTime));
-        if (lyricMode === LYRIC_MODE_SPITTING) {
+        if (lyricMode === LYRIC_MODE_SPITTING && !inlineEditorVisible) {
             syncLyricsSpitting();
         } else {
             syncLyrics();
         }
+        syncLyricEditorUi(vizTime);
     }
 
     // =========================================================
@@ -2745,7 +2848,11 @@
         var blinkAmount = getEyeBlinkAmount(eyeName);
         var shape = char.eyeShape || 'round';
 
-        if (shape === 'square') {
+        if (shape === 'round_filled') {
+            drawFilledEye(eye, proj, eyeName, char, blinkAmount);
+        } else if (shape === 'square_filled') {
+            drawSquareFilledEye(eye, proj, eyeName, char, blinkAmount);
+        } else if (shape === 'square') {
             drawSquareEye(eye, proj, eyeName, char, blinkAmount);
         } else if (shape === 'clippy') {
             drawGooglyEye(eye, proj, eyeName, char, blinkAmount);
@@ -2867,6 +2974,74 @@
             wireCtx.strokeStyle = 'rgba(' + eRGB + ',0.85)';
             wireCtx.lineWidth = 1.1 + eyeGlow * 0.5;
             wireCtx.stroke();
+        }
+    }
+
+    // Filled iris eye — solid colored circle with dark pupil center
+    function drawFilledEye(eye, proj, eyeName, char, blinkAmount) {
+        var segs = 16, pts = [];
+        var eyeScaleY = Math.max(0.08, 0.7 - blinkAmount * 0.62);
+        for (var i = 0; i <= segs; i++) {
+            var a = (i / segs) * Math.PI * 2;
+            pts.push(proj(eye.x + eye.r * Math.cos(a), eye.y + eye.r * Math.sin(a) * eyeScaleY, eye.z));
+        }
+        var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
+        var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
+        if (char.cgaWireframe) { var ec = getCgaColor(); eHex = ec.hex; eRGB = ec.rgb; }
+        wireCtx.shadowBlur = 10 + eyeGlow * 16;
+        wireCtx.shadowColor = eHex;
+        // Fill the iris
+        wireCtx.fillStyle = 'rgba(' + eRGB + ',' + (0.6 + eyeGlow * 0.4) + ')';
+        wireCtx.beginPath();
+        for (var i = 0; i < pts.length; i++) { i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y); }
+        wireCtx.fill();
+        // Outline
+        var oHex = (char.eyeOutlineColor ? char.eyeOutlineColor.hex : eHex);
+        var oRGB = (char.eyeOutlineColor ? char.eyeOutlineColor.rgb : eRGB);
+        wireCtx.strokeStyle = 'rgba(' + oRGB + ',' + (0.8 + eyeGlow * 0.2) + ')';
+        wireCtx.lineWidth = 1.5;
+        wireCtx.beginPath();
+        for (var i = 0; i < pts.length; i++) { i === 0 ? wireCtx.moveTo(pts[i].x, pts[i].y) : wireCtx.lineTo(pts[i].x, pts[i].y); }
+        wireCtx.stroke();
+        // Dark pupil center
+        if (blinkAmount < 0.72) {
+            var c = proj(eye.x, eye.y, eye.z);
+            var pupilR = 3.0 + eyeGlow * 2.5;
+            wireCtx.beginPath(); wireCtx.arc(c.x, c.y, pupilR, 0, Math.PI * 2);
+            wireCtx.fillStyle = 'rgba(0,0,0,' + (0.7 + eyeGlow * 0.3) + ')';
+            wireCtx.shadowBlur = 0;
+            wireCtx.fill();
+        }
+    }
+
+    // Filled square eye — solid colored square with dark pupil center
+    function drawSquareFilledEye(eye, proj, eyeName, char, blinkAmount) {
+        var eHex = (char.eyeColor ? char.eyeColor.hex : char.wireColor);
+        var eRGB = (char.eyeColor ? char.eyeColor.rgb : char.wireRGB);
+        if (char.cgaWireframe) { var ec = getCgaColor(); eHex = ec.hex; eRGB = ec.rgb; }
+        var r = eye.r;
+        var hw = r * 1.15, hh = r * 0.9;
+        var squish = Math.max(0.06, 1 - blinkAmount * 0.92);
+        var tl = proj(eye.x - hw, eye.y + hh * squish, eye.z);
+        var tr = proj(eye.x + hw, eye.y + hh * squish, eye.z);
+        var br = proj(eye.x + hw, eye.y - hh * squish, eye.z);
+        var bl = proj(eye.x - hw, eye.y - hh * squish, eye.z);
+        wireCtx.shadowBlur = 8 + eyeGlow * 12;
+        wireCtx.shadowColor = eHex;
+        // Filled square
+        wireCtx.fillStyle = 'rgba(' + eRGB + ',' + (0.5 + eyeGlow * 0.3) + ')';
+        wireCtx.beginPath();
+        wireCtx.moveTo(tl.x, tl.y); wireCtx.lineTo(tr.x, tr.y);
+        wireCtx.lineTo(br.x, br.y); wireCtx.lineTo(bl.x, bl.y);
+        wireCtx.closePath(); wireCtx.fill();
+        wireCtx.strokeStyle = 'rgba(' + eRGB + ',' + (0.8 + eyeGlow * 0.2) + ')';
+        wireCtx.lineWidth = 1.4; wireCtx.stroke();
+        // Dark pupil square
+        if (blinkAmount < 0.72) {
+            var pw = hw * 0.35, ph = hh * squish * 0.35;
+            var c = proj(eye.x, eye.y, eye.z);
+            wireCtx.fillStyle = 'rgba(0,0,0,0.8)'; wireCtx.shadowBlur = 0;
+            wireCtx.fillRect(c.x - pw * 30 * c.d, c.y - ph * 30 * c.d, pw * 60 * c.d, ph * 60 * c.d);
         }
     }
 
@@ -3113,8 +3288,10 @@
             wireCtx.shadowColor = mc1.hex;
             wireCtx.strokeStyle = 'rgba(' + mc1.rgb + ',' + (0.7 + mouthOpen * 0.3) + ')';
         } else {
-            wireCtx.shadowColor = char.accentColor;
-            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
+            var mLipHex = char.lipColor || char.accentColor;
+            var mLipRGB = char.lipRGB || char.accentRGB;
+            wireCtx.shadowColor = mLipHex;
+            wireCtx.strokeStyle = 'rgba(' + mLipRGB + ',' + (0.6 + mouthOpen * 0.4) + ')';
         }
         wireCtx.lineWidth   = 1.5 + mouthOpen;
 
@@ -4821,6 +4998,74 @@
         // =========================================================
     //  Pucker Mouth Renderer (pursed lips → screaming oval)
     // =========================================================
+
+    // =========================================================
+    //  Shared teeth renderer — called by all mouth variants
+    // =========================================================
+    function drawMouthTeeth(proj, mth, openAmt, mouthCX, mouthCY, mouthCZ, halfW, halfH) {
+        if (!openAmt || openAmt < 0.008) return;
+        if (!mth.teeth && !mth.bucktooth) return;
+
+        // Row of vertical teeth lines
+        if (mth.teeth && openAmt > 0.015) {
+            var tN = Math.max(3, Math.floor((mth.segs || 10) * 0.7));
+            var tRGB = mth.teethColor || '255,255,255';
+            var tAlpha = Math.min(0.95, openAmt * 5);
+            wireCtx.strokeStyle = 'rgba(' + tRGB + ',' + tAlpha + ')';
+            wireCtx.shadowColor = 'rgba(' + tRGB + ',1)';
+            wireCtx.shadowBlur  = 6 + openAmt * 10;
+            wireCtx.lineWidth   = 1.0;
+            for (var ti = 1; ti < tN; ti++) {
+                var tt = (ti / tN) * 2 - 1;
+                var tx = mouthCX + tt * halfW * 0.88;
+                var topP = proj(tx, mouthCY + halfH * 0.75, mouthCZ);
+                var botP = proj(tx, mouthCY - halfH * 0.75, mouthCZ);
+                wireCtx.beginPath();
+                wireCtx.moveTo(topP.x, topP.y);
+                wireCtx.lineTo(botP.x, botP.y);
+                wireCtx.stroke();
+            }
+        }
+
+        // Bucktooth (two big front teeth from upper lip)
+        if (mth.bucktooth && openAmt > 0.008) {
+            var btRGB = mth.bucktoothColor || '255,255,255';
+            var btAlpha = Math.min(0.95, openAmt * 6);
+            var btHang = openAmt * 0.65 + 0.012;
+            var btWidth = halfW * 0.18;
+            var btGap   = halfW * 0.04;
+
+            wireCtx.shadowColor = 'rgba(' + btRGB + ',1)';
+            wireCtx.shadowBlur  = 6 + openAmt * 8;
+            wireCtx.strokeStyle = 'rgba(' + btRGB + ',' + btAlpha + ')';
+            wireCtx.lineWidth = 1.2;
+
+            // Left tooth
+            var ltl = proj(mouthCX - btGap - btWidth, mouthCY + halfH * 0.1, mouthCZ);
+            var ltr = proj(mouthCX - btGap,           mouthCY + halfH * 0.1, mouthCZ);
+            var lbr = proj(mouthCX - btGap,           mouthCY + halfH * 0.1 - btHang, mouthCZ);
+            var lbl = proj(mouthCX - btGap - btWidth, mouthCY + halfH * 0.1 - btHang, mouthCZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
+            wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl.x, lbl.y);
+            wireCtx.closePath(); wireCtx.stroke();
+            wireCtx.fillStyle = 'rgba(' + btRGB + ',' + (btAlpha * 0.3) + ')';
+            wireCtx.fill();
+
+            // Right tooth
+            var rtl = proj(mouthCX + btGap,           mouthCY + halfH * 0.1, mouthCZ);
+            var rtr = proj(mouthCX + btGap + btWidth, mouthCY + halfH * 0.1, mouthCZ);
+            var rbr = proj(mouthCX + btGap + btWidth, mouthCY + halfH * 0.1 - btHang, mouthCZ);
+            var rbl = proj(mouthCX + btGap,           mouthCY + halfH * 0.1 - btHang, mouthCZ);
+            wireCtx.beginPath();
+            wireCtx.moveTo(rtl.x, rtl.y); wireCtx.lineTo(rtr.x, rtr.y);
+            wireCtx.lineTo(rbr.x, rbr.y); wireCtx.lineTo(rbl.x, rbl.y);
+            wireCtx.closePath(); wireCtx.stroke();
+            wireCtx.fillStyle = 'rgba(' + btRGB + ',' + (btAlpha * 0.3) + ')';
+            wireCtx.fill();
+        }
+    }
+
     function drawPuckerMouth(proj, char, mth) {
         var open = mouthOpen;
         var t = performance.now() * 0.001;
@@ -4858,9 +5103,11 @@
 
         // Lip color — more visible when puckered
         var lipAlpha = 0.5 + open * 0.4 + (1 - open) * 0.3;
+        var pLipHex = char.lipColor || char.accentColor;
+        var pLipRGB = char.lipRGB || char.accentRGB;
         wireCtx.shadowBlur = 6 + mouthOpen * 14;
-        wireCtx.shadowColor = char.accentColor;
-        wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + lipAlpha + ')';
+        wireCtx.shadowColor = pLipHex;
+        wireCtx.strokeStyle = 'rgba(' + pLipRGB + ',' + lipAlpha + ')';
         wireCtx.lineWidth = 1.8 + (1 - openCurve) * 1.2;  // thicker lips when pursed
         wireCtx.lineCap = 'round';
         wireCtx.beginPath();
@@ -4901,31 +5148,10 @@
             wireCtx.fill();
         }
 
-        // Teeth visible when screaming (open > 0.3)
-        if (openCurve > 0.15) {
-            var teethAlpha = Math.min(0.9, (openCurve - 0.15) * 2.5);
-            wireCtx.strokeStyle = 'rgba(255,255,255,' + teethAlpha + ')';
-            wireCtx.shadowColor = 'rgba(255,255,255,1)';
-            wireCtx.shadowBlur  = 4 + mouthOpen * 8;
-            wireCtx.lineWidth   = 0.8;
 
-            // Upper teeth: short vertical lines hanging from top of mouth
-            var teethN = 6;
-            for (var ti = 0; ti < teethN; ti++) {
-                var tt = ((ti + 0.5) / teethN) * 2 - 1;  // -1..1
-                var tWidth = mouthW * 0.85;
-                var tx = cx + tt * tWidth;
-                // Only draw where the ellipse has room
-                var ellipseTop = cy + mouthH * Math.sqrt(Math.max(0, 1 - (tt * tt)));
-                var toothBot = cy + mouthH * 0.3;  // teeth hang 30% into mouth
-                var topP = proj(tx, ellipseTop, cz);
-                var botP = proj(tx, toothBot, cz);
-                wireCtx.beginPath();
-                wireCtx.moveTo(topP.x, topP.y);
-                wireCtx.lineTo(botP.x, botP.y);
-                wireCtx.stroke();
-            }
-        }
+        // Teeth (shared renderer)
+        drawMouthTeeth(proj, mth, openCurve, cx, cy, cz, mouthW, mouthH);
+
 
         // Pucker lines radiating out when mouth is closed/pursed
         if (openCurve < 0.25) {
@@ -4955,10 +5181,12 @@
 // =========================================================
     function drawSmileyMouth(proj, char, mth) {
         var open = mouthOpen * 0.07;
+        var smLipHex = char.lipColor || char.accentColor || char.wireColor;
+        var smLipRGB = char.lipRGB || char.accentRGB || char.wireRGB;
 
         // Simple arc smile — curves down (frown when closed, smile when singing)
         wireCtx.shadowBlur = 4 + mouthOpen * 12;
-        wireCtx.shadowColor = char.wireColor;
+        wireCtx.shadowColor = smLipHex;
 
         // Upper lip (static gentle smile curve)
         var pts = [];
@@ -4971,7 +5199,7 @@
             pts.push(proj(xp, yBase + open * curv * 0.5, mth.z));
         }
 
-        wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.50 + mouthOpen * 0.4) + ')';
+        wireCtx.strokeStyle = 'rgba(' + smLipRGB + ',' + (0.50 + mouthOpen * 0.4) + ')';
         wireCtx.lineWidth = 1.3 + mouthOpen * 0.8;
         wireCtx.beginPath();
         for (var i = 0; i < pts.length; i++) {
@@ -4988,7 +5216,7 @@
                 var xp = t * mth.hw * 0.9;
                 lower.push(proj(xp, mth.y - open * curv * 2.5 - 0.015, mth.z));
             }
-            wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.3 + mouthOpen * 0.35) + ')';
+            wireCtx.strokeStyle = 'rgba(' + smLipRGB + ',' + (0.3 + mouthOpen * 0.35) + ')';
             wireCtx.lineWidth = 1.0 + mouthOpen * 0.5;
             wireCtx.beginPath();
             for (var i = 0; i < lower.length; i++) {
@@ -5009,6 +5237,9 @@
                 wireCtx.fill();
             }
         }
+
+        // Teeth (shared renderer)
+        drawMouthTeeth(proj, mth, open, 0, mth.y, mth.z, mth.hw, open * 2.5);
     }
 
     // =========================================================
@@ -5101,6 +5332,8 @@
     //  Drive Slot Mouth (for floppy drive characters)
     // =========================================================
     function drawDriveSlot(proj, char, mth) {
+        var slotLipColor = char.lipColor || char.accentColor;
+        var slotLipRGB = char.lipRGB || char.accentRGB;
         var slotOpen = mouthOpen * 0.16;  // wider range than lip mouth
         var slotHW = mth.hw;
         var slotY = mth.y;
@@ -5124,7 +5357,7 @@
 
         // Slot opening glow
         wireCtx.shadowBlur = 4 + mouthOpen * 18;
-        wireCtx.shadowColor = char.accentColor;
+        wireCtx.shadowColor = slotLipColor;
 
         // Top rail (double line for thickness)
         wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',' + (0.6 + mouthOpen * 0.3) + ')';
@@ -5186,8 +5419,8 @@
             var headX = Math.sin(headT) * slotHW * 0.5;
             var headY = (railY1 + railY2) * 0.5;
             var headW = 0.06;
-            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + mechAlpha + ')';
-            wireCtx.shadowColor = char.accentColor;
+            wireCtx.strokeStyle = 'rgba(' + slotLipRGB + ',' + mechAlpha + ')';
+            wireCtx.shadowColor = slotLipColor;
             wireCtx.shadowBlur = 6 + mouthOpen * 12;
             wireCtx.lineWidth = 1.2;
             var hl = proj(headX - headW, headY, mechInnerZ);
@@ -5198,7 +5431,7 @@
 
             // Read head vertical arm
             wireCtx.lineWidth = 0.6;
-            wireCtx.strokeStyle = 'rgba(' + char.accentRGB + ',' + (mechAlpha * 0.6) + ')';
+            wireCtx.strokeStyle = 'rgba(' + slotLipRGB + ',' + (mechAlpha * 0.6) + ')';
             var hc = proj(headX, railY1, mechInnerZ);
             var hb = proj(headX, railY2, mechInnerZ);
             wireCtx.beginPath();
@@ -5214,11 +5447,14 @@
                 gc.x, gc.y, 0,
                 gc.x, gc.y, Math.abs(tr.x - tl.x) * 0.5
             );
-            grad.addColorStop(0, 'rgba(' + char.accentRGB + ',' + glowAlpha + ')');
-            grad.addColorStop(1, 'rgba(' + char.accentRGB + ',0)');
+            grad.addColorStop(0, 'rgba(' + slotLipRGB + ',' + glowAlpha + ')');
+            grad.addColorStop(1, 'rgba(' + slotLipRGB + ',0)');
             wireCtx.fillStyle = grad;
             wireCtx.fillRect(tl.x, tl.y, tr.x - tl.x, bl.y - tl.y);
         }
+
+        // Teeth (shared renderer)
+        drawMouthTeeth(proj, mth, slotOpen, 0, mth.y, mth.z, slotHW, slotOpen);
     }
 
     // =========================================================
@@ -5250,7 +5486,7 @@
                 var isBottom = (sets[si] === 'bottom');
                 // Bottom lashes: shorter, fewer
                 var setCount = isBottom ? Math.max(3, count - 1) : count;
-                var setLen   = isBottom ? lash.length * 0.55 : lash.length;
+                var setLen   = (isBottom ? lash.length * 0.55 : lash.length) * 2.5;
 
                 for (var i = 0; i < setCount; i++) {
                     var frac = setCount > 1 ? (i / (setCount - 1)) : 0.5;
@@ -6420,7 +6656,7 @@
         var glowW     = body.glowWidth || 6;
 
         // Body origin: directly below the chin
-        var chinY = -0.80;
+        var chinY = (char.boxDims) ? -(char.boxDims.h + 0.06) : -0.80;
         var neckScreen = projectHeadPoint(projState, 0, chinY, 0, projState.pulse || 1);
         var bodyOriginX = neckScreen.x;
         var bodyOriginY = neckScreen.y;
@@ -6759,6 +6995,7 @@
         lrcLines  = [];
         lrcIndex  = -1;
         trackMeta = null;
+        resetLyricEditorState();
         setActiveCharacter('_default');
         resetLyricFxState();
         if (elLyrics) elLyrics.textContent = '';
@@ -6794,6 +7031,57 @@
         return merged;
     }
 
+    function trimText(value) {
+        return String(value == null ? '' : value).replace(/\r/g, '').trim();
+    }
+
+    function normalizeContributorName(value) {
+        return trimText(value).replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function splitContributorNames(value) {
+        return trimText(value)
+            .split(/\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*/i)
+            .map(function (entry) {
+                return trimText(entry);
+            })
+            .filter(Boolean);
+    }
+
+    function currentUserAlias() {
+        return trimText(window.sbbsConfig && window.sbbsConfig.userAlias ? window.sbbsConfig.userAlias : '');
+    }
+
+    function isSysopUser() {
+        return !!(window.sbbsConfig && window.sbbsConfig.isSysop);
+    }
+
+    function getEffectiveTrackMeta() {
+        return mergeTrackTags(trackMeta, getRadioTrackTags(trackFile));
+    }
+
+    function canCurrentUserEditLyrics() {
+        var alias;
+        var tags;
+        var composers;
+
+        if (isSysopUser()) return true;
+        alias = normalizeContributorName(currentUserAlias());
+        if (!alias) return false;
+
+        tags = getEffectiveTrackMeta();
+        composers = splitContributorNames(tags && tags.composer ? tags.composer : '');
+        return composers.some(function (name) {
+            return normalizeContributorName(name) === alias;
+        });
+    }
+
+    function getTrackMetaUpdateUrl() {
+        var radio = window.sbbsRadio;
+        var dirCode = radio && radio.dirCode ? String(radio.dirCode) : 'originalcontent_mp3s';
+        return './api/files.ssjs?call=update-track-meta&dir=' + encodeURIComponent(dirCode);
+    }
+
     function getRadioTrackTags(filename) {
         var radio = window.sbbsRadio;
         if (!radio) return {};
@@ -6814,7 +7102,21 @@
         var merged = mergeTrackTags(tags, getRadioTrackTags(trackFile));
 
         trackMeta = merged;
-        setActiveCharacter(getCharacterForArtist(merged.artist));
+
+        // Per-track character override (Option B: INI-stored JSON)
+        if (merged.character) {
+            try {
+                var customCharDef = JSON.parse(merged.character);
+                CHARACTERS['_track_custom'] = customCharDef;
+                setActiveCharacter('_track_custom');
+                console.log('[viz] per-track character override: ' + (customCharDef.name || 'custom'));
+            } catch (charParseErr) {
+                console.warn('[viz] bad character JSON in track override, falling back to artist', charParseErr);
+                setActiveCharacter(getCharacterForArtist(merged.artist));
+            }
+        } else {
+            setActiveCharacter(getCharacterForArtist(merged.artist));
+        }
         console.log('[viz] metadata ready:', merged.artist || '(none)',
                     '| genre:', merged.genre || '(none)',
                     '| SYLT lines:', merged.sylt && merged.sylt.length ? merged.sylt.length : 0,
@@ -7005,6 +7307,570 @@
         if (metaArtUrl) { URL.revokeObjectURL(metaArtUrl); metaArtUrl = ''; }
     }
 
+    function clearLyricEditorStatusTimer() {
+        if (lyricEditorState.statusTimer) {
+            clearTimeout(lyricEditorState.statusTimer);
+            lyricEditorState.statusTimer = 0;
+        }
+    }
+
+    function setLyricEditorStatus(message, isError, sticky) {
+        if (!elLyricEditorStatus) return;
+        clearLyricEditorStatusTimer();
+        if (!message) {
+            elLyricEditorStatus.hidden = true;
+            elLyricEditorStatus.textContent = '';
+            elLyricEditorStatus.classList.remove('is-error', 'is-success');
+            return;
+        }
+        elLyricEditorStatus.hidden = false;
+        elLyricEditorStatus.textContent = message;
+        elLyricEditorStatus.classList.toggle('is-error', !!isError);
+        elLyricEditorStatus.classList.toggle('is-success', !isError);
+        if (!sticky) {
+            lyricEditorState.statusTimer = setTimeout(function () {
+                setLyricEditorStatus('', false, true);
+            }, 1800);
+        }
+    }
+
+    function updateLyricEditorStateClass() {
+        if (!elLyricEditor) return;
+        elLyricEditor.classList.toggle('is-dirty', !!lyricEditorState.dirty);
+        elLyricEditor.classList.toggle('is-saving', !!lyricEditorState.saving);
+        elLyricEditor.classList.toggle('is-dragging', !!(lyricEditorState.drag && lyricEditorState.drag.active));
+    }
+
+    function setLyricEditorBusy(isBusy) {
+        var disabled = !!isBusy;
+        lyricEditorState.saving = disabled;
+        if (elLyricEditorInput) elLyricEditorInput.disabled = disabled;
+        updateLyricEditorStateClass();
+    }
+
+    function resetLyricEditorState(preserveStatusHint) {
+        clearLyricEditorStatusTimer();
+        lyricEditorState.lineIndex = -1;
+        lyricEditorState.dirty = false;
+        lyricEditorState.saving = false;
+        lyricEditorState.followLive = true;
+        lyricEditorState.skipBlurSave = false;
+        lyricEditorState.drag = null;
+        currentLyricLayout = null;
+        setLyricEditorBusy(false);
+        if (elLyricEditorInput) elLyricEditorInput.value = '';
+        if (elLyricEditorTime) elLyricEditorTime.textContent = '[00:00.00]';
+        if (elLyricEditor) elLyricEditor.hidden = true;
+        setLyricEditorStatus('', false, true);
+        updateLyricEditorStateClass();
+    }
+
+    function getCurrentPlaybackTime() {
+        var radio = window.sbbsRadio;
+        return radio && isFinite(radio.currentTime) ? Number(radio.currentTime) : 0;
+    }
+
+    function formatCueTime(seconds) {
+        var total = Math.max(0, Number(seconds) || 0);
+        var mins = Math.floor(total / 60);
+        var secs = Math.floor(total % 60);
+        var centis = Math.round((total - Math.floor(total)) * 100);
+
+        if (centis > 99) {
+            centis = 0;
+            secs += 1;
+        }
+        if (secs > 59) {
+            secs = 0;
+            mins += 1;
+        }
+        return String(mins).padStart(2, '0') + ':' +
+            String(secs).padStart(2, '0') + '.' +
+            String(centis).padStart(2, '0');
+    }
+
+    function formatLrcTime(seconds) {
+        return '[' + formatCueTime(seconds) + ']';
+    }
+
+    function normalizeLyricLineText(value) {
+        return String(value == null ? '' : value)
+            .replace(/\r/g, '')
+            .replace(/\n+/g, ' ')
+            .trim();
+    }
+
+    function serializeLrcLines(lines) {
+        return lines
+            .filter(function (line) {
+                return line && isFinite(line.time) && normalizeLyricLineText(line.text);
+            })
+            .slice()
+            .sort(function (a, b) {
+                return a.time - b.time;
+            })
+            .map(function (line) {
+                return formatLrcTime(line.time) + normalizeLyricLineText(line.text);
+            })
+            .join('\n');
+    }
+
+    function getLyricCueAtTime(now) {
+        var ni = -1;
+        var nextLineTime = Infinity;
+        var i;
+
+        for (i = lrcLines.length - 1; i >= 0; i--) {
+            if (now >= lrcLines[i].time) {
+                ni = i;
+                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
+                break;
+            }
+        }
+        if (ni < 0 && lrcLines.length) {
+            nextLineTime = lrcLines[0].time;
+        }
+        return { index: ni, nextTime: nextLineTime };
+    }
+
+    function getPreferredLyricEditorIndex(now) {
+        var cue = getLyricCueAtTime(now);
+        if (!lrcLines.length) return -1;
+        return cue.index >= 0 ? cue.index : 0;
+    }
+
+    function getLyricEditorLine() {
+        if (lyricEditorState.lineIndex < 0 || lyricEditorState.lineIndex >= lrcLines.length) return null;
+        return lrcLines[lyricEditorState.lineIndex];
+    }
+
+    function isPendingLyricInsertLine(line) {
+        return !!(line && line._pendingInsert);
+    }
+
+    function discardPendingLyricInsertLine() {
+        var index = -1;
+        var i;
+        var now;
+
+        for (i = 0; i < lrcLines.length; i++) {
+            if (isPendingLyricInsertLine(lrcLines[i])) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) return false;
+
+        lrcLines.splice(index, 1);
+        now = getCurrentPlaybackTime();
+        lyricEditorState.lineIndex = lrcLines.length ? getPreferredLyricEditorIndex(now) : -1;
+        lyricEditorState.dirty = false;
+        lyricEditorState.followLive = true;
+        lyricEditorState.skipBlurSave = false;
+        if (elLyricEditorInput) elLyricEditorInput.value = '';
+        updateLyricEditorStateClass();
+        setLyricEditorStatus('', false, true);
+        return true;
+    }
+
+    function shouldShowInlineLyricEditor(now) {
+        var radio = window.sbbsRadio;
+
+        return !!(
+            isOpen &&
+            radio &&
+            !radio.isPlaying &&
+            canCurrentUserEditLyrics() &&
+            trackFile &&
+            lrcLines.length &&
+            getPreferredLyricEditorIndex(now) >= 0
+        );
+    }
+
+    function getLyricInsertContext(now) {
+        var cue = getLyricCueAtTime(now);
+        var insertAfter = cue.index;
+        var insertBefore = cue.index + 1;
+        var minTime = 0;
+        var maxTime = Math.max(0, now);
+
+        if (insertAfter >= 0 && lrcLines[insertAfter]) {
+            minTime = Math.max(0, lrcLines[insertAfter].time + 0.02);
+        }
+        if (insertBefore < lrcLines.length && lrcLines[insertBefore]) {
+            maxTime = Math.min(maxTime, Math.max(minTime, lrcLines[insertBefore].time - 0.02));
+        }
+        if (maxTime < minTime) maxTime = minTime;
+
+        return {
+            insertAt: Math.max(0, insertBefore),
+            time: Math.max(minTime, Math.min(maxTime, Math.max(0, now)))
+        };
+    }
+
+    function getLyricEditorTimeBounds(index, now) {
+        var minTime = 0;
+        var maxTime = Math.max(0, now);
+
+        if (index > 0 && lrcLines[index - 1]) {
+            minTime = Math.max(0, lrcLines[index - 1].time + 0.02);
+        }
+        if (index + 1 < lrcLines.length && lrcLines[index + 1]) {
+            maxTime = Math.min(maxTime, Math.max(minTime, lrcLines[index + 1].time - 0.02));
+        }
+        if (maxTime < minTime) maxTime = minTime;
+        return { min: minTime, max: maxTime };
+    }
+
+    function deriveLyricStartFromProgress(index, progress, now) {
+        var nextLine = (index + 1 < lrcLines.length) ? lrcLines[index + 1] : null;
+        var nextTime = nextLine ? nextLine.time : Infinity;
+        var clampedProgress = Math.max(0, Math.min(0.999, progress));
+
+        if (!isFinite(nextTime) || (nextTime - now) > 30) {
+            return now - (clampedProgress * 4);
+        }
+
+        return (now - (clampedProgress * nextTime)) / Math.max(0.001, 1 - clampedProgress);
+    }
+
+    function clampLyricTime(seconds, index, now) {
+        var bounds = getLyricEditorTimeBounds(index, now);
+        return Math.max(bounds.min, Math.min(bounds.max, Math.max(0, seconds)));
+    }
+
+    function revertLyricEditorInput() {
+        var line = getLyricEditorLine();
+        if (isPendingLyricInsertLine(line)) {
+            discardPendingLyricInsertLine();
+            return;
+        }
+        lyricEditorState.dirty = false;
+        lyricEditorState.followLive = true;
+        if (elLyricEditorInput) elLyricEditorInput.value = line ? line.text : '';
+        updateLyricEditorStateClass();
+        setLyricEditorStatus('', false, true);
+    }
+
+    function insertLyricEditorLine() {
+        var now = getCurrentPlaybackTime();
+        var context;
+        var line;
+        var currentLine = getLyricEditorLine();
+
+        if (lyricEditorState.saving || !shouldShowInlineLyricEditor(now)) return Promise.resolve(false);
+        if (isPendingLyricInsertLine(currentLine) && !lyricEditorState.dirty &&
+                !normalizeLyricLineText(elLyricEditorInput ? elLyricEditorInput.value : '')) {
+            discardPendingLyricInsertLine();
+            now = getCurrentPlaybackTime();
+        }
+
+        if (lyricEditorState.dirty) {
+            return saveLyricEditorLine().then(function (saved) {
+                if (!saved) return false;
+                return insertLyricEditorLine();
+            });
+        }
+
+        context = getLyricInsertContext(now);
+        line = { time: context.time, text: '', _pendingInsert: true };
+        lrcLines.splice(context.insertAt, 0, line);
+        lyricEditorState.lineIndex = context.insertAt;
+        lyricEditorState.dirty = false;
+        lyricEditorState.followLive = false;
+        lyricEditorState.skipBlurSave = false;
+        if (elLyricEditorInput) elLyricEditorInput.value = '';
+        updateLyricEditorStateClass();
+        setLyricEditorStatus('New line at ' + formatCueTime(context.time), false, false);
+        focusLyricEditorInput(false);
+        return Promise.resolve(true);
+    }
+
+    function focusLyricEditorInput(selectText) {
+        var now;
+
+        if (!elLyricEditorInput || !elLyricEditor || elLyricEditor.hidden || lyricEditorState.saving) return false;
+        now = getCurrentPlaybackTime();
+        if (lyricEditorState.lineIndex < 0) {
+            lyricEditorState.lineIndex = getPreferredLyricEditorIndex(now);
+        }
+        if (lyricEditorState.lineIndex < 0) return false;
+        lyricEditorState.followLive = false;
+        elLyricEditorInput.focus();
+        if (selectText && typeof elLyricEditorInput.select === 'function') {
+            elLyricEditorInput.select();
+        }
+        return true;
+    }
+
+    function beginLyricEditorDrag(e) {
+        var now = getCurrentPlaybackTime();
+        var line = getLyricEditorLine();
+        var bounds;
+        var activeElement;
+
+        if (!e || !elLyricEditorBall || lyricEditorState.saving || !currentLyricLayout || !shouldShowInlineLyricEditor(now) || !line) return;
+
+        activeElement = document.activeElement;
+        if (activeElement === elLyricEditorInput) {
+            lyricEditorState.skipBlurSave = true;
+            elLyricEditorInput.blur();
+        }
+
+        bounds = getLyricEditorTimeBounds(lyricEditorState.lineIndex, now);
+        lyricEditorState.followLive = false;
+        lyricEditorState.drag = {
+            active: true,
+            pointerId: e.pointerId,
+            startClientX: e.clientX,
+            startTime: line.time,
+            previewTime: line.time,
+            startBallOffset: currentLyricLayout.ballOffset,
+            previewBallOffset: currentLyricLayout.ballOffset,
+            minTime: bounds.min,
+            maxTime: bounds.max
+        };
+        if (elLyricEditorBall.setPointerCapture) {
+            try { elLyricEditorBall.setPointerCapture(e.pointerId); } catch (captureErr) {}
+        }
+        updateLyricEditorStateClass();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function onLyricEditorDragMove(e) {
+        var drag = lyricEditorState.drag;
+        var now;
+        var nextOffset;
+        var progress;
+
+        if (!drag || !drag.active || e.pointerId !== drag.pointerId) return;
+        now = getCurrentPlaybackTime();
+        nextOffset = drag.startBallOffset + (e.clientX - drag.startClientX);
+        drag.previewBallOffset = Math.max(0, Math.min(currentLyricLayout ? currentLyricLayout.width : 0, nextOffset));
+        progress = currentLyricLayout && currentLyricLayout.width > 0
+            ? (drag.previewBallOffset / currentLyricLayout.width)
+            : 0;
+        drag.previewTime = clampLyricTime(
+            deriveLyricStartFromProgress(lyricEditorState.lineIndex, progress, now),
+            lyricEditorState.lineIndex,
+            now
+        );
+        e.preventDefault();
+    }
+
+    function endLyricEditorDrag(e) {
+        var drag = lyricEditorState.drag;
+        var nextTime;
+
+        if (!drag || !drag.active) return;
+        if (e && drag.pointerId !== undefined && e.pointerId !== undefined && e.pointerId !== drag.pointerId) return;
+
+        nextTime = drag.previewTime;
+        if (elLyricEditorBall && elLyricEditorBall.releasePointerCapture && drag.pointerId !== undefined) {
+            try { elLyricEditorBall.releasePointerCapture(drag.pointerId); } catch (releaseErr) {}
+        }
+        lyricEditorState.drag = null;
+        lyricEditorState.skipBlurSave = false;
+        updateLyricEditorStateClass();
+
+        if (Math.abs(nextTime - drag.startTime) > 0.0001) {
+            saveLyricEditorLine({ time: nextTime });
+        }
+    }
+
+    function syncLyricEditorUi(now) {
+        var activeElement = document.activeElement;
+        var isFocused = activeElement === elLyricEditorInput;
+        var desiredIndex;
+        var line;
+        var previewTime;
+        var previewBallOffset;
+        var drag = lyricEditorState.drag;
+        var isPendingInsert;
+        var editorWidth;
+        var editorLeft;
+
+        if (!elLyricEditor) return;
+        if (!shouldShowInlineLyricEditor(now) || !currentLyricLayout || currentLyricLayout.index < 0) {
+            elLyricEditor.hidden = true;
+            return;
+        }
+
+        elLyricEditor.hidden = false;
+
+        if (lyricEditorState.lineIndex < 0) {
+            lyricEditorState.lineIndex = getPreferredLyricEditorIndex(now);
+        }
+
+        if (lyricEditorState.followLive && !isFocused && !lyricEditorState.dirty && !drag) {
+            desiredIndex = currentLyricLayout.index;
+            if (desiredIndex >= 0) {
+                lyricEditorState.lineIndex = desiredIndex;
+            }
+        }
+
+        line = getLyricEditorLine();
+        if (!line) {
+            elLyricEditor.hidden = true;
+            return;
+        }
+
+        isPendingInsert = isPendingLyricInsertLine(line);
+        previewTime = drag && drag.active ? drag.previewTime : line.time;
+        previewBallOffset = drag && drag.active ? drag.previewBallOffset : currentLyricLayout.ballOffset;
+        editorWidth = Math.max(
+            isPendingInsert ? 280 : 24,
+            Math.round(currentLyricLayout.width),
+            isPendingInsert && elLyricEditorInput
+                ? Math.min(420, Math.max(220, elLyricEditorInput.scrollWidth + 32))
+                : 0
+        );
+        editorLeft = isPendingInsert
+            ? Math.round(currentLyricLayout.left + (currentLyricLayout.width / 2))
+            : Math.round(currentLyricLayout.left);
+
+        elLyricEditor.style.left = editorLeft + 'px';
+        elLyricEditor.style.top = Math.round(currentLyricLayout.top) + 'px';
+        elLyricEditor.style.width = editorWidth + 'px';
+        elLyricEditor.style.transform = isPendingInsert ? 'translateX(-50%)' : 'translateZ(0)';
+        if (elLyricEditorInput) {
+            elLyricEditorInput.style.font = currentLyricLayout.font;
+            elLyricEditorInput.style.height = Math.max(20, Math.round(currentLyricLayout.fontSize * 1.12)) + 'px';
+            elLyricEditorInput.style.color = currentLyricLayout.scheme.hi;
+            elLyricEditorInput.style.textShadow =
+                '0 0 6px ' + currentLyricLayout.scheme.hi + ', 0 0 18px ' + currentLyricLayout.scheme.glow;
+            elLyricEditorInput.placeholder = isPendingInsert ? 'New lyric line' : '';
+        }
+        if (elLyricEditorTime) {
+            elLyricEditorTime.textContent = formatLrcTime(previewTime);
+        }
+        if (elLyricEditorInsert) {
+            elLyricEditorInsert.hidden = !!isPendingInsert || !!(drag && drag.active);
+        }
+        if (elLyricEditorBall) {
+            elLyricEditorBall.style.left = Math.round(previewBallOffset) + 'px';
+            elLyricEditorBall.style.background = currentLyricLayout.scheme.hi;
+            elLyricEditorBall.style.boxShadow =
+                '0 0 8px ' + currentLyricLayout.scheme.hi + ', 0 0 18px ' + currentLyricLayout.scheme.glow;
+        }
+        if (elLyricEditorInput && !isFocused && !lyricEditorState.dirty && elLyricEditorInput.value !== line.text) {
+            elLyricEditorInput.value = line.text;
+        }
+        updateLyricEditorStateClass();
+    }
+
+    function saveLyricEditorLine(options) {
+        var line = getLyricEditorLine();
+        var trackName = trackFile || (window.sbbsRadio && window.sbbsRadio.currentTrackFile) || '';
+        var nextText;
+        var nextTime;
+        var body;
+        var csrfToken;
+        var previousText;
+        var previousTime;
+        var activeElement;
+        var attemptedText;
+        var attemptedTime;
+        var pendingInsert;
+
+        if (!line || lyricEditorState.saving || !trackName) return Promise.resolve(false);
+
+        pendingInsert = isPendingLyricInsertLine(line);
+        nextText = normalizeLyricLineText(elLyricEditorInput ? elLyricEditorInput.value : line.text);
+        nextTime = line.time;
+        if (options && typeof options.time === 'number' && isFinite(options.time)) {
+            nextTime = clampLyricTime(options.time, lyricEditorState.lineIndex, getCurrentPlaybackTime());
+        }
+
+        if (!nextText) {
+            if (pendingInsert) {
+                discardPendingLyricInsertLine();
+                return Promise.resolve(false);
+            }
+            setLyricEditorStatus('Line text cannot be blank.', true, true);
+            return Promise.resolve(false);
+        }
+
+        previousText = line.text;
+        previousTime = line.time;
+        attemptedText = nextText;
+        attemptedTime = nextTime;
+        line.text = nextText;
+        line.time = nextTime;
+        delete line._pendingInsert;
+        lrcLines.sort(function (a, b) {
+            return a.time - b.time;
+        });
+        lyricEditorState.lineIndex = lrcLines.indexOf(line);
+        lyricEditorState.dirty = false;
+        lyricEditorState.followLive = true;
+        lyricEditorState.skipBlurSave = false;
+        updateLyricEditorStateClass();
+
+        body = new URLSearchParams();
+        body.set('file', trackName);
+        body.set('lyrics', serializeLrcLines(lrcLines));
+        csrfToken = window.sbbsConfig && window.sbbsConfig.csrfToken
+            ? String(window.sbbsConfig.csrfToken)
+            : '';
+
+        activeElement = document.activeElement;
+        setLyricEditorBusy(true);
+        setLyricEditorStatus('Saving line…', false, true);
+
+        return fetch(getTrackMetaUpdateUrl(), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                if (!data || data.error) {
+                    throw new Error(data && data.error ? data.error : 'Could not save lyric line.');
+                }
+                setLyricEditorBusy(false);
+                lyricEditorState.followLive = true;
+                if (options && options.blurAfter && activeElement === elLyricEditorInput) {
+                    elLyricEditorInput.blur();
+                } else if (activeElement && activeElement !== document.body && activeElement !== elLyricEditorInput &&
+                        typeof activeElement.blur === 'function') {
+                    activeElement.blur();
+                }
+                setLyricEditorStatus('Saved', false);
+                return true;
+            })
+            .catch(function (error) {
+                line.text = previousText;
+                line.time = previousTime;
+                if (pendingInsert) {
+                    line._pendingInsert = true;
+                }
+                lrcLines.sort(function (a, b) {
+                    return a.time - b.time;
+                });
+                lyricEditorState.lineIndex = lrcLines.indexOf(line);
+                lyricEditorState.dirty = attemptedText !== previousText;
+                lyricEditorState.followLive = false;
+                lyricEditorState.skipBlurSave = false;
+                setLyricEditorBusy(false);
+                if (activeElement && activeElement !== document.body && activeElement !== elLyricEditorInput &&
+                        typeof activeElement.blur === 'function') {
+                    activeElement.blur();
+                }
+                if (elLyricEditorInput) elLyricEditorInput.value = attemptedText;
+                updateLyricEditorStateClass();
+                setLyricEditorStatus(error && error.message ? error.message : 'Could not save lyric line.', true, true);
+                return false;
+            });
+    }
+
     function fetchLyrics() {
         if (!trackFile) {
             var r = window.sbbsRadio;
@@ -7057,6 +7923,10 @@
     }
 
     function getLyricMouthState(now) {
+        var cue;
+        var ni;
+        var nextLineTime;
+
         if (!lrcLines.length) {
             return {
                 active: false,
@@ -7066,15 +7936,9 @@
             };
         }
 
-        var ni = -1;
-        var nextLineTime = Infinity;
-        for (var i = lrcLines.length - 1; i >= 0; i--) {
-            if (now >= lrcLines[i].time) {
-                ni = i;
-                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
-                break;
-            }
-        }
+        cue = getLyricCueAtTime(now);
+        ni = cue.index;
+        nextLineTime = cue.nextTime;
 
         if (ni < 0) {
             return {
@@ -7137,18 +8001,13 @@
         // Clear with transparency
         karaokeCtx.clearRect(0, 0, w, h);
 
+        currentLyricLayout = null;
         if (!lrcLines.length) return;
 
         // Find current and next line
-        var ni = -1;
-        var nextLineTime = Infinity;
-        for (var i = lrcLines.length - 1; i >= 0; i--) {
-            if (now >= lrcLines[i].time) {
-                ni = i;
-                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
-                break;
-            }
-        }
+        var cue = getLyricCueAtTime(now);
+        var ni = cue.index;
+        var nextLineTime = cue.nextTime;
 
         // Track changes trigger new color/font for song
         if (ni !== lrcIndex) {
@@ -7171,6 +8030,7 @@
         var line = lrcLines[ni];
         var scheme = LYRIC_SCHEMES[songColorIdx % LYRIC_SCHEMES.length];
         var fontFamily = LYRIC_FONTS[songFontIdx % LYRIC_FONTS.length];
+        var inlineEditorVisible = shouldShowInlineLyricEditor(now);
 
         // Responsive font sizing
         var baseFontSize = Math.min(48, Math.max(24, h * 0.06));
@@ -7202,6 +8062,8 @@
                 currentX += wordW + spaceW;
             }
         }
+        var totalWidth = karaokeCtx.measureText(line.text).width;
+        var startX = (w - totalWidth) / 2;
 
         // Calculate progress through current line (0-1)
         var lineStart = line.time;
@@ -7217,6 +8079,7 @@
         var ly = h * 0.92;  // lyrics Y position
         var ballBaseY = ly - baseFontSize * 0.8;
         var currentWord = wordPositions[wordIdx];
+        var ballY = ballBaseY;
         if (currentWord) {
             // Progress within this word
             var wordProgress = (progress * words.length) - wordIdx;
@@ -7228,11 +8091,27 @@
             // Bouncing motion
             var bouncePhase = wordProgress * Math.PI;
             var bounceHeight = Math.sin(bouncePhase) * baseFontSize * 0.6;
-            var ballY = ballBaseY - bounceHeight;
+            ballY = ballBaseY - bounceHeight;
 
             // Add to trail
             ballTrail.push({ x: ballX, y: ballY, alpha: 1.0 });
             if (ballTrail.length > 12) ballTrail.shift();
+
+            currentLyricLayout = {
+                index: ni,
+                left: startX,
+                top: ly - baseFontSize * 0.86,
+                width: totalWidth,
+                font: font,
+                fontSize: baseFontSize,
+                lineY: ly,
+                ballOffset: Math.max(0, Math.min(totalWidth, ballX - startX)),
+                scheme: scheme
+            };
+
+            if (inlineEditorVisible) {
+                return;
+            }
 
             // Draw phosphor trail
             for (var t = 0; t < ballTrail.length; t++) {
@@ -7256,6 +8135,23 @@
             karaokeCtx.fillStyle = scheme.hi;
             karaokeCtx.fill();
             karaokeCtx.shadowBlur = 0;
+        }
+        if (!currentLyricLayout) {
+            currentLyricLayout = {
+                index: ni,
+                left: startX,
+                top: ly - baseFontSize * 0.86,
+                width: totalWidth,
+                font: font,
+                fontSize: baseFontSize,
+                lineY: ly,
+                ballOffset: Math.max(0, Math.min(totalWidth, ballX - startX)),
+                scheme: scheme
+            };
+        }
+
+        if (inlineEditorVisible) {
+            return;
         }
 
         // Draw lyrics with highlighting
@@ -7293,15 +8189,9 @@
         if (!lrcLines.length) return;
 
         // Find current line
-        var ni = -1;
-        var nextLineTime = Infinity;
-        for (var i = lrcLines.length - 1; i >= 0; i--) {
-            if (now >= lrcLines[i].time) {
-                ni = i;
-                if (i + 1 < lrcLines.length) nextLineTime = lrcLines[i + 1].time;
-                break;
-            }
-        }
+        var cue = getLyricCueAtTime(now);
+        var ni = cue.index;
+        var nextLineTime = cue.nextTime;
 
         // New line or song?
         if (ni !== spitLineIdx) {

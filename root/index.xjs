@@ -449,6 +449,20 @@
             <span class="viz-meta-mini-text" id="viz-meta-mini-text"></span>
         </div>
     </div>
+    <div id="viz-lyric-editor" class="viz-lyric-editor" hidden>
+        <div class="viz-lyric-editor-ball" id="viz-lyric-editor-ball" title="Drag left or right to retime this line"></div>
+        <div class="viz-lyric-editor-time" id="viz-lyric-editor-time">[00:00.00]</div>
+        <button type="button" class="viz-lyric-editor-insert" id="viz-lyric-editor-insert" title="Insert a new lyric line at the paused playback time">+</button>
+        <input
+            type="text"
+            class="viz-lyric-editor-input"
+            id="viz-lyric-editor-input"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Edit current lyric line"
+        >
+        <div class="viz-lyric-editor-status" id="viz-lyric-editor-status" hidden></div>
+    </div>
     <div class="viz-canvas-container"></div>
     <div class="viz-lyrics"></div>
 </div>

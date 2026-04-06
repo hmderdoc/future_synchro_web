@@ -83,8 +83,12 @@
     var elModeShuffle, elModeOrdered, elPlayView, elClearFilters, elSortMode;
     var elMainList, elSummary;
     var elCreateBar, elCreateInput, elCreateBtn;
-    var elEditModal, elEditTrack, elEditArtist, elEditLyrics, elEditStatus;
+    var elEditModal, elEditTrack, elEditKicker, elEditTitle, elEditArtist, elEditGenre, elEditAlbum, elEditYear, elEditComposerWrap, elEditComposer;
+    var elEditArtistOptions, elEditGenreOptions, elEditComposerOptions;
+    var elEditLyrics, elEditStatus, elEditTimingNow, elEditTimingNote, elEditTimingPlay, elEditInsertTime, elEditStampLine, elEditNudgeBack, elEditNudgeForward;
+    var elEditCharacter, elEditCharacterClear;
     var elEditCancel, elEditSave, elEditClose;
+    var editorTimingInterval = 0;
     var vizW, vizH, vizCtx;
 
     // =========================================================
@@ -142,6 +146,38 @@
         return String((track.tags && track.tags.composer) || '');
     }
 
+    function currentUserAlias() {
+        return trimText(window.sbbsConfig && window.sbbsConfig.userAlias ? window.sbbsConfig.userAlias : '');
+    }
+
+    function isSysopUser() {
+        return !!(window.sbbsConfig && window.sbbsConfig.isSysop);
+    }
+
+    function normalizeContributorName(value) {
+        return trimText(value).replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function splitContributorNames(value) {
+        return trimText(value)
+            .split(/\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*/i)
+            .map(function (entry) {
+                return trimText(entry);
+            })
+            .filter(Boolean);
+    }
+
+    function isTrackComposerForCurrentUser(track) {
+        var alias = normalizeContributorName(currentUserAlias());
+        var composers;
+
+        if (!alias || !track) return false;
+        composers = splitContributorNames(trackComposer(track));
+        return composers.some(function (name) {
+            return normalizeContributorName(name) === alias;
+        });
+    }
+
     function trackGenre(track) {
         return String((track.tags && track.tags.genre) || '');
     }
@@ -197,8 +233,9 @@
         return String(value || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
-    function canEditTrackMeta() {
-        return !!(window.sbbsConfig && window.sbbsConfig.isSysop);
+    function canEditTrackMeta(track) {
+        if (isSysopUser()) return true;
+        return !!track && isTrackComposerForCurrentUser(track);
     }
 
     function updateTrackOverrides(track, tags) {
@@ -337,7 +374,7 @@
             '<div class="rl-head">',
               '<div class="rl-head-left" title="Drag window">',
                 '<span class="rl-drag-indicator" aria-hidden="true"></span>',
-                '<div class="rl-brand">Futureland Records</div>',
+                '<div class="rl-brand">Vektrax Records</div>',
               '</div>',
               '<div class="rl-head-right">',
                 '<div class="rl-mode-tabs" role="tablist">',
@@ -362,14 +399,13 @@
 
             // === Create-playlist bar (shown when no playlist selected) ===
             '<div class="rl-create" id="rl-create">',
-              '<span class="rl-create-prompt">Create a playlist to get started</span>',
-              '<input type="text" class="rl-create-input" id="rl-create-input" placeholder="Playlist name\u2026" maxlength="80">',
+              '<input type="text" class="rl-create-input" id="rl-create-input" placeholder="Create a playlist to get started\u2026" maxlength="80">',
               '<button type="button" class="rl-btn rl-btn-go" id="rl-create-btn">Create</button>',
             '</div>',
 
             // === Toolbar (search + filters — only in Add mode) ===
             '<div class="rl-toolbar" id="rl-toolbar">',
-              '<input type="text" class="rl-search" id="rl-search" placeholder="Search tracks, artists, genres\u2026">',
+              '<input type="text" class="rl-search" id="rl-search" placeholder="Search tracks\u2026">',
               '<select class="rl-filter" id="rl-filter-artist"><option value="">All artists</option></select>',
               '<select class="rl-filter" id="rl-filter-genre"><option value="">All genres</option></select>',
               '<select class="rl-filter" id="rl-filter-composer"><option value="">All composers</option></select>',
@@ -401,21 +437,67 @@
               '<div class="rl-edit-card" role="dialog" aria-modal="true" aria-labelledby="rl-edit-title">',
                 '<div class="rl-edit-head">',
                   '<div>',
-                    '<div class="rl-edit-kicker">Sysop Track Editor</div>',
+                    '<div class="rl-edit-kicker" id="rl-edit-kicker">Track Metadata Editor</div>',
                     '<div class="rl-edit-title" id="rl-edit-title">Edit Track Metadata</div>',
                   '</div>',
                   '<button type="button" class="rl-close rl-edit-close" id="rl-edit-close" aria-label="Close">\u2715</button>',
                 '</div>',
                 '<div class="rl-edit-body">',
                   '<div class="rl-edit-track" id="rl-edit-track"></div>',
-                  '<label class="rl-edit-field" for="rl-edit-artist">',
-                    '<span class="rl-edit-label">Artist Name</span>',
-                    '<input type="text" class="rl-edit-input" id="rl-edit-artist" maxlength="160" placeholder="Artist name">',
-                  '</label>',
+                  '<div class="rl-edit-grid">',
+                    '<label class="rl-edit-field rl-edit-field-wide" for="rl-edit-title-input">',
+                      '<span class="rl-edit-label">Track Title</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-title-input" maxlength="160" placeholder="Track title">',
+                    '</label>',
+                    '<label class="rl-edit-field" for="rl-edit-artist">',
+                      '<span class="rl-edit-label">Artist Name</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-artist" list="rl-edit-artist-options" maxlength="160" placeholder="Artist name">',
+                    '</label>',
+                    '<label class="rl-edit-field" for="rl-edit-genre">',
+                      '<span class="rl-edit-label">Genre</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-genre" list="rl-edit-genre-options" maxlength="80" placeholder="Genre">',
+                    '</label>',
+                    '<label class="rl-edit-field" for="rl-edit-album">',
+                      '<span class="rl-edit-label">Album</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-album" maxlength="120" placeholder="Album / project name">',
+                    '</label>',
+                    '<label class="rl-edit-field" for="rl-edit-year">',
+                      '<span class="rl-edit-label">Year</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-year" inputmode="numeric" maxlength="12" placeholder="2026">',
+                    '</label>',
+                    '<label class="rl-edit-field rl-edit-field-wide" id="rl-edit-composer-wrap" for="rl-edit-composer" hidden>',
+                      '<span class="rl-edit-label">Composer / Owner</span>',
+                      '<input type="text" class="rl-edit-input" id="rl-edit-composer" list="rl-edit-composer-options" maxlength="160" placeholder="Composer alias">',
+                    '</label>',
+                    '<div class="rl-edit-field rl-edit-field-wide rl-edit-character-row" id="rl-edit-character-wrap">',
+                      '<span class="rl-edit-label">Rock Star Character</span>',
+                      '<div class="rl-edit-character-status">',
+                        '<span class="rl-edit-character-badge" id="rl-edit-character">No custom character</span>',
+                        '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-character-clear">Clear</button>',
+                      '</div>',
+                    '</div>',
+                  '</div>',
+                  '<datalist id="rl-edit-artist-options"></datalist>',
+                  '<datalist id="rl-edit-genre-options"></datalist>',
+                  '<datalist id="rl-edit-composer-options"></datalist>',
                   '<label class="rl-edit-field" for="rl-edit-lyrics">',
                     '<span class="rl-edit-label">Song Lyrics</span>',
                     '<textarea class="rl-edit-textarea" id="rl-edit-lyrics" placeholder="[00:00.00]Intro&#10;[00:12.40]Verse line&#10;&#10;Plain text also works if you do not need sync timing."></textarea>',
                   '</label>',
+                  '<div class="rl-edit-timing">',
+                    '<div class="rl-edit-timing-head">',
+                      '<span class="rl-edit-label">Lyric Timing Assist</span>',
+                      '<span class="rl-edit-timing-now" id="rl-edit-timing-now">00:00.00</span>',
+                    '</div>',
+                    '<div class="rl-edit-timing-actions">',
+                      '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-timing-play">Load This Track</button>',
+                      '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-insert-time">Insert Time</button>',
+                      '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-stamp-line">Stamp Line</button>',
+                      '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-nudge-back">-0.10s</button>',
+                      '<button type="button" class="rl-btn rl-btn-dim rl-edit-mini" id="rl-edit-nudge-forward">+0.10s</button>',
+                    '</div>',
+                    '<div class="rl-edit-note rl-edit-timing-note" id="rl-edit-timing-note">Load the track here, then place the caret on a lyric line to capture or nudge its timestamp.</div>',
+                  '</div>',
                   '<div class="rl-edit-note">Lyrics are saved as the track&apos;s companion <code>.lrc</code> file. Existing timestamps are preserved if you keep them.</div>',
                   '<div class="rl-edit-status" id="rl-edit-status" aria-live="polite"></div>',
                 '</div>',
@@ -462,9 +544,28 @@
         elMainList       = document.getElementById('rl-list');
         elEditModal      = document.getElementById('rl-edit-modal');
         elEditTrack      = document.getElementById('rl-edit-track');
+        elEditKicker     = document.getElementById('rl-edit-kicker');
+        elEditTitle      = document.getElementById('rl-edit-title-input');
         elEditArtist     = document.getElementById('rl-edit-artist');
+        elEditGenre      = document.getElementById('rl-edit-genre');
+        elEditAlbum      = document.getElementById('rl-edit-album');
+        elEditYear       = document.getElementById('rl-edit-year');
+        elEditComposerWrap = document.getElementById('rl-edit-composer-wrap');
+        elEditComposer   = document.getElementById('rl-edit-composer');
+        elEditArtistOptions = document.getElementById('rl-edit-artist-options');
+        elEditGenreOptions = document.getElementById('rl-edit-genre-options');
+        elEditComposerOptions = document.getElementById('rl-edit-composer-options');
         elEditLyrics     = document.getElementById('rl-edit-lyrics');
         elEditStatus     = document.getElementById('rl-edit-status');
+        elEditTimingNow  = document.getElementById('rl-edit-timing-now');
+        elEditTimingNote = document.getElementById('rl-edit-timing-note');
+        elEditTimingPlay = document.getElementById('rl-edit-timing-play');
+        elEditInsertTime = document.getElementById('rl-edit-insert-time');
+        elEditStampLine  = document.getElementById('rl-edit-stamp-line');
+        elEditNudgeBack  = document.getElementById('rl-edit-nudge-back');
+        elEditNudgeForward = document.getElementById('rl-edit-nudge-forward');
+        elEditCharacter  = document.getElementById('rl-edit-character');
+        elEditCharacterClear = document.getElementById('rl-edit-character-clear');
         elEditCancel     = document.getElementById('rl-edit-cancel');
         elEditSave       = document.getElementById('rl-edit-save');
         elEditClose      = document.getElementById('rl-edit-close');
@@ -478,11 +579,41 @@
         if (elEditCancel) {
             elEditCancel.addEventListener('click', closeTrackEditor);
         }
+        if (elEditCharacterClear) {
+            elEditCharacterClear.addEventListener('click', function () {
+                var track = editorTrack();
+                if (track && track.tags) delete track.tags.character;
+                if (track && track.overrideTags) delete track.overrideTags.character;
+                editorState.characterJson = '';
+                syncCharacterBadge();
+            });
+        }
+
+
         if (elEditClose) {
             elEditClose.addEventListener('click', closeTrackEditor);
         }
         if (elEditSave) {
             elEditSave.addEventListener('click', saveTrackEditor);
+        }
+        if (elEditTimingPlay) {
+            elEditTimingPlay.addEventListener('click', toggleTrackEditorTimingPlayback);
+        }
+        if (elEditInsertTime) {
+            elEditInsertTime.addEventListener('click', insertCurrentLyricTimestamp);
+        }
+        if (elEditStampLine) {
+            elEditStampLine.addEventListener('click', stampCurrentLyricLine);
+        }
+        if (elEditNudgeBack) {
+            elEditNudgeBack.addEventListener('click', function () {
+                nudgeCurrentLyricTimestamp(-0.1);
+            });
+        }
+        if (elEditNudgeForward) {
+            elEditNudgeForward.addEventListener('click', function () {
+                nudgeCurrentLyricTimestamp(0.1);
+            });
         }
 
         ensureLibraryBackdrop();
@@ -505,7 +636,7 @@
 
     function getPanelSizeBounds() {
         var maxWidth = Math.max(360, Math.min(window.innerWidth - 24, 980));
-        var minWidth = Math.min(480, maxWidth);
+        var minWidth = Math.min(380, maxWidth);
         var maxHeight = Math.max(360, Math.min(window.innerHeight - 24, 900));
         var minHeight = Math.min(420, maxHeight);
         return {
@@ -843,6 +974,23 @@
             return true;
         }
 
+        // Listen for Rock Star Designer character assignments
+        document.addEventListener('rsd:character-assigned', function (e) {
+            var detail = e && e.detail;
+            if (!detail || !detail.file || !detail.character) return;
+            var idx = trackIndexByName[detail.file];
+            if (typeof idx !== 'number' || !playlist[idx]) return;
+            var track = playlist[idx];
+            if (!track.overrideTags) track.overrideTags = {};
+            track.overrideTags.character = detail.character;
+            track.tags = mergeTrackTags(track.baseTags, track.overrideTags);
+            if (editorState.open && editorState.idx === idx) {
+                editorState.characterJson = detail.character;
+                syncCharacterBadge();
+            }
+            console.log('[radio] character assigned to track:', detail.file);
+        });
+
         window.sbbsRadio = {
             get audioCtx()        { return audioCtx; },
             get analyserNode()    { return analyser; },
@@ -858,6 +1006,7 @@
                 return typeof idx === 'number' && playlist[idx] ? copyTrackTags(playlist[idx].tags) : {};
             },
             playByFile: playByFile,
+            togglePlay: togglePlay,
             toggleLibraryPanel: toggleLibraryPanel,
             openLibraryPanel: openLibraryPanel,
             closeLibraryPanel: closeLibraryPanel,
@@ -1125,6 +1274,19 @@
         selectEl.innerHTML = html;
         selectEl.value = value || '';
         if (selectEl.value !== (value || '')) selectEl.value = '';
+    }
+
+    function fillDataList(listEl, options) {
+        var html = '';
+        if (!listEl) return;
+        options.forEach(function (option) {
+            html += '<option value="' + escHtml(option) + '"></option>';
+        });
+        listEl.innerHTML = html;
+    }
+
+    function editorSuggestionValues(getter) {
+        return uniqueFilterValues(allTrackIndices(), getter);
     }
 
     function uniquePlaylistName(baseName, excludeId) {
@@ -1519,6 +1681,265 @@
         }).filter(Boolean).join('\n');
     }
 
+    function formatCueTime(seconds) {
+        return formatLrcTime(seconds).replace(/^\[|\]$/g, '');
+    }
+
+    function parseLrcTimestampSeconds(text) {
+        var match = String(text || '').match(/\[(\d+):(\d{2})(?:\.(\d{1,2}))?\]/);
+        var mins;
+        var secs;
+        var hundredths;
+
+        if (!match) return null;
+        mins = parseInt(match[1], 10);
+        secs = parseInt(match[2], 10);
+        hundredths = match[3] ? parseInt((match[3] + '0').slice(0, 2), 10) : 0;
+
+        if (isNaN(mins) || isNaN(secs) || isNaN(hundredths)) return null;
+        return mins * 60 + secs + (hundredths / 100);
+    }
+
+    function currentEditorTrack() {
+        return editorState.idx >= 0 && playlist[editorState.idx] ? playlist[editorState.idx] : null;
+    }
+
+    function isEditorTrackLoadedForTiming(track) {
+        return !!(window.sbbsRadio && track && window.sbbsRadio.currentTrackFile === track.name);
+    }
+
+    function getEditorTimingSeconds() {
+        var track = currentEditorTrack();
+        if (!isEditorTrackLoadedForTiming(track)) return null;
+        return Math.max(0, Number(window.sbbsRadio.currentTime) || 0);
+    }
+
+    function refreshTrackEditorSuggestions() {
+        fillDataList(elEditArtistOptions, editorSuggestionValues(trackArtist));
+        fillDataList(elEditGenreOptions, editorSuggestionValues(trackGenre));
+        fillDataList(elEditComposerOptions, editorSuggestionValues(trackComposer));
+    }
+
+    function syncTrackEditorAccess(track) {
+        var sysop = isSysopUser();
+        if (elEditComposerWrap) elEditComposerWrap.hidden = !sysop;
+        if (elEditComposer) elEditComposer.disabled = !sysop || editorState.saving;
+        if (elEditKicker) {
+            if (sysop) {
+                elEditKicker.textContent = 'Sysop Track Editor';
+            } else if (track && isTrackComposerForCurrentUser(track)) {
+                elEditKicker.textContent = 'Composer Track Editor';
+            } else {
+                elEditKicker.textContent = 'Track Metadata Editor';
+            }
+        }
+    }
+
+    function syncCharacterBadge() {
+        var json = editorState.characterJson || '';
+        var label = 'No custom character';
+        if (json) {
+            try { label = '\u2605 ' + (JSON.parse(json).name || 'Custom'); } catch(e) { label = '\u2605 Custom character set'; }
+        }
+        if (elEditCharacter) {
+            elEditCharacter.textContent = label;
+            elEditCharacter.classList.toggle('has-character', !!json);
+        }
+        if (elEditCharacterClear) elEditCharacterClear.style.display = json ? '' : 'none';
+    }
+
+
+    function applyTrackEditorFields(track) {
+        if (!track) return;
+        if (elEditTrack) {
+            elEditTrack.textContent = trackTitle(track) + ' [' + track.name + ']';
+        }
+        if (elEditTitle) elEditTitle.value = trackTitle(track);
+        if (elEditArtist) elEditArtist.value = trackArtist(track);
+        if (elEditGenre) elEditGenre.value = trackGenre(track);
+        if (elEditAlbum) elEditAlbum.value = trackAlbum(track);
+        if (elEditYear) elEditYear.value = trackYear(track);
+        if (elEditComposer) elEditComposer.value = trackComposer(track);
+        editorState.characterJson = (track.tags && track.tags.character) || '';
+        syncCharacterBadge();
+    }
+
+    function setTextareaValueAndSelection(textarea, value, start, end) {
+        var nextStart = Math.max(0, Math.min(typeof start === 'number' ? start : value.length, value.length));
+        var nextEnd = Math.max(nextStart, Math.min(typeof end === 'number' ? end : nextStart, value.length));
+        var scrollTop = textarea.scrollTop;
+
+        textarea.value = value;
+        textarea.focus();
+        textarea.setSelectionRange(nextStart, nextEnd);
+        textarea.scrollTop = scrollTop;
+    }
+
+    function insertTextAtCursor(textarea, text) {
+        var value = textarea.value || '';
+        var start = textarea.selectionStart || 0;
+        var end = textarea.selectionEnd || start;
+        var nextValue = value.slice(0, start) + text + value.slice(end);
+        var caret = start + text.length;
+
+        setTextareaValueAndSelection(textarea, nextValue, caret, caret);
+    }
+
+    function transformCurrentLyricLine(transform) {
+        var textarea = elEditLyrics;
+        var value;
+        var selStart;
+        var selEnd;
+        var lineStart;
+        var lineEnd;
+        var currentLine;
+        var updatedLine;
+        var nextValue;
+
+        if (!textarea) return false;
+
+        value = textarea.value || '';
+        selStart = textarea.selectionStart || 0;
+        selEnd = textarea.selectionEnd || selStart;
+        lineStart = value.lastIndexOf('\n', Math.max(0, selStart - 1));
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        lineEnd = value.indexOf('\n', selEnd);
+        lineEnd = lineEnd < 0 ? value.length : lineEnd;
+        currentLine = value.slice(lineStart, lineEnd);
+        updatedLine = transform(currentLine);
+
+        if (typeof updatedLine !== 'string' || updatedLine === currentLine) {
+            return false;
+        }
+
+        nextValue = value.slice(0, lineStart) + updatedLine + value.slice(lineEnd);
+        setTextareaValueAndSelection(textarea, nextValue, lineStart, lineStart + updatedLine.length);
+        return true;
+    }
+
+    function replaceLineTimestamp(line, seconds) {
+        var stamp = formatLrcTime(seconds);
+        if (!trimText(line).length) {
+            return stamp;
+        }
+        if (/^\s*\[\d+:\d{2}(?:\.\d{1,2})?\]\s*/.test(line)) {
+            return line.replace(/^\s*\[\d+:\d{2}(?:\.\d{1,2})?\]\s*/, stamp);
+        }
+        return stamp + line;
+    }
+
+    function updateTrackEditorTimingUI() {
+        var track = currentEditorTrack();
+        var isLoaded = isEditorTrackLoadedForTiming(track);
+        var timeSeconds = isLoaded ? getEditorTimingSeconds() : 0;
+        var playing = isLoaded && !!(window.sbbsRadio && window.sbbsRadio.isPlaying);
+
+        if (elEditTimingNow) elEditTimingNow.textContent = formatCueTime(timeSeconds || 0);
+        if (elEditTimingPlay) {
+            if (!track || !isLoaded) {
+                elEditTimingPlay.textContent = 'Load This Track';
+            } else if (playing) {
+                elEditTimingPlay.textContent = 'Pause Timing';
+            } else if ((window.sbbsRadio.currentTime || 0) > 0) {
+                elEditTimingPlay.textContent = 'Resume Timing';
+            } else {
+                elEditTimingPlay.textContent = 'Play For Timing';
+            }
+            elEditTimingPlay.disabled = editorState.saving;
+        }
+        if (elEditInsertTime) elEditInsertTime.disabled = editorState.saving || !isLoaded;
+        if (elEditStampLine) elEditStampLine.disabled = editorState.saving || !isLoaded;
+        if (elEditNudgeBack) elEditNudgeBack.disabled = editorState.saving || !elEditLyrics;
+        if (elEditNudgeForward) elEditNudgeForward.disabled = editorState.saving || !elEditLyrics;
+        if (elEditTimingNote) {
+            elEditTimingNote.textContent = isLoaded
+                ? 'Place the caret on a lyric line, then stamp or nudge its timestamp against the live playback position.'
+                : 'Load this track here to capture timestamps from the current playback position.';
+        }
+    }
+
+    function startTrackEditorTimingUI() {
+        clearInterval(editorTimingInterval);
+        updateTrackEditorTimingUI();
+        editorTimingInterval = setInterval(updateTrackEditorTimingUI, 100);
+    }
+
+    function stopTrackEditorTimingUI() {
+        clearInterval(editorTimingInterval);
+        editorTimingInterval = 0;
+    }
+
+    function toggleTrackEditorTimingPlayback() {
+        var track = currentEditorTrack();
+
+        if (!track || editorState.saving) return;
+
+        if (isEditorTrackLoadedForTiming(track)) {
+            togglePlay();
+        } else {
+            playTrackByIndex(editorState.idx, true, [editorState.idx]);
+        }
+
+        setTimeout(updateTrackEditorTimingUI, 60);
+    }
+
+    function insertCurrentLyricTimestamp() {
+        var seconds = getEditorTimingSeconds();
+
+        if (seconds === null || !elEditLyrics) {
+            setTrackEditorStatus('Load this track for timing first.', true);
+            return;
+        }
+
+        insertTextAtCursor(elEditLyrics, formatLrcTime(seconds));
+        setTrackEditorStatus('Inserted timestamp ' + formatCueTime(seconds) + '.', false);
+        updateTrackEditorTimingUI();
+    }
+
+    function stampCurrentLyricLine() {
+        var seconds = getEditorTimingSeconds();
+        var changed;
+
+        if (seconds === null) {
+            setTrackEditorStatus('Load this track for timing first.', true);
+            return;
+        }
+
+        changed = transformCurrentLyricLine(function (line) {
+            return replaceLineTimestamp(line, seconds);
+        });
+
+        if (!changed) {
+            insertCurrentLyricTimestamp();
+            return;
+        }
+
+        setTrackEditorStatus('Stamped current line at ' + formatCueTime(seconds) + '.', false);
+        updateTrackEditorTimingUI();
+    }
+
+    function nudgeCurrentLyricTimestamp(deltaSeconds) {
+        var changed = transformCurrentLyricLine(function (line) {
+            var existing = parseLrcTimestampSeconds(line);
+            var nextSeconds;
+
+            if (existing === null) {
+                return line;
+            }
+
+            nextSeconds = Math.max(0, existing + (Number(deltaSeconds) || 0));
+            return replaceLineTimestamp(line, nextSeconds);
+        });
+
+        if (!changed) {
+            setTrackEditorStatus('Place the caret on a timestamped lyric line to nudge it.', true);
+            return;
+        }
+
+        setTrackEditorStatus('Adjusted current line by ' + (deltaSeconds > 0 ? '+' : '') + deltaSeconds.toFixed(2) + ' seconds.', false);
+        updateTrackEditorTimingUI();
+    }
+
     function loadTrackLyricsText(track) {
         var lrcName;
 
@@ -1543,7 +1964,12 @@
 
     function setTrackEditorBusy(isBusy) {
         editorState.saving = !!isBusy;
+        if (elEditTitle) elEditTitle.disabled = !!isBusy;
         if (elEditArtist) elEditArtist.disabled = !!isBusy;
+        if (elEditGenre) elEditGenre.disabled = !!isBusy;
+        if (elEditAlbum) elEditAlbum.disabled = !!isBusy;
+        if (elEditYear) elEditYear.disabled = !!isBusy;
+        if (elEditComposer) elEditComposer.disabled = !!isBusy || !isSysopUser();
         if (elEditLyrics) elEditLyrics.disabled = !!isBusy;
         if (elEditCancel) elEditCancel.disabled = !!isBusy;
         if (elEditClose) elEditClose.disabled = !!isBusy;
@@ -1551,6 +1977,7 @@
             elEditSave.disabled = !!isBusy;
             elEditSave.textContent = isBusy ? 'Saving…' : 'Save';
         }
+        updateTrackEditorTimingUI();
     }
 
     function setTrackEditorStatus(message, isError) {
@@ -1563,6 +1990,7 @@
         editorState.open = false;
         editorState.saving = false;
         editorState.idx = -1;
+        stopTrackEditorTimingUI();
         if (elEditModal) elEditModal.hidden = true;
         setTrackEditorBusy(false);
         setTrackEditorStatus('', false);
@@ -1571,17 +1999,18 @@
     function openTrackEditor(idx) {
         var track = playlist[idx];
 
-        if (!canEditTrackMeta() || !track || !elEditModal) return;
+        if (!track || !elEditModal || !canEditTrackMeta(track)) return;
 
+        editorState.characterJson = '';
         editorState.open = true;
         editorState.idx = idx;
         editorState.saving = false;
         elEditModal.hidden = false;
-        if (elEditTrack) {
-            elEditTrack.textContent = trackTitle(track) + ' [' + track.name + ']';
-        }
-        if (elEditArtist) elEditArtist.value = trackArtist(track);
+        refreshTrackEditorSuggestions();
+        syncTrackEditorAccess(track);
+        applyTrackEditorFields(track);
         if (elEditLyrics) elEditLyrics.value = '';
+        startTrackEditorTimingUI();
         setTrackEditorBusy(true);
         setTrackEditorStatus('Loading current metadata…', false);
 
@@ -1591,10 +2020,13 @@
             })
             .then(function (lyricsText) {
                 if (!editorState.open || editorState.idx !== idx) return;
-                if (elEditArtist) elEditArtist.value = trackArtist(track);
+                syncTrackEditorAccess(track);
+                refreshTrackEditorSuggestions();
+                applyTrackEditorFields(track);
                 if (elEditLyrics) elEditLyrics.value = lyricsText || '';
                 setTrackEditorBusy(false);
                 setTrackEditorStatus('', false);
+                updateTrackEditorTimingUI();
                 if (elEditArtist) {
                     elEditArtist.focus();
                     elEditArtist.select();
@@ -1602,9 +2034,11 @@
             })
             .catch(function () {
                 if (!editorState.open || editorState.idx !== idx) return;
-                if (elEditArtist) elEditArtist.value = trackArtist(track);
+                syncTrackEditorAccess(track);
+                applyTrackEditorFields(track);
                 setTrackEditorBusy(false);
                 setTrackEditorStatus('Could not load the current track metadata.', true);
+                updateTrackEditorTimingUI();
             });
     }
 
@@ -1618,8 +2052,16 @@
 
         body = new URLSearchParams();
         body.set('file', track.name);
+        body.set('title', trimText(elEditTitle ? elEditTitle.value : ''));
         body.set('artist', trimText(elEditArtist ? elEditArtist.value : ''));
+        body.set('genre', trimText(elEditGenre ? elEditGenre.value : ''));
+        body.set('album', trimText(elEditAlbum ? elEditAlbum.value : ''));
+        body.set('year', trimText(elEditYear ? elEditYear.value : ''));
+        if (isSysopUser()) {
+            body.set('composer', trimText(elEditComposer ? elEditComposer.value : ''));
+        }
         body.set('lyrics', normalizeLyricsText(elEditLyrics ? elEditLyrics.value : ''));
+        body.set('character', editorState.characterJson || '');
         csrfToken = window.sbbsConfig && window.sbbsConfig.csrfToken
             ? String(window.sbbsConfig.csrfToken)
             : '';
@@ -2190,7 +2632,7 @@
             }
 
             // Play button (secondary, small — at end)
-            if (canEditTrackMeta()) {
+            if (canEditTrackMeta(track)) {
                 var editBtn = document.createElement('button');
                 editBtn.type = 'button';
                 editBtn.className = 'rl-action rl-action-edit';
@@ -2303,7 +2745,7 @@
             var actions = document.createElement('div');
             actions.className = 'rl-track-actions';
 
-            if (canEditTrackMeta()) {
+            if (canEditTrackMeta(track)) {
                 var editBtn = document.createElement('button');
                 editBtn.type = 'button';
                 editBtn.className = 'rl-action rl-action-edit';

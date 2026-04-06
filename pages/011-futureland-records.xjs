@@ -1,4 +1,4 @@
-<!--Futureland Records-->
+<!--Vektrax Records-->
 <?xjs
     function _recordsQueryValue(name) {
         return (
@@ -51,7 +51,7 @@
             }
         }
     } catch (_cw_err) {
-        log(LOG_WARNING, 'Futureland cowriter fetch error: ' + _cw_err);
+        log(LOG_WARNING, 'Vektrax cowriter fetch error: ' + _cw_err);
     }
     var _cowriters_json = JSON.stringify(_cowriters).replace(/<\//g, '<\\/');
 ?>
@@ -63,33 +63,21 @@
     display: grid;
     gap: 18px;
 }
-.flrd-page-art {
-    display: flex;
-    justify-content: center;
-    border: 1px solid #55FFFF;
-    background: #000;
-    padding: clamp(14px, 2vw, 24px);
-    box-shadow: 0 0 0 1px rgba(85, 255, 255, 0.08) inset;
-}
-.flrd-page-art img {
-    display: block;
-    width: min(100%, 980px);
-    height: auto;
-    object-fit: contain;
-}
 .flrd-panel {
-    --bs-card-border-color: #5555FF;
+    --bs-card-border-color: #55FF55;
     --bs-card-bg: #000;
     --bs-card-cap-bg: #000;
-    --bs-card-cap-color: #5555FF;
-    border-color: #5555FF !important;
+    --bs-card-cap-color: #55FF55;
+    border-color: #55FF55 !important;
     background: #000 !important;
     container-type: inline-size;
+    border-radius: 18px;
+    overflow: hidden;
 }
 .flrd-panel > .card-header {
-    color: #5555FF !important;
+    color: #55FF55 !important;
     background: #000 !important;
-    border-bottom: 2px solid #5555FF !important;
+    border-bottom: 2px solid #55FF55 !important;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -102,7 +90,7 @@
     gap: 12px;
     font-weight: bold;
     white-space: nowrap;
-    color: #5555FF;
+    color: #55FF55;
 }
 .flrd-brand-head {
     width: 42px;
@@ -116,8 +104,8 @@
 }
 .flrd-brand-label {
     display: inline-block;
-    color: #5555FF;
-    border-bottom: 2px solid #55FFFF;
+    color: #55FF55;
+    border-bottom: 2px solid #55FF55;
     padding-bottom: 2px;
     line-height: 1;
 }
@@ -129,8 +117,8 @@
 }
 .flrd-nav button {
     background: transparent;
-    border: 1px solid #5555FF;
-    color: #55FFFF;
+    border: 1px solid #55FF55;
+    color: #55FF55;
     font-family: monospace;
     font-size: 14px;
     line-height: 1;
@@ -139,21 +127,18 @@
     border-radius: 2px;
 }
 .flrd-nav button:hover:not(:disabled) {
-    background: rgba(85, 255, 255, 0.12);
-    border-color: #55FFFF;
-    color: #55FFFF;
+    background: rgba(85, 255, 85, 0.12);
+    border-color: #55FF55;
+    color: #55FF55;
 }
 .flrd-nav button:disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
-.flrd-share {
-    border-color: #55FFFF !important;
-}
 .flrd-track-select-header {
     background: #050505;
     color: #FFFFFF;
-    border: 1px solid #5555FF;
+    border: 1px solid #55FF55;
     padding: 4px 8px;
     border-radius: 2px;
     font-family: inherit;
@@ -366,6 +351,75 @@
 .flrd-play-icon {
     color: #55FFFF;
 }
+.flrd-bios-card {
+    margin: 0 auto;
+    width: min(100%, 920px);
+    border: 1px solid #55FF55 !important;
+    border-radius: 18px;
+    background: #020802;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(85, 255, 85, 0.08) inset;
+}
+.flrd-bios-card > .card-header {
+    color: #55FF55 !important;
+    background: #000 !important;
+    border-bottom: 2px solid #55FF55 !important;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+}
+.flrd-bios-card > .card-body {
+    padding: 0;
+    background: #020802;
+}
+.flrd-bios-title {
+    color: #55FF55;
+    font-family: monospace;
+    font-size: 0.94rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.flrd-bios-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.flrc-card-toggle {
+    background: transparent;
+    border: 0;
+    color: #55FF55;
+    font-family: monospace;
+    font-size: 0.94rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: color 0.15s, opacity 0.15s;
+}
+.flrc-card-toggle:hover {
+    color: #55FF55;
+    opacity: 0.82;
+}
+.flrc-card-toggle:focus,
+.flrc-card-toggle:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+.flrc-card-toggle-icon {
+    display: inline-block;
+    font-size: 0.9em;
+    transition: transform 0.18s ease;
+}
+.is-collapsed .flrc-card-toggle-icon {
+    transform: rotate(-90deg);
+}
+.is-collapsed > .card-header {
+    border-bottom-width: 1px !important;
+}
 .flrsb-panel {
     --bs-card-border-color: #00AA00;
     --bs-card-bg: #000;
@@ -374,6 +428,8 @@
     border-color: #00AA00 !important;
     background: #000 !important;
     container-type: inline-size;
+    border-radius: 18px;
+    overflow: hidden;
 }
 .flrsb-panel > .card-header {
     color: #55FF55 !important;
@@ -386,13 +442,28 @@
     flex-wrap: wrap;
 }
 .flrsb-brand {
-    display: grid;
-    gap: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: #55FF55;
+    font: inherit;
+    cursor: pointer;
 }
 .flrsb-brand-kicker {
     color: #55FF55;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+.flrsb-brand:hover {
+    opacity: 0.82;
+}
+.flrsb-brand:focus,
+.flrsb-brand:focus-visible {
+    outline: none;
+    box-shadow: none;
 }
 /* .flrsb-head-copy removed */
 .flrsb-head-actions {
@@ -400,6 +471,13 @@
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+}
+.flrsb-panel.is-collapsed .flrsb-head-reset,
+.flrsb-panel.is-collapsed .flrsb-head-submit {
+    display: none;
+}
+.flrsb-panel.is-collapsed .flrsb-head-actions {
+    display: none;
 }
 /* .flrsb-head-status removed */
 /* Header submit & reset buttons */
@@ -1123,18 +1201,59 @@
     font-size: 0.88rem;
     color: #55FF55;
 }
+
+/* ── Vektrax Tabs ── */
+.vr-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 18px;
+    border: 1px solid #55FF55;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+}
+.vr-tab {
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #55FF55;
+    background: #000;
+    border: none;
+    border-right: 1px solid #55FF55;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.05em;
+}
+.vr-tab:last-child { border-right: none; }
+.vr-tab:hover { background: rgba(85, 255, 85, 0.08); }
+.vr-tab.active {
+    background: rgba(85, 255, 85, 0.15);
+    color: #AAFFAA;
+    text-shadow: 0 0 8px rgba(85, 255, 85, 0.5);
+}
+.vr-tab-content { display: none; }
+.vr-tab-content.active { display: block; }
 </style>
 
 <div class="flrd-shell">
-    <div class="flrd-page-art">
-        <img src="./images/vektrax_music.png?v=1774848270" alt="Futureland Records">
+
+    <!-- Tab Navigation -->
+    <div class="vr-tabs">
+        <button class="vr-tab active" data-vr-tab="radio">📻 Radio</button>
+        <button class="vr-tab" data-vr-tab="studio">🎛 Studio</button>
+        <button class="vr-tab" data-vr-tab="label">🏷 Label</button>
     </div>
 
+    <!-- TAB 1: Radio -->
+    <div class="vr-tab-content active" id="vr-tab-radio">
     <div class="card mb-3 flrd-panel" id="flrd-panel">
         <div class="card-header">
             <div class="flrd-brand">
                 <img src="./images/vektrax-head-anim.png" alt="" class="flrd-brand-head">
-                <span class="flrd-brand-label">Futureland Records</span>
+                <span class="flrd-brand-label">Vektrax Records</span>
             </div>
             <div class="flrd-nav">
                 <select id="flrd-track-select" class="flrd-track-select-header"></select>
@@ -1168,12 +1287,28 @@
         </div>
     </div>
 
+    <div class="card mb-3 flrd-bios-card" id="flrd-bios-card">
+        <div class="card-header">
+            <button type="button" class="flrc-card-toggle" id="flrd-bios-toggle" aria-expanded="true" aria-controls="flrd-bios-body" aria-label="Toggle featured artist">
+                <span class="flrc-card-toggle-icon" data-collapse-icon aria-hidden="true">▾</span>
+                <span class="flrd-bios-title">Featured Artist</span>
+            </button>
+        </div>
+        <div class="card-body" id="flrd-bios-body">
+            <img src="./images/ai_bios.png?v=20260403" alt="Vektrax Records AI bios">
+        </div>
+    </div>
+    </div><!-- /vr-tab-radio -->
+
+    <!-- TAB 2: Studio -->
+    <div class="vr-tab-content" id="vr-tab-studio">
     <?xjs if (user.number > 0 && user.alias !== settings.guest) { ?>
     <div class="card mb-3 flrsb-panel" id="flrsb-panel">
         <div class="card-header">
-            <div class="flrsb-brand">
+            <button type="button" class="flrsb-brand" id="flrsb-panel-toggle" aria-expanded="true" aria-controls="flrsb-body" aria-label="Toggle Vektrax Song Builder">
+                <span class="flrc-card-toggle-icon" data-collapse-icon aria-hidden="true">▾</span>
                 <span class="flrsb-brand-kicker">Vektrax Song Builder</span>
-            </div>
+            </button>
             <div class="flrsb-head-actions">
                 <button type="button" class="flrsb-reset-button flrsb-head-reset" id="flrsb-reset-button" title="Clear form and start fresh">Reset</button>
                 <button type="button" class="flrsb-submit-button flrsb-head-submit" id="flrsb-head-submit-button">
@@ -1182,7 +1317,7 @@
                 </button>
             </div>
         </div>
-        <div class="card-body flrsb-body">
+        <div class="card-body flrsb-body" id="flrsb-body">
             <!-- Vektrax response feed (shown at top after submit) -->
             <div class="flrsb-vx-feed-top" id="flrsb-vx-feed-top" hidden>
                 <div class="flrsb-vx-feed" id="flrsb-vx-feed">
@@ -1450,9 +1585,674 @@
         </div>
     </div>
     <?xjs } ?>
+    </div><!-- /vr-tab-studio -->
+
+    <!-- TAB 3: Label -->
+    <div class="vr-tab-content" id="vr-tab-label">
+    <?xjs if (user.number > 0 && user.alias !== settings.guest) { ?>
+<style>
+/* Rock Star Designer - Card Layout */
+.rsd-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: 'Courier New', monospace;
+    color: #ccc;
+    background: #111;
+    border: 1px solid #292929;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.rsd-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #292929;
+}
+.rsd-titlebar-name {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #33ff33;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.3rem 0.5rem;
+    text-shadow: 0 0 8px rgba(51,255,51,0.4);
+    outline: none;
+}
+.rsd-titlebar-name:hover { border-color: #333; }
+.rsd-titlebar-name:focus { border-color: #33ff33; background: #0a0a0a; }
+.rsd-titlebar-name::placeholder { color: #444; font-weight: normal; }
+.rsd-body {
+    display: flex;
+    align-items: flex-start;
+}
+@media (max-width: 800px) {
+    .rsd-body { flex-direction: column; }
+    .rsd-preview { width: 100% !important; border-right: none !important; border-bottom: 1px solid #292929; }
+}
+.rsd-preview {
+    width: 360px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 70px;
+    border-right: 1px solid #292929;
+    background: #0a0a0a;
+}
+.rsd-preview canvas {
+    width: 100%;
+    aspect-ratio: 3/4;
+    display: block;
+}
+.rsd-preview-btns {
+    display: flex;
+    border-bottom: 1px solid #292929;
+}
+.rsd-preview-btns button {
+    flex: 1;
+    padding: 0.4rem 0;
+    background: #111;
+    border: none;
+    border-right: 1px solid #292929;
+    color: #888;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.rsd-preview-btns button:last-child { border-right: none; }
+.rsd-preview-btns button:hover { background: #1a1a1a; color: #fff; }
+.rsd-preview-btns button.active { color: #33ff33; background: #0a1a0a; }
+.rsd-controls { flex: 1; min-width: 0; }
+.rsd-section {
+    border-bottom: 1px solid #292929;
+}
+.rsd-section:last-child { border-bottom: none; }
+.rsd-section-header {
+    padding: 0.6rem 1rem;
+    background: #141414;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    font-weight: bold;
+    color: #aaa;
+}
+.rsd-section-header:hover { background: #1a1a1a; color: #fff; }
+.rsd-section-header .rsd-chevron {
+    transition: transform 0.2s;
+    font-size: 0.8rem;
+}
+.rsd-section.collapsed .rsd-section-body { display: none; }
+.rsd-section.collapsed .rsd-chevron { transform: rotate(-90deg); }
+.rsd-section-body {
+    padding: 0.8rem 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.6rem;
+    background: #0e0e0e;
+    border-top: 1px solid #222;
+}
+.rsd-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.rsd-field label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.rsd-field select,
+.rsd-field input[type="range"],
+.rsd-field input[type="color"],
+.rsd-field input[type="number"],
+.rsd-field input[type="text"] {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #ddd;
+    padding: 0.35rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.rsd-field input[type="color"] { height: 32px; padding: 2px; cursor: pointer; }
+.rsd-field input[type="range"] { padding: 0; accent-color: #33ff33; }
+.rsd-field .rsd-range-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.rsd-field .rsd-range-val {
+    font-size: 0.75rem;
+    color: #666;
+    min-width: 2.5em;
+    text-align: right;
+}
+.rsd-btn {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #1a1a1a;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.rsd-btn:hover { background: #333; color: #fff; }
+.rsd-btn-accent { border-color: #33ff33; color: #33ff33; }
+.rsd-btn-accent:hover { background: #33ff33; color: #000; }
+
+/* ── Track Manager Card ── */
+.tm-card {
+    max-width: 1200px;
+    margin: 20px auto 0;
+    font-family: 'Courier New', monospace;
+    color: #ccc;
+    background: #111;
+    border: 1px solid #292929;
+    border-radius: 8px;
+    overflow: visible;
+}
+.tm-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #292929;
+    position: relative;
+}
+.tm-titlebar-label {
+    color: #55FF55;
+    font-size: 0.85rem;
+    font-weight: bold;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.tm-search-wrap {
+    flex: 1;
+    position: relative;
+}
+.tm-search-input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #ddd;
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    outline: none;
+    box-sizing: border-box;
+}
+.tm-search-input:focus { border-color: #55FF55; }
+.tm-search-input::placeholder { color: #555; }
+.tm-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    background: #111;
+    border: 1px solid #55FF55;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+}
+.tm-dropdown.open { display: block; }
+.tm-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #1a1a1a;
+    transition: background 0.1s;
+}
+.tm-dropdown-item:last-child { border-bottom: none; }
+.tm-dropdown-item:hover,
+.tm-dropdown-item.highlighted { background: rgba(85, 255, 85, 0.1); }
+.tm-dropdown-art {
+    width: 36px;
+    height: 36px;
+    border-radius: 3px;
+    object-fit: cover;
+    background: #222;
+    flex-shrink: 0;
+}
+.tm-dropdown-art-placeholder {
+    width: 36px;
+    height: 36px;
+    border-radius: 3px;
+    background: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+.tm-dropdown-name {
+    color: #ccc;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tm-dropdown-empty {
+    padding: 16px;
+    text-align: center;
+    color: #666;
+    font-size: 0.85rem;
+}
+/* Track detail area */
+.tm-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 18px;
+}
+.tm-detail-empty {
+    padding: 30px 18px;
+    text-align: center;
+    color: #555;
+    font-size: 0.85rem;
+}
+.tm-detail-art {
+    width: 120px;
+    height: 120px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #1a1a1a;
+    flex-shrink: 0;
+    border: 1px solid #292929;
+}
+.tm-detail-art-placeholder {
+    width: 120px;
+    height: 120px;
+    border-radius: 6px;
+    background: #1a1a1a;
+    border: 1px solid #292929;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 2.5rem;
+    flex-shrink: 0;
+}
+.tm-detail-meta {
+    flex: 1;
+    min-width: 0;
+}
+.tm-detail-title {
+    color: #55FF55;
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-shadow: 0 0 6px rgba(85, 255, 85, 0.3);
+}
+.tm-detail-field {
+    color: #999;
+    font-size: 0.82rem;
+    margin-bottom: 3px;
+}
+.tm-detail-field span { color: #ccc; }
+.tm-detail-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.tm-action-btn {
+    padding: 0.45rem 1rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #1a1a1a;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+.tm-action-btn:hover { background: #333; color: #fff; }
+.tm-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tm-action-btn.tm-accent { border-color: #55FF55; color: #55FF55; }
+.tm-action-btn.tm-accent:hover { background: #55FF55; color: #000; }
+@media (max-width: 600px) {
+    .tm-detail { flex-direction: column; align-items: center; text-align: center; }
+    .tm-detail-actions { flex-direction: row; }
+}
+</style>
+
+<div class="rsd-card" id="rsd-root">
+    <div class="rsd-titlebar">
+        <input class="rsd-titlebar-name" id="rsd-char-name"
+               type="text" placeholder="Untitled Character" maxlength="40" />
+        <button class="rsd-btn" id="rsd-btn-preview" title="Open in the music visualizer">&#127911; Preview Live</button>
+        <button class="rsd-btn" id="rsd-btn-assign" title="Save this character to the currently playing track">&#127925; Assign to Current Track</button>
+        <button class="rsd-btn rsd-btn-accent" id="rsd-btn-randomize">&#127922; Randomize</button>
+    </div>
+    <div class="rsd-body">
+        <div class="rsd-preview">
+            <div class="rsd-preview-btns">
+                <button id="rsd-btn-dance">&#128131; Dance</button>
+                <button id="rsd-btn-mouth">&#128068; Mouth</button>
+                <button id="rsd-btn-spin" class="active">&#128260; Spin</button>
+            </div>
+            <canvas id="rsd-canvas"></canvas>
+        </div>
+        <div class="rsd-controls" id="rsd-controls"></div>
+    </div>
+</div>
+
+<script src="./js/rockstar-designer.js?_v=<?xjs write(time()); ?>"></script>
+
+
+<!-- Track Manager Card -->
+<div class="tm-card" id="tm-card">
+    <div class="tm-titlebar">
+        <span class="tm-titlebar-label">🎵 My Tracks</span>
+        <div class="tm-search-wrap" id="tm-search-wrap">
+            <input type="text" class="tm-search-input" id="tm-search"
+                   placeholder="Search your tracks…" autocomplete="off" />
+            <div class="tm-dropdown" id="tm-dropdown"></div>
+        </div>
+    </div>
+    <div id="tm-body">
+        <div class="tm-detail-empty" id="tm-empty">Loading your tracks…</div>
+        <div class="tm-detail" id="tm-detail" style="display:none">
+            <div id="tm-art-slot"></div>
+            <div class="tm-detail-meta" id="tm-meta">
+                <div class="tm-detail-title" id="tm-title"></div>
+                <div class="tm-detail-field">Artist: <span id="tm-artist"></span></div>
+                <div class="tm-detail-field">Genre: <span id="tm-genre"></span></div>
+                <div class="tm-detail-field">Album: <span id="tm-album"></span></div>
+            </div>
+            <div class="tm-detail-actions">
+                <button type="button" class="tm-action-btn tm-accent" id="tm-btn-assign" disabled>🎭 Assign Character</button>
+                <button type="button" class="tm-action-btn" id="tm-btn-edit" disabled>✏️ Edit Metadata</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var COMPOSER = <?xjs write(JSON.stringify(user.alias).replace(/<\//g, '<\\/')); ?>;
+    var API_URL  = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s';
+    var STREAM_URL = './radio-stream/';
+    var RANGE_BYTES = 262144;
+
+    var searchInput = document.getElementById('tm-search');
+    var dropdown    = document.getElementById('tm-dropdown');
+    var detailEl    = document.getElementById('tm-detail');
+    var emptyEl     = document.getElementById('tm-empty');
+    var artSlot     = document.getElementById('tm-art-slot');
+    var titleEl     = document.getElementById('tm-title');
+    var artistEl    = document.getElementById('tm-artist');
+    var genreEl     = document.getElementById('tm-genre');
+    var albumEl     = document.getElementById('tm-album');
+    var assignBtn   = document.getElementById('tm-btn-assign');
+    var editBtn     = document.getElementById('tm-btn-edit');
+
+    var myTracks = [];
+    var hlIndex  = -1;
+    var selectedTrack = null;
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    /* ── Merge helpers (mirrors the radio player) ── */
+    function mergeTrackTags(base, over) {
+        var m = {}, k;
+        base = base || {}; over = over || {};
+        for (k in base)  if (base.hasOwnProperty(k))  m[k] = base[k];
+        for (k in over)  if (over.hasOwnProperty(k) && over[k] !== undefined && over[k] !== null && over[k] !== '') m[k] = over[k];
+        return m;
+    }
+
+    function tagVal(track, key) {
+        return (track.tags && track.tags[key]) ? track.tags[key] : '';
+    }
+    function trackTitle(track) {
+        return tagVal(track, 'title') || track.name.replace(/\.mp3$/i, '').replace(/_/g, ' ');
+    }
+
+    /* ── Parse track list exactly like the radio player ── */
+    function parseTrackList(list) {
+        return Promise.all(list.map(function(item) {
+            var url = STREAM_URL + encodeURIComponent(item.name);
+            return fetch(url, {
+                headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
+            })
+            .then(function(r) { return r.arrayBuffer(); })
+            .then(function(buf) {
+                var tags = {};
+                var artURL = '';
+                var overrideTags = item && item.tags ? item.tags : {};
+                if (typeof window.parseID3v2 === 'function') {
+                    try { tags = window.parseID3v2(buf) || {}; } catch(_) { tags = {}; }
+                }
+                if (tags.picture && tags.picture.blob) {
+                    artURL = URL.createObjectURL(tags.picture.blob);
+                }
+                tags = mergeTrackTags(tags, overrideTags);
+                return { name: item.name, desc: item.desc || '', tags: tags, artURL: artURL };
+            })
+            .catch(function() {
+                return { name: item.name, desc: item.desc || '',
+                         tags: mergeTrackTags({}, item && item.tags ? item.tags : {}), artURL: '' };
+            });
+        }));
+    }
+
+    /* ── Load ── */
+    showEmpty('Loading your tracks…');
+    fetch(API_URL)
+        .then(function(r) { return r.json(); })
+        .then(function(list) {
+            if (!Array.isArray(list)) { showEmpty('Could not load tracks.'); return; }
+            return parseTrackList(list);
+        })
+        .then(function(parsed) {
+            if (!parsed) return;
+            /* Filter by composer from fully-merged tags (ID3 + overrides) */
+            var composerLower = COMPOSER.toLowerCase();
+            myTracks = parsed.filter(function(tr) {
+                var c = tagVal(tr, 'composer');
+                return c.toLowerCase() === composerLower;
+            });
+            if (!myTracks.length) {
+                showEmpty('No tracks found for your account.');
+            } else {
+                showEmpty('Select a track above to view details.');
+            }
+        })
+        .catch(function() { showEmpty('Error loading track list.'); });
+
+    function showEmpty(msg) {
+        emptyEl.textContent = msg;
+        emptyEl.style.display = '';
+        detailEl.style.display = 'none';
+    }
+
+    /* ── Dropdown typeahead ── */
+    searchInput.addEventListener('focus', function() { showDropdown(''); });
+    searchInput.addEventListener('input', function() { showDropdown(searchInput.value); });
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('tm-search-wrap').contains(e.target)) {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        var items = dropdown.querySelectorAll('.tm-dropdown-item');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            hlIndex = Math.min(hlIndex + 1, items.length - 1);
+            updateHighlight(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            hlIndex = Math.max(hlIndex - 1, 0);
+            updateHighlight(items);
+        } else if (e.key === 'Enter' && hlIndex >= 0 && hlIndex < items.length) {
+            e.preventDefault();
+            items[hlIndex].click();
+        } else if (e.key === 'Escape') {
+            dropdown.classList.remove('open');
+        }
+    });
+
+    function updateHighlight(items) {
+        for (var i = 0; i < items.length; i++) {
+            items[i].classList.toggle('highlighted', i === hlIndex);
+        }
+        if (items[hlIndex]) items[hlIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function showDropdown(query) {
+        var q = query.toLowerCase().trim();
+        var matches = myTracks.filter(function(tr) {
+            if (!q) return true;
+            return trackTitle(tr).toLowerCase().indexOf(q) >= 0 ||
+                   tagVal(tr, 'artist').toLowerCase().indexOf(q) >= 0 ||
+                   tagVal(tr, 'album').toLowerCase().indexOf(q) >= 0;
+        });
+        hlIndex = -1;
+        if (!matches.length) {
+            dropdown.innerHTML = '<div class="tm-dropdown-empty">No matching tracks</div>';
+        } else {
+            dropdown.innerHTML = matches.map(function(tr, i) {
+                var artHtml = tr.artURL
+                    ? '<img class="tm-dropdown-art" src="' + esc(tr.artURL) + '" alt="" />'
+                    : '<div class="tm-dropdown-art-placeholder">\u266b</div>';
+                return '<div class="tm-dropdown-item" data-idx="' + i + '" data-name="' + esc(tr.name) + '">'
+                     + artHtml
+                     + '<span class="tm-dropdown-name">' + esc(trackTitle(tr)) + '</span>'
+                     + '</div>';
+            }).join('');
+            var items = dropdown.querySelectorAll('.tm-dropdown-item');
+            for (var ii = 0; ii < items.length; ii++) {
+                (function(el) {
+                    el.addEventListener('click', function() {
+                        var name = el.getAttribute('data-name');
+                        var track = myTracks.filter(function(t) { return t.name === name; })[0];
+                        if (track) selectTrack(track);
+                        dropdown.classList.remove('open');
+                    });
+                })(items[ii]);
+            }
+        }
+        dropdown.classList.add('open');
+    }
+
+    function selectTrack(track) {
+        selectedTrack = track;
+        searchInput.value = trackTitle(track);
+        showDetail(track);
+        assignBtn.disabled = false;
+        editBtn.disabled = false;
+    }
+
+    function showDetail(track) {
+        emptyEl.style.display = 'none';
+        detailEl.style.display = '';
+        titleEl.textContent = trackTitle(track);
+        artistEl.textContent = tagVal(track, 'artist') || '\u2014';
+        genreEl.textContent  = tagVal(track, 'genre')  || '\u2014';
+        albumEl.textContent  = tagVal(track, 'album')  || '\u2014';
+        if (track.artURL) {
+            artSlot.innerHTML = '<img class="tm-detail-art" src="' + esc(track.artURL) + '" alt="" />';
+        } else {
+            artSlot.innerHTML = '<div class="tm-detail-art-placeholder">\u266b</div>';
+        }
+    }
+})();
+</script>
+
+    <?xjs } ?>
+    </div><!-- /vr-tab-label -->
 </div>
 
 <script>
+
+    // ── Tab Navigation ──
+    (function() {
+        var tabs = document.querySelectorAll('.vr-tab');
+        var panels = document.querySelectorAll('.vr-tab-content');
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                var target = tab.getAttribute('data-vr-tab');
+                tabs.forEach(function(t) { t.classList.remove('active'); });
+                panels.forEach(function(p) { p.classList.remove('active'); });
+                tab.classList.add('active');
+                var panel = document.getElementById('vr-tab-' + target);
+                if (panel) panel.classList.add('active');
+                // Trigger canvas resize for designer tab
+                if (target === 'label') {
+                    var rsdCanvas = document.getElementById('rsd-canvas');
+                    if (rsdCanvas) {
+                        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
+                    }
+                }
+            });
+        });
+    })();
+
+(function () {
+    'use strict';
+
+    function bindCardCollapse(options) {
+        var card = document.getElementById(options.cardId);
+        var body = document.getElementById(options.bodyId);
+        var button = document.getElementById(options.buttonId);
+        var collapsed = false;
+
+        if (!card || !body || !button || button.dataset.collapseBound === '1') return;
+        button.dataset.collapseBound = '1';
+
+        function apply(nextCollapsed) {
+            collapsed = !!nextCollapsed;
+            card.classList.toggle('is-collapsed', collapsed);
+            body.hidden = collapsed;
+            button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+
+        apply(false);
+
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            apply(!collapsed);
+        });
+    }
+
+    bindCardCollapse({
+        cardId: 'flrd-bios-card',
+        bodyId: 'flrd-bios-body',
+        buttonId: 'flrd-bios-toggle'
+    });
+
+    bindCardCollapse({
+        cardId: 'flrsb-panel',
+        bodyId: 'flrsb-body',
+        buttonId: 'flrsb-panel-toggle'
+    });
+})();
+
 (function () {
     'use strict';
 
@@ -1579,7 +2379,7 @@
         emptyEl.hidden = false;
         emptyEl.textContent = message;
         counterEl.textContent = '0 / 0';
-        document.title = 'Futureland Records';
+        document.title = 'Vektrax Records';
         [prevButton, nextButton, shareButton, trackSelect, playButton, artWrap].forEach(function (el) {
             if (!el) return;
             el.setAttribute('disabled', 'disabled');
@@ -1831,7 +2631,7 @@
         fillTrackSelect();
         renderArt(track);
         syncUrl(track);
-        document.title = trackTitle(track) + ' | Futureland Records';
+        document.title = trackTitle(track) + ' | Vektrax Records';
         [prevButton, nextButton, shareButton, trackSelect, artWrap].forEach(function (el) {
             if (!el) return;
             el.removeAttribute('disabled');
@@ -1867,7 +2667,7 @@
 
         if (navigator.share) {
             navigator.share({
-                title: document.title || 'Futureland Records',
+                title: document.title || 'Vektrax Records',
                 url: url
             })
                 .then(function () {

@@ -120,16 +120,16 @@
 })();
 </script>
 
-<!-- ═══════════ Futureland Records ═══════════ -->
+<!-- ═══════════ Vektrax Records ═══════════ -->
 <style>
-.flr-panel{--bs-card-border-color:#5555FF;--bs-card-bg:#000;--bs-card-cap-bg:#000;--bs-card-cap-color:#5555FF;border-color:#5555FF!important;background:#000!important;container-type:inline-size}
-.flr-panel>.card-header{color:#5555FF!important;background:#000!important;border-bottom:2px solid #5555FF!important;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.flr-brand{display:inline-flex;align-items:center;gap:12px;font-weight:bold;white-space:nowrap;color:#5555FF}
+.flr-panel{--bs-card-border-color:#55FF55;--bs-card-bg:#000;--bs-card-cap-bg:#000;--bs-card-cap-color:#55FF55;border-color:#55FF55!important;background:#000!important;container-type:inline-size}
+.flr-panel>.card-header{color:#55FF55!important;background:#000!important;border-bottom:2px solid #55FF55!important;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.flr-brand{display:inline-flex;align-items:center;gap:12px;font-weight:bold;white-space:nowrap;color:#55FF55}
 .flr-brand-head{width:36px;height:36px;flex:0 0 auto;display:block;object-fit:contain;background:transparent;image-rendering:auto;filter:drop-shadow(0 0 8px rgba(85,255,85,.6))}
-.flr-brand-label{display:inline-block;color:#5555FF;border-bottom:2px solid #55FFFF;padding-bottom:2px;line-height:1}
+.flr-brand-label{display:inline-block;color:#55FF55;border-bottom:2px solid #55FF55;padding-bottom:2px;line-height:1}
 .flr-nav{display:flex;align-items:center;gap:6px}
-.flr-nav button{background:transparent;border:1px solid #5555FF;color:#55FFFF;font-family:monospace;font-size:14px;line-height:1;padding:2px 8px;cursor:pointer;border-radius:2px}
-.flr-nav button:hover{background:rgba(85,255,255,.12);border-color:#55FFFF;color:#55FFFF}
+.flr-nav button{background:transparent;border:1px solid #55FF55;color:#55FF55;font-family:monospace;font-size:14px;line-height:1;padding:2px 8px;cursor:pointer;border-radius:2px}
+.flr-nav button:hover{background:rgba(85,255,85,.12);border-color:#55FF55;color:#55FF55}
 .flr-counter{color:#AAAAAA;font-size:.75em;font-weight:normal}
 .flr-body{padding:clamp(16px,3vw,24px);display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"art" "meta";gap:clamp(16px,3vw,22px);align-items:start;justify-items:center}
 .flr-art-wrap{grid-area:art;width:min(100%,420px);aspect-ratio:1/1;background:#111;border:1px solid #333;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:box-shadow .3s;justify-self:center}
@@ -179,7 +179,7 @@
 
 <div class="card mb-3 flr-panel" id="flr-panel">
     <div class="card-header">
-        <div class="flr-brand"><img src="./images/vektrax-head-anim.png" alt="" class="flr-brand-head"><span class="flr-brand-label">Futureland Records</span></div>
+        <div class="flr-brand"><img src="./images/vektrax-head-anim.png" alt="" class="flr-brand-head"><span class="flr-brand-label">Vektrax Records</span></div>
         <div class="flr-nav">
             <button id="flr-prev" title="Previous">&laquo;</button>
             <span class="flr-counter" id="flr-counter">&mdash;</span>
@@ -361,11 +361,10 @@
             html += '</div>';
         }
 
-        if (tags.artist || tags.composer) {
+        var creditsText = tags.artist || tags.composer || '';
+        if (creditsText) {
             html += '<div class="flr-credits">';
-            if (tags.artist) html += '<span class="flr-artist-name">' + esc(tags.artist) + '</span>';
-            if (tags.artist && tags.composer) html += '<span class="flr-credit-sep">and</span>';
-            if (tags.composer) html += '<span class="flr-composer-name">' + esc(tags.composer) + '</span>';
+            html += '<span class="flr-artist-name">' + esc(creditsText) + '</span>';
             html += '</div>';
         }
 

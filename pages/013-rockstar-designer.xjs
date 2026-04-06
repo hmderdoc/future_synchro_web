@@ -1,0 +1,188 @@
+<!--HIDDEN:Rock Star Designer-->
+<?xjs
+    if (user.number < 1 || user.alias === settings.guest) exit();
+?>
+
+<style>
+/* Rock Star Designer - Card Layout */
+.rsd-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: 'Courier New', monospace;
+    color: #ccc;
+    background: #111;
+    border: 1px solid #292929;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.rsd-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #1a1a1a;
+    border-bottom: 1px solid #292929;
+}
+.rsd-titlebar-name {
+    flex: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #33ff33;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.3rem 0.5rem;
+    text-shadow: 0 0 8px rgba(51,255,51,0.4);
+    outline: none;
+}
+.rsd-titlebar-name:hover { border-color: #333; }
+.rsd-titlebar-name:focus { border-color: #33ff33; background: #0a0a0a; }
+.rsd-titlebar-name::placeholder { color: #444; font-weight: normal; }
+.rsd-body {
+    display: flex;
+    align-items: flex-start;
+}
+@media (max-width: 800px) {
+    .rsd-body { flex-direction: column; }
+    .rsd-preview { width: 100% !important; border-right: none !important; border-bottom: 1px solid #292929; }
+}
+.rsd-preview {
+    width: 360px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 70px;
+    border-right: 1px solid #292929;
+    background: #0a0a0a;
+}
+.rsd-preview canvas {
+    width: 100%;
+    aspect-ratio: 3/4;
+    display: block;
+}
+.rsd-preview-btns {
+    display: flex;
+    border-bottom: 1px solid #292929;
+}
+.rsd-preview-btns button {
+    flex: 1;
+    padding: 0.4rem 0;
+    background: #111;
+    border: none;
+    border-right: 1px solid #292929;
+    color: #888;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.rsd-preview-btns button:last-child { border-right: none; }
+.rsd-preview-btns button:hover { background: #1a1a1a; color: #fff; }
+.rsd-preview-btns button.active { color: #33ff33; background: #0a1a0a; }
+.rsd-controls { flex: 1; min-width: 0; }
+.rsd-section {
+    border-bottom: 1px solid #292929;
+}
+.rsd-section:last-child { border-bottom: none; }
+.rsd-section-header {
+    padding: 0.6rem 1rem;
+    background: #141414;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    font-weight: bold;
+    color: #aaa;
+}
+.rsd-section-header:hover { background: #1a1a1a; color: #fff; }
+.rsd-section-header .rsd-chevron {
+    transition: transform 0.2s;
+    font-size: 0.8rem;
+}
+.rsd-section.collapsed .rsd-section-body { display: none; }
+.rsd-section.collapsed .rsd-chevron { transform: rotate(-90deg); }
+.rsd-section-body {
+    padding: 0.8rem 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.6rem;
+    background: #0e0e0e;
+    border-top: 1px solid #222;
+}
+.rsd-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.rsd-field label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.rsd-field select,
+.rsd-field input[type="range"],
+.rsd-field input[type="color"],
+.rsd-field input[type="number"],
+.rsd-field input[type="text"] {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #ddd;
+    padding: 0.35rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.rsd-field input[type="color"] { height: 32px; padding: 2px; cursor: pointer; }
+.rsd-field input[type="range"] { padding: 0; accent-color: #33ff33; }
+.rsd-field .rsd-range-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.rsd-field .rsd-range-val {
+    font-size: 0.75rem;
+    color: #666;
+    min-width: 2.5em;
+    text-align: right;
+}
+.rsd-btn {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #1a1a1a;
+    color: #ccc;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.rsd-btn:hover { background: #333; color: #fff; }
+.rsd-btn-accent { border-color: #33ff33; color: #33ff33; }
+.rsd-btn-accent:hover { background: #33ff33; color: #000; }
+</style>
+
+<div class="rsd-card" id="rsd-root">
+    <div class="rsd-titlebar">
+        <input class="rsd-titlebar-name" id="rsd-char-name"
+               type="text" placeholder="Untitled Character" maxlength="40" />
+        <button class="rsd-btn" id="rsd-btn-preview" title="Open in the music visualizer">&#127911; Preview Live</button>
+        <button class="rsd-btn" id="rsd-btn-assign" title="Save this character to the currently playing track">&#127925; Assign to Current Track</button>
+        <button class="rsd-btn rsd-btn-accent" id="rsd-btn-randomize">&#127922; Randomize</button>
+    </div>
+    <div class="rsd-body">
+        <div class="rsd-preview">
+            <div class="rsd-preview-btns">
+                <button id="rsd-btn-dance">&#128131; Dance</button>
+                <button id="rsd-btn-mouth">&#128068; Mouth</button>
+                <button id="rsd-btn-spin" class="active">&#128260; Spin</button>
+            </div>
+            <canvas id="rsd-canvas"></canvas>
+        </div>
+        <div class="rsd-controls" id="rsd-controls"></div>
+    </div>
+</div>
+
+<script src="./js/rockstar-designer.js?_v=<?xjs write(time()); ?>"></script>
