@@ -1981,6 +1981,7 @@
                 <div class="tm-detail-field">Album: <span id="tm-album"></span></div>
             </div>
             <div class="tm-detail-actions">
+                <button type="button" class="tm-action-btn" id="tm-btn-preview" disabled>&#127911; Preview Character</button>
                 <button type="button" class="tm-action-btn tm-accent" id="tm-btn-assign" disabled>🎭 Assign Character</button>
                 <button type="button" class="tm-action-btn" id="tm-btn-edit" disabled>✏️ Edit Metadata</button>
             </div>
@@ -2003,6 +2004,7 @@
     var artistEl    = document.getElementById('tm-artist');
     var genreEl     = document.getElementById('tm-genre');
     var albumEl     = document.getElementById('tm-album');
+    var previewBtn  = document.getElementById('tm-btn-preview');
     var assignBtn   = document.getElementById('tm-btn-assign');
     var editBtn     = document.getElementById('tm-btn-edit');
 
@@ -2164,6 +2166,8 @@
         selectedTrack = track;
         searchInput.value = trackTitle(track);
         showDetail(track);
+        previewBtn.disabled = false;
+        previewBtn.disabled = false;
         assignBtn.disabled = false;
         editBtn.disabled = false;
     }
@@ -2181,6 +2185,112 @@
             artSlot.innerHTML = '<div class="tm-detail-art-placeholder">\u266b</div>';
         }
     }
+
+    // ── Preview Character: play the selected track + inject designer char into visualizer ──
+    previewBtn.addEventListener('click', function () {
+        if (!selectedTrack) return;
+        var radio = window.sbbsRadio;
+        if (!radio) return;
+
+        // Get the current character from the Rock Star Designer
+        var charJson = typeof window.getRockstarDesignerCharacter === 'function'
+            ? window.getRockstarDesignerCharacter() : null;
+        if (!charJson) {
+            alert('Design a character first using the Rock Star Designer above.');
+            return;
+        }
+
+        // Inject character definition into the visualizer's registry
+        try {
+            var def = JSON.parse(charJson);
+            def.name = def.name || 'Custom Character';
+            if (window._CHARS) window._CHARS['_rsd_preview'] = def;
+        } catch (e) {}
+
+        // Lock the visualizer to the preview character BEFORE playing
+        // This survives the metadata fetch cycle that resets characters
+        if (typeof window._setCharPreview === 'function') {
+            window._setCharPreview('_rsd_preview');
+        }
+
+        // Open visualizer, then play the selected track
+        document.dispatchEvent(new CustomEvent('viz:open'));
+        radio.playByFile(selectedTrack.name);
+    });
+
+    // ── Assign Character: save designer char to the selected track ──
+    assignBtn.addEventListener('click', function () {
+        if (!selectedTrack) return;
+        var radio = window.sbbsRadio;
+        if (!radio) return;
+
+        var charJson = typeof window.getRockstarDesignerCharacter === 'function'
+            ? window.getRockstarDesignerCharacter() : null;
+        if (!charJson) {
+            alert('Design a character first using the Rock Star Designer above.');
+            return;
+        }
+
+        var csrfToken = (window.sbbsConfig && window.sbbsConfig.csrfToken)
+            ? String(window.sbbsConfig.csrfToken) : '';
+
+        var body = new URLSearchParams();
+        body.set('file', selectedTrack.name);
+        body.set('character', charJson);
+
+        assignBtn.disabled = true;
+        assignBtn.textContent = 'Saving\u2026';
+
+        fetch('./api/files.ssjs?call=update-track-meta&dir=' + encodeURIComponent(radio.dirCode), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data && data.error) throw new Error(data.error);
+            assignBtn.textContent = '\u2605 Assigned!';
+            document.dispatchEvent(new CustomEvent('rsd:character-assigned', {
+                detail: { file: selectedTrack.name, character: charJson }
+            }));
+            setTimeout(function () {
+                assignBtn.disabled = false;
+                assignBtn.textContent = '\ud83c\udfad Assign Character';
+            }, 2000);
+        })
+        .catch(function (err) {
+            alert('Could not assign character: ' + (err.message || err));
+            assignBtn.disabled = false;
+            assignBtn.textContent = '\ud83c\udfad Assign Character';
+        });
+    });
+
+    // ── Edit Metadata: open the radio library's track editor ──
+    editBtn.addEventListener('click', function () {
+        if (!selectedTrack) return;
+        var radio = window.sbbsRadio;
+        if (!radio) return;
+
+        if (typeof radio.openEditorByFile === 'function') {
+            var ok = radio.openEditorByFile(selectedTrack.name);
+            if (!ok) {
+                // Track might not be in the loaded playlist yet — open library so it loads
+                radio.openLibraryPanel();
+                setTimeout(function () {
+                    if (!radio.openEditorByFile(selectedTrack.name)) {
+                        alert('Could not find "' + selectedTrack.name + '" in the music library. Try playing it first.');
+                    }
+                }, 1500);
+            }
+        } else {
+            // Fallback: just open the library panel (old cached radio.js)
+            radio.openLibraryPanel();
+        }
+    });
 })();
 </script>
 

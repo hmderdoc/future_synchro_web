@@ -1010,6 +1010,14 @@
             toggleLibraryPanel: toggleLibraryPanel,
             openLibraryPanel: openLibraryPanel,
             closeLibraryPanel: closeLibraryPanel,
+            openEditorByFile: function (filename) {
+                if (!filename) return false;
+                var idx = trackIndexByName[filename];
+                if (typeof idx !== 'number' || !playlist[idx]) return false;
+                openLibraryPanel();
+                openTrackEditor(idx);
+                return true;
+            },
             get currentTime() {
                 if (!isPlaying || !audioCtx || !_bufferSource) return _playOffset;
                 return _playOffset + (audioCtx.currentTime - _playStartCtx);
