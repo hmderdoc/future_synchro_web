@@ -1762,13 +1762,8 @@
     };
 
     var activeChar = CHARACTERS._default;
-    var _previewOverrideKey = null;  // When set, character is locked to this key
 
     function setActiveCharacter(key) {
-        // If preview override is active, always use that instead
-        if (_previewOverrideKey && CHARACTERS[_previewOverrideKey]) {
-            key = _previewOverrideKey;
-        }
         var ch = CHARACTERS[key] || CHARACTERS._default;
         if (ch === activeChar) return;
         activeChar = ch;
@@ -1798,15 +1793,6 @@
     window._setChar = setActiveCharacter;
     window._CHARS = CHARACTERS;
 
-    /** Lock the visualizer to a preview character (survives track changes/metadata fetches) */
-    window._setCharPreview = function (key) {
-        _previewOverrideKey = key;
-        setActiveCharacter(key);
-    };
-    /** Clear the preview lock so normal character selection resumes */
-    window._clearCharPreview = function () {
-        _previewOverrideKey = null;
-    };
 
     var LASER_RED = '#FF5555';
 
@@ -7011,9 +6997,6 @@
         lrcIndex  = -1;
         trackMeta = null;
         resetLyricEditorState();
-        // Clear preview override on track change so normal selection resumes
-        // (preview only lasts for the one track it was requested for)
-        _previewOverrideKey = null;
         setActiveCharacter('_default');
         resetLyricFxState();
         if (elLyrics) elLyrics.textContent = '';

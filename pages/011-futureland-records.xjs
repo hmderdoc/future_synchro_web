@@ -2186,7 +2186,7 @@
         }
     }
 
-    // ── Preview Character: play the selected track + inject designer char into visualizer ──
+    // ── Preview Character: play the selected track + show designer char in visualizer ──
     previewBtn.addEventListener('click', function () {
         if (!selectedTrack) return;
         var radio = window.sbbsRadio;
@@ -2207,15 +2207,19 @@
             if (window._CHARS) window._CHARS['_rsd_preview'] = def;
         } catch (e) {}
 
-        // Lock the visualizer to the preview character BEFORE playing
-        // This survives the metadata fetch cycle that resets characters
-        if (typeof window._setCharPreview === 'function') {
-            window._setCharPreview('_rsd_preview');
-        }
-
-        // Open visualizer, then play the selected track
+        // Open visualizer, play the track, then keep re-applying our character
+        // until the metadata fetch cycle settles (it resets the character)
         document.dispatchEvent(new CustomEvent('viz:open'));
         radio.playByFile(selectedTrack.name);
+
+        function applyChar() {
+            if (window._setChar) window._setChar('_rsd_preview');
+        }
+        applyChar();
+        setTimeout(applyChar, 300);
+        setTimeout(applyChar, 800);
+        setTimeout(applyChar, 1500);
+        setTimeout(applyChar, 3000);
     });
 
     // ── Assign Character: save designer char to the selected track ──
