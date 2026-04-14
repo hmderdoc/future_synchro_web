@@ -88,12 +88,20 @@
 
     /* Build page list for nav */
     var nav_pages = getPageList();
+    /* Pages to move into "More" dropdown */
+    /* Pages to move into "More" dropdown */
     var more_nav_names = [
         'futureland-records',
         'futureland-gallery',
         'nodespy',
         'webmonitor'
     ];
+
+    /* Pages hidden from nav entirely (accessed via other UI) */
+    pullNavPage(nav_pages, 'newsflip');
+
+    /* Pages hidden from nav entirely (accessed via other UI) */
+    pullNavPage(nav_pages, 'newsflip');
 
     function pullNavPage(list, name) {
         var idx = list.findIndex(function (item) {
@@ -147,7 +155,7 @@
         } else {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="<? write(navHref(e, path)); ?>"><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
+        <a class="nav-link<? if (e.name === 'chat') write(' nav-link-chat'); ?>" href="<? write(navHref(e, path)); ?>"<?xjs if (e.name === 'chat') { ?> id="nav-link-chat"<?xjs } ?>><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span><?xjs if (e.name === 'chat') { ?><span class="badge bg-danger" id="badge-chat-unread" style="display:none;"></span><?xjs } ?></a>
     </li>
 <?xjs
         }
@@ -238,7 +246,9 @@
         news: 'newsitems',
         more: 'group',
         'futureland-records': 'headphones',
-        'futureland-gallery': 'art_gallery'
+        'futureland-gallery': 'art_gallery',
+        newsflip: 'rssfeed',
+        music_note: 'music_note'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -310,6 +320,16 @@
             </div>
         </div>
 
+        <!-- Mobile shortcut icons (visible only below md breakpoint) -->
+        <div class="navbar-mobile-shortcuts d-md-none">
+            <button class="mobile-shortcut-btn" id="btn-viz-mobile" type="button" title="Visualizer">
+                <span class="bin-icon" data-icon="music_note"></span>
+            </button>
+            <a class="mobile-shortcut-btn" href="./?page=014-newsflip.xjs" title="NewsFlip">
+                <span class="bin-icon" data-icon="newsflip"></span>
+            </a>
+        </div>
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -366,10 +386,7 @@
                         <li><a class="dropdown-item" href="./?page=010-settings.xjs">
                             <span class="bin-icon" data-icon="gear"></span><? write(locale.strings.main.menu_item_settings); ?>
                         </a></li>
-                        <li><a class="dropdown-item" href="./?page=004-chat.xjs">
-                            <span class="bin-icon" data-icon="chat"></span>Chat
-                            <span class="badge bg-primary" id="badge-chat-unread" class="d-none"></span>
-                        </a></li>
+
                         <li><a class="dropdown-item" id="button-logout" href="#"><span class="bin-icon" data-icon="logout"></span><? write(locale.strings.main.menu_item_logout); ?></a></li>
                     </ul>
                 </li>

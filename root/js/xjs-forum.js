@@ -527,6 +527,103 @@ async function listMessages(sub, thread, count, after) {
 }
 
 
+
+// --- Mark-as-read on scroll (IntersectionObserver) ---
+var _readObserver = null;
+var _highestReadMsg = 0;
+var _readFlushTimer = null;
+var _readSub = '';
+
+function _flushReadPtr() {
+    if (!_readSub || !_highestReadMsg) return;
+    var url = './api/forum.ssjs?call=set-scan-ptr&sub=' + _readSub + '&ptr=' + _highestReadMsg;
+    // Use sendBeacon if available (reliable during page unload), else fetch
+    if (navigator.sendBeacon) {
+        navigator.sendBeacon(url);
+    } else {
+        v4_get(url);
+    }
+    // After flushing, hide unread pills on messages we've now marked read
+    document.querySelectorAll('li[data-message]').forEach(function (el) {
+        var num = parseInt(el.getAttribute('data-message'), 10);
+        if (!isNaN(num) && num <= _highestReadMsg) {
+            var pill = el.querySelector('[data-badge-unread]');
+            if (pill) pill.setAttribute('hidden', true);
+        }
+    });
+    // Hide the jump-to-unread button if no unread messages remain
+    if (!document.querySelector('li[data-message] [data-badge-unread]:not([hidden])')) {
+        var jc = document.getElementById('jump-unread-container');
+        if (jc) jc.setAttribute('hidden', true);
+    }
+}
+
+function _onReadIntersect(entries) {
+    var changed = false;
+    entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        var num = parseInt(el.getAttribute('data-message'), 10);
+        if (isNaN(num)) return;
+        if (num > _highestReadMsg) {
+            _highestReadMsg = num;
+            changed = true;
+        }
+        // Stop observing this message once it's been seen
+        if (_readObserver) _readObserver.unobserve(el);
+    });
+    if (changed) {
+        // Debounce: flush after 1.5s of no new messages scrolled into view
+        if (_readFlushTimer) clearTimeout(_readFlushTimer);
+        _readFlushTimer = setTimeout(_flushReadPtr, 1500);
+    }
+}
+
+function _observeMessagesForRead(sub) {
+    _readSub = sub;
+    if (_readObserver) _readObserver.disconnect();
+    _readObserver = new IntersectionObserver(_onReadIntersect, {
+        rootMargin: '0px',
+        threshold: 0.3
+    });
+    document.querySelectorAll('li[data-message]').forEach(function (el) {
+        var pill = el.querySelector('[data-badge-unread]');
+        // Only observe messages that have the unread pill visible
+        if (pill && !pill.hasAttribute('hidden')) {
+            _readObserver.observe(el);
+        }
+    });
+}
+
+function _scrollToFirstUnread() {
+    var jumpContainer = document.getElementById('jump-unread-container');
+    var jumpBtn = document.getElementById('jump-unread');
+    // Find the first message element whose unread pill is visible
+    var firstUnread = document.querySelector('li[data-message] [data-badge-unread]:not([hidden])');
+    if (!firstUnread) {
+        if (jumpContainer) jumpContainer.setAttribute('hidden', true);
+        return;
+    }
+    var msgEl = firstUnread.closest('li[data-message]');
+    if (msgEl) {
+        msgEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    // Show the jump-to-unread button for future use
+    if (jumpContainer) jumpContainer.removeAttribute('hidden');
+    if (jumpBtn) {
+        jumpBtn.onclick = function (evt) {
+            evt.preventDefault();
+            var next = document.querySelector('li[data-message] [data-badge-unread]:not([hidden])');
+            if (next) {
+                var el = next.closest('li[data-message]');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // All read now, hide button
+                if (jumpContainer) jumpContainer.setAttribute('hidden', true);
+            }
+        };
+    }
+}
 var _msgScrollLoading = false;
 var _msgScrollExhausted = false;
 var _msgScrollObserver = null;
@@ -537,11 +634,20 @@ async function initMessageInfiniteScroll(sub, thread, count) {
     if (_msgScrollObserver) _msgScrollObserver.disconnect();
     _msgScrollExhausted = false;
     _msgScrollLoading = false;
+    _highestReadMsg = 0;
     await listMessages(sub, thread, count);
+    // Set up mark-as-read observer and scroll to first unread
+    _observeMessagesForRead(sub);
+    setTimeout(_scrollToFirstUnread, 150);
+    // Flush any pending read pointer on page unload
+    window.addEventListener('beforeunload', _flushReadPtr);
     if (_msgScrollExhausted) return;
     _msgScrollObserver = new IntersectionObserver(function (entries) {
         if (entries[0].isIntersecting && !_msgScrollLoading && !_msgScrollExhausted) {
-            listMessages(sub, thread, count, true);
+            listMessages(sub, thread, count, true).then(function () {
+                // Also observe any newly loaded messages
+                _observeMessagesForRead(sub);
+            });
         }
     }, { rootMargin: '200px' });
     _msgScrollObserver.observe(sentinel);

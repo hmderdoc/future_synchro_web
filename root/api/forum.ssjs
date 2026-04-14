@@ -99,6 +99,14 @@ if (request.has_param('call') && (http_request.method === 'GET' || http_request.
                 }
                 break;
 
+
+            case 'set-scan-ptr':
+                if (request.has_params(['sub', 'ptr'])) {
+                    reply.success = setScanPtr(http_request.query.sub[0], http_request.query.ptr[0]);
+                } else {
+                    reply.success = false;
+                }
+                break;
             case 'vote':
                 if (request.has_params(['sub', 'id', 'up']) && !(user.security.restrictions&UFLAG_V)) {
                     reply.success = voteMessage(http_request.query.sub[0], http_request.query.id[0], http_request.query.up[0]);

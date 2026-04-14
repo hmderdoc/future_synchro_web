@@ -21,6 +21,22 @@
         </div>
     </div>
 
+    <!-- Newsflip link -->
+    <div id="news-fliplink">
+        <a href="./?page=014-newsflip.xjs" class="news-fliplink-btn">
+            <span class="bin-icon" data-icon="newsflip"></span>
+            <span>NewsFlip</span>
+        </a>
+    </div>
+
+    <!-- Newsflip link -->
+    <div id="news-fliplink">
+        <a href="./?page=014-newsflip.xjs" class="news-fliplink-btn">
+            <span class="bin-icon" data-icon="newsflip"></span>
+            <span>NewsFlip</span>
+        </a>
+    </div>
+
     <!-- Breadcrumb -->
     <nav id="news-breadcrumb" aria-label="breadcrumb" style="display:none">
         <ol class="breadcrumb mb-2"></ol>

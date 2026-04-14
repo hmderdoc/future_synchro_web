@@ -396,6 +396,116 @@
         return true;
     }
 
+    function normalizeWaveform(value) {
+        var mode = String(value || '').toLowerCase();
+        if (mode === 'sine' || mode === 'square' || mode === 'triangle' || mode === 'sawtooth') {
+            return mode;
+        }
+        return 'square';
+    }
+
+    function playOscillatorTone(id, frequencyHz, durationMs, volume, waveform) {
+        var ctx = ensureAudioContext();
+        var handle;
+        if (!ctx) return Promise.reject(new Error('Web Audio unavailable'));
+
+        return unlockAudio().then(function (unlocked) {
+            var now;
+            var durSec;
+            var osc;
+            var gain;
+            var maxVol;
+
+            if (!unlocked && ctx.state !== 'running') {
+                throw new Error('Audio context not unlocked');
+            }
+
+            now = ctx.currentTime;
+            durSec = Math.max(0.01, durationMs / 1000);
+            osc = ctx.createOscillator();
+            gain = ctx.createGain();
+            maxVol = Math.max(0.0001, volume);
+
+            osc.type = normalizeWaveform(waveform);
+            osc.frequency.setValueAtTime(Math.max(20, frequencyHz), now);
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(maxVol, now + 0.004);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            handle = { kind: 'buffer', source: osc, gain: gain };
+            osc.onended = function () {
+                cleanupAudioHandle(id);
+            };
+
+            if (id) audioHandles[id] = handle;
+            osc.start(now);
+            osc.stop(now + durSec + 0.01);
+            return true;
+        });
+    }
+
+    function playZztNote(payload) {
+        var id;
+        var frequencyHz;
+        var durationMs;
+        var volume;
+        var waveform;
+
+        payload = payload || {};
+        id = payload.id ? String(payload.id) : 'zzt-main';
+        frequencyHz = clampNumber(payload.frequencyHz, 20, 20000, 440);
+        durationMs = clampNumber(payload.durationMs, 10, 10000, 60);
+        volume = clampNumber(payload.volume, 0, 1, 0.18);
+        waveform = payload.waveform || 'square';
+
+        if (id && audioHandles[id]) {
+            stopAudioHandle(audioHandles[id]);
+            cleanupAudioHandle(id);
+        }
+
+        playOscillatorTone(id, frequencyHz, durationMs, volume, waveform).catch(function (err) {
+            console.warn('[flweb] audio.zzt.note failed:', err && err.message ? err.message : err);
+            cleanupAudioHandle(id);
+        });
+
+        return true;
+    }
+
+    function playZztDrum(payload) {
+        var drum;
+        var durationMs;
+        var volume;
+        var id;
+        var freq;
+        var waveform;
+        var drumFreqs = [3200, 1200, 2400, 880, 2200, 1400, 960, 700, 1500, 440];
+
+        payload = payload || {};
+        id = payload.id ? String(payload.id) : 'zzt-main';
+        drum = Math.floor(clampNumber(payload.drumId, 0, 9, 0));
+        durationMs = clampNumber(payload.durationMs, 10, 10000, 70);
+        volume = clampNumber(payload.volume, 0, 1, 0.25);
+        freq = drumFreqs[drum] || 880;
+        freq = freq + ((Math.random() * 2 - 1) * (freq * 0.12));
+        waveform = (drum === 4 || drum === 9) ? 'sawtooth' : 'square';
+
+        if (id && audioHandles[id]) {
+            stopAudioHandle(audioHandles[id]);
+            cleanupAudioHandle(id);
+        }
+
+        playOscillatorTone(id, freq, durationMs, volume, waveform).catch(function (err) {
+            console.warn('[flweb] audio.zzt.drum failed:', err && err.message ? err.message : err);
+            cleanupAudioHandle(id);
+        });
+
+        return true;
+    }
+
     function say(payload) {
         var utter;
         var voices;
@@ -536,6 +646,12 @@
             case 'audio.play':
                 return playAudio(payload);
             case 'audio.stop':
+                return stopAudio(payload);
+            case 'audio.zzt.note':
+                return playZztNote(payload);
+            case 'audio.zzt.drum':
+                return playZztDrum(payload);
+            case 'audio.zzt.stop':
                 return stopAudio(payload);
             case 'speech.say':
                 return say(payload);

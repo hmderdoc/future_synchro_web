@@ -6,46 +6,241 @@
 ?>
 
 <style>
-    div.webmonitor-panel {
+    #webmonitor {
+        --wm-card-bg: #000000;
+        --wm-card-border: #00aaaa;
+        --wm-tab-bg: #0d0d0d;
+        --wm-tab-active-bg: #0000aa;
+        --wm-tab-active-fg: #ffff55;
+        --wm-fg: #c8c8c8;
+        --wm-muted: #9ca3af;
+        --wm-header-fg: #ffff55;
+        --wm-row-odd: #050505;
+        --wm-row-even: #101018;
+        --wm-row-hover: #001f3f;
+        color: var(--wm-fg);
+    }
+
+    #webmonitor .webmonitor-card {
+        background: var(--wm-card-bg);
+        border: 1px solid var(--wm-card-border);
+        box-shadow: 0 0 0 1px rgba(0, 170, 170, 0.2);
+        padding: 12px;
+        min-height: 100%;
+    }
+
+    #webmonitor .nav-tabs {
+        border-bottom: 1px solid var(--wm-card-border);
+        gap: 6px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+
+    #webmonitor .nav-tabs .nav-link {
+        color: var(--wm-muted);
+        background: var(--wm-tab-bg);
+        border: 1px solid #2f3a3a;
+        border-bottom: none;
+        border-radius: 0;
+        padding: 0.32rem 0.55rem;
+    }
+
+    #webmonitor .nav-tabs .nav-link:hover,
+    #webmonitor .nav-tabs .nav-link:focus {
+        color: #55ffff;
+        border-color: var(--wm-card-border);
+    }
+
+    #webmonitor .nav-tabs .nav-link.active {
+        color: var(--wm-tab-active-fg);
+        background: var(--wm-tab-active-bg);
+        border-color: var(--wm-card-border);
+    }
+
+    #webmonitor .nav-tabs .badge {
+        background: #aa00aa !important;
+        color: #ffffff;
+        margin-left: 4px;
+    }
+
+    #webmonitor div.webmonitor-panel {
         height: 400px;
     }
-    div.webmonitor-scrolling-wrapper {
+
+    #webmonitor div.webmonitor-scrolling-wrapper {
         height: 400px;
-        overflow-y: scroll;
+        overflow-y: auto;
+        overflow-x: auto;
     }
-    div.webmonitor-scrolling-wrapper-with-buttons {
+
+    #webmonitor div.webmonitor-scrolling-wrapper-with-buttons {
         height: 356px;
-        overflow-y: scroll;
+        overflow-y: auto;
+        overflow-x: auto;
     }
-    div.webmonitor-toolbar-buttons {
-        padding: 5px 0;
+
+    #webmonitor div.webmonitor-toolbar-buttons {
+        padding: 4px 0 8px;
     }
+
+    #webmonitor div.webmonitor-toolbar-buttons .form-check {
+        margin-top: 0.22rem;
+    }
+
     div.modal-body input[type=text] {
         margin-bottom: 10px;
     }
-    tr .visible-hover {
+
+    #webmonitor tr .visible-hover {
         display: none;
     }
-    tr:hover .visible-hover {
+
+    #webmonitor tr:hover .visible-hover {
         display: inline-block;
+    }
+
+    #webmonitor .table {
+        --bs-table-bg: transparent;
+        --bs-table-color: var(--wm-fg);
+        --bs-table-border-color: #2f3a3a;
+        margin-bottom: 0;
+        color: var(--wm-fg);
+        border-color: #2f3a3a;
+    }
+
+    #webmonitor .table > :not(caption) > * > * {
+        background: transparent;
+        color: var(--wm-fg);
+        border-color: #2f3a3a;
+    }
+
+    #webmonitor .table thead th {
+        color: var(--wm-header-fg);
+        background: #0000aa;
+        border-bottom: 1px solid var(--wm-card-border);
+        white-space: nowrap;
+    }
+
+    #webmonitor .table-striped > tbody > tr:nth-child(odd) > * {
+        background: var(--wm-row-odd);
+    }
+
+    #webmonitor .table-striped > tbody > tr:nth-child(even) > * {
+        background: var(--wm-row-even);
+    }
+
+    #webmonitor .table-hover tbody tr:hover > * {
+        background: var(--wm-row-hover);
+        color: #e8f8ff;
+    }
+
+    #webmonitor .table tbody tr.danger > * {
+        color: #ff8f8f;
+        background: rgba(127, 0, 0, 0.24);
+    }
+
+    #webmonitor .table tbody tr.warning > * {
+        color: #ffe08a;
+        background: rgba(90, 70, 0, 0.2);
+    }
+
+    #webmonitor .table tbody tr.info > * {
+        color: #8fe0ff;
+        background: rgba(0, 60, 120, 0.2);
+    }
+
+    #webmonitor .table tbody tr.success > * {
+        color: #8effb0;
+        background: rgba(0, 80, 40, 0.2);
+    }
+
+    #webmonitor .btn-outline-secondary {
+        color: #55ffff;
+        border-color: #2f7c8a;
+        background: #000000;
+    }
+
+    #webmonitor .btn-outline-secondary:hover,
+    #webmonitor .btn-outline-secondary:focus {
+        color: #000000;
+        border-color: #55ffff;
+        background: #55ffff;
+        box-shadow: none;
+    }
+
+    #webmonitor .btn-primary {
+        color: #000000;
+        background: #55ffff;
+        border-color: #00aaaa;
+    }
+
+    #webmonitor .btn-primary:hover,
+    #webmonitor .btn-primary:focus {
+        color: #000000;
+        background: #a8ffff;
+        border-color: #55ffff;
+    }
+
+    #webmonitor .form-check-label {
+        color: var(--wm-muted);
+    }
+
+    #webmonitor .form-check-input {
+        background-color: #000000;
+        border-color: #2f7c8a;
+    }
+
+    #webmonitor .form-check-input:checked {
+        background-color: #00aaaa;
+        border-color: #00aaaa;
+    }
+
+    #webmonitor .tab-pane h3,
+    #webmonitor .tab-pane h4 {
+        color: #ffff55;
+    }
+
+    #webmonitor .tab-pane p,
+    #webmonitor .tab-pane li,
+    #webmonitor .tab-pane label,
+    #webmonitor .tab-pane strong {
+        color: var(--wm-fg);
+    }
+
+    #webmonitor .tab-pane .small {
+        color: var(--wm-muted);
+    }
+
+    #webmonitor a {
+        color: #55ffff;
+    }
+
+    #webmonitor a:hover {
+        color: #ffff55;
     }
 </style>
 
 <div id="webmonitor">
-    <div class="row">
-        <div class="col-md-6">
-            <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'top_left'); ?>
+    <div class="row g-3">
+        <div class="col-12 col-lg-6 webmonitor-quadrant">
+            <div class="webmonitor-card">
+                <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'top_left'); ?>
+            </div>
         </div>
-        <div class="col-md-6">
-            <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'top_right'); ?>
+        <div class="col-12 col-lg-6 webmonitor-quadrant">
+            <div class="webmonitor-card">
+                <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'top_right'); ?>
+            </div>
         </div>
-    </div>
-    <div class="row">
-        <div class="col-md-6">
-            <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'bottom_left'); ?>
+        <div class="col-12 col-lg-6 webmonitor-quadrant">
+            <div class="webmonitor-card">
+                <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'bottom_left'); ?>
+            </div>
         </div>
-        <div class="col-md-6">
-            <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'bottom_right'); ?>
+        <div class="col-12 col-lg-6 webmonitor-quadrant">
+            <div class="webmonitor-card">
+                <? load(xjs_compile(settings.web_components + 'webmonitor/quadrant.xjs'), 'bottom_right'); ?>
+            </div>
         </div>
     </div>
 </div>

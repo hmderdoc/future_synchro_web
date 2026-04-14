@@ -110,16 +110,15 @@
         }
 
         _unreadCount = total;
-        if (!badge) return;
 
-        if (total > 0) {
-            badge.textContent = total > 99 ? '99+' : String(total);
-            badge.classList.remove('d-none');
-            badge.style.display = '';
-        } else {
-            badge.textContent = '';
-            badge.classList.add('d-none');
-            badge.style.display = 'none';
+        if (badge) {
+            if (total > 0) {
+                badge.textContent = total > 99 ? '99+' : String(total);
+                badge.style.display = '';
+            } else {
+                badge.textContent = '';
+                badge.style.display = 'none';
+            }
         }
     }
 
@@ -1331,7 +1330,7 @@
                     _unreadChannels[normalizeUpper(summary.name)] = (_unreadChannels[normalizeUpper(summary.name)] || 0) + summary.newCount;
                 }
 
-                if (normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name)) {
+                if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name)) {
                     _unreadChannels[normalizeUpper(summary.name)] = 0;
                 }
 
@@ -1378,7 +1377,7 @@
                     _unreadPrivate[key] = (_unreadPrivate[key] || 0) + summary.newCount;
                 }
 
-                if (normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey()) {
+                if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey()) {
                     _unreadPrivate[key] = 0;
                 }
 
@@ -1427,7 +1426,7 @@
             if (messagesChanged) {
                 _messages = nextMessages;
             }
-            _unreadChannels[normalizeUpper(_currentChannel)] = 0;
+            if (_chatPageActive) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
             _serviceHealthy = true;
             if (!silent) refreshStatus();
             if (messagesChanged) {
@@ -1472,7 +1471,7 @@
                 _activeView.avatar = nextAvatar;
                 upsertPrivateThread(response.peer);
             }
-            _unreadPrivate[getCurrentPrivateKey()] = 0;
+            if (_chatPageActive) _unreadPrivate[getCurrentPrivateKey()] = 0;
             _serviceHealthy = true;
             if (!silent) refreshStatus();
             if (messagesChanged) {
@@ -1697,7 +1696,7 @@
                 room = ensureRoom(payload.channel || _currentChannel);
                 room.lastTimestamp = Math.max(room.lastTimestamp || 0, payload.timestamp || 0);
 
-                if (normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(payload.channel || _currentChannel)) {
+                if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(payload.channel || _currentChannel)) {
                     _messages.push(payload);
                     if (_messages.length > MAX_MESSAGES) _messages.shift();
                     _unreadChannels[normalizeUpper(payload.channel || _currentChannel)] = 0;
@@ -1732,7 +1731,7 @@
                 });
                 threadKey = buildThreadKey(thread.name, thread.system || '');
 
-                if (normalizeUpper(_activeView.type) === 'PRIVATE' && threadKey === getCurrentPrivateKey()) {
+                if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && threadKey === getCurrentPrivateKey()) {
                     _messages.push(normalizeMessage({
                         sender: payload.sender,
                         system: payload.system,
@@ -1819,13 +1818,12 @@
     function setChatPageActive(active) {
         _chatPageActive = !!active;
         if (_chatPageActive) {
-            if (normalizeUpper(_activeView.type) === 'CHANNEL') {
-                _unreadChannels[normalizeUpper(_activeView.name)] = 0;
-                dispatchRooms();
-            } else if (normalizeUpper(_activeView.type) === 'PRIVATE') {
-                _unreadPrivate[getCurrentPrivateKey()] = 0;
-                dispatchPrivateThreads();
-            }
+            // Clear all unread counts on entering the chat page
+            _unreadChannels = {};
+            _unreadPrivate = {};
+            dispatchRooms();
+            dispatchPrivateThreads();
+            updateBadge();
         }
     }
 

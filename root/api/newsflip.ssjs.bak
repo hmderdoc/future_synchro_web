@@ -1,0 +1,570 @@
+/* newsflip.ssjs — Backend API for the Flipboard-style news reader
+ *
+ * Endpoints:
+ *   ?call=get-articles       Paginated articles for infinite scroll
+ *   ?call=get-topics         Available topics for onboarding
+ *   ?call=get-user-prefs     Get saved topic preferences
+ *   ?call=set-user-prefs     Save topic preferences (topics=csv)
+ *   ?call=refresh            Force re-scrape (sysop only)
+ *   ?call=archive-url        Returns archive.ph URL for a given link
+ */
+
+'use strict';
+
+load('sbbsdefs.js');
+var settings = load('modopts.js', 'web');
+load(settings.web_directory + '/lib/init.js');
+load(settings.web_lib + 'auth.js');
+
+var MODS_DIR = system.mods_dir || (system.ctrl_dir + '../mods/');
+if (MODS_DIR.slice(-1) !== '/' && MODS_DIR.slice(-1) !== '\\') MODS_DIR += '/';
+var INI_PATH = MODS_DIR + 'future_shell/config/newsreader.ini';
+
+var CACHE_DIR = system.data_dir + 'newsflip/';
+var ARTICLES_PATH  = CACHE_DIR + 'articles.json';
+var META_PATH      = CACHE_DIR + 'scrape_meta.json';
+var PREFS_DIR      = CACHE_DIR + 'prefs/';
+
+var SCRAPE_TTL_SEC = 20 * 60; /* 20 minutes */
+var MAX_PER_TOPIC  = 80;
+
+/* ── topic definitions ──────────────────────────────────────────────── */
+
+var TOPICS = [
+    { id: 'top',            label: 'Top Stories',    icon: '*', cats: ['Top Stories', 'Featured', 'Breaking'] },
+    { id: 'tech',           label: 'Tech',           icon: '>', cats: ['Technology', 'Sci/Tech', 'Gadgets'] },
+    { id: 'business',       label: 'Business',       icon: '$', cats: ['Business', 'Finance', 'Economy'] },
+    { id: 'science',        label: 'Science',        icon: '~', cats: ['Science', 'Sci/Tech', 'Space'] },
+    { id: 'sports',         label: 'Sports',         icon: '+', cats: ['Sports'] },
+    { id: 'entertainment',  label: 'Entertainment',  icon: '#', cats: ['Entertainment', 'Celebrity', 'Music', 'Movies'] },
+    { id: 'health',         label: 'Health',         icon: '+', cats: ['Health', 'Wellness'] },
+    { id: 'travel',         label: 'Travel',         icon: '^', cats: ['Travel', 'Lifestyle'] },
+    { id: 'politics',       label: 'Politics',       icon: '!', cats: ['Politics', 'Government'] },
+    { id: 'quirky',         label: 'Quirky',         icon: '?', cats: ['Offbeat', 'Odd News', 'Humor', 'Fun'] }
+];
+
+/* ── helpers ─────────────────────────────────────────────────────────── */
+
+function mkdirp(path) {
+    if (file_isdir(path)) return;
+    mkdirp(path.replace(/[\/\\][^\/\\]+[\/\\]?$/, ''));
+    mkdir(path);
+}
+
+function jsonReply(obj) {
+    http_reply.header['Content-Type'] = 'application/json; charset=utf-8';
+    write(asciiSafeJson(JSON.stringify(obj)));
+}
+
+/* Strip control characters and encode high-bytes for clean JSON.
+ * Synchronet's JSON.stringify may not escape control chars 0x00-0x1f
+ * or high bytes properly, causing JSON.parse to fail on reload.
+ * We post-process the entire JSON string to ensure it's ASCII-safe. */
+function asciiSafeJson(str) {
+    var out = '';
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+        if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) {
+            out += '\\u' + ('0000' + c.toString(16)).slice(-4);
+        } else if (c > 0x7e) {
+            out += '\\u' + ('0000' + c.toString(16)).slice(-4);
+        } else {
+            out += str.charAt(i);
+        }
+    }
+    return out;
+}
+
+/* Strip control chars from a text string (before JSON.stringify) */
+function cleanStr(s) {
+    if (!s) return '';
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+        var c = s.charCodeAt(i);
+        if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) {
+            out += ' ';
+        } else if (c === 0x7f) {
+            /* skip DEL */
+        } else {
+            out += s.charAt(i);
+        }
+    }
+    return out;
+}
+
+/* Decode common HTML entities */
+function decodeEntities(s) {
+    if (!s) return s;
+    return s.replace(/&#(\d+);/g, function (m, c) { return String.fromCharCode(parseInt(c, 10)); })
+            .replace(/&#x([0-9a-fA-F]+);/g, function (m, c) { return String.fromCharCode(parseInt(c, 16)); })
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+            .replace(/&rsquo;/g, '\u2019').replace(/&lsquo;/g, '\u2018')
+            .replace(/&rdquo;/g, '\u201D').replace(/&ldquo;/g, '\u201C')
+            .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
+            .replace(/&hellip;/g, '\u2026').replace(/&nbsp;/g, ' ');
+}
+
+/* ── feed / INI parsing ─────────────────────────────────────────────── */
+
+function mapCategoryToTopic(catName) {
+    if (!catName) return 'top';
+    var low = catName.toLowerCase();
+    for (var i = 0; i < TOPICS.length; i++) {
+        for (var j = 0; j < TOPICS[i].cats.length; j++) {
+            if (low.indexOf(TOPICS[i].cats[j].toLowerCase()) >= 0) return TOPICS[i].id;
+        }
+    }
+    if (low.indexOf('local') >= 0 || low.indexOf('regional') >= 0) return 'top';
+    if (low.indexOf('world') >= 0 || low.indexOf('international') >= 0) return 'top';
+    return 'top';
+}
+
+function parseTier1Feeds() {
+    var f = new File(INI_PATH);
+    if (!f.open('r')) return [];
+    var lines = f.readAll();
+    f.close();
+
+    var feeds = [];
+    var current = null;
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        var secMatch = line.match(/^\[Feed\.(.+)\]$/);
+        if (secMatch) {
+            if (current && current.url) feeds.push(current);
+            current = { key: secMatch[1], url: '', name: '', category: '', icon: '' };
+            continue;
+        }
+        if (!current) continue;
+        var eqIdx = line.indexOf('=');
+        if (eqIdx < 0) continue;
+        var k = line.substring(0, eqIdx).trim().toLowerCase();
+        var v = line.substring(eqIdx + 1).trim();
+        if (k === 'url')      current.url = v;
+        if (k === 'name')     current.name = v;
+        if (k === 'category') current.category = v;
+        if (k === 'icon')     current.icon = v;
+    }
+    if (current && current.url) feeds.push(current);
+
+    /* Assign topic */
+    for (var fi = 0; fi < feeds.length; fi++) {
+        feeds[fi].topic = mapCategoryToTopic(feeds[fi].category);
+    }
+
+    /* Tier-1 selection: prefer feeds with icons, then fill up to 10 per topic */
+    var withIcons = feeds.filter(function (f) { return f.icon; });
+    var selected = {};
+    var tier1 = [];
+
+    /* Pass 1: all feeds with icons */
+    for (var a = 0; a < withIcons.length; a++) {
+        var t = withIcons[a].topic;
+        selected[withIcons[a].key] = true;
+        if (!tier1._counts) tier1._counts = {};
+        tier1.push(withIcons[a]);
+    }
+
+    /* Pass 2: fill each topic to 10 feeds */
+    var topicCounts = {};
+    for (var b = 0; b < tier1.length; b++) {
+        topicCounts[tier1[b].topic] = (topicCounts[tier1[b].topic] || 0) + 1;
+    }
+    for (var c = 0; c < feeds.length && tier1.length < 120; c++) {
+        if (selected[feeds[c].key]) continue;
+        var tp = feeds[c].topic;
+        if ((topicCounts[tp] || 0) >= 10) continue;
+        tier1.push(feeds[c]);
+        selected[feeds[c].key] = true;
+        topicCounts[tp] = (topicCounts[tp] || 0) + 1;
+    }
+
+    delete tier1._counts;
+    return tier1;
+}
+
+/* ── XML / feed parsing ─────────────────────────────────────────────── */
+
+function extractTag(xml, tagName) {
+    /* Try CDATA first, then plain content */
+    var re1 = new RegExp('<' + tagName + '[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</' + tagName + '>', 'i');
+    var m1 = xml.match(re1);
+    if (m1) return m1[1].trim();
+    var re2 = new RegExp('<' + tagName + '[^>]*>([\\s\\S]*?)</' + tagName + '>', 'i');
+    var m2 = xml.match(re2);
+    return m2 ? m2[1].trim() : '';
+}
+
+function extractLink(xml) {
+    /* Atom: <link href="..." /> */
+    var atom = xml.match(/<link[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i);
+    if (atom) return atom[1];
+    atom = xml.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["']alternate["']/i);
+    if (atom) return atom[1];
+    atom = xml.match(/<link[^>]*href=["']([^"']+)["']/i);
+    if (atom) return atom[1];
+    /* RSS: <link>...</link> */
+    var rss = xml.match(/<link>([^<]+)<\/link>/i);
+    if (rss) return rss[1].trim();
+    return '';
+}
+
+function extractImage(xml, desc) {
+    /* media:content / media:thumbnail */
+    var media = xml.match(/<media:(content|thumbnail)[^>]*url=["']([^"']+)["']/i);
+    if (media) return media[2];
+    /* enclosure with image type */
+    var enc = xml.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*type=["']image/i);
+    if (enc) return enc[1];
+    enc = xml.match(/<enclosure[^>]*type=["']image[^"']*["'][^>]*url=["']([^"']+)["']/i);
+    if (enc) return enc[1];
+    /* <image><url>...</url></image> */
+    var imgTag = xml.match(/<image>\s*<url>([^<]+)<\/url>/i);
+    if (imgTag) return imgTag[1].trim();
+    /* content:encoded may have images */
+    var encoded = xml.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i);
+    if (encoded) {
+        var encImg = encoded[1].match(/<img[^>]*src=["']([^"']+)["']/i);
+        if (encImg) return encImg[1];
+    }
+    /* First <img> in description */
+    var descImg = (desc || xml).match(/<img[^>]*src=["']([^"']+)["']/i);
+    if (descImg) return descImg[1];
+    return '';
+}
+
+function hashStr(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) {
+        h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    }
+    return 'a' + Math.abs(h).toString(36);
+}
+
+function parseXmlItems(xmlText, feedLabel, topicId) {
+    var articles = [];
+    var itemPattern = /<item[\s>]([\s\S]*?)<\/item>/gi;
+    var items = xmlText.match(itemPattern);
+    if (!items || items.length === 0) {
+        itemPattern = /<entry[\s>]([\s\S]*?)<\/entry>/gi;
+        items = xmlText.match(itemPattern);
+    }
+    if (!items) return articles;
+
+    var now = Math.floor(Date.now() / 1000);
+
+    for (var i = 0; i < items.length && i < 30; i++) {
+        var raw = items[i];
+        var title = extractTag(raw, 'title');
+        var link  = extractLink(raw);
+        var desc  = extractTag(raw, 'description') || extractTag(raw, 'summary') || extractTag(raw, 'content') || '';
+        var date  = extractTag(raw, 'pubDate') || extractTag(raw, 'published') || extractTag(raw, 'updated') || extractTag(raw, 'dc:date') || '';
+        var image = extractImage(raw, desc);
+
+        if (!title || !link) continue;
+
+        var timestamp = 0;
+        if (date) {
+            try {
+                var d = new Date(date);
+                if (!isNaN(d.getTime())) timestamp = Math.floor(d.getTime() / 1000);
+            } catch (e) {}
+        }
+        if (!timestamp) timestamp = now - (i * 60);
+
+        /* Strip HTML, decode entities, clean control chars */
+        var snippet = desc.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        snippet = cleanStr(decodeEntities(snippet));
+        if (snippet.length > 280) snippet = snippet.substring(0, 277) + '...';
+
+        articles.push({
+            title:     cleanStr(decodeEntities(title.replace(/<[^>]+>/g, '').trim())),
+            link:      cleanStr(link),
+            snippet:   snippet,
+            image:     cleanStr(image) || '',
+            source:    cleanStr(feedLabel),
+            timestamp: timestamp,
+            id:        hashStr(link),
+            topic:     topicId
+        });
+    }
+    return articles;
+}
+
+/* ── scraper ────────────────────────────────────────────────────────── */
+
+function needsScrape() {
+    if (!file_exists(ARTICLES_PATH)) return true;
+    if (!file_exists(META_PATH)) return true;
+    try {
+        var f = new File(META_PATH);
+        if (!f.open('r')) return true;
+        var meta = JSON.parse(f.readAll().join(''));
+        f.close();
+        var age = Math.floor(Date.now() / 1000) - (meta.lastScrape || 0);
+        return age > SCRAPE_TTL_SEC;
+    } catch (e) { return true; }
+}
+
+function runScrape() {
+    mkdirp(CACHE_DIR);
+    var tier1 = parseTier1Feeds();
+    if (!tier1.length) {
+        log(LOG_WARNING, 'newsflip: no tier-1 feeds found');
+        return;
+    }
+
+    load('http.js');
+    var allArticles = [];
+    var successes = 0;
+    var errors = 0;
+
+    for (var i = 0; i < tier1.length; i++) {
+        try {
+            var req = new HTTPRequest();
+            var xml = req.Get(tier1[i].url);
+            if (!xml || xml.length < 50) { errors++; continue; }
+            var label = tier1[i].name || tier1[i].key;
+            var items = parseXmlItems(xml, label, tier1[i].topic);
+            allArticles = allArticles.concat(items);
+            successes++;
+        } catch (e) {
+            errors++;
+        }
+    }
+
+    /* Dedupe by link */
+    var seen = {};
+    var deduped = [];
+    for (var k = 0; k < allArticles.length; k++) {
+        if (!seen[allArticles[k].link]) {
+            seen[allArticles[k].link] = true;
+            deduped.push(allArticles[k]);
+        }
+    }
+
+    /* Sort by timestamp descending */
+    deduped.sort(function (a, b) { return b.timestamp - a.timestamp; });
+
+    /* Trim per topic */
+    var topicCounts = {};
+    var trimmed = [];
+    for (var m = 0; m < deduped.length; m++) {
+        var t = deduped[m].topic;
+        topicCounts[t] = (topicCounts[t] || 0) + 1;
+        if (topicCounts[t] <= MAX_PER_TOPIC) {
+            trimmed.push(deduped[m]);
+        }
+    }
+
+    /* Write cache — use asciiSafeJson to ensure parseable output */
+    var jsonStr = JSON.stringify(trimmed);
+    var safeStr = asciiSafeJson(jsonStr);
+    var af = new File(ARTICLES_PATH);
+    if (af.open('w')) {
+        af.write(safeStr);
+        af.close();
+    }
+
+    var mf = new File(META_PATH);
+    if (mf.open('w')) {
+        mf.write(JSON.stringify({
+            lastScrape: Math.floor(Date.now() / 1000),
+            feedCount: tier1.length,
+            successes: successes,
+            errors: errors,
+            articleCount: trimmed.length
+        }));
+        mf.close();
+    }
+
+    log(LOG_INFO, 'newsflip: scraped ' + successes + '/' + tier1.length + ' feeds, ' + trimmed.length + ' articles cached (' + errors + ' errors)');
+    return trimmed;
+}
+
+/* ── article loading ────────────────────────────────────────────────── */
+
+function loadArticles() {
+    if (needsScrape()) {
+        var scraped = runScrape();
+        if (scraped) return scraped; /* Use in-memory result to avoid re-read */
+    }
+    try {
+        var f = new File(ARTICLES_PATH);
+        if (!f.open('r')) return [];
+        var raw = f.read();
+        f.close();
+        if (!raw || raw.length === 0) return [];
+        return JSON.parse(raw);
+    } catch (e) {
+        log(LOG_ERR, 'newsflip: loadArticles parse error: ' + e.message);
+        return [];
+    }
+}
+
+/* ── user preferences ───────────────────────────────────────────────── */
+
+function prefsPath(userNum) {
+    return PREFS_DIR + 'user' + userNum + '.json';
+}
+
+function loadPrefs(userNum) {
+    try {
+        var f = new File(prefsPath(userNum));
+        if (!f.exists || !f.open('r')) return null;
+        var raw = f.readAll().join('');
+        f.close();
+        return JSON.parse(raw);
+    } catch (e) { return null; }
+}
+
+function savePrefs(userNum, prefs) {
+    mkdirp(PREFS_DIR);
+    var f = new File(prefsPath(userNum));
+    if (!f.open('w')) return false;
+    f.write(JSON.stringify(prefs));
+    f.close();
+    return true;
+}
+
+/* ── request routing ────────────────────────────────────────────────── */
+
+var call = '';
+if (http_request.query.call) {
+    call = (typeof http_request.query.call === 'object')
+        ? http_request.query.call[0] : http_request.query.call;
+}
+
+switch (call) {
+
+case 'get-topics': {
+    jsonReply({
+        topics: TOPICS.map(function (t) {
+            return { id: t.id, label: t.label, icon: t.icon };
+        })
+    });
+    break;
+}
+
+case 'get-articles': {
+    var articles = loadArticles();
+    var topicFilter = http_request.query.topics
+        ? (typeof http_request.query.topics === 'object'
+            ? http_request.query.topics[0] : http_request.query.topics).split(',')
+        : null;
+    var offset = parseInt(http_request.query.offset
+        ? (typeof http_request.query.offset === 'object'
+            ? http_request.query.offset[0] : http_request.query.offset) : 0, 10);
+    var limit = parseInt(http_request.query.limit
+        ? (typeof http_request.query.limit === 'object'
+            ? http_request.query.limit[0] : http_request.query.limit) : 20, 10);
+    if (isNaN(offset) || offset < 0) offset = 0;
+    if (isNaN(limit)  || limit < 1)  limit = 20;
+    if (limit > 50) limit = 50;
+
+    /* If user has prefs and no explicit topic filter, use their prefs */
+    if (!topicFilter && user.number > 0 && user.alias !== settings.guest) {
+        var prefs = loadPrefs(user.number);
+        if (prefs && prefs.topics && prefs.topics.length > 0) {
+            topicFilter = prefs.topics;
+        }
+    }
+
+    var filtered = articles;
+    if (topicFilter && topicFilter.length > 0) {
+        filtered = articles.filter(function (a) {
+            return topicFilter.indexOf(a.topic) >= 0;
+        });
+    }
+
+    /* Round-robin interleave so every topic gets visibility */
+    if (!topicFilter || topicFilter.length > 1) {
+        var buckets = {};
+        for (var ii = 0; ii < filtered.length; ii++) {
+            var tt = filtered[ii].topic;
+            if (!buckets[tt]) buckets[tt] = [];
+            buckets[tt].push(filtered[ii]);
+        }
+        var keys = Object.keys(buckets);
+        var interleaved = [];
+        var maxLen = 0;
+        for (var jj = 0; jj < keys.length; jj++) {
+            if (buckets[keys[jj]].length > maxLen) maxLen = buckets[keys[jj]].length;
+        }
+        for (var row = 0; row < maxLen; row++) {
+            for (var col = 0; col < keys.length; col++) {
+                if (row < buckets[keys[col]].length) {
+                    interleaved.push(buckets[keys[col]][row]);
+                }
+            }
+        }
+        filtered = interleaved;
+    }
+
+    var page = filtered.slice(offset, offset + limit);
+    var meta = {};
+    try {
+        var mf2 = new File(META_PATH);
+        if (mf2.open('r')) { meta = JSON.parse(mf2.readAll().join('')); mf2.close(); }
+    } catch(e) {}
+
+    jsonReply({
+        articles: page,
+        total: filtered.length,
+        offset: offset,
+        limit: limit,
+        lastScrape: meta.lastScrape || 0,
+        hasMore: offset + limit < filtered.length
+    });
+    break;
+}
+
+case 'get-user-prefs': {
+    if (user.number < 1 || user.alias === settings.guest) {
+        jsonReply({ topics: [] });
+        break;
+    }
+    var prefs = loadPrefs(user.number);
+    jsonReply(prefs || { topics: [] });
+    break;
+}
+
+case 'set-user-prefs': {
+    if (user.number < 1 || user.alias === settings.guest) {
+        jsonReply({ ok: false, error: 'guest' });
+        break;
+    }
+    var topicsStr = http_request.query.topics
+        ? (typeof http_request.query.topics === 'object'
+            ? http_request.query.topics[0] : http_request.query.topics)
+        : '';
+    var topicsList = topicsStr.split(',').filter(function (t) { return t; });
+    savePrefs(user.number, { topics: topicsList });
+    jsonReply({ ok: true });
+    break;
+}
+
+case 'refresh': {
+    if (user.security.level < 90) {
+        jsonReply({ ok: false, error: 'forbidden' });
+        break;
+    }
+    /* Force re-scrape by deleting meta */
+    file_remove(META_PATH);
+    var arts = loadArticles();
+    jsonReply({ ok: true, articleCount: arts.length });
+    break;
+}
+
+case 'archive-url': {
+    var url = http_request.query.url
+        ? (typeof http_request.query.url === 'object'
+            ? http_request.query.url[0] : http_request.query.url)
+        : '';
+    jsonReply({ archiveUrl: 'https://archive.ph/?run=1&url=' + encodeURIComponent(url) });
+    break;
+}
+
+default:
+    jsonReply({ error: 'unknown call', call: call });
+}

@@ -214,6 +214,12 @@
     });
 
     window.addEventListener('popstate', function (e) {
+        /* Let page overlays (e.g. article readers) intercept back button */
+        var check = new CustomEvent('spa:popstate', {
+            cancelable: true, detail: { state: e.state }
+        });
+        if (!document.dispatchEvent(check)) return; /* overlay handled it */
+
         var href;
         if (e.state && e.state.href) {
             href = e.state.href;

@@ -1062,10 +1062,24 @@ body.terminal-open {
     color: var(--bs-body-color, #212529);
 }
 
-/* Chat badge in navbar */
+/* Chat nav-link: positioning context for badge */
+.nav-link-chat {
+    position: relative;
+}
+
+/* Chat badge in navbar — center of badge at icon top-right corner */
 #badge-chat-unread {
-    font-size: 0.65rem;
-    vertical-align: top;
+    position: absolute;
+    top: 8px;
+    left: 40px;
+    transform: translate(-50%, -50%);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 2px 4px;
+    min-width: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 1;
 }
 
 /* ---- CGA theme overrides ---- */
@@ -2967,9 +2981,50 @@ div.message .ansi-canvas-img {
         font-size: 16px;
         min-width: 20px;
     }
+    /* Hide radio transport on mobile — replaced by shortcut icons */
+    .radio-controls {
+        display: none !important;
+    }
+    .radio-stack {
+        display: none !important;
+    }
     #radio-container {
         margin-right: 4px;
         gap: 0;
+    }
+
+    /* Mobile shortcut icon buttons — spread apart across available space */
+    .navbar-mobile-shortcuts {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex: 1;
+        margin: 0 6px;
+    }
+    .mobile-shortcut-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 4px;
+        padding: 3px 6px;
+        cursor: pointer;
+        color: rgba(255,255,255,0.85);
+        text-decoration: none;
+        transition: border-color 0.2s, background 0.2s;
+    }
+    .mobile-shortcut-btn:hover,
+    .mobile-shortcut-btn:focus {
+        border-color: rgba(255,255,255,0.5);
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+        text-decoration: none;
+    }
+    .mobile-shortcut-btn .bin-icon-img {
+        height: 24px !important;
+        width: auto !important;
+        image-rendering: pixelated;
     }
     .radio-playlist-panel {
         right: -28px;
@@ -3089,6 +3144,16 @@ div.message .ansi-canvas-img {
     .radio-btn-play {
         font-size: 14px;
         min-width: 16px;
+    }
+    .mobile-shortcut-btn {
+        padding: 2px 4px;
+    }
+    .mobile-shortcut-btn .bin-icon-img {
+        height: 20px !important;
+        width: auto !important;
+    }
+    .navbar-mobile-shortcuts {
+        margin: 0 3px;
     }
 }
 

@@ -1,0 +1,1114 @@
+<!--Newsflip-->
+<?xjs
+    var settings = load('modopts.js', 'web');
+    load(settings.web_directory + '/lib/init.js');
+    load(settings.web_lib + 'auth.js');
+
+    var isGuest = (!user || user.number < 1 || user.alias === settings.guest);
+?>
+
+<style>
+/* ── Newsflip: Flipboard-inspired mobile news reader ── */
+
+/* Reset & container */
+.nf-app {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #e0e0e0;
+    min-height: 100vh;
+}
+
+/* ── Topic Onboarding ── */
+.nf-onboarding {
+    padding: 24px 16px;
+    text-align: center;
+}
+.nf-onboarding h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 6px;
+}
+.nf-onboarding p {
+    color: #999;
+    font-size: 14px;
+    margin: 0 0 20px;
+}
+.nf-topic-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.nf-topic-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1.5px solid #333;
+    border-radius: 10px;
+    background: #111;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 14px;
+    color: #ccc;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.nf-topic-chip .nf-chip-icon { font-size: 20px; }
+.nf-topic-chip.selected {
+    border-color: #33ff33;
+    background: #0a1a0a;
+    color: #33ff33;
+}
+.nf-topic-chip:active { transform: scale(0.97); }
+.nf-start-btn {
+    display: inline-block;
+    padding: 12px 36px;
+    border: none;
+    border-radius: 24px;
+    background: #33ff33;
+    color: #000;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.nf-start-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.nf-start-btn:hover:not(:disabled) { opacity: 0.85; }
+
+/* ── Header / toolbar ── */
+.nf-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #1a1a1a;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.nf-header-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #33ff33;
+    letter-spacing: -0.3px;
+}
+.nf-header-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #aaa;
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.nf-header-btn:hover { color: #fff; border-color: #555; }
+
+/* ── Topic filter pills ── */
+.nf-topic-bar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.nf-topic-bar::-webkit-scrollbar { display: none; }
+.nf-pill {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #333;
+    background: transparent;
+    color: #999;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+}
+.nf-pill.active {
+    background: #33ff33;
+    color: #000;
+    border-color: #33ff33;
+    font-weight: 600;
+}
+.nf-pill:not(.active):hover { border-color: #555; color: #ccc; }
+
+/* ── Article cards ── */
+.nf-feed {
+    padding: 0 12px 80px;
+}
+
+.nf-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: #111;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid #1a1a1a;
+    transition: border-color 0.15s;
+    cursor: pointer;
+}
+.nf-card:hover { border-color: #333; }
+.nf-card:active { transform: scale(0.995); }
+
+/* Hero card (first article) */
+.nf-card-hero .nf-card-img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+}
+.nf-card-hero .nf-card-body { padding: 14px 16px 16px; }
+.nf-card-hero .nf-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #fff;
+    margin: 0 0 8px;
+}
+.nf-card-hero .nf-card-snippet {
+    font-size: 14px;
+    line-height: 1.45;
+    color: #aaa;
+    margin: 0 0 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Standard card (side-by-side) */
+.nf-card-std {
+    display: flex;
+    min-height: 100px;
+}
+.nf-card-std .nf-card-body {
+    flex: 1;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+.nf-card-std .nf-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #fff;
+    margin: 0 0 6px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.nf-card-std .nf-card-snippet {
+    font-size: 13px;
+    color: #888;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.nf-card-std .nf-card-thumb {
+    width: 120px;
+    min-height: 100px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+.nf-card-std .nf-card-thumb-placeholder {
+    width: 120px;
+    min-height: 100px;
+    flex-shrink: 0;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 28px;
+}
+
+/* Card meta line */
+.nf-card-meta {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.nf-card-source {
+    color: #33ff33;
+    font-weight: 600;
+}
+.nf-card-time { color: #555; }
+
+/* Content badge on cards */
+.nf-has-content-badge {
+    display: inline-block;
+    font-size: 10px;
+    color: #33ff33;
+    border: 1px solid #33ff3344;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+}
+
+/* ── Reading Overlay ── */
+.nf-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+}
+.nf-overlay.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+.nf-overlay-header {
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #1a1a1a;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.nf-overlay-close {
+    background: none;
+    border: none;
+    color: #33ff33;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+.nf-overlay-close:hover { background: #1a1a1a; }
+.nf-overlay-source {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #999;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.nf-overlay-source strong {
+    color: #33ff33;
+    font-weight: 600;
+}
+.nf-overlay-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.nf-overlay-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #aaa;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.nf-overlay-btn:hover { color: #fff; border-color: #555; }
+
+.nf-overlay-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+}
+
+/* Article content area */
+.nf-article-hero-img {
+    width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+    display: block;
+}
+.nf-article-header {
+    padding: 20px 16px 12px;
+}
+.nf-article-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #fff;
+    margin: 0 0 10px;
+}
+.nf-article-meta {
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.nf-article-meta .src { color: #33ff33; font-weight: 600; }
+
+/* Rich content rendering */
+.nf-article-content {
+    padding: 0 16px 40px;
+    font-size: 16px;
+    line-height: 1.7;
+    color: #ccc;
+}
+.nf-article-content p {
+    margin: 0 0 16px;
+}
+.nf-article-content h2, .nf-article-content h3, .nf-article-content h4 {
+    color: #fff;
+    margin: 24px 0 10px;
+}
+.nf-article-content a {
+    color: #33ff33;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.nf-article-content a:hover { opacity: 0.8; }
+.nf-article-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 12px 0;
+    display: block;
+}
+.nf-article-content blockquote {
+    border-left: 3px solid #33ff33;
+    margin: 16px 0;
+    padding: 8px 16px;
+    color: #aaa;
+    background: #111;
+    border-radius: 0 6px 6px 0;
+}
+.nf-article-content ul, .nf-article-content ol {
+    padding-left: 24px;
+    margin: 0 0 16px;
+}
+.nf-article-content li {
+    margin-bottom: 6px;
+}
+.nf-article-content pre, .nf-article-content code {
+    background: #111;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 14px;
+    color: #e0e0e0;
+}
+.nf-article-content pre {
+    padding: 12px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+.nf-article-content figure {
+    margin: 16px 0;
+}
+.nf-article-content figcaption {
+    font-size: 13px;
+    color: #666;
+    margin-top: 6px;
+    text-align: center;
+}
+
+/* Snippet fallback (no full content) */
+.nf-article-snippet {
+    padding: 0 16px 20px;
+    font-size: 16px;
+    line-height: 1.7;
+    color: #aaa;
+}
+
+/* Embed iframe for articles without content */
+.nf-article-embed {
+    flex: 1;
+    border: none;
+    width: 100%;
+    min-height: 70vh;
+    background: #111;
+}
+.nf-embed-notice {
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #555;
+    text-align: center;
+    border-top: 1px solid #1a1a1a;
+}
+
+/* Article action bar at bottom of overlay */
+.nf-article-actions {
+    padding: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.nf-article-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: 1px solid #333;
+    border-radius: 10px;
+    background: #111;
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.nf-article-action-btn:hover { border-color: #33ff33; color: #33ff33; }
+.nf-article-action-btn.primary {
+    background: #33ff33;
+    color: #000;
+    border-color: #33ff33;
+    font-weight: 600;
+}
+.nf-article-action-btn.primary:hover { opacity: 0.85; }
+
+/* Reading overlay loading state */
+.nf-article-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: #555;
+}
+.nf-article-loading .nf-spinner { margin-bottom: 12px; }
+
+/* ── Loading / spinner ── */
+.nf-loading {
+    text-align: center;
+    padding: 30px 0;
+    color: #555;
+    font-size: 14px;
+}
+.nf-spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 2.5px solid #222;
+    border-top-color: #33ff33;
+    border-radius: 50%;
+    animation: nf-spin 0.7s linear infinite;
+    margin-bottom: 8px;
+}
+@keyframes nf-spin { to { transform: rotate(360deg); } }
+
+.nf-end-msg {
+    text-align: center;
+    padding: 24px 0;
+    color: #444;
+    font-size: 13px;
+}
+
+/* ── Empty state ── */
+.nf-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #555;
+}
+.nf-empty-icon { font-size: 48px; margin-bottom: 12px; }
+.nf-empty-text { font-size: 15px; }
+
+/* ── Mobile optimizations ── */
+@media (max-width: 480px) {
+    .nf-app { max-width: 100%; }
+    .nf-card-hero .nf-card-img { height: 180px; }
+    .nf-card-hero .nf-card-title { font-size: 18px; }
+    .nf-topic-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .nf-card-std .nf-card-thumb,
+    .nf-card-std .nf-card-thumb-placeholder { width: 100px; }
+    .nf-article-header h1 { font-size: 20px; }
+    .nf-article-content { font-size: 15px; }
+}
+@media (min-width: 641px) {
+    .nf-feed { padding: 0 0 80px; }
+}
+</style>
+
+<div class="nf-app" id="nf-app">
+    <!-- Onboarding (shown if no prefs) -->
+    <div class="nf-onboarding" id="nf-onboarding" style="display:none">
+        <h2>What interests you?</h2>
+        <p>Pick a few topics to get started. You can change these anytime.</p>
+        <div class="nf-topic-grid" id="nf-topic-grid"></div>
+        <button class="nf-start-btn" id="nf-start-btn" disabled>Start Reading</button>
+    </div>
+
+    <!-- Main reader (shown after onboarding) -->
+    <div id="nf-reader" style="display:none">
+        <div class="nf-header">
+            <span class="nf-header-title">Newsflip</span>
+            <button class="nf-header-btn" id="nf-prefs-btn" title="Edit topics">&#9881; Topics</button>
+        </div>
+        <div class="nf-topic-bar" id="nf-topic-bar"></div>
+        <div class="nf-feed" id="nf-feed"></div>
+        <div class="nf-loading" id="nf-loading" style="display:none">
+            <div class="nf-spinner"></div>
+            <div>Loading stories&hellip;</div>
+        </div>
+        <div class="nf-end-msg" id="nf-end-msg" style="display:none">You're all caught up &#10003;</div>
+    </div>
+
+    <!-- Reading overlay (slides up when article is tapped) -->
+    <div class="nf-overlay" id="nf-overlay">
+        <div class="nf-overlay-header">
+            <button class="nf-overlay-close" id="nf-overlay-close" title="Back">&larr;</button>
+            <div class="nf-overlay-source" id="nf-overlay-source"></div>
+            <div class="nf-overlay-actions" id="nf-overlay-actions"></div>
+        </div>
+        <div class="nf-overlay-body" id="nf-overlay-body"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var API = './api/newsflip.ssjs';
+    var PAGE_SIZE = 15;
+    var IS_GUEST = <?xjs write(isGuest ? 'true' : 'false'); ?>;
+
+    /* ── topic icons (client-side, avoids encoding issues) ── */
+    var TOPIC_ICONS = {
+        top: '\u{1F4F0}', tech: '\u{1F4BB}', business: '\u{1F4BC}',
+        science: '\u{1F52C}', sports: '\u26BD', entertainment: '\u{1F3AC}',
+        health: '\u{1F3E5}', travel: '\u2708\uFE0F', politics: '\u{1F3DB}\uFE0F',
+        quirky: '\u{1F3B2}'
+    };
+    function topicIcon(id) { return TOPIC_ICONS[id] || '*'; }
+
+    /* ── state ── */
+    var topics = [];
+    var userTopics = [];
+    var articles = [];
+    var offset = 0;
+    var hasMore = true;
+    var loading = false;
+    var activeTopic = 'all';
+    var onboardingDone = false;
+    var overlayOpen = false;
+
+    /* ── DOM refs ── */
+    var $app         = document.getElementById('nf-app');
+    var $onboarding  = document.getElementById('nf-onboarding');
+    var $topicGrid   = document.getElementById('nf-topic-grid');
+    var $startBtn    = document.getElementById('nf-start-btn');
+    var $reader      = document.getElementById('nf-reader');
+    var $topicBar    = document.getElementById('nf-topic-bar');
+    var $feed        = document.getElementById('nf-feed');
+    var $loading     = document.getElementById('nf-loading');
+    var $endMsg      = document.getElementById('nf-end-msg');
+    var $prefsBtn    = document.getElementById('nf-prefs-btn');
+    var $overlay     = document.getElementById('nf-overlay');
+    var $overlayClose = document.getElementById('nf-overlay-close');
+    var $overlaySource = document.getElementById('nf-overlay-source');
+    var $overlayActions = document.getElementById('nf-overlay-actions');
+    var $overlayBody = document.getElementById('nf-overlay-body');
+
+    /* ── utilities ── */
+    function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function timeAgo(ts) {
+        if (!ts) return '';
+        var diff = Math.floor(Date.now() / 1000) - ts;
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        var d = new Date(ts * 1000);
+        return d.toLocaleDateString();
+    }
+
+    function apiCall(call, params) {
+        var qs = 'call=' + encodeURIComponent(call);
+        if (params) {
+            Object.keys(params).forEach(function (k) {
+                if (params[k] !== '' && params[k] !== undefined && params[k] !== null)
+                    qs += '&' + k + '=' + encodeURIComponent(params[k]);
+            });
+        }
+        return fetch(API + '?' + qs, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); });
+    }
+
+    /* ── HTML sanitizer (client-side, whitelist-based) ── */
+    var ALLOWED_TAGS = [
+        'p', 'br', 'hr',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'a', 'img',
+        'strong', 'em', 'b', 'i', 'u', 'mark', 'small', 'sub', 'sup',
+        'blockquote', 'pre', 'code',
+        'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'figure', 'figcaption',
+        'div', 'span', 'section', 'article',
+        'time', 'abbr', 'cite'
+    ];
+    var ALLOWED_ATTRS = {
+        'a': ['href', 'title'],
+        'img': ['src', 'alt', 'width', 'height', 'loading'],
+        'td': ['colspan', 'rowspan'],
+        'th': ['colspan', 'rowspan'],
+        'time': ['datetime'],
+        'abbr': ['title']
+    };
+
+    function sanitizeHtml(html) {
+        if (!html) return '';
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        cleanNode(doc.body);
+        return doc.body.innerHTML;
+    }
+
+    function cleanNode(node) {
+        var children = Array.prototype.slice.call(node.childNodes);
+        for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            if (child.nodeType === 3) continue; /* text node — keep */
+            if (child.nodeType !== 1) { child.remove(); continue; } /* non-element — remove */
+
+            var tag = child.tagName.toLowerCase();
+
+            /* Remove dangerous tags entirely (including contents) */
+            if (tag === 'script' || tag === 'style' || tag === 'iframe' ||
+                tag === 'object' || tag === 'embed' || tag === 'form' ||
+                tag === 'input' || tag === 'textarea' || tag === 'select' ||
+                tag === 'button' || tag === 'svg' || tag === 'math' ||
+                tag === 'link' || tag === 'meta' || tag === 'noscript') {
+                child.remove();
+                continue;
+            }
+
+            /* Unknown tag — unwrap (keep children) */
+            if (ALLOWED_TAGS.indexOf(tag) < 0) {
+                while (child.firstChild) {
+                    node.insertBefore(child.firstChild, child);
+                }
+                child.remove();
+                continue;
+            }
+
+            /* Strip disallowed attributes */
+            var allowed = ALLOWED_ATTRS[tag] || [];
+            var attrs = Array.prototype.slice.call(child.attributes);
+            for (var j = 0; j < attrs.length; j++) {
+                var attrName = attrs[j].name.toLowerCase();
+                if (allowed.indexOf(attrName) < 0) {
+                    child.removeAttribute(attrs[j].name);
+                }
+            }
+
+            /* Sanitize href (no javascript:) */
+            if (tag === 'a') {
+                var href = child.getAttribute('href') || '';
+                if (href.toLowerCase().replace(/\s/g, '').indexOf('javascript:') === 0) {
+                    child.setAttribute('href', '#');
+                }
+                child.setAttribute('target', '_blank');
+                child.setAttribute('rel', 'noopener');
+            }
+
+            /* Sanitize img src */
+            if (tag === 'img') {
+                var src = child.getAttribute('src') || '';
+                if (!src.match(/^https?:\/\//i) && !src.match(/^data:image\//i)) {
+                    child.remove();
+                    continue;
+                }
+                child.setAttribute('loading', 'lazy');
+                child.onerror = function () { this.style.display = 'none'; };
+            }
+
+            /* Recurse */
+            cleanNode(child);
+        }
+    }
+
+    /* ── onboarding ── */
+    function showOnboarding() {
+        $onboarding.style.display = '';
+        $reader.style.display = 'none';
+        $topicGrid.innerHTML = '';
+        topics.forEach(function (t) {
+            var chip = document.createElement('div');
+            chip.className = 'nf-topic-chip';
+            chip.setAttribute('data-topic', t.id);
+            chip.innerHTML = '<span class="nf-chip-icon">' + topicIcon(t.id) + '</span><span>' + esc(t.label) + '</span>';
+            chip.addEventListener('click', function () {
+                chip.classList.toggle('selected');
+                updateStartBtn();
+            });
+            if (userTopics.indexOf(t.id) >= 0) chip.classList.add('selected');
+            $topicGrid.appendChild(chip);
+        });
+        updateStartBtn();
+    }
+
+    function updateStartBtn() {
+        var sel = $topicGrid.querySelectorAll('.selected');
+        $startBtn.disabled = sel.length === 0;
+    }
+
+    $startBtn.addEventListener('click', function () {
+        var selected = [];
+        $topicGrid.querySelectorAll('.selected').forEach(function (el) {
+            selected.push(el.getAttribute('data-topic'));
+        });
+        if (!selected.length) return;
+        userTopics = selected;
+        if (!IS_GUEST) {
+            apiCall('set-user-prefs', { topics: selected.join(',') });
+        } else {
+            try { localStorage.setItem('nf_topics', JSON.stringify(selected)); } catch(e) {}
+        }
+        onboardingDone = true;
+        showReader();
+    });
+
+    /* ── reader ── */
+    function showReader() {
+        $onboarding.style.display = 'none';
+        $reader.style.display = '';
+        renderTopicBar();
+        resetAndLoad();
+    }
+
+    function renderTopicBar() {
+        $topicBar.innerHTML = '';
+        var allPill = document.createElement('button');
+        allPill.className = 'nf-pill' + (activeTopic === 'all' ? ' active' : '');
+        allPill.textContent = 'All';
+        allPill.addEventListener('click', function () {
+            activeTopic = 'all';
+            resetAndLoad();
+            renderTopicBar();
+        });
+        $topicBar.appendChild(allPill);
+
+        var show = userTopics.length > 0 ? userTopics : topics.map(function (t) { return t.id; });
+        topics.forEach(function (t) {
+            if (show.indexOf(t.id) < 0) return;
+            var pill = document.createElement('button');
+            pill.className = 'nf-pill' + (activeTopic === t.id ? ' active' : '');
+            pill.textContent = topicIcon(t.id) + ' ' + t.label;
+            pill.addEventListener('click', function () {
+                activeTopic = t.id;
+                resetAndLoad();
+                renderTopicBar();
+            });
+            $topicBar.appendChild(pill);
+        });
+    }
+
+    function resetAndLoad() {
+        articles = [];
+        offset = 0;
+        hasMore = true;
+        $feed.innerHTML = '';
+        $endMsg.style.display = 'none';
+        loadMore();
+    }
+
+    function loadMore() {
+        if (loading || !hasMore) return;
+        loading = true;
+        $loading.style.display = '';
+
+        var params = { offset: offset, limit: PAGE_SIZE };
+        if (activeTopic !== 'all') {
+            params.topics = activeTopic;
+        } else if (userTopics.length > 0) {
+            params.topics = userTopics.join(',');
+        }
+
+        apiCall('get-articles', params)
+            .then(function (data) {
+                loading = false;
+                $loading.style.display = 'none';
+                if (data.articles && data.articles.length > 0) {
+                    var startIdx = articles.length;
+                    articles = articles.concat(data.articles);
+                    offset += data.articles.length;
+                    hasMore = data.hasMore;
+                    renderCards(data.articles, startIdx);
+                } else {
+                    hasMore = false;
+                }
+                if (!hasMore) $endMsg.style.display = '';
+                if (articles.length === 0) showEmpty();
+            })
+            .catch(function () {
+                loading = false;
+                $loading.style.display = 'none';
+            });
+    }
+
+    /* ── card rendering ── */
+    function renderCards(items, startIdx) {
+        var frag = document.createDocumentFragment();
+        items.forEach(function (art, i) {
+            var idx = startIdx + i;
+            var isHero = idx === 0 && art.image;
+            var card = document.createElement('div');
+            card.className = 'nf-card ' + (isHero ? 'nf-card-hero' : 'nf-card-std');
+
+            /* Content indicator */
+            var badge = art.hasContent ? '<span class="nf-has-content-badge">FULL</span>' : '';
+
+            if (isHero) {
+                card.innerHTML =
+                    '<img class="nf-card-img" src="' + esc(art.image) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'" />'
+                    + '<div class="nf-card-body">'
+                    +   '<h3 class="nf-card-title">' + esc(art.title) + '</h3>'
+                    +   '<p class="nf-card-snippet">' + esc(art.snippet) + '</p>'
+                    +   '<div class="nf-card-meta">'
+                    +     '<span class="nf-card-source">' + esc(art.source) + '</span>'
+                    +     '<span class="nf-card-time">' + timeAgo(art.timestamp) + '</span>'
+                    +     badge
+                    +   '</div>'
+                    + '</div>';
+            } else {
+                var thumbHtml = art.image
+                    ? '<img class="nf-card-thumb" src="' + esc(art.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=nf-card-thumb-placeholder>\u{1F4F0}</div>\'" />'
+                    : '<div class="nf-card-thumb-placeholder">\u{1F4F0}</div>';
+                card.innerHTML =
+                    '<div class="nf-card-body">'
+                    +   '<h3 class="nf-card-title">' + esc(art.title) + '</h3>'
+                    +   '<div class="nf-card-meta">'
+                    +     '<span class="nf-card-source">' + esc(art.source) + '</span>'
+                    +     '<span class="nf-card-time">' + timeAgo(art.timestamp) + '</span>'
+                    +     badge
+                    +   '</div>'
+                    + '</div>'
+                    + thumbHtml;
+            }
+
+            /* Click opens in-app reading overlay instead of navigating away */
+            card.addEventListener('click', function (e) {
+                e.preventDefault();
+                openArticle(art);
+            });
+
+            frag.appendChild(card);
+        });
+        $feed.appendChild(frag);
+    }
+
+    function showEmpty() {
+        $feed.innerHTML =
+            '<div class="nf-empty">'
+            + '<div class="nf-empty-icon">\u{1F4E1}</div>'
+            + '<div class="nf-empty-text">No stories yet. News feeds are being loaded \u2014 check back in a minute.</div>'
+            + '</div>';
+    }
+
+    /* ── Reading Overlay ── */
+    function openArticle(art) {
+        overlayOpen = true;
+        document.body.style.overflow = 'hidden';
+
+        /* Update header */
+        $overlaySource.innerHTML = '<strong>' + esc(art.source) + '</strong> &middot; ' + timeAgo(art.timestamp);
+
+        /* Action buttons */
+        $overlayActions.innerHTML =
+            '<a class="nf-overlay-btn" href="' + esc(art.link) + '" target="_blank" rel="noopener" title="Open original">\u{1F517}</a>'
+            + '<a class="nf-overlay-btn" href="https://archive.ph/?run=1&url=' + encodeURIComponent(art.link) + '" target="_blank" rel="noopener" title="Archive view">\u{1F4CB}</a>';
+
+        /* Show loading state */
+        $overlayBody.innerHTML =
+            '<div class="nf-article-loading">'
+            + '<div class="nf-spinner"></div>'
+            + '<div>Loading article&hellip;</div>'
+            + '</div>';
+
+        /* Show overlay */
+        $overlay.classList.add('visible');
+
+        /* Push history state so back button closes overlay */
+        history.pushState({ nfOverlay: true }, '');
+
+        /* Fetch full content */
+        apiCall('get-article-content', { id: art.id })
+            .then(function (data) {
+                renderArticleContent(art, data);
+            })
+            .catch(function () {
+                /* Fallback: show snippet + embed attempt */
+                renderArticleContent(art, { hasContent: false, content: '' });
+            });
+    }
+
+    function renderArticleContent(art, data) {
+        var html = '';
+
+        /* Hero image */
+        if (art.image) {
+            html += '<img class="nf-article-hero-img" src="' + esc(art.image) + '" alt="" onerror="this.style.display=\'none\'" />';
+        }
+
+        /* Title + meta */
+        html += '<div class="nf-article-header">'
+            + '<h1>' + esc(art.title) + '</h1>'
+            + '<div class="nf-article-meta">'
+            + '<span class="src">' + esc(art.source) + '</span>'
+            + '<span>' + timeAgo(art.timestamp) + '</span>'
+            + '</div>'
+            + '</div>';
+
+        if (data.hasContent && data.content) {
+            /* Render sanitized article content */
+            var safeContent = sanitizeHtml(data.content);
+            html += '<div class="nf-article-content">' + safeContent + '</div>';
+        } else {
+            /* Show snippet text */
+            if (art.snippet) {
+                html += '<div class="nf-article-snippet"><p>' + esc(art.snippet) + '</p></div>';
+            }
+            /* Try iframe embed as fallback */
+            html += '<iframe class="nf-article-embed" src="' + esc(art.link) + '" '
+                + 'sandbox="allow-same-origin allow-scripts allow-popups" '
+                + 'loading="lazy" '
+                + 'onerror="this.style.display=\'none\'"'
+                + '></iframe>';
+            html += '<div class="nf-embed-notice">If the article doesn\'t load above, some sites block embedding.</div>';
+        }
+
+        /* Action buttons at bottom */
+        html += '<div class="nf-article-actions">'
+            + '<a class="nf-article-action-btn primary" href="' + esc(art.link) + '" target="_blank" rel="noopener">\u{1F517} Read Original</a>'
+            + '<a class="nf-article-action-btn" href="https://archive.ph/?run=1&url=' + encodeURIComponent(art.link) + '" target="_blank" rel="noopener">\u{1F4CB} Archive View</a>'
+            + '</div>';
+
+        $overlayBody.innerHTML = html;
+        $overlayBody.scrollTop = 0;
+
+        /* Make iframe hide itself if it errors or gets blocked */
+        var iframe = $overlayBody.querySelector('.nf-article-embed');
+        if (iframe) {
+            iframe.addEventListener('error', function () {
+                this.style.display = 'none';
+            });
+            /* Also handle X-Frame-Options blocks by hiding after timeout if blank */
+            setTimeout(function () {
+                try {
+                    /* If iframe is still effectively empty/blocked, hide it gracefully */
+                    if (iframe.contentDocument && iframe.contentDocument.body &&
+                        iframe.contentDocument.body.innerHTML.length < 10) {
+                        iframe.style.display = 'none';
+                    }
+                } catch(e) {
+                    /* Cross-origin — means content loaded (good), or was blocked */
+                }
+            }, 5000);
+        }
+    }
+
+    function closeArticle() {
+        if (!overlayOpen) return;
+        overlayOpen = false;
+        document.body.style.overflow = '';
+        $overlay.classList.remove('visible');
+        $overlayBody.innerHTML = '';
+    }
+
+    $overlayClose.addEventListener('click', function () {
+        closeArticle();
+        /* Pop the history state we pushed */
+        history.back();
+    });
+
+    /* Handle browser back button — cancel SPA navigation, just close overlay */
+    document.addEventListener('spa:popstate', function (e) {
+        if (overlayOpen) {
+            e.preventDefault();
+            closeArticle();
+        }
+    });
+
+    /* ── infinite scroll ── */
+    var scrollHandler = function () {
+        if (loading || !hasMore || overlayOpen) return;
+        var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        var viewH = window.innerHeight;
+        var docH = document.documentElement.scrollHeight;
+        if (scrollY + viewH >= docH - 400) {
+            loadMore();
+        }
+    };
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+
+    /* ── prefs button ── */
+    $prefsBtn.addEventListener('click', function () {
+        showOnboarding();
+    });
+
+    /* ── boot ── */
+    function boot() {
+        apiCall('get-topics')
+            .then(function (data) {
+                topics = data.topics || [];
+                if (!IS_GUEST) {
+                    return apiCall('get-user-prefs');
+                }
+                try {
+                    var saved = localStorage.getItem('nf_topics');
+                    if (saved) return { topics: JSON.parse(saved) };
+                } catch (e) {}
+                return { topics: [] };
+            })
+            .then(function (prefs) {
+                userTopics = (prefs && prefs.topics) ? prefs.topics : [];
+                if (userTopics.length > 0) {
+                    onboardingDone = true;
+                    showReader();
+                } else {
+                    showOnboarding();
+                }
+            })
+            .catch(function (err) {
+                console.error('[newsflip] boot error:', err);
+                topics = [
+                    { id: 'top', label: 'Top Stories', icon: '\u{1F4F0}' },
+                    { id: 'tech', label: 'Tech', icon: '\u{1F4BB}' },
+                    { id: 'business', label: 'Business', icon: '\u{1F4BC}' },
+                    { id: 'science', label: 'Science', icon: '\u{1F52C}' },
+                    { id: 'sports', label: 'Sports', icon: '\u26BD' },
+                    { id: 'entertainment', label: 'Entertainment', icon: '\u{1F3AC}' }
+                ];
+                showOnboarding();
+            });
+    }
+
+    boot();
+})();
+</script>
