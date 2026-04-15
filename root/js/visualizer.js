@@ -8327,8 +8327,8 @@
         var spread = 0.3;
         var vx = dirX * 2 + (Math.random() - 0.5) * spread;
         // Density-aware velocity: dense lyrics arc steeper so words clear face fast
-        var densityFactor = Math.max(0.8, Math.min(2.0, 0.6 / Math.max(0.15, secondsPerWord || 0.4)));
-        var vy = (2.0 + Math.random() * 1.2) * densityFactor;   // aggressive downward arc toward feet
+        var densityFactor = Math.max(1.0, Math.min(2.5, 0.6 / Math.max(0.15, secondsPerWord || 0.4)));
+        var vy = (4.0 + Math.random() * 1.5) * densityFactor;   // strong initial drop away from mouth
         var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
 
         spitParticles.push({
@@ -9277,7 +9277,7 @@
     }
         function renderSpitParticles(now, w, h, defaultFontFamily, defaultScheme) {
         var PARTICLE_LIFETIME = 3.0;  // seconds
-        var GRAVITY = 500;  // pixels/sec^2 — arc words down toward feet
+        var GRAVITY = 700;  // pixels/sec^2 — arc words down toward feet
         var TURN_RATE = 2.5;  // radians/sec - how fast words curve toward viewer
 
         // Update and render particles
