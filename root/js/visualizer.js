@@ -8490,16 +8490,14 @@
 
         // ── ASCII FIGlet mode: break into individual cell characters ──
         if (_isAsciiSpitMode()) {
-            // Find the best FIGlet data for this word using the particle's
-            // own font assignments.  Walks down from highest tier — if the
-            // particle already has a font assigned for that tier, great;
-            // if not, one gets assigned now (cheap — just a pool pick).
-            var _eTier = -1;
+            // Explode at whatever tier the particle was last displayed at.
+            // This ensures the explosion matches what was on screen — no
+            // jarring size jump from 1x1 to giant.
+            var _eTier = (target.lastTier != null && target.lastTier >= 0) ? target.lastTier : -1;
             var _eData = null;
             var _eWord = text.toUpperCase();
-            for (var ti = _FIG_TIERS.length - 1; ti >= 0; ti--) {
-                var d = _figGet(_eWord, ti, target);
-                if (d && d.rows) { _eData = d; _eTier = ti; break; }
+            if (_eTier >= 0) {
+                _eData = _figGet(_eWord, _eTier, target);
             }
 
             if (_eData && _eData.rows && _eData.rows.length) {
@@ -9152,11 +9150,18 @@
     // concat + array build, ~50-100µs per word).  This eliminates the
     // cache eviction that was destroying intermediate tiers.
 
-    function _figTierForDepth(depthScale) {
-        for (var i = _FIG_TIERS.length - 1; i >= 0; i--) {
-            if (depthScale >= _FIG_TIERS[i].minDepth) return i;
-        }
-        return -1;
+    // Age-based tier selection.  Words grow through font sizes as they age,
+    // regardless of head angle or z-velocity.  Laser fires at ~1.35s so we
+    // map 0 → 1.35s linearly across tiers -1 through 7.
+    //   0.00–0.08s  → tier -1  (1×1 monospace, brief flash at spawn)
+    //   0.08–1.35s  → tiers 0-7  (heights 3-10, evenly spaced)
+    var _FIG_TIER_START = 0.08;    // seconds before first FIGlet tier
+    var _FIG_TIER_END   = 1.35;    // seconds to reach max tier (laser time)
+    function _figTierForAge(age) {
+        if (age < _FIG_TIER_START) return -1;
+        var t = (age - _FIG_TIER_START) / (_FIG_TIER_END - _FIG_TIER_START);
+        var tier = Math.floor(t * _FIG_TIERS.length);
+        return Math.min(tier, _FIG_TIERS.length - 1);
     }
 
     // Render a word at a given tier using the particle's own font assignment.
@@ -9353,13 +9358,13 @@
             // Tier -1 = plain 1x1 monospace text (matches ASCII strobe cell size).
             // Tiers 0-7 = FIGlet fonts at heights 3 through 10.
             if (_isAsciiSpitMode()) {
-                var _ds = renderState.depthScale;
-                var _tier = _figTierForDepth(_ds);
-                var _bright = Math.min(1, 0.4 + _ds * 0.38);
+                var _age = now - p.spawnTime;
+                var _tier = _figTierForAge(_age);
+                var _bright = Math.min(1, 0.4 + (_age / 1.35) * 0.55);
 
-                // Walk down from target tier to find best available cached FIGlet.
-                // This prevents jumping from 1x1 straight to a large font when
-                // intermediate tier fetches haven't completed yet.
+                // Walk down from age-based tier to find best available font.
+                // Usually the target tier works; walk-down is a safety net
+                // for the first few seconds when pools are still loading.
                 var _figData = null;
                 var _usedTier = -1;
                 var _upperWord = p.text.toUpperCase();
@@ -9367,6 +9372,7 @@
                     var _td = _figGet(_upperWord, _ti, p);
                     if (_td && _td.rows) { _figData = _td; _usedTier = _ti; break; }
                 }
+                p.lastTier = _usedTier;  // remember for explosion
 
                 if (_figData) {
                     // FIGlet mode: render the best available TDF grid
