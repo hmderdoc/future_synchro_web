@@ -12,3 +12,7 @@ node_modules/
 playwright-report/
 test-results/
 .playwright/
+.playwright-browsers/
+
+# User data - never commit
+root/api/data/
