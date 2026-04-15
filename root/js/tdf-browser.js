@@ -55,7 +55,7 @@
     var MAGIC        = [0x13,0x54,0x68,0x65,0x44,0x72,0x61,0x77,0x20,
                         0x46,0x4F,0x4E,0x54,0x53,0x20,0x66,0x69,0x6C,0x65,0x1A];
     var INIT_POOL    = 3;      // fonts per tier loaded before isReady
-    var MAX_POOL     = 12;     // max fonts per tier (background-loaded)
+    var MAX_POOL     = 18;     // max fonts per tier (background-loaded)
     var BG_DELAY     = 350;    // ms between background font fetches
 
     /* Outline font char substitution map (from TDF spec) */
@@ -176,6 +176,23 @@
         var pool = this._tierPool[height];
         if (!pool || !pool.length) return null;
         var fontName = pool[Math.floor(Math.random() * pool.length)];
+        var font = this._fonts[fontName];
+        if (!font) return null;
+        return this._renderWith(text, font);
+    };
+
+    /* Pick a random font NAME from the pool at a given height.
+     * Returns the font name string (not the font object).
+     * Caller stores this on the particle so the same font persists. */
+    TdfBrowser.prototype.pickFontName = function (height) {
+        var pool = this._tierPool[height];
+        if (!pool || !pool.length) return null;
+        return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    /* Render text using a specific named font (no random pick).
+     * Returns the same {rows, charBounds, ...} structure as render(). */
+    TdfBrowser.prototype.renderWithFont = function (text, fontName) {
         var font = this._fonts[fontName];
         if (!font) return null;
         return this._renderWith(text, font);

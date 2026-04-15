@@ -8331,11 +8331,6 @@
         var vy = (2.0 + Math.random() * 1.2) * densityFactor;   // aggressive downward arc toward feet
         var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
 
-        // Pre-fetch FIGlet renderings for all tiers when word spawns
-        if (_isAsciiSpitMode()) {
-            _figPrefetch(text);
-        }
-
         spitParticles.push({
             id: ++spitParticleSeq,
             text: text,
@@ -8352,7 +8347,8 @@
             fontFamily: fontFamily,
             secondsPerWord: secondsPerWord,
             laserTriggered: false,
-            laserHitTime: 0
+            laserHitTime: 0,
+            figFonts: {}   // tierIdx → fontName, assigned lazily on first render
         });
     }
 
@@ -8494,14 +8490,15 @@
 
         // ── ASCII FIGlet mode: break into individual cell characters ──
         if (_isAsciiSpitMode()) {
-            // Find the best FIGlet data ALREADY CACHED for this word.
-            // Use cache-only lookup to avoid rendering+caching tiers
-            // the particle never reached (which would pollute the LRU).
+            // Find the best FIGlet data for this word using the particle's
+            // own font assignments.  Walks down from highest tier — if the
+            // particle already has a font assigned for that tier, great;
+            // if not, one gets assigned now (cheap — just a pool pick).
             var _eTier = -1;
             var _eData = null;
             var _eWord = text.toUpperCase();
             for (var ti = _FIG_TIERS.length - 1; ti >= 0; ti--) {
-                var d = _figGetCached(_eWord, ti);
+                var d = _figGet(_eWord, ti, target);
                 if (d && d.rows) { _eData = d; _eTier = ti; break; }
             }
 
@@ -9147,17 +9144,13 @@
     var _FIG_FONT_CSS = '"Spleen", "Courier New", monospace';
     var _FIG_DEBRIS = ['\u2591','\u2592','\u2593','\u2588','\u2584','\u2580']; // ░▒▓█▄▀
 
-    // Client-side TDF word render cache (zero network — parsed locally)
-    // Each word gets a random font from tdfBrowser's pool; cached for its
-    // lifetime so the same particle keeps a consistent look frame-to-frame.
-    //
-    // IMPORTANT: null results are NOT cached — if a tier has no pool yet
-    // (background still loading), we retry next frame instead of locking
-    // the word into a permanent null.  This prevents the "fonts disappear
-    // over time" symptom where intermediate tiers become unreachable.
-    var _figWordCache = {};
-    var _figWordCacheKeys = [];
-    var _FIG_CACHE_MAX = 4000;     // generous — each entry is tiny (ref to render obj)
+    // Per-particle font rendering — NO global cache.
+    // Each particle owns its font choices (particle.figFonts maps tierIdx
+    // to a font name).  Fonts are assigned lazily: the first time a
+    // particle hits a tier, we pick a random font from the pool and store
+    // it on the particle.  Re-rendering each frame is trivial (string
+    // concat + array build, ~50-100µs per word).  This eliminates the
+    // cache eviction that was destroying intermediate tiers.
 
     function _figTierForDepth(depthScale) {
         for (var i = _FIG_TIERS.length - 1; i >= 0; i--) {
@@ -9166,55 +9159,25 @@
         return -1;
     }
 
-    function _figCacheKey(word, tierIdx) {
-        return word + '|h' + _FIG_TIERS[tierIdx].height;
-    }
-
-    // Render a word locally via browser TDF parser (synchronous, zero network).
-    // tdfBrowser.render() picks a random font from the pool each call;
-    // once cached here the word keeps that font for its particle lifetime.
-    // NULL results are never cached so transient pool gaps self-heal.
-    function _figRender(word, tierIdx) {
+    // Render a word at a given tier using the particle's own font assignment.
+    // If the particle hasn't been assigned a font for this tier yet, pick one
+    // from the pool now and remember it.  Returns render data or null.
+    function _figRender(word, tierIdx, particle) {
         if (tierIdx < 0 || tierIdx >= _FIG_TIERS.length) return null;
         if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return null;
-        var key = _figCacheKey(word, tierIdx);
-        if (_figWordCache[key]) return _figWordCache[key];   // cache HIT (only truthy data)
-        var data = window.tdfBrowser.render(word, _FIG_TIERS[tierIdx].height);
-        if (!data) return null;                               // don't cache nulls — retry later
-        _figWordCache[key] = data;
-        _figWordCacheKeys.push(key);
-        while (_figWordCacheKeys.length > _FIG_CACHE_MAX) {
-            delete _figWordCache[_figWordCacheKeys.shift()];
+        var height = _FIG_TIERS[tierIdx].height;
+        // Lazy font assignment: pick once, keep forever on this particle
+        if (!particle.figFonts[tierIdx]) {
+            var name = window.tdfBrowser.pickFontName(height);
+            if (!name) return null;   // pool not loaded yet for this tier
+            particle.figFonts[tierIdx] = name;
         }
-        return data;
+        return window.tdfBrowser.renderWithFont(word, particle.figFonts[tierIdx]);
     }
 
-    // Cache-only lookup — returns cached data or null, never triggers a new
-    // render.  Used by explosion walk-down to avoid polluting the cache with
-    // tiers the particle never actually reached during its flight.
-    function _figGetCached(word, tierIdx) {
-        if (tierIdx < 0 || tierIdx >= _FIG_TIERS.length) return null;
-        var key = _figCacheKey(word, tierIdx);
-        return _figWordCache[key] || null;
-    }
-
-    function _figGet(word, tierIdx) {
+    function _figGet(word, tierIdx, particle) {
         if (tierIdx < 0) return null;
-        return _figRender(word, tierIdx);
-    }
-
-    // Pre-warm word cache for the tiers a particle will actually hit
-    // during early flight.  Words spawn at depthScale ~1.0 and reach
-    // ~1.5 before laser/gravity kills them, so tiers 0-2 (heights 3-5)
-    // are the useful ones.  Prefetching ALL 8 tiers was wasteful — it
-    // filled 62% of the cache with entries that were never read, causing
-    // early eviction of the intermediate tiers that matter.
-    var _FIG_PREFETCH_TIERS = 3;   // tiers 0,1,2  (heights 3,4,5)
-    function _figPrefetch(word) {
-        if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return;
-        var w = word.toUpperCase();
-        var limit = Math.min(_FIG_PREFETCH_TIERS, _FIG_TIERS.length);
-        for (var i = 0; i < limit; i++) _figRender(w, i);
+        return _figRender(word, tierIdx, particle);
     }
 
     // Compute the monospace cell height matching the ASCII strobe head.
@@ -9401,7 +9364,7 @@
                 var _usedTier = -1;
                 var _upperWord = p.text.toUpperCase();
                 for (var _ti = _tier; _ti >= 0; _ti--) {
-                    var _td = _figGet(_upperWord, _ti);
+                    var _td = _figGet(_upperWord, _ti, p);
                     if (_td && _td.rows) { _figData = _td; _usedTier = _ti; break; }
                 }
 
