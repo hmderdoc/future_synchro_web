@@ -8494,12 +8494,14 @@
 
         // ── ASCII FIGlet mode: break into individual cell characters ──
         if (_isAsciiSpitMode()) {
-            // Find the best FIGlet data we have cached for this word
+            // Find the best FIGlet data ALREADY CACHED for this word.
+            // Use cache-only lookup to avoid rendering+caching tiers
+            // the particle never reached (which would pollute the LRU).
             var _eTier = -1;
             var _eData = null;
             var _eWord = text.toUpperCase();
             for (var ti = _FIG_TIERS.length - 1; ti >= 0; ti--) {
-                var d = _figGet(_eWord, ti);
+                var d = _figGetCached(_eWord, ti);
                 if (d && d.rows) { _eData = d; _eTier = ti; break; }
             }
 
@@ -9148,9 +9150,14 @@
     // Client-side TDF word render cache (zero network — parsed locally)
     // Each word gets a random font from tdfBrowser's pool; cached for its
     // lifetime so the same particle keeps a consistent look frame-to-frame.
+    //
+    // IMPORTANT: null results are NOT cached — if a tier has no pool yet
+    // (background still loading), we retry next frame instead of locking
+    // the word into a permanent null.  This prevents the "fonts disappear
+    // over time" symptom where intermediate tiers become unreachable.
     var _figWordCache = {};
     var _figWordCacheKeys = [];
-    var _FIG_CACHE_MAX = 600;
+    var _FIG_CACHE_MAX = 4000;     // generous — each entry is tiny (ref to render obj)
 
     function _figTierForDepth(depthScale) {
         for (var i = _FIG_TIERS.length - 1; i >= 0; i--) {
@@ -9163,16 +9170,18 @@
         return word + '|h' + _FIG_TIERS[tierIdx].height;
     }
 
-    // Render a word locally via browser TDF parser (synchronous, zero network)
+    // Render a word locally via browser TDF parser (synchronous, zero network).
     // tdfBrowser.render() picks a random font from the pool each call;
     // once cached here the word keeps that font for its particle lifetime.
+    // NULL results are never cached so transient pool gaps self-heal.
     function _figRender(word, tierIdx) {
         if (tierIdx < 0 || tierIdx >= _FIG_TIERS.length) return null;
         if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return null;
         var key = _figCacheKey(word, tierIdx);
-        if (_figWordCache[key] !== undefined) return _figWordCache[key];
+        if (_figWordCache[key]) return _figWordCache[key];   // cache HIT (only truthy data)
         var data = window.tdfBrowser.render(word, _FIG_TIERS[tierIdx].height);
-        _figWordCache[key] = data || null;
+        if (!data) return null;                               // don't cache nulls — retry later
+        _figWordCache[key] = data;
         _figWordCacheKeys.push(key);
         while (_figWordCacheKeys.length > _FIG_CACHE_MAX) {
             delete _figWordCache[_figWordCacheKeys.shift()];
@@ -9180,16 +9189,32 @@
         return data;
     }
 
+    // Cache-only lookup — returns cached data or null, never triggers a new
+    // render.  Used by explosion walk-down to avoid polluting the cache with
+    // tiers the particle never actually reached during its flight.
+    function _figGetCached(word, tierIdx) {
+        if (tierIdx < 0 || tierIdx >= _FIG_TIERS.length) return null;
+        var key = _figCacheKey(word, tierIdx);
+        return _figWordCache[key] || null;
+    }
+
     function _figGet(word, tierIdx) {
         if (tierIdx < 0) return null;
         return _figRender(word, tierIdx);
     }
 
-    // Pre-warm word cache for all tiers (synchronous — no network)
+    // Pre-warm word cache for the tiers a particle will actually hit
+    // during early flight.  Words spawn at depthScale ~1.0 and reach
+    // ~1.5 before laser/gravity kills them, so tiers 0-2 (heights 3-5)
+    // are the useful ones.  Prefetching ALL 8 tiers was wasteful — it
+    // filled 62% of the cache with entries that were never read, causing
+    // early eviction of the intermediate tiers that matter.
+    var _FIG_PREFETCH_TIERS = 3;   // tiers 0,1,2  (heights 3,4,5)
     function _figPrefetch(word) {
         if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return;
         var w = word.toUpperCase();
-        for (var i = 0; i < _FIG_TIERS.length; i++) _figRender(w, i);
+        var limit = Math.min(_FIG_PREFETCH_TIERS, _FIG_TIERS.length);
+        for (var i = 0; i < limit; i++) _figRender(w, i);
     }
 
     // Compute the monospace cell height matching the ASCII strobe head.

@@ -55,7 +55,7 @@
     var MAGIC        = [0x13,0x54,0x68,0x65,0x44,0x72,0x61,0x77,0x20,
                         0x46,0x4F,0x4E,0x54,0x53,0x20,0x66,0x69,0x6C,0x65,0x1A];
     var INIT_POOL    = 3;      // fonts per tier loaded before isReady
-    var MAX_POOL     = 18;     // max fonts per tier (background-loaded)
+    var MAX_POOL     = 12;     // max fonts per tier (background-loaded)
     var BG_DELAY     = 350;    // ms between background font fetches
 
     /* Outline font char substitution map (from TDF spec) */
