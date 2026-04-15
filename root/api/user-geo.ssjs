@@ -38,7 +38,7 @@ function regenerate() {
         f.write(JSON.stringify(out));
         f.close();
     }
-    system.exec('node ' + GEN_SCRIPT);
+    system.exec('/sbbs/webv4_custom/scripts/run-node.sh ' + GEN_SCRIPT);
 }
 
 if (fileAge(GEO_FILE) > MAX_AGE) {

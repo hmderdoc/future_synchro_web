@@ -99,6 +99,7 @@
     var headWaveform  = [];     // normalized analyser time-domain samples
     var headFreqData  = [];     // normalized frequency bin data (0-1)
     var headProjectionState = null;
+    var characterFeetY = null;  // screen Y of character feet — updated each frame by drawBody
     var eyeScreenPoints = { left: null, right: null, mouth: null };
     var vizTime       = 0;
 
@@ -136,7 +137,7 @@
 
     // DOM refs
     var elPanel, elLyrics, elClose;
-    var elFxLyrics, elFxLasers, elFxWave;
+    var elFxLyrics, elFxLasers, elFxWave, elFxAscii;
     var elMetaHud, elMetaArt, elMetaTitle;
     var elMetaArtist, elMetaComposer, elMetaAlbum, elMetaYear, elMetaGenre;
     var elLyricEditor, elLyricEditorBall, elLyricEditorTime, elLyricEditorInsert;
@@ -1769,12 +1770,8 @@
         activeChar = ch;
         console.log('[visualizer] character: ' + ch.name);
 
-        // Spit lyrics only for Vektrax and Metatron; bouncing ball for everyone else
-        if (key === '_default' || key === 'metatron' || ch.spitStyle) {
-            lyricMode = LYRIC_MODE_SPITTING;
-        } else {
-            lyricMode = LYRIC_MODE_BOUNCING;
-        }
+        // Spit lyrics on by default for all characters
+        lyricMode = LYRIC_MODE_SPITTING;
         resetLyricFxState();
         updateFxHud();
     }
@@ -1821,6 +1818,13 @@
             elFxWave,
             waveHeadEnabled ? 'On' : 'Off',
             waveHeadEnabled ? 'is-on is-wave' : ''
+        );
+        var asciiOn = window.asciiStrobe && window.asciiStrobe.isEnabled();
+        var asciiProfile = window.asciiStrobe ? window.asciiStrobe.getProfile() : 'flash';
+        setFxValue(
+            elFxAscii,
+            asciiOn ? asciiProfile.charAt(0).toUpperCase() + asciiProfile.slice(1) : 'Off',
+            asciiOn ? 'is-on is-ascii' : ''
         );
     }
 
@@ -2006,6 +2010,7 @@
         setLyricEditorStatus('', false, true);
         elFxLasers = document.getElementById('viz-fx-lasers');
         elFxWave = document.getElementById('viz-fx-wave');
+        elFxAscii = document.getElementById('viz-fx-ascii');
         updateFxHud();
 
         // Tap/click canvas area to toggle lyric mode (spit <-> bouncing ball)
@@ -2077,6 +2082,12 @@
             } else if (e.key === 'w' || e.key === 'W') {
                 e.preventDefault();
                 toggleWaveHead();
+            } else if (e.key === 'A' && e.shiftKey) {
+                e.preventDefault();
+                toggleAsciiStrobe();
+            } else if (e.key === 'a' && !e.shiftKey) {
+                e.preventDefault();
+                cycleAsciiProfile();
             }
         });
 
@@ -2252,6 +2263,13 @@
         box.appendChild(karaokeCanvas);
         karaokeCtx = karaokeCanvas.getContext('2d');
 
+        // ASCII strobe overlay (between wireframe and karaoke)
+        if (window.asciiStrobe && wireCanvas) {
+            var oldAscii = box.querySelector('#viz-ascii');
+            if (oldAscii) oldAscii.remove();
+            window.asciiStrobe.init(wireCanvas, box);
+        }
+
         lastCanvasW = 0;
         lastCanvasH = 0;
         scheduleCanvasResize();
@@ -2324,6 +2342,7 @@
             }
         });
 
+        if (window.asciiStrobe) window.asciiStrobe.resize(w, h);
         if (bcViz) bcViz.setRendererSize(w, h);
     }
 
@@ -2497,7 +2516,21 @@
 
         var inlineEditorVisible = shouldShowInlineLyricEditor(vizTime);
 
+        // --- Dynamic MilkDrop dimming: pull opacity down when energy is high ---
+        if (milkCanvas) {
+            var milkBase = 0.55;           // CSS default
+            var energyDip = Math.min(1, amp * 1.4 + bass * 0.6);
+            // At peak energy, drop to ~0.30 opacity
+            milkCanvas.style.opacity = (milkBase - energyDip * 0.25).toFixed(3);
+        }
+
         drawHead(amp, bass, vocalPresence, getLyricMouthState(vizTime));
+
+        // ASCII strobe: beat-triggered ASCII 3D effect overlay
+        if (window.asciiStrobe && window.asciiStrobe.isEnabled()) {
+            window.asciiStrobe.tick(bass, amp, beatDetector, activeChar, headProjectionState, mouthOpen);
+        }
+
         if (lyricMode === LYRIC_MODE_SPITTING && !inlineEditorVisible) {
             syncLyricsSpitting();
         } else {
@@ -2513,6 +2546,23 @@
         if (!wireCtx || !wireCanvas) return;
         var W = wireCanvas.width, H = wireCanvas.height;
         wireCtx.clearRect(0, 0, W, H);
+
+        // --- Dark backdrop halo: dim the MilkDrop behind the character ---
+        // Stronger when audio energy is high (busy background).
+        (function () {
+            var cx = W * 0.5, cy = H * 0.42;
+            // Radius covers head + body region
+            var rMax = Math.min(W, H) * 0.48;
+            // Base halo is subtle; ramps up with amplitude
+            var energy = Math.min(1, (headAmp || 0) * 1.6 + (headBass || 0) * 0.5);
+            var alpha = 0.12 + energy * 0.22;   // 0.12 idle → 0.34 peak
+            var grad = wireCtx.createRadialGradient(cx, cy, rMax * 0.05, cx, cy, rMax);
+            grad.addColorStop(0, 'rgba(0,0,0,' + alpha.toFixed(3) + ')');
+            grad.addColorStop(0.55, 'rgba(0,0,0,' + (alpha * 0.55).toFixed(3) + ')');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            wireCtx.fillStyle = grad;
+            wireCtx.fillRect(0, 0, W, H);
+        })();
 
         headRotY += 0.007;
         breathPhase += 0.02;
@@ -6681,6 +6731,12 @@
             joints[name] = { x: screenX, y: screenY, localY: j.y };
         }
 
+        // Store feet Y for spit word bounds checking
+        var _fL = joints.footL, _fR = joints.footR;
+        if (_fL || _fR) {
+            characterFeetY = Math.max(_fL ? _fL.y : 0, _fR ? _fR.y : 0);
+        }
+
         // --- Neck bridge (cable from box-head bottom to spine neck joint) ---
         if (body.neckBridge && char.boxDims) {
             var nb = body.neckBridge;
@@ -8211,6 +8267,15 @@
         var line = lrcLines[ni];
         var scheme = LYRIC_SCHEMES[songColorIdx % LYRIC_SCHEMES.length];
         var fontFamily = LYRIC_FONTS[songFontIdx % LYRIC_FONTS.length];
+
+        // When ASCII strobe is active, match mesh aesthetic:
+        // CGA bright white text in monospace font (skip smoke style)
+        if (window.asciiStrobe && window.asciiStrobe.isEnabled() &&
+            activeChar.spitStyle !== 'smoke') {
+            scheme = { fg: '#FFFFFF', hi: '#FFFFFF', glow: '#AAAAAA' };
+            fontFamily = 'monospace';
+        }
+
         var words = line.text.split(/\s+/);
 
         // Calculate line progress
@@ -8261,8 +8326,15 @@
         // Add some randomness and spread
         var spread = 0.3;
         var vx = dirX * 2 + (Math.random() - 0.5) * spread;
-        var vy = -0.5 - Math.random() * 0.5;  // upward arc
+        // Density-aware velocity: dense lyrics arc steeper so words clear face fast
+        var densityFactor = Math.max(0.8, Math.min(2.0, 0.6 / Math.max(0.15, secondsPerWord || 0.4)));
+        var vy = (2.0 + Math.random() * 1.2) * densityFactor;   // aggressive downward arc toward feet
         var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
+
+        // Pre-fetch FIGlet renderings for all tiers when word spawns
+        if (_isAsciiSpitMode()) {
+            _figPrefetch(text);
+        }
 
         spitParticles.push({
             id: ++spitParticleSeq,
@@ -8410,8 +8482,131 @@
         var fontSize = (renderState && renderState.fontSize) ? renderState.fontSize : 36;
         var fontFamily = (renderState && renderState.fontFamily) ? renderState.fontFamily : LYRIC_FONTS[0];
         var scheme = (renderState && renderState.scheme) ? renderState.scheme : LYRIC_SCHEMES[0];
+
+        // Match ASCII mesh aesthetic when strobe is active
+        if (window.asciiStrobe && window.asciiStrobe.isEnabled() &&
+            activeChar.spitStyle !== 'smoke') {
+            fontFamily = _FIG_FONT_CSS;
+            scheme = { fg: '#FFFFFF', hi: '#FFFFFF', glow: '#AAAAAA' };
+        }
         var horizScale = (renderState && renderState.horizScale) ? renderState.horizScale : 1;
         var text = target.text || '';
+
+        // ── ASCII FIGlet mode: break into individual cell characters ──
+        if (_isAsciiSpitMode()) {
+            // Find the best FIGlet data we have cached for this word
+            var _eTier = -1;
+            var _eData = null;
+            var _eWord = text.toUpperCase();
+            for (var ti = _FIG_TIERS.length - 1; ti >= 0; ti--) {
+                var d = _figGet(_eWord, ti);
+                if (d && d.rows) { _eData = d; _eTier = ti; break; }
+            }
+
+            if (_eData && _eData.rows && _eData.rows.length) {
+                // Measure cell dimensions
+                karaokeCtx.save();
+                var _eCellH = _figAsciiCellH(karaokeCanvas.width);
+                var _eRefW = Math.round(_eCellH * 0.6);
+                karaokeCtx.restore();
+                var _eRows = _eData.rows;
+                var _eCols = _eRows[0].chars.length;
+                var _eCellW = _eRefW;  // matches _figDraw cellW
+                var _eTotalW = _eCols * _eCellW;
+                var _eTotalH = _eRows.length * _eCellH;
+                var _eOx = target.x - _eTotalW / 2;
+                var _eOy = target.y - _eTotalH / 2;
+
+                // Explode each non-space cell as its own glyph fragment
+                for (var _er = 0; _er < _eRows.length; _er++) {
+                    var _eRow = _eRows[_er];
+                    for (var _ec = 0; _ec < _eRow.chars.length; _ec++) {
+                        var _eCh = _eRow.chars.charAt(_ec);
+                        if (!_eCh || _eCh === ' ') continue;
+                        var _eColor = _CGA16[(_eRow.colors[_ec] || 7) & 0x0F] || '#FFFFFF';
+                        var _eCx = _eOx + _ec * _eCellW + _eCellW / 2;
+                        var _eCy = _eOy + _er * _eCellH + _eCellH / 2;
+                        // Offset from center → velocity direction
+                        var _eDx = _eCx - target.x;
+                        var _eDy = _eCy - target.y;
+                        var _eDist = Math.sqrt(_eDx * _eDx + _eDy * _eDy) || 1;
+                        var _eSpread = 0.5 + _eDist / Math.max(20, _eTotalW * 0.5);
+                        wordExplosions.push({
+                            kind: 'glyph',
+                            char: _eCh,
+                            figColor: _eColor,
+                            x: _eCx,
+                            y: _eCy,
+                            vx: _eDx * 2.5 + (Math.random() - 0.5) * 100 * _eSpread,
+                            vy: _eDy * 2.5 - 80 - Math.random() * 120,
+                            rotation: 0,
+                            vr: (Math.random() - 0.5) * 6,
+                            spawnTime: now,
+                            life: 0.55 + Math.random() * 0.35,
+                            fontSize: _eCellH,
+                            fontFamily: _FIG_FONT_CSS,
+                            scheme: scheme
+                        });
+                    }
+                }
+                // Sparse crumb debris
+                var _crumbN = 4 + Math.floor(Math.random() * 6);
+                for (var _ci = 0; _ci < _crumbN; _ci++) {
+                    var _cAngle = Math.random() * Math.PI * 2;
+                    var _cSpeed = 80 + Math.random() * 160;
+                    var _cColor = _CGA16[Math.floor(Math.random() * 16)];
+                    wordExplosions.push({
+                        kind: 'crumb',
+                        figColor: _cColor,
+                        x: target.x + (Math.random() - 0.5) * _eTotalW * 0.5,
+                        y: target.y + (Math.random() - 0.5) * _eTotalH * 0.5,
+                        vx: Math.cos(_cAngle) * _cSpeed,
+                        vy: Math.sin(_cAngle) * _cSpeed - 50,
+                        spawnTime: now,
+                        life: 0.3 + Math.random() * 0.2,
+                        size: 1.5 + Math.random() * 2.5,
+                        color: _cColor
+                    });
+                }
+            } else {
+                // Fallback: plain text explosion (no FIGlet data available)
+                var chars = text.split('');
+                var totalWidth = 0;
+                karaokeCtx.save();
+                karaokeCtx.font = Math.round(fontSize) + 'px ' + fontFamily;
+                var metrics = [];
+                for (var i = 0; i < chars.length; i++) {
+                    var w = karaokeCtx.measureText(chars[i]).width;
+                    metrics.push({ char: chars[i], width: w });
+                    totalWidth += w;
+                }
+                karaokeCtx.restore();
+                var cursor = -totalWidth / 2;
+                for (var j = 0; j < metrics.length; j++) {
+                    var glyph = metrics[j];
+                    var centerOffset = cursor + glyph.width / 2;
+                    cursor += glyph.width;
+                    if (!glyph.char.trim()) continue;
+                    wordExplosions.push({
+                        kind: 'glyph',
+                        char: glyph.char,
+                        figColor: '#FFFFFF',
+                        x: target.x + centerOffset * horizScale,
+                        y: target.y,
+                        vx: centerOffset * 1.4 + (Math.random() - 0.5) * 110,
+                        vy: -120 - Math.random() * 160,
+                        rotation: (Math.random() - 0.5) * 0.5,
+                        vr: (Math.random() - 0.5) * 9,
+                        spawnTime: now,
+                        life: 0.65 + Math.random() * 0.3,
+                        fontSize: fontSize,
+                        fontFamily: fontFamily,
+                        scheme: scheme
+                    });
+                }
+            }
+        } else {
+        // ── Normal (non-ASCII) mode ──
         var chars = text.split('');
         var metrics = [];
         var totalWidth = 0;
@@ -8470,6 +8665,7 @@
                 });
             }
         }
+        } // end non-ASCII
 
         // Use contrasting color for Metatron, red for everyone else
         var flashColor = LASER_RED;
@@ -8556,29 +8752,67 @@
 
             karaokeCtx.save();
             karaokeCtx.globalAlpha = 0.92 - progress * 0.25;
-            karaokeCtx.lineCap = 'round';
-            karaokeCtx.shadowColor = laserShadow;
-            karaokeCtx.shadowBlur = 16;
 
-            karaokeCtx.strokeStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
-            karaokeCtx.lineWidth = 3.2;
-            karaokeCtx.beginPath();
-            karaokeCtx.moveTo(laser.originX, laser.originY);
-            karaokeCtx.lineTo(endX, endY);
-            karaokeCtx.stroke();
+            // --- ASCII mode: beam is a trail of directional ASCII chars ---
+            if (window.asciiStrobe && window.asciiStrobe.isEnabled() &&
+                activeChar.spitStyle !== 'smoke') {
+                var dx = endX - laser.originX;
+                var dy = endY - laser.originY;
+                var beamLen = Math.sqrt(dx * dx + dy * dy);
+                var cellSize = 13;  // character spacing along beam
+                var steps = Math.max(1, Math.floor(beamLen / cellSize));
 
-            karaokeCtx.shadowBlur = 8;
-            karaokeCtx.strokeStyle = 'rgba(255,255,255,0.9)';
-            karaokeCtx.lineWidth = 1.1;
-            karaokeCtx.beginPath();
-            karaokeCtx.moveTo(laser.originX, laser.originY);
-            karaokeCtx.lineTo(endX, endY);
-            karaokeCtx.stroke();
+                // Pick ASCII glyph based on beam angle
+                var angle = Math.atan2(dy, dx);
+                var octant = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8;
+                // 8 directions: → ↘ ↓ ↙ ← ↖ ↑ ↗
+                var beamChars = ['-', '\\', '|', '/', '-', '\\', '|', '/'];
+                var glyph = beamChars[octant];
 
-            karaokeCtx.beginPath();
-            karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.8)';
-            karaokeCtx.arc(laser.originX, laser.originY, 3, 0, Math.PI * 2);
-            karaokeCtx.fill();
+                karaokeCtx.font = cellSize + 'px monospace';
+                karaokeCtx.textAlign = 'center';
+                karaokeCtx.textBaseline = 'middle';
+                karaokeCtx.shadowColor = laserShadow;
+                karaokeCtx.shadowBlur = 10;
+
+                for (var si = 0; si <= steps; si++) {
+                    var t = si / Math.max(1, steps);
+                    var cx = laser.originX + dx * t;
+                    var cy = laser.originY + dy * t;
+                    // CGA light red core
+                    karaokeCtx.fillStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
+                    karaokeCtx.fillText(glyph, cx, cy);
+                }
+                // Bright white hot-spot at origin
+                karaokeCtx.shadowBlur = 14;
+                karaokeCtx.fillStyle = 'rgba(255,255,255,0.85)';
+                karaokeCtx.fillText('*', laser.originX, laser.originY);
+            } else {
+                // --- Classic vector beam ---
+                karaokeCtx.lineCap = 'round';
+                karaokeCtx.shadowColor = laserShadow;
+                karaokeCtx.shadowBlur = 16;
+
+                karaokeCtx.strokeStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
+                karaokeCtx.lineWidth = 3.2;
+                karaokeCtx.beginPath();
+                karaokeCtx.moveTo(laser.originX, laser.originY);
+                karaokeCtx.lineTo(endX, endY);
+                karaokeCtx.stroke();
+
+                karaokeCtx.shadowBlur = 8;
+                karaokeCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+                karaokeCtx.lineWidth = 1.1;
+                karaokeCtx.beginPath();
+                karaokeCtx.moveTo(laser.originX, laser.originY);
+                karaokeCtx.lineTo(endX, endY);
+                karaokeCtx.stroke();
+
+                karaokeCtx.beginPath();
+                karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.8)';
+                karaokeCtx.arc(laser.originX, laser.originY, 3, 0, Math.PI * 2);
+                karaokeCtx.fill();
+            }
             karaokeCtx.restore();
 
             activeLasers.push(laser);
@@ -8623,23 +8857,52 @@
             if (fragment.kind === 'glyph') {
                 karaokeCtx.translate(px, py);
                 karaokeCtx.rotate(fragment.rotation + fragment.vr * age);
-                karaokeCtx.font = Math.round(fragment.fontSize * (1 - t * 0.18)) + 'px ' + fragment.fontFamily;
-                karaokeCtx.textAlign = 'center';
-                karaokeCtx.textBaseline = 'middle';
-                karaokeCtx.shadowColor = fragment.scheme.glow;
-                karaokeCtx.shadowBlur = 14;
-                karaokeCtx.fillStyle = fragment.scheme.hi;
-                karaokeCtx.fillText(fragment.char, 0, 0);
-                karaokeCtx.shadowBlur = 0;
-                karaokeCtx.fillStyle = fragment.scheme.fg;
-                karaokeCtx.globalAlpha = alpha * 0.65;
-                karaokeCtx.fillText(fragment.char, 1, 1);
+                if (_isAsciiSpitMode()) {
+                    // Single ASCII cell fragment (broken from FIGlet grid)
+                    var _eBr = Math.max(0.4, 1 - t * 0.4);
+                    var _eFsize = Math.max(10, Math.round(fragment.fontSize * 0.7));
+                    karaokeCtx.font = _eFsize + 'px ' + _FIG_FONT_CSS;
+                    karaokeCtx.textAlign = 'center';
+                    karaokeCtx.textBaseline = 'middle';
+                    var _eColor = fragment.figColor || '#FFFFFF';
+                    if (_eBr < 1) _eColor = _figDimColor(_eColor, _eBr);
+                    karaokeCtx.fillStyle = _eColor;
+                    karaokeCtx.shadowColor = _eColor;
+                    karaokeCtx.shadowBlur = 5;
+                    karaokeCtx.fillText(fragment.char, 0, 0);
+                } else {
+                    karaokeCtx.font = Math.round(fragment.fontSize * (1 - t * 0.18)) + 'px ' + fragment.fontFamily;
+                    karaokeCtx.textAlign = 'center';
+                    karaokeCtx.textBaseline = 'middle';
+                    karaokeCtx.shadowColor = fragment.scheme.glow;
+                    karaokeCtx.shadowBlur = 14;
+                    karaokeCtx.fillStyle = fragment.scheme.hi;
+                    karaokeCtx.fillText(fragment.char, 0, 0);
+                    karaokeCtx.shadowBlur = 0;
+                    karaokeCtx.fillStyle = fragment.scheme.fg;
+                    karaokeCtx.globalAlpha = alpha * 0.65;
+                    karaokeCtx.fillText(fragment.char, 1, 1);
+                }
             } else {
                 var size = fragment.size * (1 - t * 0.35);
-                karaokeCtx.shadowColor = fragment.color;
-                karaokeCtx.shadowBlur = 10;
-                karaokeCtx.fillStyle = fragment.color;
-                karaokeCtx.fillRect(px - size * 0.5, py - size * 0.5, size, size);
+                if (_isAsciiSpitMode()) {
+                    // Block-element debris from FIGlet breakup
+                    karaokeCtx.font = Math.round(size * 2.5) + 'px ' + _FIG_FONT_CSS;
+                    karaokeCtx.textAlign = 'center';
+                    karaokeCtx.textBaseline = 'middle';
+                    karaokeCtx.shadowColor = '#FF5555';
+                    karaokeCtx.shadowBlur = 4;
+                    karaokeCtx.fillStyle = fragment.figColor || '#FFFFFF';
+                    karaokeCtx.fillText(
+                        _FIG_DEBRIS[Math.abs(Math.floor(fragment.x * 13 + fragment.y * 7)) % _FIG_DEBRIS.length],
+                        px, py
+                    );
+                } else {
+                    karaokeCtx.shadowColor = fragment.color;
+                    karaokeCtx.shadowBlur = 10;
+                    karaokeCtx.fillStyle = fragment.color;
+                    karaokeCtx.fillRect(px - size * 0.5, py - size * 0.5, size, size);
+                }
             }
 
             karaokeCtx.restore();
@@ -8846,9 +9109,182 @@
         cigarWisps = active;
     }
 
-    function renderSpitParticles(now, w, h, defaultFontFamily, defaultScheme) {
+    // =========================================================
+    //  TDF FIGlet Rendering System for ASCII Spit Lyrics
+    //  Uses server-side TheDraw font rendering via API.
+    //  Words start as 1×1 plain text (matching ASCII strobe cell size),
+    //  then scale through 8 progressively larger FIGlet tiers (h=3→10)
+    //  as they approach. Each height tier draws from a pool of ~50-140
+    //  random TDF fonts for maximum visual variety.
+    // =========================================================
+
+    // CGA 16-color palette → CSS hex (for FIGlet color attributes)
+    var _CGA16 = [
+        '#000000','#0000AA','#00AA00','#00AAAA',
+        '#AA0000','#AA00AA','#AA5500','#AAAAAA',
+        '#555555','#5555FF','#55FF55','#55FFFF',
+        '#FF5555','#FF55FF','#FFFF55','#FFFFFF'
+    ];
+
+    // 8 height tiers with evenly distributed depth thresholds.
+    // depthScale ranges ~1.0 (spawn) → ~2.3 (laser hit).
+    // Below tier 0 = plain 1×1 monospace text.
+    // API uses &height=N and picks random font from pool server-side.
+    var _FIG_TIERS = [
+        { height: 3,  minDepth: 1.10 },
+        { height: 4,  minDepth: 1.24 },
+        { height: 5,  minDepth: 1.38 },
+        { height: 6,  minDepth: 1.52 },
+        { height: 7,  minDepth: 1.66 },
+        { height: 8,  minDepth: 1.80 },
+        { height: 9,  minDepth: 1.94 },
+        { height: 10, minDepth: 2.08 }
+    ];
+
+    // Spleen bitmap font for DOS-authentic 1x1 text (matches lyric font stack)
+    var _FIG_FONT_CSS = '"Spleen", "Courier New", monospace';
+    var _FIG_DEBRIS = ['\u2591','\u2592','\u2593','\u2588','\u2584','\u2580']; // ░▒▓█▄▀
+
+    // Client-side TDF word render cache (zero network — parsed locally)
+    // Each word gets a random font from tdfBrowser's pool; cached for its
+    // lifetime so the same particle keeps a consistent look frame-to-frame.
+    var _figWordCache = {};
+    var _figWordCacheKeys = [];
+    var _FIG_CACHE_MAX = 600;
+
+    function _figTierForDepth(depthScale) {
+        for (var i = _FIG_TIERS.length - 1; i >= 0; i--) {
+            if (depthScale >= _FIG_TIERS[i].minDepth) return i;
+        }
+        return -1;
+    }
+
+    function _figCacheKey(word, tierIdx) {
+        return word + '|h' + _FIG_TIERS[tierIdx].height;
+    }
+
+    // Render a word locally via browser TDF parser (synchronous, zero network)
+    // tdfBrowser.render() picks a random font from the pool each call;
+    // once cached here the word keeps that font for its particle lifetime.
+    function _figRender(word, tierIdx) {
+        if (tierIdx < 0 || tierIdx >= _FIG_TIERS.length) return null;
+        if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return null;
+        var key = _figCacheKey(word, tierIdx);
+        if (_figWordCache[key] !== undefined) return _figWordCache[key];
+        var data = window.tdfBrowser.render(word, _FIG_TIERS[tierIdx].height);
+        _figWordCache[key] = data || null;
+        _figWordCacheKeys.push(key);
+        while (_figWordCacheKeys.length > _FIG_CACHE_MAX) {
+            delete _figWordCache[_figWordCacheKeys.shift()];
+        }
+        return data;
+    }
+
+    function _figGet(word, tierIdx) {
+        if (tierIdx < 0) return null;
+        return _figRender(word, tierIdx);
+    }
+
+    // Pre-warm word cache for all tiers (synchronous — no network)
+    function _figPrefetch(word) {
+        if (!window.tdfBrowser || !window.tdfBrowser.isReady()) return;
+        var w = word.toUpperCase();
+        for (var i = 0; i < _FIG_TIERS.length; i++) _figRender(w, i);
+    }
+
+    // Compute the monospace cell height matching the ASCII strobe head.
+    // Strobe uses: cellW = max(7, round(canvasW / 110)), cellH = cellW * 1.55
+    function _figAsciiCellH(canvasW) {
+        var cw = Math.max(7, Math.round(canvasW / 110));
+        return Math.round(cw * 1.55);
+    }
+
+    // Draw a FIGlet grid on the karaoke canvas at (cx, cy) centered.
+    // cellPx = pixel height per cell row (controls overall size).
+    function _figDraw(ctx, data, cx, cy, alpha, brightness, cellPx) {
+        if (!data || !data.rows || !data.rows.length) return { w: 0, h: 0 };
+        var rows = data.rows;
+        var height = rows.length;
+
+        var cellH = cellPx || 14;
+        var cellW = Math.round(cellH * 0.6);  // monospace aspect
+        // data.width from SSJS is UTF-8 byte count (wrong) — use browser char count
+        var totalW = rows[0].chars.length * cellW;
+        var totalH = height * cellH;
+
+        var ox = cx - totalW / 2;
+        var oy = cy - totalH / 2;
+
+        ctx.save();
+        ctx.font = cellH + 'px ' + _FIG_FONT_CSS;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.globalAlpha = alpha;
+
+        for (var r = 0; r < height; r++) {
+            var row = rows[r];
+            var chars = row.chars;
+            var colors = row.colors;
+            if (!chars || !colors) continue;
+
+            for (var c = 0; c < chars.length; c++) {
+                var ch = chars.charAt(c);
+                if (!ch || ch === ' ') continue;
+
+                var colorVal = (colors[c] !== undefined && colors[c] !== null) ? colors[c] : 7;
+                var cgaIdx = colorVal & 0x0F;
+                var bgIdx  = (colorVal >> 4) & 0x07;
+                if (cgaIdx === 0 && bgIdx === 0) continue;
+
+                var px = ox + c * cellW;
+                var py = oy + r * cellH;
+
+                if (bgIdx > 0) {
+                    var bgHex = _CGA16[bgIdx] || '#000000';
+                    ctx.fillStyle = brightness < 1 ? _figDimColor(bgHex, brightness * 0.6) : bgHex;
+                    ctx.fillRect(px, py, cellW, cellH);
+                }
+
+                var fgHex = _CGA16[cgaIdx] || '#FFFFFF';
+                var fgColor = brightness < 1 ? _figDimColor(fgHex, brightness) : fgHex;
+                ctx.fillStyle = fgColor;
+                ctx.shadowColor = fgColor;
+                ctx.shadowBlur = 3;
+                ctx.fillText(ch, px, py);
+                ctx.shadowBlur = 0;
+            }
+        }
+        ctx.restore();
+        return { w: totalW, h: totalH };
+    }
+
+    function _figDimColor(hex, brightness) {
+        var r, g, b;
+        if (hex.charAt(0) === '#') {
+            r = parseInt(hex.slice(1,3), 16);
+            g = parseInt(hex.slice(3,5), 16);
+            b = parseInt(hex.slice(5,7), 16);
+        } else {
+            var m = hex.match(/(\d+)/g);
+            if (m && m.length >= 3) {
+                r = parseInt(m[0]); g = parseInt(m[1]); b = parseInt(m[2]);
+            } else {
+                return hex;
+            }
+        }
+        r = Math.round((r || 0) * brightness);
+        g = Math.round((g || 0) * brightness);
+        b = Math.round((b || 0) * brightness);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
+    function _isAsciiSpitMode() {
+        return !!(window.asciiStrobe && window.asciiStrobe.isEnabled() &&
+                  activeChar && activeChar.spitStyle !== 'smoke');
+    }
+        function renderSpitParticles(now, w, h, defaultFontFamily, defaultScheme) {
         var PARTICLE_LIFETIME = 3.0;  // seconds
-        var GRAVITY = 120;  // pixels/sec^2
+        var GRAVITY = 500;  // pixels/sec^2 — arc words down toward feet
         var TURN_RATE = 2.5;  // radians/sec - how fast words curve toward viewer
 
         // Update and render particles
@@ -8859,7 +9295,7 @@
             var age = now - p.spawnTime;
             var renderState = getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme);
 
-            if (laserEyesEnabled && !p.laserTriggered && age >= PARTICLE_LIFETIME * 0.72) {
+            if (laserEyesEnabled && !p.laserTriggered && age >= PARTICLE_LIFETIME * 0.45) {
                 spawnEyeLaser(p, now);
             }
             if (p.laserTriggered && now >= p.laserHitTime) {
@@ -8888,6 +9324,15 @@
             var horizScale = renderState.horizScale;
             p.alpha = renderState.alpha;
 
+            // --- Bounds-based destruction: word dropped past feet or off bottom ---
+            var _boundsFloor = (characterFeetY != null) ? characterFeetY + 20 : h * 0.85;
+            if (!p.laserTriggered && p.y > _boundsFloor) {
+                // Word has hit the "ground" — explode immediately, skip laser
+                var _brs = getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme);
+                spawnWordExplosion(p, now, _brs);
+                continue;
+            }
+
             // Skip if off screen
             if (p.x < -100 || p.x > w + 100 || p.y < -100 || p.y > h + 100) {
                 continue;
@@ -8915,27 +9360,59 @@
                 karaokeCtx.scale(-1, 1);  // mirror horizontally
             }
 
-            // Set up text rendering - use particle's own font
-            var scheme = renderState.scheme;
-            var pFont = renderState.fontFamily;
-            karaokeCtx.font = Math.round(fontSize) + 'px ' + pFont;
-            karaokeCtx.textAlign = 'center';
-            karaokeCtx.textBaseline = 'middle';
-            
-            // Glow effect - bigger glow for bigger text
-            karaokeCtx.shadowColor = scheme.glow;
-            karaokeCtx.shadowBlur = 12 + (1 - p.alpha) * 16;
-            
-            // Text color with alpha
-            karaokeCtx.globalAlpha = p.alpha;
-            karaokeCtx.fillStyle = scheme.hi;
-            karaokeCtx.fillText(p.text, 0, 0);
-            
-            // Second pass with main color for depth
-            karaokeCtx.shadowBlur = 0;
-            karaokeCtx.globalAlpha = p.alpha * 0.6;
-            karaokeCtx.fillStyle = scheme.fg;
-            karaokeCtx.fillText(p.text, 1, 1);
+            // --- TDF FIGlet progressive mode ---
+            // depthScale grows as words approach camera.
+            // Tier -1 = plain 1x1 monospace text (matches ASCII strobe cell size).
+            // Tiers 0-7 = FIGlet fonts at heights 3 through 10.
+            if (_isAsciiSpitMode()) {
+                var _ds = renderState.depthScale;
+                var _tier = _figTierForDepth(_ds);
+                var _bright = Math.min(1, 0.4 + _ds * 0.38);
+
+                // Walk down from target tier to find best available cached FIGlet.
+                // This prevents jumping from 1x1 straight to a large font when
+                // intermediate tier fetches haven't completed yet.
+                var _figData = null;
+                var _usedTier = -1;
+                var _upperWord = p.text.toUpperCase();
+                for (var _ti = _tier; _ti >= 0; _ti--) {
+                    var _td = _figGet(_upperWord, _ti);
+                    if (_td && _td.rows) { _figData = _td; _usedTier = _ti; break; }
+                }
+
+                if (_figData) {
+                    // FIGlet mode: render the best available TDF grid
+                    var _cellH = _figAsciiCellH(w);
+                    _figDraw(karaokeCtx, _figData, 0, 0, p.alpha, _bright, _cellH);
+                } else {
+                    // Plain 1×1 text — same font & cell size as ASCII strobe face
+                    var _cellH = _figAsciiCellH(w);
+                    karaokeCtx.font = _cellH + 'px ' + _FIG_FONT_CSS;
+                    karaokeCtx.textAlign = 'center';
+                    karaokeCtx.textBaseline = 'middle';
+                    karaokeCtx.globalAlpha = p.alpha;
+                    karaokeCtx.fillStyle = 'rgba(255,255,255,' + _bright.toFixed(2) + ')';
+                    karaokeCtx.shadowColor = 'rgba(170,170,170,' + (p.alpha * 0.5).toFixed(2) + ')';
+                    karaokeCtx.shadowBlur = 3;
+                    karaokeCtx.fillText(p.text, 0, 0);  // mixed case for DOS feel
+                }
+            } else {
+                // --- Original rendered text ---
+                var scheme = renderState.scheme;
+                var pFont = renderState.fontFamily;
+                karaokeCtx.font = Math.round(fontSize) + 'px ' + pFont;
+                karaokeCtx.textAlign = 'center';
+                karaokeCtx.textBaseline = 'middle';
+                karaokeCtx.shadowColor = scheme.glow;
+                karaokeCtx.shadowBlur = 12 + (1 - p.alpha) * 16;
+                karaokeCtx.globalAlpha = p.alpha;
+                karaokeCtx.fillStyle = scheme.hi;
+                karaokeCtx.fillText(p.text, 0, 0);
+                karaokeCtx.shadowBlur = 0;
+                karaokeCtx.globalAlpha = p.alpha * 0.6;
+                karaokeCtx.fillStyle = scheme.fg;
+                karaokeCtx.fillText(p.text, 1, 1);
+            }
             
             karaokeCtx.restore();
         }
@@ -8984,6 +9461,20 @@
         updateFxHud();
         console.log('[viz] wave head:', waveHeadEnabled ? 'on' : 'off');
         return waveHeadEnabled;
+    }
+
+    function toggleAsciiStrobe() {
+        if (!window.asciiStrobe) return false;
+        var on = window.asciiStrobe.toggle();
+        updateFxHud();
+        return on;
+    }
+
+    function cycleAsciiProfile() {
+        if (!window.asciiStrobe) return;
+        var name = window.asciiStrobe.cycleProfile();
+        updateFxHud();
+        console.log('[viz] ascii profile:', name);
     }
 
     // =========================================================
@@ -9097,7 +9588,9 @@
         toggleLyricMode: toggleLyricMode,
         setLyricMode: setLyricMode,
         toggleLaserEyes: toggleLaserEyes,
-        toggleWaveHead: toggleWaveHead
+        toggleWaveHead: toggleWaveHead,
+        toggleAsciiStrobe: toggleAsciiStrobe,
+        cycleAsciiProfile: cycleAsciiProfile
     };
 
     // =========================================================

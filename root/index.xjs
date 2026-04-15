@@ -444,6 +444,11 @@
             <span class="viz-fx-label">Wave Head</span>
             <span class="viz-fx-value" id="viz-fx-wave">On</span>
         </div>
+        <div class="viz-fx-row">
+            <span class="viz-fx-key">A</span>
+            <span class="viz-fx-label">ASCII Strobe</span>
+            <span class="viz-fx-value" id="viz-fx-ascii">Flash</span>
+        </div>
     </div>
     <!-- Metadata HUD (album art + track info, shown when ID3 data present) -->
     <div id="viz-meta-hud" class="viz-meta-hud" hidden>
@@ -572,6 +577,8 @@
 <script src="./lib/butterchurn.min.js"></script>
 <script src="./lib/butterchurnPresets.min.js"></script>
 <script src="./js/id3parser.js?_v=<? write(time()); ?>"></script>
+<script src="./js/ascii-strobe.js?_v=<? write(time()); ?>"></script>
+<script src="./js/tdf-browser.js?_v=<? write(time()); ?>"></script>
 <script src="./js/visualizer.js?_v=<? write(time()); ?>"></script>
 <div id="chat-toasts"></div>
 
