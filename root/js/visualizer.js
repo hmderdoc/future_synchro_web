@@ -9375,8 +9375,13 @@
                 p.lastTier = _usedTier;  // remember for explosion
 
                 if (_figData) {
-                    // FIGlet mode: render the best available TDF grid
-                    var _cellH = _figAsciiCellH(w);
+                    // FIGlet mode: render the best available TDF grid.
+                    // Apply a gentle scale boost as words age — higher tiers
+                    // (closer to camera) render with slightly larger cells,
+                    // giving the impression of approaching the viewer.
+                    var _baseCellH = _figAsciiCellH(w);
+                    var _tierScale = 1.0 + (_usedTier / (_FIG_TIERS.length - 1)) * 0.3;
+                    var _cellH = Math.round(_baseCellH * _tierScale);
                     _figDraw(karaokeCtx, _figData, 0, 0, p.alpha, _bright, _cellH);
                 } else {
                     // Plain 1×1 text — same font & cell size as ASCII strobe face
