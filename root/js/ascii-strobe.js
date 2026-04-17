@@ -30,8 +30,18 @@
     var RAMP_FULL   = " .'`^\",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
     var RAMP_BLOCK  = ' .\u00b7:+*#\u2593\u2588'; // 9 chars  · ▓ █
 
+    // CP437 high-glyph ramp — shader blocks, box-drawing, and geometric chars
+    // from the same character set TDF fonts are built with
+    var RAMP_CP437  = ' \u00b7\u2591\u2592\u2593\u2580\u2584\u258c\u2590\u2588';
+    //                  ·    ░    ▒    ▓    ▀    ▄    ▌    ▐    █     (10 chars)
+
     var ramp    = RAMP_CLEAN;
     var rampLen = ramp.length;
+
+    // Beat-alternating ramp: swap between user-selected ramp and CP437 each beat
+    var _baseRamp     = RAMP_CLEAN;    // the user's chosen ramp
+    var _altRamp      = RAMP_CP437;    // alternate ramp (CP437 shader blocks)
+    var _useAltRamp   = false;         // toggled each beat
 
     // Target ASCII grid size (cell px derived from canvas size)
     var TARGET_COLS = 110;
@@ -849,6 +859,10 @@
         if (beatDetector && beatDetector.beatCount !== lastBeatCount) {
             lastBeatCount = beatDetector.beatCount;
             triggerStrobe();
+            // Alternate between base ramp and CP437 shader blocks each beat
+            _useAltRamp = !_useAltRamp;
+            ramp    = _useAltRamp ? _altRamp : _baseRamp;
+            rampLen = ramp.length;
         }
 
         updateEnvelope();
@@ -937,10 +951,12 @@
     function getMix()      { return mixValue; }
 
     function setRamp(name) {
-        if (name === 'clean')      { ramp = RAMP_CLEAN; }
-        else if (name === 'full')  { ramp = RAMP_FULL; }
-        else if (name === 'block') { ramp = RAMP_BLOCK; }
+        if (name === 'clean')      { _baseRamp = RAMP_CLEAN; }
+        else if (name === 'full')  { _baseRamp = RAMP_FULL; }
+        else if (name === 'block') { _baseRamp = RAMP_BLOCK; }
+        ramp    = _baseRamp;
         rampLen = ramp.length;
+        _useAltRamp = false;
     }
 
     /* ── Export ──────────────────────────────────────────────── */
