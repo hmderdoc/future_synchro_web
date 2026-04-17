@@ -1086,17 +1086,15 @@
                 analyser.getByteFrequencyData(testData);
                 var sum = 0;
                 for (var i = 0; i < testData.length; i++) sum += testData[i];
-                if (sum > 0 && !document.hidden && audioCtx._lastHealthKick) {
-                    var elapsed = performance.now() - audioCtx._lastHealthKick;
-                    if (elapsed > 30000) {
-                        audioCtx._lastHealthKick = performance.now();
-                        audioCtx.suspend().then(function () {
-                            return audioCtx.resume();
-                        }).catch(function () {});
+                // Health monitor: just track that audio is flowing.
+                // (Removed suspend/resume kick — it caused audible gaps.)
+                if (sum === 0 && audioCtx._lastHealthOk) {
+                    var silent = performance.now() - audioCtx._lastHealthOk;
+                    if (silent > 10000) {
+                        console.warn('[radio] no audio data for ' + Math.round(silent/1000) + 's while playing');
                     }
-                } else if (sum > 0) {
-                    audioCtx._lastHealthKick = performance.now();
                 }
+                if (sum > 0) audioCtx._lastHealthOk = performance.now();
             }, 5000);
 
             if (audioCtx.state === 'suspended') return audioCtx.resume();
