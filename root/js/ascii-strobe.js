@@ -57,8 +57,8 @@
         var l = Math.sqrt(x * x + y * y + z * z);
         return { x: x / l, y: y / l, z: z / l };
     })();
-    var AMBIENT          = 0.08;
-    var DIFFUSE          = 0.50;
+    var AMBIENT          = 0.22;
+    var DIFFUSE          = 0.55;
     var SPECULAR         = 0.22;
     var SPEC_POWER       = 5;
     var FRESNEL_STRENGTH = 0.18;
@@ -798,7 +798,7 @@
                     // Bright wireframe feature (hair, visor, hat, accessories)
                     lum = wireLum;
                     isHead = false;
-                } else if (solidLum > 5) {
+                } else if (solidLum > 2) {
                     lum = solidLum;
                     isHead = true;
                 } else if (wireLum > 8) {
