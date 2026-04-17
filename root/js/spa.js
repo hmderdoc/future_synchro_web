@@ -104,6 +104,8 @@
 
     function refreshSidebar() {
         if (!sidebarEl || sidebarEl.style.display === 'none') return Promise.resolve();
+        // Skip when visualizer or terminal is active — reduce main-thread work
+        if (document.body.classList.contains('viz-open')) return Promise.resolve();
         return fetch('./api/sidebar.ssjs', {
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'SPA' }

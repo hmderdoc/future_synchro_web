@@ -1593,6 +1593,8 @@
     }
 
     function reconcileState(forceUsers) {
+        // Skip when visualizer is active — reduce background work
+        if (!forceUsers && document.body.classList.contains('viz-open')) return;
         return loadRoomSummaries(true).then(function () {
             var work = [
                 loadPrivateThreads(true),

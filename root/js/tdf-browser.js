@@ -46,6 +46,83 @@
              '\u00B0\u2219\u00B7\u221A\u207F\u00B2\u25A0\u00A0';
     for (var i = 0; i < 128; i++) CP437[0x80 + i] = hi.charAt(i);
 
+
+    /* ── IndexedDB font cache ──────────────────────────────────────── */
+    var IDB_NAME    = 'tdf-font-cache';
+    var IDB_VERSION = 1;
+    var IDB_STORE   = 'fonts';
+    var _idb        = null;   // will hold IDBDatabase once opened
+
+    function _openIDB() {
+        return new Promise(function (resolve, reject) {
+            if (_idb) { resolve(_idb); return; }
+            try {
+                var req = indexedDB.open(IDB_NAME, IDB_VERSION);
+                req.onupgradeneeded = function (e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE))
+                        db.createObjectStore(IDB_STORE);
+                };
+                req.onsuccess = function (e) {
+                    _idb = e.target.result;
+                    resolve(_idb);
+                };
+                req.onerror = function () { resolve(null); };
+            } catch (err) { resolve(null); }
+        });
+    }
+
+    function _idbGet(key) {
+        return _openIDB().then(function (db) {
+            if (!db) return null;
+            return new Promise(function (resolve) {
+                try {
+                    var tx  = db.transaction(IDB_STORE, 'readonly');
+                    var st  = tx.objectStore(IDB_STORE);
+                    var req = st.get(key);
+                    req.onsuccess = function () { resolve(req.result || null); };
+                    req.onerror   = function () { resolve(null); };
+                } catch (e) { resolve(null); }
+            });
+        });
+    }
+
+    function _idbPut(key, value) {
+        return _openIDB().then(function (db) {
+            if (!db) return;
+            try {
+                var tx = db.transaction(IDB_STORE, 'readwrite');
+                tx.objectStore(IDB_STORE).put(value, key);
+            } catch (e) { /* silent */ }
+        });
+    }
+
+    /* Bulk-read all cached fonts in one transaction */
+    function _idbGetAll() {
+        return _openIDB().then(function (db) {
+            if (!db) return {};
+            return new Promise(function (resolve) {
+                try {
+                    var tx   = db.transaction(IDB_STORE, 'readonly');
+                    var st   = tx.objectStore(IDB_STORE);
+                    var all  = {};
+                    var req  = st.openCursor();
+                    req.onsuccess = function (e) {
+                        var cursor = e.target.result;
+                        if (cursor) {
+                            all[cursor.key] = cursor.value;
+                            cursor.continue();
+                        } else {
+                            resolve(all);
+                        }
+                    };
+                    req.onerror = function () { resolve({}); };
+                } catch (e) { resolve({}); }
+            });
+        });
+    }
+
+
     /* ── Constants ─────────────────────────────────────────────────── */
     var NUM_CHARS    = 94;
     var CHARLIST     = '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
@@ -55,8 +132,8 @@
     var MAGIC        = [0x13,0x54,0x68,0x65,0x44,0x72,0x61,0x77,0x20,
                         0x46,0x4F,0x4E,0x54,0x53,0x20,0x66,0x69,0x6C,0x65,0x1A];
     var INIT_POOL    = 3;      // fonts per tier loaded before isReady
-    var MAX_POOL     = 18;     // max fonts per tier (background-loaded)
-    var BG_DELAY     = 350;    // ms between background font fetches
+    var MAX_POOL     = Infinity; // no cap — cache every available font
+    var BG_DELAY     = 120;    // ms between background font fetches
 
     /* Outline font char substitution map (from TDF spec) */
     var OL = {};
@@ -248,29 +325,44 @@
 
     /* ── Font loading ──────────────────────────────────────────────── */
 
+    TdfBrowser.prototype._parseB64 = function (b64) {
+        var bin = atob(b64);
+        var buf = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return this.parseFont(buf.buffer);
+    };
+
     TdfBrowser.prototype._fetchFont = function (name) {
         if (this._fonts[name]) return Promise.resolve(this._fonts[name]);
         if (this._loading[name]) return this._loading[name];
         var self = this;
-        var p = fetch(self._serveUrl + '?font=' + encodeURIComponent(name))
-            .then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
-            .then(function (json) {
-                var bin = atob(json.b64);
-                var buf = new Uint8Array(bin.length);
-                for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-                var font = self.parseFont(buf.buffer);
+        var p = _idbGet(name).then(function (cached) {
+            if (cached) {
+                // Parse from cached b64 — no network needed
+                var font = self._parseB64(cached);
                 self._fonts[name] = font;
                 delete self._loading[name];
                 return font;
-            })
-            .catch(function (err) {
-                console.warn('[tdf] load failed:', name, String(err));
-                delete self._loading[name];
-                return null;
-            });
+            }
+            // Cache miss — fetch from server
+            return fetch(self._serveUrl + '?font=' + encodeURIComponent(name))
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (json) {
+                    var font = self._parseB64(json.b64);
+                    self._fonts[name] = font;
+                    // Persist to IndexedDB for next visit
+                    _idbPut(name, json.b64);
+                    delete self._loading[name];
+                    return font;
+                });
+        }).catch(function (err) {
+            console.warn('[tdf] load failed:', name, String(err));
+            delete self._loading[name];
+            return null;
+        });
         self._loading[name] = p;
         return p;
     };
@@ -291,22 +383,52 @@
 
     TdfBrowser.prototype.init = function () {
         var self = this;
-        return fetch(self._serveUrl + '?map')
-            .then(function (r) {
+        // Phase 1: fetch font map + bulk-restore from IndexedDB
+        return Promise.all([
+            fetch(self._serveUrl + '?map').then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
-            })
-            .then(function (map) {
-                self._fontMap = map;
-                var proms = [];
+            }),
+            _idbGetAll()
+        ]).then(function (results) {
+            var map    = results[0];
+            var cached = results[1];
+            self._fontMap = map;
+
+            // Parse all cached fonts first (synchronous, no network)
+            var cacheHits = 0;
+            for (var name in cached) {
+                try {
+                    self._fonts[name] = self._parseB64(cached[name]);
+                    cacheHits++;
+                } catch (e) { /* corrupt entry, will re-fetch */ }
+            }
+
+            // Build tier pools from whatever is already cached
+            for (var h = 3; h <= 12; h++) {
+                var pool = map[String(h)];
+                if (!pool || !pool.length) continue;
+                self._tierPool[h]   = [];
+                self._tierLoaded[h] = {};
+                for (var i = 0; i < pool.length; i++) {
+                    var name = pool[i];
+                    if (self._fonts[name]) {
+                        self._tierPool[h].push(name);
+                        self._tierLoaded[h][name] = true;
+                    }
+                }
+            }
+
+            // If cache was mostly empty, fetch INIT_POOL per tier to be usable quickly
+            var proms = [];
+            if (cacheHits < 30) {
                 for (var h = 3; h <= 12; h++) {
                     var pool = map[String(h)];
                     if (!pool || !pool.length) continue;
-                    self._tierPool[h]   = [];
-                    self._tierLoaded[h] = {};
                     var picks = _pickN(pool, INIT_POOL);
                     for (var pi = 0; pi < picks.length; pi++) {
                         var name = picks[pi];
+                        if (self._tierLoaded[h][name]) continue;
                         self._tierLoaded[h][name] = true;
                         (function (hh, nn) {
                             proms.push(
@@ -317,25 +439,34 @@
                         })(h, name);
                     }
                 }
-                return Promise.all(proms);
-            })
-            .then(function () {
-                self._ready = true;
-                var summary = {};
-                for (var h in self._tierPool) summary[h] = self._tierPool[h].length;
-                console.log('[tdf] ready — pool sizes:', JSON.stringify(summary));
-                // Start background loading to grow pools
-                self._bgLoad();
-            })
-            .catch(function (err) {
-                console.error('[tdf] init failed:', String(err));
-            });
+            }
+            return Promise.all(proms).then(function () { return cacheHits; });
+        }).then(function (cacheHits) {
+            self._ready = true;
+            var summary = {};
+            var total   = 0;
+            for (var h in self._tierPool) {
+                summary[h] = self._tierPool[h].length;
+                total += self._tierPool[h].length;
+            }
+            console.log('[tdf] ready — ' + total + ' fonts (' + cacheHits +
+                        ' from cache) — pool sizes:', JSON.stringify(summary));
+            // Background-load remaining fonts into pools
+            self._bgLoad();
+        }).catch(function (err) {
+            console.error('[tdf] init failed:', String(err));
+        });
     };
 
     /* ── Background loader: grow each tier's pool to MAX_POOL ──────── */
 
     TdfBrowser.prototype._bgLoad = function () {
         var self = this;
+        // Defer if visualizer is active — avoid network contention during playback
+        if (document.body.classList.contains('viz-open')) {
+            setTimeout(function () { self._bgLoad(); }, 2000);
+            return;
+        }
         // Find a tier that still needs more fonts
         var candidates = [];
         for (var h = 3; h <= 12; h++) {
