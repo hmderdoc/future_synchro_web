@@ -33,7 +33,7 @@
     // CP437 high-glyph ramp — shader blocks, box-drawing, and geometric chars
     // from the same character set TDF fonts are built with
     var RAMP_CP437  = ' \u00b7\u2591\u2592\u2593\u2580\u2584\u258c\u2590\u2588';
-    //                  ·    ░    ▒    ▓    ▀    ▄    ▌    ▐    █     (10 chars)
+    //                  .    ░    ▒    ▓    █     (5 chars)
 
     var ramp    = RAMP_CLEAN;
     var rampLen = ramp.length;
