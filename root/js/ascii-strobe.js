@@ -32,7 +32,7 @@
 
     // CP437 high-glyph ramp — shader blocks, box-drawing, and geometric chars
     // from the same character set TDF fonts are built with
-    var RAMP_CP437  = ' \u00b7\u2591\u2592\u2593\u2580\u2584\u258c\u2590\u2588';
+    var RAMP_CP437  = ' .░▒▓█';              // 6 chars: space . ░ ▒ ▓ █
     //                  .    ░    ▒    ▓    █     (5 chars)
 
     var ramp    = RAMP_CLEAN;
@@ -452,7 +452,7 @@
      *  head and body regions, preventing glow/shadowBlur bleed artifacts.
      * ================================================================ */
 
-    var MASK_PAD_CELLS = 0.6;  // padding in grid cells around the silhouette
+    var MASK_PAD_CELLS = 0.0;  // no padding — strobe only on actual surface
 
     function _projectPt(ps, x, y, z) {
         // Minimal projectHeadPoint clone — avoids cross-file dependency
@@ -838,14 +838,7 @@
             }
         }
 
-        // Phosphor glow
-        if (mixValue > 0.25) {
-            asciiCtx.save();
-            asciiCtx.globalAlpha = 0.14 * mixValue;
-            asciiCtx.filter = 'blur(3px)';
-            asciiCtx.drawImage(asciiCanvas, 0, 0);
-            asciiCtx.restore();
-        }
+        // Phosphor glow removed — strobe should only light actual surface
     }
 
     /* ================================================================
