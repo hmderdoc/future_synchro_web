@@ -384,7 +384,7 @@
         }
 
         // Deep black for cavities
-        solidCtx.fillStyle = 'rgb(2,2,2)';
+        solidCtx.fillStyle = 'rgb(18,18,18)';
 
         // Eye sockets
         var eR = (ch.eyes.left.r || 0.08) * S * 2.0;
@@ -796,10 +796,10 @@
                     // Bright wireframe feature (hair, visor, hat, accessories)
                     lum = wireLum;
                     isHead = false;
-                } else if (solidLum > 2) {
+                } else if (solidLum > 0) {
                     lum = solidLum;
                     isHead = true;
-                } else if (wireLum > 8) {
+                } else if (wireLum > 3) {
                     lum = wireLum;
                     isHead = false;
                 } else {
