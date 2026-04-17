@@ -509,11 +509,7 @@
             // Lathe head: walk profile Y range and project screen bounds per row
             var yMin = profile[0][1] * pulse;
             var yMax = profile[profile.length - 1][1] * pulse;
-            // Extend range for hair that hangs below chin or sweeps above top
-            if (char.hair && char.hair.length > 0) {
-                yMin -= 0.15 * pulse;
-                yMax += 0.12 * pulse;
-            }
+            // Hair is rendered via wireframe; no Y extension needed for mask
             var STEPS = 40;  // sample head at 40 height slices for accuracy
             // Build an array of screen-space horizontal extents
             var headSpans = [];  // {screenY, screenLeft, screenRight}
@@ -521,8 +517,7 @@
                 var localY = yMin + (yMax - yMin) * (s / STEPS);
                 var r = _getProfileRadius(profile, localY / pulse) * pulse;
                 if (r < 0.001) r = 0.02;  // thin tip still needs a sliver of coverage
-                // Widen mask where hair extends beyond skull surface
-                if (char.hair && char.hair.length > 0) r *= 1.25;
+                // Hair extent is handled by wireframe, not the geometric mask
                 // Project leftmost and rightmost points at this Y
                 // At head rotation, the widest visible extent is at x=+/-r, z=0
                 // But we also need to check x=0, z=+/-r for front/back thickness
@@ -778,7 +773,10 @@
                 var hsy = Math.floor(((row + 0.5) / rows) * SOLID_H);
                 if (hsx >= SOLID_W) hsx = SOLID_W - 1;
                 if (hsy >= SOLID_H) hsy = SOLID_H - 1;
-                solidLum = sPx[(hsy * SOLID_W + hsx) * 4]; // R channel (grayscale)
+                var sPxIdx = (hsy * SOLID_W + hsx) * 4;
+                // Use alpha to confirm renderer actually painted this pixel;
+                // unpainted pixels are transparent after clearRect.
+                solidLum = sPx[sPxIdx + 3] > 0 ? sPx[sPxIdx] : 0;
 
                 // --- Source B: wireframe luminance (body / accessories) ---
                 var wireLum = 0;
