@@ -42,15 +42,16 @@
 
     // Lighting (in camera / eye space)
     var LIGHT = (function () {
-        var x = 0.30, y = -0.50, z = -0.90;
+        // Light from the viewer's position — like a projector beam
+        var x = 0.10, y = 0.25, z = 0.96;
         var l = Math.sqrt(x * x + y * y + z * z);
         return { x: x / l, y: y / l, z: z / l };
     })();
-    var AMBIENT          = 0.06;
-    var DIFFUSE          = 0.68;
-    var SPECULAR         = 0.38;
+    var AMBIENT          = 0.08;
+    var DIFFUSE          = 0.50;
+    var SPECULAR         = 0.22;
     var SPEC_POWER       = 5;
-    var FRESNEL_STRENGTH = 0.30;
+    var FRESNEL_STRENGTH = 0.18;
     var SCANLINE_DIM     = 0.88;   // odd rows get multiplied by this
 
     // Strobe profiles  { attack, hold, decay } in ms
@@ -128,10 +129,10 @@
 
         // Offscreen for wireframe body capture
         bodyOffscreen = document.createElement('canvas');
-        bodyOffCtx = bodyOffscreen.getContext('2d');
+        bodyOffCtx = bodyOffscreen.getContext('2d', { willReadFrequently: true });
         solidCanvas.width  = SOLID_W;
         solidCanvas.height = SOLID_H;
-        solidCtx = solidCanvas.getContext('2d');
+        solidCtx = solidCanvas.getContext('2d', { willReadFrequently: true });
 
         resize(wireCanvas.width, wireCanvas.height);
     }
@@ -436,10 +437,296 @@
     }
 
     /* ================================================================
+     *  GEOMETRIC SILHOUETTE MASK
+     *  Constrains ASCII characters to only appear inside the character's
+     *  head and body regions, preventing glow/shadowBlur bleed artifacts.
+     * ================================================================ */
+
+    var MASK_PAD_CELLS = 0.6;  // padding in grid cells around the silhouette
+
+    function _projectPt(ps, x, y, z) {
+        // Minimal projectHeadPoint clone — avoids cross-file dependency
+        var rx  = x * ps.cosY - z * ps.sinY;
+        var rz  = x * ps.sinY + z * ps.cosY;
+        var ry2 = y * ps.cosX - rz * ps.sinX;
+        var rz2 = y * ps.sinX + rz * ps.cosX;
+        var d   = ps.fl / (ps.fl + rz2);
+        var S   = ps.scale * (ps.pulse || 1);
+        return { x: ps.cx + rx * S * d, y: ps.cy - ry2 * S * d };
+    }
+
+    function _getProfileRadius(profile, y) {
+        // Interpolate head radius at local y — clone of visualizer's getHeadRadius
+        if (!profile || profile.length < 2) return 0;
+        var first = profile[0], last = profile[profile.length - 1];
+        if (y <= first[1]) return first[0];
+        if (y >= last[1])  return last[0];
+        for (var i = 0; i < profile.length - 1; i++) {
+            var ay = profile[i][1], by = profile[i + 1][1];
+            if (y >= ay && y <= by) {
+                var f = (by === ay) ? 0 : (y - ay) / (by - ay);
+                return profile[i][0] + (profile[i + 1][0] - profile[i][0]) * f;
+            }
+        }
+        return 0;
+    }
+
+    function buildSilhouetteMask(char, ps) {
+        // Returns a Uint8Array of cols*rows, 1 = inside silhouette, 0 = outside
+        // Returns null for wireframe-only shapes (metatronscube etc.) to skip masking
+        if (!ps || cols < 2 || rows < 2) return null;
+
+        var profile = char.profile;
+        var box = char.boxDims;
+        var hasHead = (profile && profile.length >= 2) || box;
+        var hasBody = char.body && char.body.skeleton;
+        if (!hasHead && !hasBody) return null;  // wireframe-only → no mask
+
+        // Reuse mask buffer to reduce GC pressure
+        if (!buildSilhouetteMask._buf || buildSilhouetteMask._buf.length !== cols * rows) {
+            buildSilhouetteMask._buf = new Uint8Array(cols * rows);
+        }
+        var mask = buildSilhouetteMask._buf;
+        mask.fill(0);
+        var W = cols * cellW, H = rows * cellH;
+        var padX = MASK_PAD_CELLS * cellW;
+        var padY = MASK_PAD_CELLS * cellH;
+        var pulse = ps.pulse || 1;
+
+        // ---- HEAD SILHOUETTE ----
+
+        if (profile && profile.length >= 2) {
+            // Lathe head: walk profile Y range and project screen bounds per row
+            var yMin = profile[0][1] * pulse;
+            var yMax = profile[profile.length - 1][1] * pulse;
+            // Extend range for hair that hangs below chin or sweeps above top
+            if (char.hair && char.hair.length > 0) {
+                yMin -= 0.15 * pulse;
+                yMax += 0.12 * pulse;
+            }
+            var STEPS = 40;  // sample head at 40 height slices for accuracy
+            // Build an array of screen-space horizontal extents
+            var headSpans = [];  // {screenY, screenLeft, screenRight}
+            for (var s = 0; s <= STEPS; s++) {
+                var localY = yMin + (yMax - yMin) * (s / STEPS);
+                var r = _getProfileRadius(profile, localY / pulse) * pulse;
+                if (r < 0.001) r = 0.02;  // thin tip still needs a sliver of coverage
+                // Widen mask where hair extends beyond skull surface
+                if (char.hair && char.hair.length > 0) r *= 1.25;
+                // Project leftmost and rightmost points at this Y
+                // At head rotation, the widest visible extent is at x=+/-r, z=0
+                // But we also need to check x=0, z=+/-r for front/back thickness
+                // Take the max screen extent from ring samples
+                var minSX = Infinity, maxSX = -Infinity, screenY = 0;
+                var RING_SAMPLES = 8;
+                for (var rs = 0; rs < RING_SAMPLES; rs++) {
+                    var a = (rs / RING_SAMPLES) * 6.2831853;
+                    var px = r * Math.cos(a);
+                    var pz = r * Math.sin(a);
+                    var pt = _projectPt(ps, px, localY, pz);
+                    if (pt.x < minSX) minSX = pt.x;
+                    if (pt.x > maxSX) maxSX = pt.x;
+                    screenY = pt.y;  // Y is the same for all ring samples (same localY)
+                }
+                headSpans.push({ y: screenY, l: minSX - padX, r: maxSX + padX });
+            }
+            // For each ASCII grid row, find head column bounds by interpolating spans
+            for (var row = 0; row < rows; row++) {
+                var cy = row * cellH + cellH * 0.5;
+                // Find the two spans bracketing this screen Y
+                var spanL = -1, spanR = -1;
+                for (var i = 0; i < headSpans.length - 1; i++) {
+                    var a = headSpans[i], b = headSpans[i + 1];
+                    // headSpans Y may not be monotonic due to rotation, so check if cy is between
+                    var minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y);
+                    if (cy >= minY - padY && cy <= maxY + padY) {
+                        var f = (maxY === minY) ? 0.5 : (cy - a.y) / (b.y - a.y);
+                        f = Math.max(0, Math.min(1, f));
+                        var iL = a.l + (b.l - a.l) * f;
+                        var iR = a.r + (b.r - a.r) * f;
+                        if (spanL < 0 || iL < spanL) spanL = iL;
+                        if (spanR < 0 || iR > spanR) spanR = iR;
+                    }
+                }
+                if (spanL >= 0 && spanR >= 0) {
+                    var colStart = Math.max(0, Math.floor(spanL / cellW));
+                    var colEnd   = Math.min(cols - 1, Math.ceil(spanR / cellW));
+                    for (var c = colStart; c <= colEnd; c++) {
+                        mask[row * cols + c] = 1;
+                    }
+                }
+            }
+        } else if (box) {
+            // Box head: project 8 corners, find screen bounding box
+            var bw = box.w * pulse, bh = box.h * pulse, bd = (box.d || 0.28) * pulse;
+            var corners = [
+                [-bw, 0, -bd], [bw, 0, -bd], [-bw, 0, bd], [bw, 0, bd],
+                [-bw, -bh, -bd], [bw, -bh, -bd], [-bw, -bh, bd], [bw, -bh, bd]
+            ];
+            var minSX = Infinity, maxSX = -Infinity, minSY = Infinity, maxSY = -Infinity;
+            for (var i = 0; i < 8; i++) {
+                var pt = _projectPt(ps, corners[i][0], corners[i][1], corners[i][2]);
+                if (pt.x < minSX) minSX = pt.x;
+                if (pt.x > maxSX) maxSX = pt.x;
+                if (pt.y < minSY) minSY = pt.y;
+                if (pt.y > maxSY) maxSY = pt.y;
+            }
+            minSX -= padX; maxSX += padX;
+            minSY -= padY; maxSY += padY;
+            var rowStart = Math.max(0, Math.floor(minSY / cellH));
+            var rowEnd   = Math.min(rows - 1, Math.ceil(maxSY / cellH));
+            var colStart = Math.max(0, Math.floor(minSX / cellW));
+            var colEnd   = Math.min(cols - 1, Math.ceil(maxSX / cellW));
+            for (var row = rowStart; row <= rowEnd; row++) {
+                for (var c = colStart; c <= colEnd; c++) {
+                    mask[row * cols + c] = 1;
+                }
+            }
+        }
+
+        // ---- HAT SILHOUETTE ----
+        if (char.hat && profile && profile.length >= 2) {
+            var topY = profile[profile.length - 1][1];
+            var hatExtra = 0, hatRadMul = 1.0;
+            if (char.hat.type === 'cowboy') {
+                hatExtra = 0.30; hatRadMul = 1.8;
+            } else if (char.hat.type === 'baseballcap') {
+                hatExtra = 0.20; hatRadMul = 1.3;
+            } else if (char.hat.type === 'afro') {
+                hatExtra = (char.hat.height || 0.50) + 0.10;
+                hatRadMul = (char.hat.radiusX || 0.68) / 0.50 + 0.15;
+            } else {
+                hatExtra = 0.25; hatRadMul = 1.2;
+            }
+            // Extend mask upward from head top through hat region
+            var hatTopY = (topY + hatExtra) * pulse;
+            var hatBotY = (topY - 0.05) * pulse;  // overlap with head top
+            var topR = _getProfileRadius(profile, topY) * pulse;
+            var HAT_STEPS = 12;
+            var hatSpans = [];
+            for (var hs = 0; hs <= HAT_STEPS; hs++) {
+                var localY = hatBotY + (hatTopY - hatBotY) * (hs / HAT_STEPS);
+                // Hat radius: starts at head top radius, widens by hatRadMul
+                var t01 = hs / HAT_STEPS;
+                var hatR = topR * (1.0 + (hatRadMul - 1.0) * Math.min(1, t01 * 2));
+                var minSX = Infinity, maxSX = -Infinity, screenY = 0;
+                for (var rs = 0; rs < 8; rs++) {
+                    var a = (rs / 8) * 6.2831853;
+                    var pt = _projectPt(ps, hatR * Math.cos(a), localY, hatR * Math.sin(a));
+                    if (pt.x < minSX) minSX = pt.x;
+                    if (pt.x > maxSX) maxSX = pt.x;
+                    screenY = pt.y;
+                }
+                hatSpans.push({ y: screenY, l: minSX - padX, r: maxSX + padX });
+            }
+            for (var row = 0; row < rows; row++) {
+                var cy = row * cellH + cellH * 0.5;
+                var spanL = -1, spanR = -1;
+                for (var i = 0; i < hatSpans.length - 1; i++) {
+                    var a = hatSpans[i], b = hatSpans[i + 1];
+                    var minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y);
+                    if (cy >= minY - padY && cy <= maxY + padY) {
+                        var f = (maxY === minY) ? 0.5 : (cy - a.y) / (b.y - a.y);
+                        f = Math.max(0, Math.min(1, f));
+                        var iL = a.l + (b.l - a.l) * f;
+                        var iR = a.r + (b.r - a.r) * f;
+                        if (spanL < 0 || iL < spanL) spanL = iL;
+                        if (spanR < 0 || iR > spanR) spanR = iR;
+                    }
+                }
+                if (spanL >= 0 && spanR >= 0) {
+                    var colStart = Math.max(0, Math.floor(spanL / cellW));
+                    var colEnd = Math.min(cols - 1, Math.ceil(spanR / cellW));
+                    for (var c = colStart; c <= colEnd; c++) {
+                        mask[row * cols + c] = 1;
+                    }
+                }
+            }
+        }
+
+        // ---- BODY SILHOUETTE ----
+        var body = char.body;
+        if (body && body.skeleton) {
+            var skel = body.skeleton;
+            var chinY = box ? -(box.h * pulse + 0.06) : -0.80;
+            var neckPt = _projectPt(ps, 0, chinY, 0);
+            var bOriginX = neckPt.x;
+            var bOriginY = neckPt.y;
+            var bScale = ps.scale * pulse * 0.52;
+
+            // Project all skeleton joints to screen space
+            var jScreen = {};
+            for (var jn in skel) {
+                var j = skel[jn];
+                jScreen[jn] = {
+                    x: bOriginX + j.x * bScale,
+                    y: bOriginY + j.y * bScale
+                };
+            }
+
+            // Build body outline polygon from key joints
+            // Left side down, right side up — forms a closed polygon
+            var outline = [];
+            var jointOrder = [
+                'neck', 'shoulderL', 'elbowL', 'handL',
+                'hipL', 'kneeL', 'footL',
+                'footR', 'kneeR', 'hipR',
+                'handR', 'elbowR', 'shoulderR'
+            ];
+            for (var ji = 0; ji < jointOrder.length; ji++) {
+                var jp = jScreen[jointOrder[ji]];
+                if (jp) outline.push(jp);
+            }
+
+            if (outline.length >= 3) {
+                // Find bounding box of body polygon for efficient row scanning
+                var bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
+                for (var i = 0; i < outline.length; i++) {
+                    if (outline[i].x < bMinX) bMinX = outline[i].x;
+                    if (outline[i].x > bMaxX) bMaxX = outline[i].x;
+                    if (outline[i].y < bMinY) bMinY = outline[i].y;
+                    if (outline[i].y > bMaxY) bMaxY = outline[i].y;
+                }
+                bMinX -= padX; bMaxX += padX;
+                bMinY -= padY; bMaxY += padY;
+
+                var rStart = Math.max(0, Math.floor(bMinY / cellH));
+                var rEnd   = Math.min(rows - 1, Math.ceil(bMaxY / cellH));
+
+                for (var row = rStart; row <= rEnd; row++) {
+                    var cy = row * cellH + cellH * 0.5;
+                    // Ray-cast to find x-intersections at this screen Y (with padding)
+                    var xHits = [];
+                    var n = outline.length;
+                    for (var i = 0; i < n; i++) {
+                        var a = outline[i], b = outline[(i + 1) % n];
+                        var ay = a.y, by = b.y;
+                        if ((ay <= cy && by > cy) || (by <= cy && ay > cy)) {
+                            var f = (cy - ay) / (by - ay);
+                            xHits.push(a.x + (b.x - a.x) * f);
+                        }
+                    }
+                    xHits.sort(function(a, b) { return a - b; });
+                    // Fill pairs
+                    for (var h = 0; h + 1 < xHits.length; h += 2) {
+                        var colStart = Math.max(0, Math.floor((xHits[h] - padX) / cellW));
+                        var colEnd   = Math.min(cols - 1, Math.ceil((xHits[h + 1] + padX) / cellW));
+                        for (var c = colStart; c <= colEnd; c++) {
+                            mask[row * cols + c] = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        return mask;
+    }
+
+    /* ================================================================
      *  COMPOSITE  →  ASCII CHARACTERS  (solid head + wireframe body)
      * ================================================================ */
 
-    function compositeToAscii(bass, wireRGB) {
+    function compositeToAscii(bass, wireRGB, silhouetteMask) {
         if (!solidCtx || !asciiCtx || cols < 2 || rows < 2) return;
 
         // Source A: the volumetric solid render (head)
@@ -472,6 +759,9 @@
 
             for (var col = 0; col < cols; col++) {
 
+                // --- Geometric mask: skip cells outside character silhouette ---
+                if (silhouetteMask && !silhouetteMask[row * cols + col]) continue;
+
                 // --- Source A: solid head luminance ---
                 var solidLum = 0;
                 var hsx = Math.floor(((col + 0.5) / cols) * SOLID_W);
@@ -490,9 +780,15 @@
                     wireLum = (0.299 * wireR + 0.587 * wireG + 0.114 * wireB) * (wireA / 255);
                 }
 
-                // --- Composite: solid head takes priority, wireframe fills the rest ---
+                // --- Composite: blend solid head and wireframe ---
+                // Wireframe wins when brighter (hair, eyelashes, visor, hats
+                // are drawn ON TOP of the head and should keep their color)
                 var lum, isHead;
-                if (solidLum > 5) {
+                if (wireLum > 30 && wireLum > solidLum * 0.8) {
+                    // Bright wireframe feature (hair, visor, hat, accessories)
+                    lum = wireLum;
+                    isHead = false;
+                } else if (solidLum > 5) {
                     lum = solidLum;
                     isHead = true;
                 } else if (wireLum > 8) {
@@ -559,7 +855,7 @@
 
         // Base mix: always show ASCII at BASE_MIX when enabled,
         // strobe envelope adds extra intensity on beats
-        var BASE_MIX = 0.92;
+        var BASE_MIX = 0.62;
         var strobeMix = mixValue;           // 0-1 from envelope
         mixValue = BASE_MIX + (1.0 - BASE_MIX) * strobeMix;
 
@@ -590,6 +886,7 @@
                 renderSolid(faces, projState);
                 renderCavities(activeChar, projState, mOpen);
                 hasSolid = true;
+
             }
         }
 
@@ -599,11 +896,12 @@
         }
 
         // Convert to ASCII (volumetric head where available + wireframe everywhere else)
-        compositeToAscii(bass, activeChar.wireRGB);
+        var silMask = buildSilhouetteMask(activeChar, projState);
+        compositeToAscii(bass, activeChar.wireRGB, silMask);
 
         // Cross-fade: show ASCII, dim wireframe
         asciiCanvas.style.opacity = mixValue;
-        if (wireCanvasRef) wireCanvasRef.style.opacity = 1 - mixValue * 0.75;
+        if (wireCanvasRef) wireCanvasRef.style.opacity = 1 - mixValue * 0.35;
     }
 
     /* ================================================================
