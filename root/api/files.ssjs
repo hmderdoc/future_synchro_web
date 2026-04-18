@@ -809,6 +809,62 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 					: 'Could not update track metadata';
 			}
 			break;
+		case 'delete-track':
+			var ddir = request.get_param('dir');
+			if (http_request.method !== 'POST') {
+				reply.error = 'POST required';
+				break;
+			}
+			if (!validateCsrfToken()) {
+				reply.error = 'Invalid CSRF token';
+				break;
+			}
+			if (ddir === undefined
+				|| file_area.dir[ddir] === undefined
+				|| !file_area.dir[ddir].can_download
+				|| !user.compare_ars(file_area.dir[ddir].download_ars)
+				) {
+				reply.error = 'Invalid directory or access denied';
+				break;
+			}
+
+			var delFile = trimText(getRequestValue('file', ''));
+			if (!delFile.length) {
+				reply.error = 'Track file is required';
+				break;
+			}
+
+			var delRecord = findFileRecord(ddir, delFile);
+			if (!delRecord || !delRecord.path) {
+				reply.error = 'File not found';
+				break;
+			}
+
+			var delOverrides = copyTags(loadTrackOverrides()[trackOverrideSection(delRecord.name)] || {});
+			if (!canUserEditTrackMeta(delRecord, delOverrides)) {
+				reply.error = 'Composer or sysop access required';
+				break;
+			}
+
+			try {
+				var delBase = new FileBase(ddir);
+				if (!delBase.open()) throw new Error('Could not open file base');
+				var delOk = delBase.remove(delRecord.name, true);
+				delBase.close();
+				if (!delOk) throw new Error('FileBase remove failed');
+				var delLrc = lyricPathFor(delRecord.path);
+				var delChar = charPathFor(delRecord.path);
+				if (file_exists(delLrc)) file_remove(delLrc);
+				if (file_exists(delChar)) file_remove(delChar);
+				writeTrackOverride(delRecord.name, {});
+				reply = { success: true, deleted: delRecord.name };
+			} catch (delErr) {
+				log(LOG_ERR, 'files.ssjs delete-track error: ' + delErr);
+				reply.error = delErr && delErr.message
+					? String(delErr.message)
+					: 'Could not delete track';
+			}
+			break;
 		default:
 			break;
 	}

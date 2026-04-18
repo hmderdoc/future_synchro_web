@@ -1930,6 +1930,10 @@
 .tm-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .tm-action-btn.tm-accent { border-color: #55FF55; color: #55FF55; }
 .tm-action-btn.tm-accent:hover { background: #55FF55; color: #000; }
+.tm-action-btn.tm-danger { border-color: #FF4444; color: #FF4444; }
+.tm-action-btn.tm-danger:hover { background: #FF4444; color: #000; }
+.tm-action-btn.tm-danger.tm-confirm { border-color: #FF8800; color: #FF8800; animation: tm-pulse 0.6s infinite; }
+@keyframes tm-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 @media (max-width: 600px) {
     .tm-detail { flex-direction: column; align-items: center; text-align: center; }
     .tm-detail-actions { flex-direction: row; }
@@ -1984,6 +1988,7 @@
                 <button type="button" class="tm-action-btn" id="tm-btn-preview" disabled>&#127911; Preview Character</button>
                 <button type="button" class="tm-action-btn tm-accent" id="tm-btn-assign" disabled>🎭 Assign Character</button>
                 <button type="button" class="tm-action-btn" id="tm-btn-edit" disabled>✏️ Edit Metadata</button>
+                <button type="button" class="tm-action-btn tm-danger" id="tm-btn-delete" disabled>🗑 Delete Track</button>
             </div>
         </div>
     </div>
@@ -2007,6 +2012,7 @@
     var previewBtn  = document.getElementById('tm-btn-preview');
     var assignBtn   = document.getElementById('tm-btn-assign');
     var editBtn     = document.getElementById('tm-btn-edit');
+    var deleteBtn   = document.getElementById('tm-btn-delete');
 
     var myTracks = [];
     var hlIndex  = -1;
@@ -2167,9 +2173,22 @@
         searchInput.value = trackTitle(track);
         showDetail(track);
         previewBtn.disabled = false;
-        previewBtn.disabled = false;
-        assignBtn.disabled = false;
         editBtn.disabled = false;
+
+        // Assign: only if the currently-playing track has this user as composer
+        var playingTags = window.sbbsRadio ? window.sbbsRadio.currentTrackTags : {};
+        var playingComposer = String(playingTags.composer || '').toLowerCase();
+        var isMyPlaying = playingComposer === COMPOSER.toLowerCase() && playingComposer.length > 0;
+        assignBtn.disabled = !isMyPlaying;
+        assignBtn.title = isMyPlaying ? '' : 'You can only assign characters to your own tracks while they are playing';
+
+        // Delete: enabled for composer's own tracks (regardless of what's playing)
+        var trackComp = trackComposer(track).toLowerCase();
+        var canDelete = trackComp === COMPOSER.toLowerCase() && trackComp.length > 0;
+        deleteBtn.disabled = !canDelete;
+        deleteBtn.classList.remove('tm-confirm');
+        deleteBtn.textContent = '🗑 Delete Track';
+        deleteBtn._confirmPending = false;
     }
 
     function showDetail(track) {
@@ -4243,5 +4262,66 @@
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', function () {
         setPreviewOpen(false);
     });
+
+    // Delete Track: two-click confirmation, then remove from file area
+    deleteBtn.addEventListener('click', function () {
+        if (!selectedTrack) return;
+        if (!deleteBtn._confirmPending) {
+            deleteBtn._confirmPending = true;
+            deleteBtn.classList.add('tm-confirm');
+            deleteBtn.textContent = '⚠ Confirm Delete?';
+            setTimeout(function () {
+                if (deleteBtn._confirmPending) {
+                    deleteBtn._confirmPending = false;
+                    deleteBtn.classList.remove('tm-confirm');
+                    deleteBtn.textContent = '🗑 Delete Track';
+                }
+            }, 4000);
+            return;
+        }
+        deleteBtn._confirmPending = false;
+        deleteBtn.classList.remove('tm-confirm');
+        var radio = window.sbbsRadio;
+        if (!radio) return;
+        var csrfToken = (window.sbbsConfig && window.sbbsConfig.csrfToken)
+            ? String(window.sbbsConfig.csrfToken) : '';
+        var body = new URLSearchParams();
+        body.set('file', selectedTrack.name);
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting…';
+        fetch('./api/files.ssjs?call=delete-track&dir=' + encodeURIComponent(radio.dirCode), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data && data.error) throw new Error(data.error);
+            var delName = selectedTrack.name;
+            myTracks = myTracks.filter(function (t) { return t.name !== delName; });
+            selectedTrack = null;
+            deleteBtn.textContent = '✅ Deleted';
+            setTimeout(function () {
+                detailEl.style.display = 'none';
+                emptyEl.style.display = '';
+                searchInput.value = '';
+                previewBtn.disabled = true;
+                assignBtn.disabled = true;
+                editBtn.disabled = true;
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = '🗑 Delete Track';
+            }, 1500);
+        })
+        .catch(function (err) {
+            alert('Could not delete track: ' + (err.message || err));
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = '🗑 Delete Track';
+        });
+    });
+
 })();
 </script>
