@@ -520,8 +520,8 @@
             profile: null,
             ringN: 0,
             eyes: {
-                left:  { x: -0.15, y: 0.12, z: 0.28, r: 0.075 },
-                right: { x:  0.15, y: 0.12, z: 0.28, r: 0.075 }
+                left:  { x: -0.15, y: 0.12, z: -0.28, r: 0.075 },
+                right: { x:  0.15, y: 0.12, z: -0.28, r: 0.075 }
             },
             mascara: true,
             eyeColor: { hex: '#55FF55', rgb: '85,255,85' },
@@ -537,7 +537,7 @@
                 bottom: true
             },
             // Drive slot mouth — wide rectangular opening
-            mouth: { y: -0.12, hw: 0.36, z: 0.28, segs: 2,
+            mouth: { y: -0.12, hw: 0.36, z: -0.28, segs: 2,
                      teeth: false, slot: true },
             nose: null,
             wireColor: '#AAAAAA',
@@ -621,8 +621,8 @@
             ringN: 0,
             eyes: {
                 // Eyes sit on the label area of the front face
-                left:  { x: -0.10, y: -0.02, z: 0.06, r: 0.055 },
-                right: { x:  0.10, y: -0.02, z: 0.06, r: 0.055 }
+                left:  { x: -0.10, y: -0.02, z: -0.06, r: 0.055 },
+                right: { x:  0.10, y: -0.02, z: -0.06, r: 0.055 }
             },
             eyeColor: { hex: '#000000', rgb: '0,0,0' },
             eyeOutlineColor: { hex: '#111155', rgb: '17,17,85' },
@@ -630,7 +630,7 @@
             mascara: false,
             eyelashes: null,
             // Smiley mouth — small happy curve on the label
-            mouth: { y: -0.16, hw: 0.12, z: 0.06, segs: 8,
+            mouth: { y: -0.16, hw: 0.12, z: -0.06, segs: 8,
                      teeth: false, smiley: true },
             nose: null,
             wireColor: '#5555FF',
