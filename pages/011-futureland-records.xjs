@@ -2314,6 +2314,66 @@
             radio.openLibraryPanel();
         }
     });
+
+    // Delete Track: two-click confirmation, then remove from file area
+    deleteBtn.addEventListener('click', function () {
+        if (!selectedTrack) return;
+        if (!deleteBtn._confirmPending) {
+            deleteBtn._confirmPending = true;
+            deleteBtn.classList.add('tm-confirm');
+            deleteBtn.textContent = '⚠ Confirm Delete?';
+            setTimeout(function () {
+                if (deleteBtn._confirmPending) {
+                    deleteBtn._confirmPending = false;
+                    deleteBtn.classList.remove('tm-confirm');
+                    deleteBtn.textContent = '🗑 Delete Track';
+                }
+            }, 4000);
+            return;
+        }
+        deleteBtn._confirmPending = false;
+        deleteBtn.classList.remove('tm-confirm');
+        var radio = window.sbbsRadio;
+        if (!radio) return;
+        var csrfToken = (window.sbbsConfig && window.sbbsConfig.csrfToken)
+            ? String(window.sbbsConfig.csrfToken) : '';
+        var body = new URLSearchParams();
+        body.set('file', selectedTrack.name);
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting…';
+        fetch('./api/files.ssjs?call=delete-track&dir=' + encodeURIComponent(radio.dirCode), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data && data.error) throw new Error(data.error);
+            var delName = selectedTrack.name;
+            myTracks = myTracks.filter(function (t) { return t.name !== delName; });
+            selectedTrack = null;
+            deleteBtn.textContent = '✅ Deleted';
+            setTimeout(function () {
+                detailEl.style.display = 'none';
+                emptyEl.style.display = '';
+                searchInput.value = '';
+                previewBtn.disabled = true;
+                assignBtn.disabled = true;
+                editBtn.disabled = true;
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = '🗑 Delete Track';
+            }, 1500);
+        })
+        .catch(function (err) {
+            alert('Could not delete track: ' + (err.message || err));
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = '🗑 Delete Track';
+        });
+    });
 })();
 </script>
 
@@ -4261,66 +4321,6 @@
     /* Close-preview button */
     if (closePreviewBtn) closePreviewBtn.addEventListener('click', function () {
         setPreviewOpen(false);
-    });
-
-    // Delete Track: two-click confirmation, then remove from file area
-    deleteBtn.addEventListener('click', function () {
-        if (!selectedTrack) return;
-        if (!deleteBtn._confirmPending) {
-            deleteBtn._confirmPending = true;
-            deleteBtn.classList.add('tm-confirm');
-            deleteBtn.textContent = '⚠ Confirm Delete?';
-            setTimeout(function () {
-                if (deleteBtn._confirmPending) {
-                    deleteBtn._confirmPending = false;
-                    deleteBtn.classList.remove('tm-confirm');
-                    deleteBtn.textContent = '🗑 Delete Track';
-                }
-            }, 4000);
-            return;
-        }
-        deleteBtn._confirmPending = false;
-        deleteBtn.classList.remove('tm-confirm');
-        var radio = window.sbbsRadio;
-        if (!radio) return;
-        var csrfToken = (window.sbbsConfig && window.sbbsConfig.csrfToken)
-            ? String(window.sbbsConfig.csrfToken) : '';
-        var body = new URLSearchParams();
-        body.set('file', selectedTrack.name);
-        deleteBtn.disabled = true;
-        deleteBtn.textContent = 'Deleting…';
-        fetch('./api/files.ssjs?call=delete-track&dir=' + encodeURIComponent(radio.dirCode), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'x-csrf-token': csrfToken
-            },
-            body: body
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data && data.error) throw new Error(data.error);
-            var delName = selectedTrack.name;
-            myTracks = myTracks.filter(function (t) { return t.name !== delName; });
-            selectedTrack = null;
-            deleteBtn.textContent = '✅ Deleted';
-            setTimeout(function () {
-                detailEl.style.display = 'none';
-                emptyEl.style.display = '';
-                searchInput.value = '';
-                previewBtn.disabled = true;
-                assignBtn.disabled = true;
-                editBtn.disabled = true;
-                deleteBtn.disabled = true;
-                deleteBtn.textContent = '🗑 Delete Track';
-            }, 1500);
-        })
-        .catch(function (err) {
-            alert('Could not delete track: ' + (err.message || err));
-            deleteBtn.disabled = false;
-            deleteBtn.textContent = '🗑 Delete Track';
-        });
     });
 
 })();
