@@ -80,6 +80,7 @@
 
     // Head animation
     var headRotY      = 0;
+    var headRotDir    = 1;     // +1 or -1, reverses at sway limits
     var headRotX      = 0.18;   // slight downward tilt
     var mouthOpen     = 0;      // 0-1 smoothed
     var eyeGlow       = 0;      // 0-1 smoothed
@@ -2667,13 +2668,17 @@
         // free spin during instrumentals
         var lyricsNow = lyricMouth && lyricMouth.active;
         if (lyricsNow) {
-            // Gentle sway within ±30° (±π/6) — slow down & soft-clamp
-            headRotY += 0.003;
+            // Gentle oscillating sway within ±30° (±π/6)
             var maxSway = Math.PI / 6;
-            // Wrap into [-π, π] then clamp
+            // Normalize into [-π, π] first (in case we just left free-spin)
             headRotY = ((headRotY + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-            if (headRotY >  maxSway) headRotY = maxSway - 0.01;
-            if (headRotY < -maxSway) headRotY = -maxSway + 0.01;
+            // Clamp hard if coming from a wild spin, pick nearest direction
+            if (headRotY > maxSway)  { headRotY = maxSway;  headRotDir = -1; }
+            if (headRotY < -maxSway) { headRotY = -maxSway; headRotDir =  1; }
+            headRotY += 0.004 * headRotDir;
+            // Bounce at limits
+            if (headRotY >=  maxSway) { headRotY =  maxSway; headRotDir = -1; }
+            if (headRotY <= -maxSway) { headRotY = -maxSway; headRotDir =  1; }
         } else {
             headRotY += 0.007;
         }
