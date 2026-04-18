@@ -2663,7 +2663,20 @@
             wireCtx.fillRect(0, 0, W, H);
         })();
 
-        headRotY += 0.007;
+        // Constrain head rotation during lyrics so words come from the mouth;
+        // free spin during instrumentals
+        var lyricsNow = lyricMouth && lyricMouth.active;
+        if (lyricsNow) {
+            // Gentle sway within ±30° (±π/6) — slow down & soft-clamp
+            headRotY += 0.003;
+            var maxSway = Math.PI / 6;
+            // Wrap into [-π, π] then clamp
+            headRotY = ((headRotY + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+            if (headRotY >  maxSway) headRotY = maxSway - 0.01;
+            if (headRotY < -maxSway) headRotY = -maxSway + 0.01;
+        } else {
+            headRotY += 0.007;
+        }
         breathPhase += 0.02;
 
         // Mouth motion should mainly respond during lyric-active windows,
