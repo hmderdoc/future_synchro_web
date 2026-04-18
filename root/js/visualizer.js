@@ -134,6 +134,8 @@
     var smokeParticles = []; // [{text, x, y, puffs[], spawnTime, ...}] cigar smoke words
     var lastSpitWord = -1;   // index of last word spit out
     var spitLineIdx = -1;    // current line being spit
+    var spitWordQueue = [];  // overflow queue when visible cap is hit
+    var MAX_VISIBLE_SPIT = 3;  // max words rendered at once (adjustable)
 
     // DOM refs
     var elPanel, elLyrics, elClose;
@@ -1793,6 +1795,100 @@
 
     var LASER_RED = '#FF5555';
 
+    // Laser color palette — built per character, rotates per shot
+    var laserColorPalette = [];
+    var laserColorIdx = 0;
+
+    function buildLaserPalette(ch) {
+        var pal = [];
+        // Always include classic red
+        pal.push({ r: 255, g: 85, b: 85, hex: '#FF5555' });
+        // Green laser
+        pal.push({ r: 85, g: 255, b: 85, hex: '#55FF55' });
+        // Eye color (if distinct from wire color and not black/too dark)
+        if (ch.eyeColor && ch.eyeColor.rgb) {
+            var parts = ch.eyeColor.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {  // skip near-black eyes
+                pal.push({ r: Math.min(255, er + 40), g: Math.min(255, eg + 40), b: Math.min(255, eb + 40), hex: ch.eyeColor.hex });
+            }
+        }
+        // Eyebrow color
+        if (ch.eyebrows && ch.eyebrows.rgb) {
+            var parts = ch.eyebrows.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {
+                pal.push({ r: Math.min(255, er + 30), g: Math.min(255, eg + 30), b: Math.min(255, eb + 30), hex: ch.eyebrows.color });
+            }
+        }
+        // Eyelash color
+        if (ch.eyelashes && ch.eyelashes.rgb) {
+            var parts = ch.eyelashes.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {
+                pal.push({ r: Math.min(255, er + 30), g: Math.min(255, eg + 30), b: Math.min(255, eb + 30), hex: ch.eyelashes.color });
+            }
+        }
+        // Cyan/electric blue
+        pal.push({ r: 85, g: 220, b: 255, hex: '#55DCFF' });
+        laserColorPalette = pal;
+        laserColorIdx = 0;
+    }
+
+    function nextLaserColor() {
+        if (!laserColorPalette.length) return { r: 255, g: 85, b: 85, hex: '#FF5555' };
+        var c = laserColorPalette[laserColorIdx % laserColorPalette.length];
+        laserColorIdx++;
+        return c;
+    }
+
+    // Laser color palette — built per character, rotates per shot
+    var laserColorPalette = [];
+    var laserColorIdx = 0;
+
+    function buildLaserPalette(ch) {
+        var pal = [];
+        // Always include classic red
+        pal.push({ r: 255, g: 85, b: 85, hex: '#FF5555' });
+        // Green laser
+        pal.push({ r: 85, g: 255, b: 85, hex: '#55FF55' });
+        // Eye color (if distinct from wire color and not black/too dark)
+        if (ch.eyeColor && ch.eyeColor.rgb) {
+            var parts = ch.eyeColor.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {  // skip near-black eyes
+                pal.push({ r: Math.min(255, er + 40), g: Math.min(255, eg + 40), b: Math.min(255, eb + 40), hex: ch.eyeColor.hex });
+            }
+        }
+        // Eyebrow color
+        if (ch.eyebrows && ch.eyebrows.rgb) {
+            var parts = ch.eyebrows.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {
+                pal.push({ r: Math.min(255, er + 30), g: Math.min(255, eg + 30), b: Math.min(255, eb + 30), hex: ch.eyebrows.color });
+            }
+        }
+        // Eyelash color
+        if (ch.eyelashes && ch.eyelashes.rgb) {
+            var parts = ch.eyelashes.rgb.split(',');
+            var er = parseInt(parts[0])||0, eg = parseInt(parts[1])||0, eb = parseInt(parts[2])||0;
+            if (er + eg + eb > 100) {
+                pal.push({ r: Math.min(255, er + 30), g: Math.min(255, eg + 30), b: Math.min(255, eb + 30), hex: ch.eyelashes.color });
+            }
+        }
+        // Cyan/electric blue
+        pal.push({ r: 85, g: 220, b: 255, hex: '#55DCFF' });
+        laserColorPalette = pal;
+        laserColorIdx = 0;
+    }
+
+    function nextLaserColor() {
+        if (!laserColorPalette.length) return { r: 255, g: 85, b: 85, hex: '#FF5555' };
+        var c = laserColorPalette[laserColorIdx % laserColorPalette.length];
+        laserColorIdx++;
+        return c;
+    }
+
     function isEditableTarget(target) {
         return !!(target && target.closest && target.closest('input, textarea, select, button, a, [contenteditable="true"]'));
     }
@@ -1831,6 +1927,7 @@
     function resetLyricFxState() {
         spitParticles = [];
         smokeParticles = [];
+        spitWordQueue = [];
         lastSpitWord = -1;
         spitLineIdx = -1;
         wordPositions = [];
@@ -2549,7 +2646,9 @@
 
         // --- Dark backdrop halo: dim the MilkDrop behind the character ---
         // Stronger when audio energy is high (busy background).
-        (function () {
+        // Skip when ASCII strobe is active — the halo gets captured as ASCII characters
+        var _asciiActive = window.asciiStrobe && window.asciiStrobe.isEnabled();
+        if (!_asciiActive) (function () {
             var cx = W * 0.5, cy = H * 0.42;
             // Radius covers head + body region
             var rMax = Math.min(W, H) * 0.48;
@@ -2596,6 +2695,16 @@
         var projState = buildProjectionState(W, H);
         projState.pulse = pulse;
         headProjectionState = projState;
+        // Rebuild laser color palette if character changed
+        if (activeChar && activeChar._laserPalBuilt !== activeChar.name) {
+            buildLaserPalette(activeChar);
+            activeChar._laserPalBuilt = activeChar.name;
+        }
+        // Rebuild laser color palette if character changed
+        if (activeChar && activeChar._laserPalBuilt !== activeChar.name) {
+            buildLaserPalette(activeChar);
+            activeChar._laserPalBuilt = activeChar.name;
+        }
 
         function proj(x, y, z) {
             return projectHeadPoint(projState, x, y, z, pulse);
@@ -8259,6 +8368,7 @@
             songFontIdx = Math.floor(Math.random() * LYRIC_FONTS.length);
             if (ni === 0) {
                 spitParticles = [];
+                spitWordQueue = [];
             }
         }
 
@@ -8289,10 +8399,27 @@
         var wordIdx = Math.floor(progress * words.length);
         wordIdx = Math.min(wordIdx, words.length - 1);
 
-        // Spawn new words when we reach them
+        // Spawn new words when we reach them — queue overflow if at visible cap
         while (lastSpitWord < wordIdx && lastSpitWord < words.length - 1) {
             lastSpitWord++;
-            spawnSpitWord(words[lastSpitWord], scheme, fontFamily, now, w, h, secondsPerWord);
+            var activeCount = spitParticles.length;
+            if (activeCount < MAX_VISIBLE_SPIT) {
+                spawnSpitWord(words[lastSpitWord], scheme, fontFamily, now, w, h, secondsPerWord, 1.0);
+            } else {
+                // Queue for later — store everything needed to spawn
+                spitWordQueue.push({
+                    text: words[lastSpitWord], scheme: scheme, fontFamily: fontFamily,
+                    w: w, h: h, secondsPerWord: secondsPerWord
+                });
+            }
+        }
+
+        // Drain overflow queue when there's room — boost velocity for catchup
+        while (spitWordQueue.length > 0 && spitParticles.length < MAX_VISIBLE_SPIT) {
+            var q = spitWordQueue.shift();
+            // Rush factor: more queued = faster words (1.4× to 2.5×)
+            var rushFactor = Math.min(2.5, 1.4 + spitWordQueue.length * 0.15);
+            spawnSpitWord(q.text, q.scheme, q.fontFamily, now, q.w, q.h, q.secondsPerWord, rushFactor);
         }
 
         // Render all particles
@@ -8306,7 +8433,8 @@
         }
     }
 
-    function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord) {
+    function spawnSpitWord(text, scheme, fontFamily, time, w, h, secondsPerWord, rushFactor) {
+        rushFactor = rushFactor || 1.0;
         // --- Smoke style: cigar smoke words for Clippy etc. ---
         if (activeChar.spitStyle === 'smoke') {
             spawnSmokeWord(text, scheme, fontFamily, time, w, h, secondsPerWord);
@@ -8315,21 +8443,42 @@
 
         var projState = headProjectionState || buildProjectionState(w, h);
         var mouthPoint = eyeScreenPoints.mouth || (activeChar.mouth ? projectHeadPoint(projState, 0, activeChar.mouth.y, activeChar.mouth.z, projState.pulse || 1) : { x: w / 2, y: h / 2, d: 1 });
+        // Project spawn from lower lip (mouth.y - 0.08) so words clear the face faster
+        var lipOffset = 0.08;
+        var lowerLipPoint = activeChar.mouth ? projectHeadPoint(projState, 0, activeChar.mouth.y - lipOffset, activeChar.mouth.z, projState.pulse || 1) : mouthPoint;
         var spawnX = mouthPoint.x;
-        var spawnY = mouthPoint.y;
+        var spawnY = lowerLipPoint.y;
+
+        // --- Spatial lane staggering: spread concurrent words across L/C/R ---
+        var usedLanes = {};
+        for (var li = 0; li < spitParticles.length; li++) {
+            if (spitParticles[li].lane !== undefined) usedLanes[spitParticles[li].lane] = true;
+        }
+        var lane = 1; // default center
+        if (!usedLanes[0])      lane = 0;
+        else if (!usedLanes[2]) lane = 2;
+        else if (!usedLanes[1]) lane = 1;
+        var laneSpread = w * 0.18;
+        var laneOffset = (lane - 1) * laneSpread;
+        spawnX += laneOffset;
 
         // Calculate ejection direction based on head rotation
         // Words fly OUT from the face direction
         var dirX = Math.sin(headRotY);     // left-right based on head turn
         var dirZ = Math.cos(headRotY);     // forward based on head facing
         
-        // Add some randomness and spread
+        // Add some randomness and spread, plus lane drift bias
         var spread = 0.3;
-        var vx = dirX * 2 + (Math.random() - 0.5) * spread;
+        var laneDrift = (lane - 1) * 0.8;
+        var vx = dirX * 2 + (Math.random() - 0.5) * spread + laneDrift;
         // Density-aware velocity: dense lyrics arc steeper so words clear face fast
         var densityFactor = Math.max(1.0, Math.min(2.5, 0.6 / Math.max(0.15, secondsPerWord || 0.4)));
         var vy = (4.0 + Math.random() * 1.5) * densityFactor;   // strong initial drop away from mouth
         var vz = dirZ * 2 + (Math.random() - 0.5) * spread;
+
+        // Rush factor: boosted velocity + compressed tier timeline for queued words
+        vx *= rushFactor;
+        vy *= rushFactor;
 
         spitParticles.push({
             id: ++spitParticleSeq,
@@ -8346,6 +8495,8 @@
             scheme: scheme,
             fontFamily: fontFamily,
             secondsPerWord: secondsPerWord,
+            rushFactor: rushFactor,  // 1.0 = normal, >1 = compressed tier timeline
+            lane: lane,  // 0=left, 1=center, 2=right spatial stagger
             laserTriggered: false,
             laserHitTime: 0,
             figFonts: {}   // tierIdx → fontName, assigned lazily on first render
@@ -8407,7 +8558,7 @@
 
     function getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme) {
         var PARTICLE_LIFETIME = 3.0;
-        var age = vizTime - p.spawnTime;
+        var age = (vizTime - p.spawnTime) * (p.rushFactor || 1.0);  // rushFactor compresses timeline
         var depthScale = 1 + p.z * 0.6;
         depthScale = Math.max(0.4, Math.min(2.5, depthScale));
 
@@ -8457,6 +8608,7 @@
             eyeBlinkState[eyeName].fire = now + blinkLead;
             eyeBlinkState[eyeName].end = now + blinkLead + blinkTail;
 
+            var lc = nextLaserColor();
             eyeLasers.push({
                 eyeName: eyeName,
                 originX: origin.x,
@@ -8464,7 +8616,8 @@
                 target: target,
                 spawnTime: now,
                 fireTime: now + blinkLead,
-                duration: beamDuration
+                duration: beamDuration,
+                color: lc
             });
         }
 
@@ -8665,7 +8818,7 @@
         } // end non-ASCII
 
         // Use contrasting color for Metatron, red for everyone else
-        var flashColor = LASER_RED;
+        var flashColor = (laserColorPalette.length > 0) ? laserColorPalette[(laserColorIdx - 1 + laserColorPalette.length) % laserColorPalette.length].hex : LASER_RED;
         if (activeChar && activeChar.headShape === 'metatronscube' && metatronState.currentHue !== undefined) {
             var fh = (metatronState.currentHue + 0.5) % 1.0;
             var fc = 0.88, fx = fc * (1 - Math.abs((fh * 6) % 2 - 1)), fm = 0.50 - fc / 2;
@@ -8693,44 +8846,6 @@
     function renderEyeLasers(now) {
         if (!karaokeCtx || !eyeLasers.length) return;
 
-        // --- Determine laser color (contrast Metatron's skeleton hue) ---
-        var laserR = 255, laserG = 85, laserB = 85;  // default red
-        var laserGlowR = 255, laserGlowG = 170, laserGlowB = 170;
-        var laserShadow = LASER_RED;
-
-        if (activeChar && activeChar.headShape === 'metatronscube' && metatronState.currentHue !== undefined) {
-            // Complementary hue: offset by 0.5 on the color wheel
-            var contrastHue = (metatronState.currentHue + 0.5) % 1.0;
-            // Convert to RGB at high saturation + moderate lightness for a vivid laser
-            var c = 0.88 * 1.0;  // saturation * chroma factor
-            var x = c * (1 - Math.abs((contrastHue * 6) % 2 - 1));
-            var m = 0.50 - c / 2;  // lightness offset
-            var cr, cg, cb;
-            if      (contrastHue < 1/6) { cr=c; cg=x; cb=0; }
-            else if (contrastHue < 2/6) { cr=x; cg=c; cb=0; }
-            else if (contrastHue < 3/6) { cr=0; cg=c; cb=x; }
-            else if (contrastHue < 4/6) { cr=0; cg=x; cb=c; }
-            else if (contrastHue < 5/6) { cr=x; cg=0; cb=c; }
-            else                        { cr=c; cg=0; cb=x; }
-            laserR = Math.round((cr + m) * 255);
-            laserG = Math.round((cg + m) * 255);
-            laserB = Math.round((cb + m) * 255);
-            // Brighter glow version
-            var gm = 0.70 - c / 2;
-            var gc = 0.78;
-            var gx = gc * (1 - Math.abs((contrastHue * 6) % 2 - 1));
-            if      (contrastHue < 1/6) { cr=gc; cg=gx; cb=0; }
-            else if (contrastHue < 2/6) { cr=gx; cg=gc; cb=0; }
-            else if (contrastHue < 3/6) { cr=0; cg=gc; cb=gx; }
-            else if (contrastHue < 4/6) { cr=0; cg=gx; cb=gc; }
-            else if (contrastHue < 5/6) { cr=gx; cg=0; cb=gc; }
-            else                        { cr=gc; cg=0; cb=gx; }
-            laserGlowR = Math.round((cr + gm) * 255);
-            laserGlowG = Math.round((cg + gm) * 255);
-            laserGlowB = Math.round((cb + gm) * 255);
-            laserShadow = 'rgb(' + laserR + ',' + laserG + ',' + laserB + ')';
-        }
-
         var activeLasers = [];
         for (var i = 0; i < eyeLasers.length; i++) {
             var laser = eyeLasers[i];
@@ -8742,27 +8857,68 @@
             if (progress >= 1) continue;
             progress = Math.max(0, progress);
 
+            // Per-laser color (from palette) or fallback red
+            var lc = laser.color || { r: 255, g: 85, b: 85, hex: '#FF5555' };
+            var laserR = lc.r, laserG = lc.g, laserB = lc.b;
+            var laserShadow = lc.hex;
+            // Brighter glow variant
+            var laserGlowR = Math.min(255, laserR + 80);
+            var laserGlowG = Math.min(255, laserG + 80);
+            var laserGlowB = Math.min(255, laserB + 80);
+
+            // Override for Metatron: use contrast hue
+            if (activeChar && activeChar.headShape === 'metatronscube' && metatronState.currentHue !== undefined) {
+                var contrastHue = (metatronState.currentHue + 0.5) % 1.0;
+                var c = 0.88, x = c * (1 - Math.abs((contrastHue * 6) % 2 - 1));
+                var m = 0.50 - c / 2;
+                var cr, cg, cb;
+                if      (contrastHue < 1/6) { cr=c; cg=x; cb=0; }
+                else if (contrastHue < 2/6) { cr=x; cg=c; cb=0; }
+                else if (contrastHue < 3/6) { cr=0; cg=c; cb=x; }
+                else if (contrastHue < 4/6) { cr=0; cg=x; cb=c; }
+                else if (contrastHue < 5/6) { cr=x; cg=0; cb=c; }
+                else                        { cr=c; cg=0; cb=x; }
+                laserR = Math.round((cr + m) * 255);
+                laserG = Math.round((cg + m) * 255);
+                laserB = Math.round((cb + m) * 255);
+                laserGlowR = Math.min(255, laserR + 60);
+                laserGlowG = Math.min(255, laserG + 60);
+                laserGlowB = Math.min(255, laserB + 60);
+                laserShadow = 'rgb(' + laserR + ',' + laserG + ',' + laserB + ')';
+            }
+
             var targetX = laser.target ? laser.target.x : laser.originX;
             var targetY = laser.target ? laser.target.y : laser.originY;
-            var endX = laser.originX + (targetX - laser.originX) * progress;
-            var endY = laser.originY + (targetY - laser.originY) * progress;
+
+            // --- TRAVELING BOLT: short segment that moves from eye to target ---
+            var BOLT_LEN = 0.18;  // fraction of total beam length (short bolt)
+            var boltHead = progress;
+            var boltTail = Math.max(0, progress - BOLT_LEN);
+            // Fade bolt as it nears target
+            var boltAlpha = 0.95 - progress * 0.15;
+
+            var ox = laser.originX, oy = laser.originY;
+            var fullDx = targetX - ox, fullDy = targetY - oy;
+
+            var headX = ox + fullDx * boltHead;
+            var headY = oy + fullDy * boltHead;
+            var tailX = ox + fullDx * boltTail;
+            var tailY = oy + fullDy * boltTail;
 
             karaokeCtx.save();
-            karaokeCtx.globalAlpha = 0.92 - progress * 0.25;
+            karaokeCtx.globalAlpha = boltAlpha;
 
-            // --- ASCII mode: beam is a trail of directional ASCII chars ---
+            // --- ASCII mode: bolt is a trail of directional ASCII chars ---
             if (window.asciiStrobe && window.asciiStrobe.isEnabled() &&
                 activeChar.spitStyle !== 'smoke') {
-                var dx = endX - laser.originX;
-                var dy = endY - laser.originY;
-                var beamLen = Math.sqrt(dx * dx + dy * dy);
-                var cellSize = 13;  // character spacing along beam
-                var steps = Math.max(1, Math.floor(beamLen / cellSize));
+                var dx = headX - tailX;
+                var dy = headY - tailY;
+                var boltLen = Math.sqrt(dx * dx + dy * dy);
+                var cellSize = 13;
+                var steps = Math.max(2, Math.floor(boltLen / cellSize));
 
-                // Pick ASCII glyph based on beam angle
-                var angle = Math.atan2(dy, dx);
+                var angle = Math.atan2(fullDy, fullDx);
                 var octant = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8;
-                // 8 directions: → ↘ ↓ ↙ ← ↖ ↑ ↗
                 var beamChars = ['-', '\\', '|', '/', '-', '\\', '|', '/'];
                 var glyph = beamChars[octant];
 
@@ -8774,41 +8930,59 @@
 
                 for (var si = 0; si <= steps; si++) {
                     var t = si / Math.max(1, steps);
-                    var cx = laser.originX + dx * t;
-                    var cy = laser.originY + dy * t;
-                    // CGA light red core
-                    karaokeCtx.fillStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
+                    var cx = tailX + dx * t;
+                    var cy = tailY + dy * t;
+                    // Brighter at head, dimmer at tail
+                    var charAlpha = 0.4 + 0.6 * t;
+                    karaokeCtx.fillStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',' + charAlpha.toFixed(2) + ')';
                     karaokeCtx.fillText(glyph, cx, cy);
                 }
-                // Bright white hot-spot at origin
-                karaokeCtx.shadowBlur = 14;
-                karaokeCtx.fillStyle = 'rgba(255,255,255,0.85)';
-                karaokeCtx.fillText('*', laser.originX, laser.originY);
+                // Bright tip at bolt head
+                karaokeCtx.shadowBlur = 16;
+                karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.95)';
+                karaokeCtx.fillText('*', headX, headY);
+                // Origin flash (brief)
+                if (progress < 0.3) {
+                    karaokeCtx.globalAlpha = (0.3 - progress) * 3 * boltAlpha;
+                    karaokeCtx.fillStyle = 'rgba(255,255,255,0.9)';
+                    karaokeCtx.fillText('*', ox, oy);
+                }
             } else {
-                // --- Classic vector beam ---
+                // --- Classic vector bolt ---
                 karaokeCtx.lineCap = 'round';
                 karaokeCtx.shadowColor = laserShadow;
-                karaokeCtx.shadowBlur = 16;
+                karaokeCtx.shadowBlur = 14;
 
-                karaokeCtx.strokeStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.95)';
-                karaokeCtx.lineWidth = 3.2;
+                // Outer glow
+                karaokeCtx.strokeStyle = 'rgba(' + laserR + ',' + laserG + ',' + laserB + ',0.9)';
+                karaokeCtx.lineWidth = 3.5;
                 karaokeCtx.beginPath();
-                karaokeCtx.moveTo(laser.originX, laser.originY);
-                karaokeCtx.lineTo(endX, endY);
+                karaokeCtx.moveTo(tailX, tailY);
+                karaokeCtx.lineTo(headX, headY);
                 karaokeCtx.stroke();
 
-                karaokeCtx.shadowBlur = 8;
-                karaokeCtx.strokeStyle = 'rgba(255,255,255,0.9)';
-                karaokeCtx.lineWidth = 1.1;
+                // White-hot core
+                karaokeCtx.shadowBlur = 6;
+                karaokeCtx.strokeStyle = 'rgba(255,255,255,0.85)';
+                karaokeCtx.lineWidth = 1.2;
                 karaokeCtx.beginPath();
-                karaokeCtx.moveTo(laser.originX, laser.originY);
-                karaokeCtx.lineTo(endX, endY);
+                karaokeCtx.moveTo(tailX, tailY);
+                karaokeCtx.lineTo(headX, headY);
                 karaokeCtx.stroke();
 
+                // Tip glow
                 karaokeCtx.beginPath();
-                karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.8)';
-                karaokeCtx.arc(laser.originX, laser.originY, 3, 0, Math.PI * 2);
+                karaokeCtx.fillStyle = 'rgba(' + laserGlowR + ',' + laserGlowG + ',' + laserGlowB + ',0.85)';
+                karaokeCtx.arc(headX, headY, 3, 0, Math.PI * 2);
                 karaokeCtx.fill();
+
+                // Origin flash (brief)
+                if (progress < 0.25) {
+                    karaokeCtx.beginPath();
+                    karaokeCtx.fillStyle = 'rgba(255,255,255,' + ((0.25 - progress) * 4 * 0.8).toFixed(2) + ')';
+                    karaokeCtx.arc(ox, oy, 3.5, 0, Math.PI * 2);
+                    karaokeCtx.fill();
+                }
             }
             karaokeCtx.restore();
 
@@ -9288,14 +9462,15 @@
             var age = now - p.spawnTime;
             var renderState = getSpitParticleRenderState(p, h, defaultFontFamily, defaultScheme);
 
-            if (laserEyesEnabled && !p.laserTriggered && age >= PARTICLE_LIFETIME * 0.45) {
+            var effectiveAge = age * (p.rushFactor || 1.0);
+            if (laserEyesEnabled && !p.laserTriggered && effectiveAge >= PARTICLE_LIFETIME * 0.32) {
                 spawnEyeLaser(p, now);
             }
             if (p.laserTriggered && now >= p.laserHitTime) {
                 spawnWordExplosion(p, now, renderState);
                 continue;
             }
-            if (age > PARTICLE_LIFETIME) continue;  // expired
+            if (effectiveAge > PARTICLE_LIFETIME) continue;  // expired (rushFactor-scaled)
 
             // Physics update
             var dt = 1/60;  // assume 60fps for consistent physics
@@ -9359,7 +9534,8 @@
             // Tiers 0-7 = FIGlet fonts at heights 3 through 10.
             if (_isAsciiSpitMode()) {
                 var _age = now - p.spawnTime;
-                var _tier = _figTierForAge(_age);
+                var _rushAge = _age * (p.rushFactor || 1.0);  // compressed timeline for rushed words
+                var _tier = _figTierForAge(_rushAge);
                 var _bright = Math.min(1, 0.4 + (_age / 1.35) * 0.55);
 
                 // Walk down from age-based tier to find best available font.
