@@ -5007,10 +5007,11 @@
             drawFloppyDiskDetails(char, proj, amp, bass, w, h, d);
         } else {
             // Default drive enclosure details (FDP etc.)
+            var fd = -(d + 0.005);  // front face Z (viewer side)
             // "SCSI GAL" tramp stamp on the back, near the bottom
             wireCtx.save();
             var stampY = -h * 0.75;
-            var stampZ = -d - 0.001;
+            var stampZ = d + 0.001;  // back of box (positive Z = away from viewer)
             var stampC = proj(0, stampY, stampZ);
             var stampScale = Math.abs(proj(0.1, stampY, stampZ).x - stampC.x);
             wireCtx.font = (stampScale * 0.9) + 'px monospace';
@@ -5025,10 +5026,10 @@
             var labelW = w * 0.65, labelTop = h * 0.80, labelBot = h * 0.45;
             wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.22)';
             wireCtx.lineWidth = 0.8;
-            var ltl = proj(-labelW, labelTop, d + 0.005);
-            var ltr = proj(labelW, labelTop, d + 0.005);
-            var lbr = proj(labelW, labelBot, d + 0.005);
-            var lbl = proj(-labelW, labelBot, d + 0.005);
+            var ltl = proj(-labelW, labelTop, fd);
+            var ltr = proj(labelW, labelTop, fd);
+            var lbr = proj(labelW, labelBot, fd);
+            var lbl = proj(-labelW, labelBot, fd);
             wireCtx.beginPath();
             wireCtx.moveTo(ltl.x, ltl.y); wireCtx.lineTo(ltr.x, ltr.y);
             wireCtx.lineTo(lbr.x, lbr.y); wireCtx.lineTo(lbl.x, lbl.y);
@@ -5040,8 +5041,8 @@
             wireCtx.lineWidth = 0.5;
             for (var li = 0; li < 3; li++) {
                 var ly = labelBot + (labelTop - labelBot) * (0.25 + li * 0.25);
-                var ll = proj(-labelW * 0.85, ly, d + 0.005);
-                var lr = proj(labelW * 0.85, ly, d + 0.005);
+                var ll = proj(-labelW * 0.85, ly, fd);
+                var lr = proj(labelW * 0.85, ly, fd);
                 wireCtx.beginPath();
                 wireCtx.moveTo(ll.x, ll.y); wireCtx.lineTo(lr.x, lr.y);
                 wireCtx.stroke();
@@ -5052,10 +5053,10 @@
             var ejY = -h * 0.65;
             wireCtx.strokeStyle = 'rgba(' + char.wireRGB + ',0.30)';
             wireCtx.lineWidth = 0.8;
-            var etl = proj(-ejW, ejY + ejH, d + 0.005);
-            var etr = proj(ejW, ejY + ejH, d + 0.005);
-            var ebr = proj(ejW, ejY - ejH, d + 0.005);
-            var ebl = proj(-ejW, ejY - ejH, d + 0.005);
+            var etl = proj(-ejW, ejY + ejH, fd);
+            var etr = proj(ejW, ejY + ejH, fd);
+            var ebr = proj(ejW, ejY - ejH, fd);
+            var ebl = proj(-ejW, ejY - ejH, fd);
             wireCtx.beginPath();
             wireCtx.moveTo(etl.x, etl.y); wireCtx.lineTo(etr.x, etr.y);
             wireCtx.lineTo(ebr.x, ebr.y); wireCtx.lineTo(ebl.x, ebl.y);
@@ -5072,6 +5073,7 @@
     //  Floppy Disk Details (3.5" disk face — label, notches, write-protect)
     // =========================================================
     function drawFloppyDiskDetails(char, proj, amp, bass, w, h, d) {
+        d = -d;  // flip to viewer-facing side (negative Z = toward camera)
         var t = performance.now() * 0.001;
         var lbl = char.label;
 
@@ -5439,7 +5441,7 @@
         var shutR =  sh.width + slideOffset;
         var shutT =  sh.yTop;
         var shutB =  sh.yBot;
-        var shutZ =  d + 0.006;  // slightly in front of disk body
+        var shutZ =  -(d + 0.006);  // slightly in front of disk body (viewer side)
 
         wireCtx.shadowBlur = 3 + bass * 5;
         wireCtx.shadowColor = sh.color;
@@ -5738,7 +5740,7 @@
 
         for (var i = 0; i < leds.length; i++) {
             var led = leds[i];
-            var z = char.boxDims ? char.boxDims.d + 0.01 : 0.50;
+            var z = char.boxDims ? -(char.boxDims.d + 0.01) : 0.50;
             var pt = proj(led.x, led.y, z);
 
             var brightness = 0;
