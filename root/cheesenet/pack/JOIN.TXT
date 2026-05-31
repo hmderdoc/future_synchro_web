@@ -1,0 +1,104 @@
+================================================================
+                  Joining CheeseNet (Zone 3323)
+================================================================
+
+  HOW TO APPLY
+  ------------
+
+  Send the application form below by either:
+
+    Email:    hm.derdoc@futureland.today
+    Netmail:  Sysop @ 21:2/139   (fsxNet)
+              Sysop @ 1337:3/222 (tqwNet)
+
+  Subject line:  CheeseNet Node Application
+
+  You will receive your assigned node number, a shared password,
+  and confirmation of your AKA within a few days. Once you
+  receive that, follow HUB.TXT to configure your tosser.
+
+
+  ============================================================
+                       APPLICATION FORM
+  ============================================================
+
+  BBS NAME:                 ________________________________
+
+  HOSTNAME / IP:            ________________________________
+
+  BINKP PORT:               ________________________________
+
+  SYSOP NAME (real or
+  handle - your choice):    ________________________________
+
+  CONTACT EMAIL:            ________________________________
+
+  EXISTING FTN AKAs (if
+  any - one per line):
+
+      _________________________________________
+
+      _________________________________________
+
+      _________________________________________
+
+  BBS SOFTWARE:             ________________________________
+
+  TOSSER:                   ________________________________
+
+  TIME ZONE (UTC offset):   ________________________________
+
+  DESIRED LOCAL ADDRESS
+  (optional - we may
+  honour your preference):  3323:1/_____
+
+  AREAS YOU WANT TO
+  SUBSCRIBE TO INITIALLY
+  (or "ALL"):
+
+      _________________________________________
+
+      _________________________________________
+
+      _________________________________________
+
+  BRIEFLY, ABOUT YOUR
+  BBS / WHY JOIN:           ________________________________
+
+                            ________________________________
+
+                            ________________________________
+
+  HAVE YOU READ POLICY.TXT
+  AND AGREE TO ABIDE BY IT?  YES / NO
+
+  ============================================================
+
+
+  WHAT HAPPENS NEXT
+  -----------------
+
+  1. ZC reviews application (typically 1-3 days).
+
+  2. ZC assigns a node number (3323:1/N) and generates a
+     shared secret.
+
+  3. ZC sends both back to you by reply email or netmail.
+
+  4. You configure your tosser per HUB.TXT and connect.
+
+  5. Welcome to CheeseNet.
+
+
+  REJECTIONS
+  ----------
+
+  Applications may be declined. Reasons include but are not
+  limited to:
+
+   - Unverifiable BBS (no public hostname or contact)
+   - History of policy violations on other networks
+   - Identity already in active use elsewhere on CheeseNet
+
+  If declined, you will receive a netmail or email explaining
+  why and (where applicable) what would be needed to reapply.

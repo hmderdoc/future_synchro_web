@@ -1453,9 +1453,30 @@ async function getVotesInThreads(sub) {
 }
 
 // --- Thread keyboard navigation ---
+// Plain Left/Right step between messages within the open thread.
+// Shift+Left/Shift+Right jump to the previous/next thread in the
+// containing sub. Same shift-modifier handling applies to the breadcrumb
+// arrow buttons and the bottom-of-thread labeled prev/next buttons --
+// see fetchThreadNeighbors / updateThreadNavButtons / navigateToThread.
+var _threadNeighbors = null;
+
 function threadNav() {
     var flc = document.getElementById('forum-list-container');
     if (!flc) return;
+
+    // Kick off the neighbor lookup so the prev/next buttons can wire up
+    // their hrefs as soon as the response arrives. URL params drive
+    // identity here; we don't pass sub/thread to this function because
+    // the existing callsite in 002-forum.xjs already inlines them into
+    // the surrounding initMessageInfiniteScroll call but doesn't pass
+    // them to threadNav(). Reading from URL keeps the helper independent.
+    var params = new URLSearchParams(window.location.search);
+    var sub = params.get('sub');
+    var thread = params.get('thread');
+    if (sub && thread) {
+        fetchThreadNeighbors(sub, thread);
+    }
+
     function setCurrentFromHash() {
         flc.querySelectorAll('.current').forEach(function (el) { el.classList.remove('current'); });
         var target;
@@ -1472,6 +1493,15 @@ function threadNav() {
     setCurrentFromHash();
     document.addEventListener('keydown', function (evt) {
         if (evt.target.tagName === 'TEXTAREA' || evt.target.tagName === 'INPUT') return;
+        // Shift+Left / Shift+Right --> navigate between threads. Bound
+        // to a modifier so plain Left/Right keeps doing the existing
+        // intra-thread message-stepping below without collision.
+        if (evt.shiftKey && (evt.keyCode === 37 || evt.keyCode === 39)) {
+            navigateToThread(evt.keyCode === 37 ? 'prev' : 'next');
+            evt.preventDefault();
+            return;
+        }
+        // Plain Left/Right --> step between messages in this thread.
         var cur = flc.querySelector('.list-group-item.current');
         if (!cur) return;
         var items = Array.from(flc.querySelectorAll('.list-group-item[data-message]'));
@@ -1497,6 +1527,68 @@ function threadNav() {
         }
     });
     // keyboard nav uses direct DOM manipulation, no hashchange needed
+}
+
+// --- Thread-to-thread navigation (Shift+arrows / buttons) ---
+
+async function fetchThreadNeighbors(sub, thread) {
+    var data = await v4_get('./api/forum.ssjs?call=get-thread-neighbors&sub=' + encodeURIComponent(sub) + '&thread=' + encodeURIComponent(thread));
+    if (!data) return;
+    _threadNeighbors = data;
+    updateThreadNavButtons(data);
+}
+
+// Wire up any DOM elements tagged [data-thread-prev-btn] or
+// [data-thread-next-btn] with the resolved neighbor's URL + a tooltip
+// showing its subject. Elements without a target are disabled rather
+// than hidden so the layout doesn't reflow on first paint vs after
+// the neighbor fetch resolves.
+function updateThreadNavButtons(neighbors) {
+    var params = new URLSearchParams(window.location.search);
+    var baseHref = './?';
+    var preservedKeys = ['page', 'sub'];
+    var basePairs = [];
+    preservedKeys.forEach(function (k) {
+        var v = params.get(k);
+        if (v !== null && v !== undefined) basePairs.push(k + '=' + encodeURIComponent(v));
+    });
+    baseHref += basePairs.join('&');
+
+    function apply(side, target) {
+        document.querySelectorAll('[data-thread-' + side + '-btn]').forEach(function (btn) {
+            if (target) {
+                btn.setAttribute('href', baseHref + '&thread=' + target.id);
+                btn.setAttribute('title', (side === 'prev' ? 'Previous thread: ' : 'Next thread: ') + (target.subject || ''));
+                btn.classList.remove('disabled');
+                btn.removeAttribute('aria-disabled');
+            } else {
+                btn.removeAttribute('href');
+                btn.setAttribute('title', side === 'prev' ? 'No previous thread' : 'No next thread');
+                btn.classList.add('disabled');
+                btn.setAttribute('aria-disabled', 'true');
+            }
+        });
+    }
+    apply('prev', neighbors && neighbors.prev);
+    apply('next', neighbors && neighbors.next);
+}
+
+function navigateToThread(direction) {
+    if (!_threadNeighbors) return;
+    var target = direction === 'next' ? _threadNeighbors.next : _threadNeighbors.prev;
+    if (!target) return;
+    // Pick the first prev/next button with an href to reuse the resolved URL
+    // rather than reconstructing it. This keeps key-driven navigation in
+    // lockstep with what clicking the button would do.
+    var btn = document.querySelector('[data-thread-' + direction + '-btn]:not(.disabled)');
+    if (btn && btn.getAttribute('href')) {
+        window.location.href = btn.getAttribute('href');
+        return;
+    }
+    // Fallback: synthesize the URL from current params.
+    var params = new URLSearchParams(window.location.search);
+    params.set('thread', target.id);
+    window.location.search = params.toString();
 }
 
 // --- Poll interaction ---

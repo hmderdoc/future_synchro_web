@@ -3207,7 +3207,7 @@ body.viz-open {
     opacity: 0.55; /* dim MilkDrop so wireframe pops */
 }
 #viz-wireframe {
-    z-index: 1;
+    z-index: 11;  /* render character ON TOP of spit lyrics (front-projection effect) */
 }
 
 /* Close button */

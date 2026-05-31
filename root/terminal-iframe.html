@@ -56,6 +56,10 @@
     var clickSequence = 0;
     var tapFallbackTimer = null;
     var terminalUiBuffer = '';
+    var STANDARD_TERMINAL_TYPE = 'ansi-bbs-cp437';
+    var TRUECOLOR_TERMINAL_TYPE = 'ansi-bbs-cp437-truecolor';
+    var TERMINAL_UI_PREFIXES = ['FLWEB/1 ', 'FLWEB:ALERT'];
+    var TERMINAL_UI_MAX_BUFFER = 4096;
 
     /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
        Same order as fTelnet's GetBestFit — this IS the contract. */
@@ -71,6 +75,7 @@
         { w:  6, h:  8 }
     ];
     var MIN_COLS = 80, MIN_ROWS = 24, MAX_COLS = 160, MAX_ROWS = 60;
+    var NAWS_MIN_INTERVAL_MS = 250;
 
     function getScreenSize() {
         var container = document.getElementById('fTelnetContainer');
@@ -96,10 +101,426 @@
         return { columns: cols, rows: rows, scale: scale, fontW: font.w, fontH: font.h };
     }
 
+    function installScreenSizeGuard(cl, initialCols, initialRows) {
+        var crt;
+        var originalSetScreenSize;
+        var pendingTimer = null;
+        var pendingCols = 0;
+        var pendingRows = 0;
+        var lastCols = parseInt(initialCols, 10) || 0;
+        var lastRows = parseInt(initialRows, 10) || 0;
+        var lastSentAt = 0;
+
+        if (!cl || !cl._Crt || typeof cl._Crt.SetScreenSize !== 'function') return;
+        crt = cl._Crt;
+        if (crt._flwebSetScreenSizeGuarded) return;
+
+        originalSetScreenSize = crt.SetScreenSize.bind(crt);
+
+        function apply(cols, rows) {
+            cols = parseInt(cols, 10) || 0;
+            rows = parseInt(rows, 10) || 0;
+            if (cols < 1 || rows < 1) return false;
+            if (cols === lastCols && rows === lastRows) return false;
+            originalSetScreenSize(cols, rows);
+            lastCols = cols;
+            lastRows = rows;
+            lastSentAt = Date.now();
+            return true;
+        }
+
+        function schedule(cols, rows) {
+            pendingCols = parseInt(cols, 10) || 0;
+            pendingRows = parseInt(rows, 10) || 0;
+            if (pendingCols < 1 || pendingRows < 1) return false;
+            if (pendingTimer) return false;
+            pendingTimer = setTimeout(function () {
+                var nextCols = pendingCols;
+                var nextRows = pendingRows;
+                pendingTimer = null;
+                pendingCols = 0;
+                pendingRows = 0;
+                apply(nextCols, nextRows);
+            }, NAWS_MIN_INTERVAL_MS);
+            return true;
+        }
+
+        crt.SetScreenSize = function (cols, rows) {
+            var nextCols = parseInt(cols, 10) || 0;
+            var nextRows = parseInt(rows, 10) || 0;
+            var now = Date.now();
+
+            if (nextCols < 1 || nextRows < 1) return;
+            if (nextCols === lastCols && nextRows === lastRows) return;
+            if (lastSentAt && (now - lastSentAt) < NAWS_MIN_INTERVAL_MS) {
+                schedule(nextCols, nextRows);
+                return;
+            }
+            apply(nextCols, nextRows);
+        };
+
+        crt._flwebSetScreenSizeGuarded = true;
+        crt._flwebSetScreenSizeFlush = function () {
+            var nextCols;
+            var nextRows;
+            if (!pendingTimer) return false;
+            clearTimeout(pendingTimer);
+            pendingTimer = null;
+            nextCols = pendingCols;
+            nextRows = pendingRows;
+            pendingCols = 0;
+            pendingRows = 0;
+            return apply(nextCols, nextRows);
+        };
+    }
+
     function sendToParent(msg) {
         if (window.parent && window.parent !== window) {
             window.parent.postMessage(msg, location.origin);
         }
+    }
+
+    function setNormalRLoginTerminalType(cl) {
+        var terminalType = getRLoginTerminalType();
+        if (cl && cl.Options && cl.Options.ConnectionType === 'rlogin') {
+            cl.Options.RLoginTerminalType = terminalType;
+        }
+        if (cl && cl._Options && cl._Options.ConnectionType === 'rlogin') {
+            cl._Options.RLoginTerminalType = terminalType;
+        }
+    }
+
+    function getRLoginTerminalType() {
+        return TRUECOLOR_TERMINAL_TYPE;
+    }
+
+    function installTrueColorSupport(cl) {
+        var crt = cl && cl._Crt;
+        var charInfo = crt && crt._CharInfo;
+        var supports = false;
+
+        if (!crt || !charInfo) {
+            window._flwebTrueColor = { supported: false, reason: 'missing-crt' };
+            return false;
+        }
+
+        if (typeof crt.TextColor24 !== 'function') {
+            crt.TextColor24 = function (red, green, blue) {
+                this._CharInfo.Fore24 =
+                    ((red & 0xFF) << 16) + ((green & 0xFF) << 8) + (blue & 0xFF);
+            };
+        }
+        if (typeof crt.TextBackground24 !== 'function') {
+            crt.TextBackground24 = function (red, green, blue) {
+                this._CharInfo.Back24 =
+                    ((red & 0xFF) << 16) + ((green & 0xFF) << 8) + (blue & 0xFF);
+            };
+        }
+
+        function normalizeSgr(match, params) {
+            var tokens = String(params || '').replace(/:/g, ';').split(';').filter(function (token) {
+                return token !== '';
+            });
+            var output = '';
+            var normal = [];
+            var changed = false;
+
+            function isByte(token) {
+                var value = parseInt(token, 10);
+                return String(value) === String(token) && value >= 0 && value <= 255;
+            }
+
+            function flushNormal() {
+                if (!normal.length) return;
+                output += '\x1b[' + normal.join(';') + 'm';
+                normal = [];
+            }
+
+            for (var i = 0; i < tokens.length;) {
+                var code = parseInt(tokens[i], 10);
+                var mode = parseInt(tokens[i + 1], 10);
+
+                if (i + 4 < tokens.length &&
+                    isByte(tokens[i]) && isByte(tokens[i + 1]) && isByte(tokens[i + 2]) &&
+                    (parseInt(tokens[i + 3], 10) === 38 || parseInt(tokens[i + 3], 10) === 48) &&
+                    parseInt(tokens[i + 4], 10) === 2) {
+                    flushNormal();
+                    output += '\x1b[' + [
+                        38, 2, tokens[i], tokens[i + 1], tokens[i + 2]
+                    ].join(';') + 'm';
+                    i += 3;
+                    changed = true;
+                    continue;
+                }
+
+                if ((code === 38 || code === 48) && mode === 2 && i + 4 < tokens.length) {
+                    flushNormal();
+                    output += '\x1b[' + [
+                        code, mode, tokens[i + 2], tokens[i + 3], tokens[i + 4]
+                    ].join(';') + 'm';
+                    i += 5;
+                    changed = true;
+                    continue;
+                }
+
+                if ((code === 38 || code === 48) && mode === 5 && i + 2 < tokens.length) {
+                    flushNormal();
+                    output += '\x1b[' + [code, mode, tokens[i + 2]].join(';') + 'm';
+                    i += 3;
+                    changed = true;
+                    continue;
+                }
+
+                normal.push(tokens[i]);
+                i++;
+            }
+
+            flushNormal();
+            return changed ? output : match;
+        }
+
+        if (cl._Ansi && typeof cl._Ansi.Write === 'function' && !cl._Ansi._flwebTrueColorWrite) {
+            var originalAnsiWrite = cl._Ansi.Write.bind(cl._Ansi);
+            var pendingAnsiFragment = '';
+
+            function normalizeAnsiText(text) {
+                var combined = pendingAnsiFragment + text;
+                var lastEsc = combined.lastIndexOf('\x1b[');
+                var tail;
+
+                pendingAnsiFragment = '';
+                if (combined.charAt(combined.length - 1) === '\x1b') {
+                    pendingAnsiFragment = '\x1b';
+                    combined = combined.slice(0, -1);
+                    lastEsc = combined.lastIndexOf('\x1b[');
+                }
+                if (lastEsc >= 0) {
+                    tail = combined.slice(lastEsc + 2);
+                    if (!/[\x40-\x7e]/.test(tail)) {
+                        pendingAnsiFragment = combined.slice(lastEsc);
+                        combined = combined.slice(0, lastEsc);
+                    }
+                }
+
+                return combined.replace(/\x1b\[([0-9;:]*)m/g, normalizeSgr);
+            }
+
+            cl._Ansi.Write = function (text) {
+                if (typeof text === 'string' && text.indexOf('\x1b[') >= 0) {
+                    text = normalizeAnsiText(text);
+                } else if (typeof text === 'string' && pendingAnsiFragment) {
+                    text = normalizeAnsiText(text);
+                }
+                if (text === '') return;
+                return originalAnsiWrite(text);
+            };
+            cl._Ansi._flwebTrueColorWrite = true;
+        }
+
+        if (!window._flwebSuppressFtelnetUnknownEsc) {
+            var originalConsoleLog = console.log.bind(console);
+            console.log = function () {
+                if (arguments.length > 0 &&
+                    /^Unknown ESC sequence: PB\(/.test(String(arguments[0] || ''))) {
+                    return;
+                }
+                return originalConsoleLog.apply(console, arguments);
+            };
+            window._flwebSuppressFtelnetUnknownEsc = true;
+        }
+
+        try {
+            var oldFore = charInfo.Fore24;
+            var oldBack = charInfo.Back24;
+            crt.TextColor24(1, 2, 3);
+            crt.TextBackground24(4, 5, 6);
+            supports = charInfo.Fore24 === 0x010203 && charInfo.Back24 === 0x040506;
+            charInfo.Fore24 = oldFore;
+            charInfo.Back24 = oldBack;
+        } catch (err) {
+            window._flwebTrueColor = {
+                supported: false,
+                reason: err && err.message ? err.message : String(err)
+            };
+            console.warn('[flweb] fTelnet truecolor probe failed:',
+                window._flwebTrueColor.reason);
+            return false;
+        }
+
+        window._flwebTrueColor = {
+            supported: supports,
+            terminalType: getRLoginTerminalType(),
+            sgrNormalizer: !!(cl._Ansi && cl._Ansi._flwebTrueColorWrite),
+            textColor24: typeof crt.TextColor24 === 'function',
+            textBackground24: typeof crt.TextBackground24 === 'function'
+        };
+        console.log('[flweb] fTelnet truecolor support:',
+            supports ? 'enabled' : 'unavailable',
+            window._flwebTrueColor);
+        return supports;
+    }
+
+    function installFtelnetFontCacheGuard(cl) {
+        var font = cl && cl._Crt && cl._Crt._Font;
+        var MAX_CHARS_MAPS = 48;
+        var MAX_CHAR_MAPS = 4096;
+        var charsLru = [];
+        var charLru = [];
+
+        if (!font || font._flwebFontCacheGuarded) return false;
+
+        function touch(list, key) {
+            var idx = list.indexOf(key);
+            if (idx !== -1) list.splice(idx, 1);
+            list.push(key);
+        }
+
+        function trimCache(cache, list, max) {
+            var key;
+            while (cache && list.length > max) {
+                key = list.shift();
+                delete cache[key];
+            }
+        }
+
+        function getCharsKey(charInfo) {
+            return font._Name + '-' + font._Size.x + '-' + font._Size.y + '-' +
+                charInfo.Fore24 + '-' + charInfo.Back24 + '-' + charInfo.Reverse;
+        }
+
+        function getCharKey(charCode, charInfo) {
+            return font._Name + '-' + font._Size.x + '-' + font._Size.y + '-' +
+                charCode + '-' + charInfo.Fore24 + '-' + charInfo.Back24 + '-' +
+                charInfo.Reverse;
+        }
+
+        if (typeof font.GetChars === 'function' && !font.GetChars._flwebGuarded) {
+            var originalGetChars = font.GetChars.bind(font);
+            font.GetChars = function (charInfo) {
+                var key = charInfo ? getCharsKey(charInfo) : null;
+                var ret = originalGetChars(charInfo);
+                if (key && this._CharsMap && this._CharsMap[key]) {
+                    touch(charsLru, key);
+                    trimCache(this._CharsMap, charsLru, MAX_CHARS_MAPS);
+                }
+                return ret;
+            };
+            font.GetChars._flwebGuarded = true;
+        }
+
+        if (typeof font.GetChar === 'function' && !font.GetChar._flwebGuarded) {
+            var originalGetChar = font.GetChar.bind(font);
+            font.GetChar = function (charCode, charInfo) {
+                var key = charInfo ? getCharKey(charCode, charInfo) : null;
+                var ret = originalGetChar(charCode, charInfo);
+                if (key && this._CharMap && this._CharMap[key]) {
+                    touch(charLru, key);
+                    trimCache(this._CharMap, charLru, MAX_CHAR_MAPS);
+                }
+                return ret;
+            };
+            font.GetChar._flwebGuarded = true;
+        }
+
+        font._flwebFontCacheGuarded = true;
+        window._flwebFontCacheGuard = {
+            charsMapLimit: MAX_CHARS_MAPS,
+            charMapLimit: MAX_CHAR_MAPS,
+            charsMapEntries: charsLru,
+            charMapEntries: charLru
+        };
+        console.log('[flweb] fTelnet font cache guard installed',
+            window._flwebFontCacheGuard);
+        return true;
+    }
+
+    function installTrueColorFastWrite(cl) {
+        var crt = cl && cl._Crt;
+        var originalFastWrite;
+
+        if (!crt || typeof crt.FastWrite !== 'function' || crt._flwebTrueColorFastWrite) {
+            return false;
+        }
+
+        function isDynamicTrueColor(charInfo) {
+            if (!charInfo) return false;
+            if (charInfo.Reverse || charInfo.Blink || charInfo.Underline) return false;
+            return charInfo.Fore24 > 0x0F || charInfo.Back24 > 0x0F;
+        }
+
+        function setCell(cell, ch, charInfo) {
+            if (!cell) return;
+            cell.Set(charInfo);
+            cell.Ch = ch;
+            cell.NeedsRedraw = false;
+        }
+
+        function drawCellRect(ctx, px, py, w, h, color) {
+            ctx.fillStyle = '#' + ('000000' + (color & 0xFFFFFF).toString(16)).slice(-6);
+            ctx.fillRect(px, py, w, h);
+        }
+
+        function drawFastChar(ch, x, y, charInfo, updateBuffer) {
+            var ctx = crt._CanvasContext;
+            var font = crt._Font;
+            var fw = font && font.Width;
+            var fh = font && font.Height;
+            var px;
+            var py;
+            var fg = charInfo.Fore24 & 0xFFFFFF;
+            var bg = charInfo.Back24 & 0xFFFFFF;
+
+            if (!ctx || !fw || !fh) return false;
+            px = (x - 1) * fw;
+            py = (y - 1) * fh;
+            if (crt._UseModernScrollback) {
+                py = (y - 1 + crt._ScrollbackSize) * fh;
+            } else if (crt._InScrollback && updateBuffer) {
+                return true;
+            }
+
+            if (ch === ' ' || ch.charCodeAt(0) === 0) {
+                drawCellRect(ctx, px, py, fw, fh, bg);
+            } else if (ch === String.fromCharCode(219)) {
+                drawCellRect(ctx, px, py, fw, fh, fg);
+            } else if (ch === String.fromCharCode(220)) {
+                drawCellRect(ctx, px, py, fw, fh, bg);
+                drawCellRect(ctx, px, py + Math.floor(fh / 2), fw, Math.ceil(fh / 2), fg);
+            } else if (ch === String.fromCharCode(223)) {
+                drawCellRect(ctx, px, py, fw, Math.ceil(fh / 2), fg);
+                drawCellRect(ctx, px, py + Math.ceil(fh / 2), fw, Math.floor(fh / 2), bg);
+            } else {
+                return false;
+            }
+            return true;
+        }
+
+        originalFastWrite = crt.FastWrite.bind(crt);
+        crt.FastWrite = function (text, x, y, charInfo, updateBuffer) {
+            var i;
+            var ch;
+            var maxLen;
+
+            if (typeof updateBuffer === 'undefined') updateBuffer = true;
+            if (!isDynamicTrueColor(charInfo) || typeof text === 'undefined' ||
+                x > this._ScreenSize.x || y > this._ScreenSize.y) {
+                return originalFastWrite(text, x, y, charInfo, updateBuffer);
+            }
+
+            maxLen = Math.min(String(text).length, this._ScreenSize.x - x + 1);
+            for (i = 0; i < maxLen; i++) {
+                ch = String(text).charAt(i);
+                if (!drawFastChar(ch, x + i, y, charInfo, updateBuffer)) {
+                    return originalFastWrite(text, x, y, charInfo, updateBuffer);
+                }
+                if (updateBuffer && this._Buffer[y] && this._Buffer[y][x + i]) {
+                    setCell(this._Buffer[y][x + i], ch, charInfo);
+                }
+            }
+        };
+        crt._flwebTrueColorFastWrite = true;
+        console.log('[flweb] fTelnet truecolor FastWrite fast path installed');
+        return true;
     }
 
     function parseTerminalUiPayload(payload) {
@@ -223,10 +644,27 @@
 
         terminalUiBuffer = '';
 
+        function couldBeTerminalUiPayload(text) {
+            for (var i = 0; i < TERMINAL_UI_PREFIXES.length; i++) {
+                if (TERMINAL_UI_PREFIXES[i].indexOf(text) === 0 ||
+                    text.indexOf(TERMINAL_UI_PREFIXES[i]) === 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         while ((start = input.indexOf('\x1b_', cursor)) !== -1) {
             output += input.slice(cursor, start);
             end = input.indexOf('\x1b\\', start + 2);
             if (end === -1) {
+                payload = input.slice(start + 2);
+                if (!couldBeTerminalUiPayload(payload) ||
+                    payload.length > TERMINAL_UI_MAX_BUFFER) {
+                    output += input.slice(start, start + 2);
+                    cursor = start + 2;
+                    continue;
+                }
                 terminalUiBuffer = input.slice(start);
                 return output;
             }
@@ -277,6 +715,16 @@
         return out;
     }
 
+    function bytesContainTerminalUiOpen(bytes) {
+        var i;
+        for (i = 0; i < bytes.length - 1; i += 1) {
+            if (bytes[i] === 0x1b && bytes[i + 1] === 0x5f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function stringToArrayBuffer(str) {
         var bytes = new Uint8Array(str.length);
         var i;
@@ -301,7 +749,15 @@
         }
 
         if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
-            text = bytesToString(new Uint8Array(data));
+            var bytes = new Uint8Array(data);
+            if (!bytesContainTerminalUiOpen(bytes)) {
+                return {
+                    supported: true,
+                    suppressed: false,
+                    data: data
+                };
+            }
+            text = bytesToString(bytes);
             filtered = filterTerminalUiOutput(text);
             return {
                 supported: true,
@@ -313,7 +769,15 @@
         if (typeof ArrayBuffer !== 'undefined' &&
             typeof ArrayBuffer.isView === 'function' &&
             ArrayBuffer.isView(data)) {
-            text = bytesToString(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+            var viewBytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+            if (!bytesContainTerminalUiOpen(viewBytes)) {
+                return {
+                    supported: true,
+                    suppressed: false,
+                    data: data
+                };
+            }
+            text = bytesToString(viewBytes);
             filtered = filterTerminalUiOutput(text);
             return {
                 supported: true,
@@ -847,7 +1311,7 @@
             opts.ConnectionType = 'rlogin';
             opts.RLoginClientUsername = cfg.userPassword;
             opts.RLoginServerUsername = cfg.userAlias;
-            opts.RLoginTerminalType = 'ansi-bbs-cp437';
+            opts.RLoginTerminalType = getRLoginTerminalType();
         } else {
             opts.ConnectionType = 'telnet';
         }
@@ -862,7 +1326,11 @@
             return;
         }
         window._ftClient = client;
+        installTrueColorSupport(client);
+        installFtelnetFontCacheGuard(client);
+        installTrueColorFastWrite(client);
         installTerminalUiBridge();
+        installScreenSizeGuard(client, currentColumns, currentRows);
 
         /* ── Render-speed fix v3 ────────────────────────────────────
          *  fTelnet has a BPS rate limiter in OnConnectionData that reads
@@ -909,6 +1377,7 @@
             /* ---- Fix A: drain-all-data monkey-patch ---- */
             var totalDrained = 0;
             var drainCalls = 0;
+            var MAX_DRAIN_CHUNK_BYTES = 65536;
 
             /* Shared NeedsRedraw sweeper — called from multiple places */
             function flushNeedsRedraw() {
@@ -939,7 +1408,8 @@
                 var avail = cl._Connection.bytesAvailable;
                 var batchSize = 0;
                 while (avail > 0) {
-                    var data = cl._Connection.readString(avail);
+                    var readSize = Math.min(avail, MAX_DRAIN_CHUNK_BYTES);
+                    var data = cl._Connection.readString(readSize);
                     if (!data || data.length === 0) break;
                     batchSize += data.length;
                     try { cl.ondata.trigger(data); } catch (_) {}
@@ -1212,14 +1682,7 @@
 
             case 'connect':
                 if (client) {
-                    if (client.Options &&
-                        client.Options.ConnectionType === 'rlogin') {
-                        client.Options.RLoginTerminalType = 'ansi-bbs-cp437';
-                    }
-                    if (client._Options &&
-                        client._Options.ConnectionType === 'rlogin') {
-                        client._Options.RLoginTerminalType = 'ansi-bbs-cp437';
-                    }
+                    setNormalRLoginTerminalType(client);
                     try { client.Connect(); } catch (ex) {}
                 }
                 break;
@@ -1238,6 +1701,10 @@
                 client.Options.ConnectionType = 'rlogin';
                 client.Options.RLoginClientUsername = msg.password;
                 client.Options.RLoginServerUsername = msg.username;
+                client.Options.RLoginTerminalType = getRLoginTerminalType();
+                if (client._Options) {
+                    client._Options.RLoginTerminalType = getRLoginTerminalType();
+                }
                 if (msg.isSecure) {
                     client.Options.WebSocketUrlPath =
                         '/ws?Port=' + msg.rloginPort;

@@ -1,0 +1,23 @@
+;A FidoNet style nodelist for CheeseNet (Zone 3323)
+;
+;Day number 143 : Sat, May 23, 2026
+;Compiled by  : Hm Derdoc, ZC of CheeseNet
+;Released     : 2026-05-23
+;
+;
+;Format reference: FTS-0005
+;
+;Flags in use:
+;  CM      Continuous Mail (24/7 availability)
+;  XX      No human voice
+;  IBN     Internet BinkP available (default port 24554)
+;  INA:    Internet Network Address (hostname)
+;
+;
+Zone,3323,CheeseNet,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
+Host,1,CheeseNet_Hub,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
+,2,Too_Lazy_BBS,Internet,Amessyroom,-Unpublished-,300,CM,XX,IBN,INA:toolazy.synchro.net
+,3,Funtopia_BBS,Internet,Stephan_Gebbers,-Unpublished-,300,CM,XX,IBN,INA:funtopia.synchro.net
+,4,Claudes_BBS,Internet,awehttam,-Unpublished-,300,CM,XX,IBN,INA:claudes.lovelybits.org
+,100,futureland,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
+,321,Palantir_BBS,Internet,Dan_Clough,-Unpublished-,300,CM,XX,IBN,INA:palantirbbs.ddns.net

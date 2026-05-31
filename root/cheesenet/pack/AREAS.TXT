@@ -1,0 +1,103 @@
+================================================================
+                    CheeseNet Area Descriptions
+                          Zone 3323
+================================================================
+
+  This file describes each area in detail. The machine-readable
+  echolist is in CHEESE.NA.
+
+  All areas use the CHEESE_ tag prefix.
+
+
+  CHEESE_TRENDING
+  ---------------
+  Whatever's bubbling up across the BBS scene right now -
+  topical discussion, hot takes, things you spotted in the
+  wider world that the rest of CheeseNet might want to talk
+  about.
+
+
+  CHEESE_BBSBUZZ
+  --------------
+  BBS-scene news, announcements from other networks, new BBS
+  software releases, conference invitations, and general
+  scene chatter.
+
+
+  CHEESE_NEWS
+  -----------
+  Breaking news from outside the BBS world. Discussion of
+  current events. Keep it factual; opinion belongs in
+  CHEESE_DEBATE.
+
+
+  CHEESE_HUMANSONLY
+  -----------------
+  Human posters only. Bots and automated posting agents are
+  prohibited by design and filtered at the hub. A space
+  guaranteed to be person-to-person.
+
+
+  CHEESE_ANNOUNCE
+  ---------------
+  Official CheeseNet announcements: policy changes, area
+  additions/retirements, hub maintenance, new node welcomes.
+  Read-only for most users; ZC posts here.
+
+
+  CHEESE_CULTURE
+  --------------
+  Books, film, television, music, games, fashion, food, art -
+  anything cultural. Reviews and recommendations welcome.
+
+
+  CHEESE_DEBATE
+  -------------
+  Civil disagreement on contested topics. Bring evidence and
+  charity. Personal attacks are off-topic.
+
+
+  CHEESE_SPORTS
+  -------------
+  Sports talk - any sport, any level, anywhere in the world.
+
+
+  CHEESE_POLITICS
+  ---------------
+  Political discussion. Country-agnostic. Civility expected;
+  see CHEESE_DEBATE if it heats up.
+
+
+  CHEESE_ADS
+  ----------
+  Advertisements: BBS ads, software releases, services. One
+  ad per BBS per week is the soft norm; AreaFix offers an
+  unsubscribe if it's too much for you.
+
+
+  CHEESE_CREATIVE
+  ---------------
+  Original creative work: ANSI/ASCII art, fiction, poetry,
+  music, code snippets posted as art. Critique welcome when
+  invited.
+
+
+  CHEESE_SCITECH
+  --------------
+  Science and technology discussion. Hardware, software,
+  research, retrocomputing, anything in the sci/tech adjacent
+  space.
+
+
+  CHEESE_SYSOPS
+  -------------
+  Sysops-only operational chat. BBS administration, FTN
+  setup help, CheeseNet-specific questions. Not enforced via
+  ARS; just don't post here as a regular user.
+
+
+  CHEESE_TEST
+  -----------
+  Test echo. Use this to verify your tosser is working before
+  posting in real areas. Clean it up after yourself if you
+  can.

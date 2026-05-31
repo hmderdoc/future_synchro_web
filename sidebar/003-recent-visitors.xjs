@@ -1,9 +1,73 @@
 <?xjs
     var logonlist_lib = load({}, 'logonlist_lib.js');
     var options = load("modopts.js", "logonlist") || {};
-    if (options.last_few_callers === undefined) options.last_few_callers = 10;
-    var ll = logonlist_lib.get(-options.last_few_callers);
-    if (!Array.isArray(ll)) ll = [];
+    var callerCount = parseInt(options.last_few_callers, 10);
+    if (!isFinite(callerCount) || callerCount < 1) callerCount = 10;
+    var maxDisplayCount = parseInt(options.last_few_callers_cap, 10);
+    if (!isFinite(maxDisplayCount) || maxDisplayCount < callerCount) maxDisplayCount = 10;
+    if (maxDisplayCount > 10) maxDisplayCount = 10;
+    if (callerCount > maxDisplayCount) callerCount = maxDisplayCount;
+    var backupLevel = parseInt(options.backup_level, 10);
+    if (!isFinite(backupLevel) || backupLevel < 1) backupLevel = 30;
+
+    function getRecentVisitors(limit, maxHistoryDays) {
+        var current = logonlist_lib.get(-limit);
+        if (!Array.isArray(current)) current = [];
+        if (current.length >= limit) return current;
+
+        var needed = limit - current.length;
+        var history = [];
+        for (var day = 1; day <= maxHistoryDays && needed > 0; day++) {
+            var historyFile = system.data_dir + format("logon.%u.jsonl", day - 1);
+            if (!file_exists(historyFile)) break;
+            var more = logonlist_lib.get(-needed, day);
+            if (!Array.isArray(more)) break;
+            if (more.length > 0) {
+                history = more.concat(history);
+                needed -= more.length;
+            }
+        }
+        return history.concat(current);
+    }
+
+    function dayKey(ts) {
+        if (!isFinite(ts)) return '';
+        var d = new Date(ts * 1000);
+        return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    }
+
+    function userKey(e) {
+        if (!e || !e.user) return '';
+        if (e.user.number && e.user.number > 0) return 'n:' + e.user.number;
+        if (e.user.alias) return 'a:' + String(e.user.alias).toLowerCase();
+        return '';
+    }
+
+    function dedupeConsecutiveSameDay(entries) {
+        var deduped = [];
+        for (var i = 0; i < entries.length; i++) {
+            var cur = entries[i];
+            if (!cur) continue;
+            if (deduped.length === 0) {
+                deduped.push(cur);
+                continue;
+            }
+            var prev = deduped[deduped.length - 1];
+            if (userKey(prev) && userKey(prev) === userKey(cur) && dayKey(prev.time) === dayKey(cur.time)) {
+                // Same user, same day, consecutive entries: keep newer one.
+                deduped[deduped.length - 1] = cur;
+                continue;
+            }
+            deduped.push(cur);
+        }
+        return deduped;
+    }
+
+    var fetchCount = maxDisplayCount * 3;
+    if (fetchCount < maxDisplayCount) fetchCount = maxDisplayCount;
+    var ll = getRecentVisitors(fetchCount, backupLevel);
+    ll = dedupeConsecutiveSameDay(ll);
+    if (ll.length > maxDisplayCount) ll = ll.slice(-maxDisplayCount);
     ll.reverse();
     var avatarNumbers = [];
 ?>
@@ -32,7 +96,7 @@
 .rv-conn { color: #AAAAAA; font-size: 0.75em; }
 </style>
 
-<div class="card rv-panel">
+<div class="card rv-panel" id="recent-visitors-widget" data-rv-min-rows="<?xjs write(callerCount); ?>" data-rv-max-rows="<?xjs write(maxDisplayCount); ?>">
     <div class="card-header">Recent Visitors</div>
     <div class="card-body p-0">
 <?xjs
@@ -66,6 +130,80 @@
 ?>
     </div>
 </div>
+
+<script type="text/javascript">
+    (function () {
+        function applyRecentVisitorRowLimit() {
+            var panel = document.getElementById('recent-visitors-widget');
+            if (!panel) return;
+
+            var rows = panel.querySelectorAll('.rv-row');
+            if (!rows.length) return;
+
+            var minRows = parseInt(panel.getAttribute('data-rv-min-rows'), 10);
+            var maxRows = parseInt(panel.getAttribute('data-rv-max-rows'), 10);
+            if (!isFinite(minRows) || minRows < 1) minRows = 4;
+            if (!isFinite(maxRows) || maxRows < minRows) maxRows = minRows;
+            if (maxRows > rows.length) maxRows = rows.length;
+
+            function setVisible(count) {
+                for (var i = 0; i < rows.length; i++) {
+                    rows[i].style.display = (i < count) ? '' : 'none';
+                }
+            }
+
+            if (window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches) {
+                setVisible(maxRows);
+                return;
+            }
+
+            var visible = Math.min(minRows, maxRows);
+            setVisible(visible);
+
+            var sidebar = document.getElementById('sidebar');
+            var content = document.getElementById('content');
+            if (!sidebar || !content) return;
+
+            while (visible < maxRows) {
+                rows[visible].style.display = '';
+                if (sidebar.offsetHeight <= (content.offsetHeight + 2)) {
+                    visible++;
+                    continue;
+                }
+                rows[visible].style.display = 'none';
+                break;
+            }
+        }
+
+        function scheduleRecentVisitorRowLimit() {
+            if (window.requestAnimationFrame) {
+                window.requestAnimationFrame(applyRecentVisitorRowLimit);
+                return;
+            }
+            setTimeout(applyRecentVisitorRowLimit, 0);
+        }
+
+        scheduleRecentVisitorRowLimit();
+        setTimeout(scheduleRecentVisitorRowLimit, 250);
+        setTimeout(scheduleRecentVisitorRowLimit, 1000);
+
+        if (window.__recentVisitorsResizeHandler) {
+            window.removeEventListener('resize', window.__recentVisitorsResizeHandler);
+        }
+        window.__recentVisitorsResizeHandler = function () {
+            scheduleRecentVisitorRowLimit();
+        };
+        window.addEventListener('resize', window.__recentVisitorsResizeHandler);
+
+        if (window.__recentVisitorsLoadHandler) {
+            window.removeEventListener('load', window.__recentVisitorsLoadHandler);
+        }
+        window.__recentVisitorsLoadHandler = function () {
+            scheduleRecentVisitorRowLimit();
+        };
+        window.addEventListener('load', window.__recentVisitorsLoadHandler);
+    })();
+</script>
 
 <?xjs if (avatarNumbers.length > 0) { ?>
 <script type="text/javascript">

@@ -1,0 +1,90 @@
+================================================================
+                    CheeseNet Hub Connection
+                          Zone 3323
+================================================================
+
+  HUB ADDRESS
+  -----------
+
+  FTN address:    3323:1/100
+  System name:    futureland
+  Sysop:          Hm Derdoc
+  Email:          hm.derdoc@futureland.today
+
+
+  BINKP CONNECTION
+  ----------------
+
+  Host:           futureland.today
+  Port:           24554
+  Protocol:       BinkP (FTS-1026)
+  TLS:            not required (plain BinkP)
+
+
+  PASSWORDS
+  ---------
+
+  On node assignment, the ZC will issue you a single shared
+  secret used for:
+
+   - Packet password (PacketPwd)
+   - Session password (SessionPwd)
+   - AreaFix password (AreaFixPwd)
+   - TIC file password (TicFilePwd)
+
+  Set the same value for all four in your tosser config.
+
+  Passwords are exchanged out-of-band by netmail or email at
+  application time. Keep yours secret. If compromised, request
+  a rotation by netmail to 3323:1/100.
+
+
+  AREAS
+  -----
+
+  See CHEESE.NA for the current echolist. All areas use the
+  CHEESE_ tag prefix.
+
+  Use AreaFix to subscribe/unsubscribe areas after your node
+  is wired up:
+
+   - Send netmail to AreaFix @ 3323:1/100
+   - Subject: your AreaFix password
+   - Body: %LIST     (lists available areas)
+           +CHEESE_GENERAL  (subscribes)
+           -CHEESE_DEBATE   (unsubscribes)
+           %HELP     (full command list)
+
+
+  TOSSERS KNOWN TO WORK
+  ---------------------
+
+  - SBBSecho (Synchronet, the hub itself)
+  - hpt / Husky
+  - FastEcho
+  - CrashMail II
+  - Mystic's built-in tosser
+  - WWIV's NetX
+  - ENiGMA 1/2's FTN module
+
+  If you use something else and it speaks BinkP + FTS-0001
+  packets, it will probably work. Report success/failure in
+  CHEESE_SYSOPS.
+
+
+  TROUBLESHOOTING
+  ---------------
+
+  Connect refused:
+    Verify port 24554 reachable. Hub IP changes are announced
+    in CHEESE_ANNOUNCE; if futureland.today resolves but
+    refuses, check CHEESE_ANNOUNCE first.
+
+  Auth fails:
+    Confirm your password matches what the ZC sent. Capital-
+    sensitive. Some tossers strip trailing whitespace; some
+    don't - check both ends.
+
+  Mail not arriving:
+    Verify your AKA matches what's configured at the hub. If
+    you changed your address, netmail the ZC before tossing.

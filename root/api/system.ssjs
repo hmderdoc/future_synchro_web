@@ -3,6 +3,25 @@ require('nodedefs.js', 'NODE_WFC');
 require("presence_lib.js", 'node_status');
 var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
 
+// presence_lib's node_status() prefers node.activity, which the core formats
+// for an external program as "running external program NAME" -- the name is
+// last, so the narrow Who's Online column truncates it away. For a node
+// running a door (NODE_XTRN + aux) blank the activity so node_status falls to
+// its own "running <program name>" branch, then drop the leading verb to
+// leave just the program name (matching how subprograms already display).
+function friendlyNodeStatus(node, idx) {
+	if (node.action == NODE_XTRN && node.aux) {
+		var shim = {
+			status: node.status, action: node.action, aux: node.aux,
+			useron: node.useron, misc: node.misc, connection: node.connection,
+			vstatus: node.vstatus, activity: ''
+		};
+		return node_status(shim, user.is_sysop, { exclude_username: true, exclude_connection: true }, idx)
+			.replace(/^\s*running\s+/i, '');
+	}
+	return node_status(node, user.is_sysop, { exclude_username: true, exclude_connection: true }, idx);
+}
+
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
 
@@ -212,7 +231,7 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 					node: i + 1,
 					useron: c.useron,
 					status: format(NodeStatus[c.status], c.aux, c.extaux),
-					action: node_status(c, user.is_sysop, {exclude_username: true, exclude_connection: true}, i),
+					action: friendlyNodeStatus(c, i),
 					user: usr.alias,
 					connection: usr.connection
 				});

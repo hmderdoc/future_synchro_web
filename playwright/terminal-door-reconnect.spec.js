@@ -122,12 +122,12 @@ test.describe('terminal door reconnect', function () {
         await expect.poll(async function () {
             const state = await getTerminalState(page);
             return state.terminalType;
-        }, { timeout: 15000 }).toBe('ansi-bbs-cp437');
+        }, { timeout: 15000 }).toBe('ansi-bbs-cp437-truecolor');
         await expect.poll(async function () {
             const state = await getTerminalState(page);
             return state.modemActive;
         }, { timeout: 15000 }).toBeTruthy();
-        console.log('step: terminal reconnected with ansi-bbs-cp437');
+        console.log('step: terminal reconnected with ansi-bbs-cp437-truecolor');
 
         await context.close();
     });

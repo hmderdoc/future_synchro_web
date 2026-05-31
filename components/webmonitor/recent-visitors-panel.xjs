@@ -1,6 +1,31 @@
 <?
     var logonlist_lib = load({}, 'logonlist_lib.js');
-    var ll = logonlist_lib.get(-10);
+    var options = load("modopts.js", "logonlist") || {};
+    var callerCount = 10;
+    var backupLevel = parseInt(options.backup_level, 10);
+    if (!isFinite(backupLevel) || backupLevel < 1) backupLevel = 30;
+
+    function getRecentVisitors(limit, maxHistoryDays) {
+        var current = logonlist_lib.get(-limit);
+        if (!Array.isArray(current)) current = [];
+        if (current.length >= limit) return current;
+
+        var needed = limit - current.length;
+        var history = [];
+        for (var day = 1; day <= maxHistoryDays && needed > 0; day++) {
+            var historyFile = system.data_dir + format("logon.%u.jsonl", day - 1);
+            if (!file_exists(historyFile)) break;
+            var more = logonlist_lib.get(-needed, day);
+            if (!Array.isArray(more)) break;
+            if (more.length > 0) {
+                history = more.concat(history);
+                needed -= more.length;
+            }
+        }
+        return history.concat(current);
+    }
+
+    var ll = getRecentVisitors(callerCount, backupLevel);
 ?>
 
 <div class="tab-pane fade webmonitor-panel <? write(argv[0]); ?>" id="recent-visitorsTab">

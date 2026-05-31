@@ -16,3 +16,9 @@ test-results/
 
 # User data - never commit
 root/api/data/
+
+# Generated deployment payloads and local editor backups
+root/updates/
+root/js/*.bak
+root/js/*.bak-*
+root/cheesenet/pack/*.bak.*

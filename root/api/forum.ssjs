@@ -197,6 +197,17 @@ if (request.has_param('call') && (http_request.method === 'GET' || http_request.
                 }
                 break;
 
+            case 'get-thread-neighbors':
+                if (request.has_params(['sub', 'thread'])) {
+                    reply = getThreadNeighbors(
+                        request.get_param('sub'),
+                        request.get_param('thread'),
+                        request.get_param('sort'),
+                        request.get_param('dir')
+                    );
+                }
+                break;
+
             case 'search-threads':
                 if (request.has_param('query')) {
                     if (request.has_param('count')) var count = request.get_param('count');

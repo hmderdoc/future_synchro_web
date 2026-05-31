@@ -75,6 +75,51 @@
         display: inline-flex;
         align-items: center;
     }
+    /* Anchor the prev/next-thread arrow pair to the right edge of the
+       breadcrumb. The default bootstrap breadcrumb is a flex container,
+       so margin-left:auto pushes this li past whatever spacing tracks
+       the segment chain on the left. */
+    .forum-breadcrumb li.forum-thread-nav-crumb {
+        margin-left: auto;
+        gap: 0.25rem;
+    }
+    .forum-thread-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.6em;
+        padding: 0 0.45em;
+        line-height: 1.4;
+        font-size: 1.15em;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .forum-thread-arrow:hover:not(.disabled) {
+        background: rgba(127, 127, 127, 0.15);
+    }
+    .forum-thread-arrow.disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    /* Bottom-of-thread navigation block: sits below the message list and
+       above (or alongside) the reply-form insertion point. Labeled buttons
+       so it's discoverable as a primary action; matches reply-button
+       sizing/weight rather than the slim breadcrumb arrows. */
+    .forum-thread-nav-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 1rem 0;
+        flex-wrap: wrap;
+    }
+    .forum-thread-nav-btn.disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
     #forum-search-bar {
         margin-bottom: var(--forum-stack-gap);
     }
@@ -770,6 +815,10 @@
                 <? write(thread.subject); ?>
             </a>
         </li>
+        <li class="forum-thread-nav-crumb">
+            <a class="forum-thread-arrow disabled" data-thread-prev-btn aria-disabled="true" title="No previous thread" aria-label="Previous thread">&lsaquo;</a>
+            <a class="forum-thread-arrow disabled" data-thread-next-btn aria-disabled="true" title="No next thread" aria-label="Next thread">&rsaquo;</a>
+        </li>
     </ol>
 
     <div id="jump-unread-container" style="margin-bottom:1em;" hidden>
@@ -781,6 +830,15 @@
 	<div id="forum-list-container" class="list-group"></div>
 	<div id="forum-thread-sentinel" class="text-center p-3" hidden></div>
 	<div id="forum-message-sentinel" class="text-center p-3" hidden></div>
+
+	<div class="forum-thread-nav-bottom" role="navigation" aria-label="Adjacent threads">
+		<a class="btn btn-default forum-thread-nav-btn disabled" data-thread-prev-btn aria-disabled="true" title="No previous thread">
+			<span aria-hidden="true">&larr;</span> Previous Thread
+		</a>
+		<a class="btn btn-default forum-thread-nav-btn disabled" data-thread-next-btn aria-disabled="true" title="No next thread">
+			Next Thread <span aria-hidden="true">&rarr;</span>
+		</a>
+	</div>
 
 	<script type="text/javascript">
 		initMessageInfiniteScroll('<? request.write_param('sub'); ?>', <? request.write_param('thread'); ?>, <? write(settings.page_size); ?>).then(function () {

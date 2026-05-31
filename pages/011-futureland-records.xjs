@@ -2182,8 +2182,11 @@
         assignBtn.disabled = !isMyPlaying;
         assignBtn.title = isMyPlaying ? '' : 'You can only assign characters to your own tracks while they are playing';
 
-        // Delete: enabled for composer's own tracks (regardless of what's playing)
-        var trackComp = trackComposer(track).toLowerCase();
+        // Delete: enabled for composer's own tracks (regardless of what's playing).
+        // Use the in-scope tagVal() (same helper the list filter uses); the
+        // trackComposer() helper lives in a different IIFE and referencing it
+        // here threw, leaving the Delete button permanently disabled.
+        var trackComp = tagVal(track, 'composer').toLowerCase();
         var canDelete = trackComp === COMPOSER.toLowerCase() && trackComp.length > 0;
         deleteBtn.disabled = !canDelete;
         deleteBtn.classList.remove('tm-confirm');
