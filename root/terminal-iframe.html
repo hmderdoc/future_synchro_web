@@ -44,6 +44,7 @@
 </head>
 <body>
 <div id="fTelnetContainer" class="fTelnetContainer"></div>
+<script src="js/ansi-music.js?_v=20260705a"></script>
 <script>
 (function () {
     'use strict';
@@ -60,6 +61,18 @@
     var TRUECOLOR_TERMINAL_TYPE = 'ansi-bbs-cp437-truecolor';
     var TERMINAL_UI_PREFIXES = ['FLWEB/1 ', 'FLWEB:ALERT'];
     var TERMINAL_UI_MAX_BUFFER = 4096;
+    var ansiMusicPlayer = window.AnsiMusic ? new window.AnsiMusic.Player() : null;
+    var apcAudioPlayer = window.AnsiMusic && window.AnsiMusic.ApcPlayer
+        ? new window.AnsiMusic.ApcPlayer({
+            // Closed-loop feedback: the armed drain notify is how doors
+            // (fl_records) detect this sink and recover from underruns.
+            onNotify: function (ch) {
+                sendInputToServer('\x1b[=7;' + ch + ';0n');
+            }
+        }) : null;
+    var ansiMusicFilter = window.AnsiMusic ? new window.AnsiMusic.Filter(function (mml) {
+        ansiMusicPlayer.play(mml);
+    }, { onApc: function (payload) { if (apcAudioPlayer) apcAudioPlayer.feed(payload); } }) : null;
 
     /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
        Same order as fTelnet's GetBestFit — this IS the contract. */
@@ -696,6 +709,7 @@
         origWrite = ansi.Write;
         ansi.Write = function (str) {
             var filtered = filterTerminalUiOutput(str);
+            if (ansiMusicFilter) filtered = ansiMusicFilter.feed(filtered);
             if (!filtered.length) {
                 return;
             }
@@ -1640,6 +1654,9 @@
         if (client.OnConnectionClose) {
             var origClose = client.OnConnectionClose;
             client.OnConnectionClose = function () {
+                if (ansiMusicPlayer) ansiMusicPlayer.stop();
+                if (apcAudioPlayer) apcAudioPlayer.stop();
+                if (ansiMusicFilter) ansiMusicFilter.reset();
                 isConnected = false;
                 sendToParent({ type: 'status', connected: false });
                 if (origClose) origClose.apply(this, arguments);
@@ -1658,9 +1675,15 @@
     }
 
     document.addEventListener('click', function () {
+        if (ansiMusicPlayer) ansiMusicPlayer.unlock();
+        if (apcAudioPlayer) apcAudioPlayer.unlock();
         clickSequence += 1;
         sendToParent({ type: 'click' });
     });
+    window.addEventListener('keydown', function () {
+        if (ansiMusicPlayer) ansiMusicPlayer.unlock();
+        if (apcAudioPlayer) apcAudioPlayer.unlock();
+    }, { once: true });
 
     window.addEventListener('message', function (e) {
         if (e.origin !== location.origin) return;
@@ -1725,6 +1748,9 @@
                 break;
 
             case 'logout':
+                if (ansiMusicPlayer) ansiMusicPlayer.stop();
+                if (apcAudioPlayer) apcAudioPlayer.stop();
+                if (ansiMusicFilter) ansiMusicFilter.reset();
                 if (client && isConnected) {
                     try { client.Disconnect(); } catch (ex) {}
                 }
