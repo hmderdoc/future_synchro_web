@@ -72,7 +72,13 @@
         }) : null;
     var ansiMusicFilter = window.AnsiMusic ? new window.AnsiMusic.Filter(function (mml) {
         ansiMusicPlayer.play(mml);
-    }, { onApc: function (payload) { if (apcAudioPlayer) apcAudioPlayer.feed(payload); } }) : null;
+    }, { onApc: function (payload) {
+        if (!apcAudioPlayer) return;
+        /* feed() returns a reply for a feature query (Q;libsndfile), which
+           the door waits on before it will stream audio. Send it back. */
+        var reply = apcAudioPlayer.feed(payload);
+        if (reply) sendInputToServer(reply);
+    } }) : null;
 
     /* fTelnet CP437 bitmap font sizes (exact PNGs, sorted largest-first).
        Same order as fTelnet's GetBestFit — this IS the contract. */
@@ -1034,6 +1040,14 @@
         }
         window._ftClient = client;
         suppressUnknownEscLogging();
+        /* Answer the door's CSI = 7 [; ch] n audio-state polls from the real
+           APC sink state. The terminal core forwards the request here because
+           it has no audio of its own. */
+        if (apcAudioPlayer) {
+            client.AudioStateProvider = function (channel) {
+                return apcAudioPlayer.audioStateReply(channel);
+            };
+        }
         installTerminalUiBridge();
         installScreenSizeGuard(client, currentColumns, currentRows);
 

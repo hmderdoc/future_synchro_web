@@ -233,10 +233,48 @@
         return Promise.resolve(context.resume()).then(function () { return true; })
             .catch(function () { return false; });
     };
+    // Whether an audio sink is available, WITHOUT opening the device. A door
+    // probes this before streaming; opening an AudioContext here would grab
+    // the hardware for a session that may never play a sound (and browsers
+    // start it suspended anyway). Constructibility is the honest answer.
+    ApcPlayer.prototype.available = function () {
+        return !!(root.AudioContext || root.webkitAudioContext);
+    };
+    // Is this channel still playing (scheduled clips outstanding, or queues
+    // accepted but not yet scheduled)? Matches _checkDrain's idle test.
+    ApcPlayer.prototype._channelRunning = function (ch) {
+        return (this.pending[ch] || 0) > 0 || this.chainDepth > 0;
+    };
+    // Reply for a CSI = 7 [; channel] n audio-state poll, mirroring SyncTERM's
+    // audio_apc.c: CSI = 7 [; id ; state]... n, state 1 = running 0 = stopped.
+    // channel -1 means "all", and lists every running channel.
+    ApcPlayer.prototype.audioStateReply = function (channel) {
+        if (channel >= 0) {
+            return '\x1b[=7;' + channel + ';' + (this._channelRunning(channel) ? 1 : 0) + 'n';
+        }
+        var pairs = '';
+        for (var ch in this.pending) {
+            if (this.pending.hasOwnProperty(ch) && this._channelRunning(parseInt(ch, 10))) {
+                pairs += ';' + ch + ';1';
+            }
+        }
+        return '\x1b[=7' + pairs + 'n';
+    };
     // Parse one APC payload (the bytes between ESC_ and ST) and act on it.
+    // Returns a reply string to send back to the server, or undefined.
     ApcPlayer.prototype.feed = function (payload) {
         if (payload.indexOf('SyncTERM:') !== 0) return;
-        var parts = payload.slice(9).split(';'); // after "SyncTERM:"
+        var body = payload.slice(9);           // after "SyncTERM:"
+        // Feature query: Q;<feature>. Answered from capability, not by opening
+        // the device. Unknown features stay silent, as SyncTERM does.
+        if (body.indexOf('Q;') === 0) {
+            var feature = body.slice(2);
+            if (feature === 'libsndfile') {
+                return '\x1b[=7;100;' + (this.available() ? 1 : 0) + 'n';
+            }
+            return;
+        }
+        var parts = body.split(';');
         if (parts[0] === 'C' && parts[1] === 'S') {
             // Store: C;S;<name>;<base64-wav>  (base64 contains no ';')
             this._store(parts[2], parts.slice(3).join(';'));
