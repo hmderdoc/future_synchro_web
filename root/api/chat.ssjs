@@ -47,6 +47,61 @@ function sanitizeAlias(raw) {
     return alias.substr(0, 60);
 }
 
+function isUserMailboxName(name) {
+    /* True if the name matches a local user account. Used ONLY on the write path
+       to stop a new public room from colliding with a username (which would mix a
+       user's private mailbox and a public room in the same channels.<name> key).
+       NOT used to gate reads - a legit public room can share a name with a bot
+       account (e.g. GameBot), so reads are gated on the public_channels registry. */
+    var candidate = trimText(name);
+    if (!candidate.length) {
+        return false;
+    }
+    try {
+        return (system.matchuser(candidate) || 0) > 0;
+    } catch (_matchError) {
+        return false;
+    }
+}
+
+function isRegisteredPublicChannel(client, channel) {
+    /* A channel is publicly readable/listable ONLY if it is explicitly registered
+       as a public room. Private mailboxes (channels.<alias>.*) are never registered,
+       so this allowlist keeps them off every unauthenticated read/list endpoint. */
+    if (channel === _defaultChannel) {
+        return true;
+    }
+    try {
+        return client.read('chat', 'public_channels.' + channel, 1) === true;
+    } catch (_registryError) {
+        return false;
+    }
+}
+
+function channelHasPrivateTraffic(client, channel) {
+    var history = getRecentHistory(client, 'channels.' + channel + '.history', 20);
+    var index = 0;
+    for (index = 0; index < history.length; index += 1) {
+        if (isPrivateMessage(history[index])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function isWritablePublicChannel(client, channel) {
+    /* Permit posting/creating a public room only when it is already an established
+       public room, or a fresh name that is neither a username nor an in-use mailbox.
+       This is what prevents a "public" post from ever landing in channels.<alias>. */
+    if (isRegisteredPublicChannel(client, channel)) {
+        return true;
+    }
+    if (isUserMailboxName(channel)) {
+        return false;
+    }
+    return !channelHasPrivateTraffic(client, channel);
+}
+
 function getBodyParams() {
     var params = {};
     var pairs = [];
@@ -313,29 +368,13 @@ function getRecentHistory(client, historyPath, count) {
     return Array.isArray(history) ? history : [];
 }
 
-function historyHasPublicTraffic(history) {
-    var index = 0;
-
-    for (index = 0; index < history.length; index += 1) {
-        if (!isPrivateMessage(history[index])) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 function listPublicChannelNames(client) {
     var seen = {};
     var names = [];
     var registryKeys = [];
-    var channelKeys = [];
     var index = 0;
-    var name = '';
-    var history = [];
 
     try { registryKeys = getKeys(client.keys('chat', 'public_channels', 1)); } catch (_registryError) {}
-    try { channelKeys = getKeys(client.keys('chat', 'channels', 1)); } catch (_channelsError) {}
 
     function addName(value) {
         var normalized = sanitizeChannel(value, '');
@@ -346,22 +385,15 @@ function listPublicChannelNames(client) {
         names.push(normalized);
     }
 
+    /* Allowlist only: the default room plus channels explicitly registered as
+       public. Private mailboxes (channels.<alias>.*) are never registered, so
+       they can never surface in the public channel list. (Previously this also
+       scanned every channels.* key and promoted any with non-private traffic,
+       which leaked mailboxes that had a stray public-shaped message.) */
     addName(_defaultChannel);
 
     for (index = 0; index < registryKeys.length; index += 1) {
         addName(registryKeys[index]);
-    }
-
-    for (index = 0; index < channelKeys.length; index += 1) {
-        name = sanitizeChannel(channelKeys[index], '');
-        if (!name.length || seen[name.toUpperCase()]) {
-            continue;
-        }
-
-        history = getRecentHistory(client, 'channels.' + name + '.history', 20);
-        if (historyHasPublicTraffic(history)) {
-            addName(name);
-        }
     }
 
     return names.sort();
@@ -572,6 +604,77 @@ function buildPrivateMessage(sender, recipient, text, timestamp) {
     };
 }
 
+/* --- shared read builders (used by the individual actions AND by `sync`, which
+       bundles them into a single JSONClient connection per poll) --- */
+
+function buildWhoUsers(client, channel) {
+    var users = [];
+    var whoResult = client.who('chat', 'channels.' + channel + '.messages') || {};
+    var key;
+
+    for (key in whoResult) {
+        if (!Object.prototype.hasOwnProperty.call(whoResult, key)) {
+            continue;
+        }
+
+        var entry = whoResult[key];
+        var nickObj = normalizeNick(entry && entry.nick && typeof entry.nick === 'object' ? entry.nick : null);
+        var nickName = nickObj && nickObj.name ? nickObj.name : String(entry && entry.nick ? entry.nick : key);
+        var systemName = nickObj && nickObj.host ? nickObj.host : String(entry && entry.system ? entry.system : '');
+        var userNumber = 0;
+
+        if (nickName.length) {
+            try { userNumber = system.matchuser(nickName) || 0; } catch (_matchUserError) {}
+        }
+
+        users.push({
+            nick: nickName,
+            system: systemName,
+            userNumber: userNumber,
+            avatar: nickObj && nickObj.avatar ? nickObj.avatar : undefined,
+            qwkid: nickObj && nickObj.qwkid ? nickObj.qwkid : undefined
+        });
+    }
+
+    return users;
+}
+
+function buildPublicHistory(client, channel, count, ownAlias) {
+    var history = getRecentHistory(client, 'channels.' + channel + '.history', count);
+    var messages = [];
+    var index = 0;
+
+    for (index = 0; index < history.length; index += 1) {
+        if (isPrivateMessage(history[index])) {
+            continue;
+        }
+        messages.push(formatChatMessage(history[index], ownAlias));
+    }
+
+    return messages;
+}
+
+function buildChannelSummaries(client, since, ownAlias) {
+    var names = listPublicChannelNames(client);
+    var summaries = [];
+    var index = 0;
+
+    for (index = 0; index < names.length; index += 1) {
+        summaries.push(summarizePublicChannel(client, names[index], since, ownAlias));
+    }
+
+    summaries.sort(function (a, b) {
+        return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+    });
+
+    return summaries;
+}
+
+function flagDefaultsOn(name) {
+    /* a sync sub-section is included unless the client explicitly passes name=0 */
+    return hasRequestParam(name) ? getRequestValue(name, '1') !== '0' : true;
+}
+
 var reply = { error: 'invalid request' };
 var action = hasRequestParam('action') ? getRequestValue('action', '') : '';
 
@@ -588,21 +691,13 @@ switch (action) {
         }
 
         reply = withClient(function (client) {
-            var history = getRecentHistory(client, 'channels.' + historyChannel + '.history', historyCount);
-            var messages = [];
-            var index = 0;
-            var ownAlias = user.number > 0 ? user.alias : '';
-
-            for (index = 0; index < history.length; index += 1) {
-                if (isPrivateMessage(history[index])) {
-                    continue;
-                }
-                messages.push(formatChatMessage(history[index], ownAlias));
+            if (!isRegisteredPublicChannel(client, historyChannel)) {
+                return { error: 'not found' };
             }
-
+            var ownAlias = user.number > 0 ? user.alias : '';
             return {
                 channel: historyChannel,
-                messages: messages,
+                messages: buildPublicHistory(client, historyChannel, historyCount, ownAlias),
                 serverTime: Date.now()
             };
         });
@@ -612,37 +707,12 @@ switch (action) {
         var whoChannel = getChannel();
 
         reply = withClient(function (client) {
-            var users = [];
-            var whoResult = client.who('chat', 'channels.' + whoChannel + '.messages') || {};
-            var key;
-
-            for (key in whoResult) {
-                if (!Object.prototype.hasOwnProperty.call(whoResult, key)) {
-                    continue;
-                }
-
-                var entry = whoResult[key];
-                var nickObj = normalizeNick(entry && entry.nick && typeof entry.nick === 'object' ? entry.nick : null);
-                var nickName = nickObj && nickObj.name ? nickObj.name : String(entry && entry.nick ? entry.nick : key);
-                var systemName = nickObj && nickObj.host ? nickObj.host : String(entry && entry.system ? entry.system : '');
-                var userNumber = 0;
-
-                if (nickName.length) {
-                    try { userNumber = system.matchuser(nickName) || 0; } catch (_matchUserError) {}
-                }
-
-                users.push({
-                    nick: nickName,
-                    system: systemName,
-                    userNumber: userNumber,
-                    avatar: nickObj && nickObj.avatar ? nickObj.avatar : undefined,
-                    qwkid: nickObj && nickObj.qwkid ? nickObj.qwkid : undefined
-                });
+            if (!isRegisteredPublicChannel(client, whoChannel)) {
+                return { error: 'not found' };
             }
-
             return {
                 channel: whoChannel,
-                users: users,
+                users: buildWhoUsers(client, whoChannel),
                 serverTime: Date.now()
             };
         });
@@ -652,51 +722,85 @@ switch (action) {
         var sinceChannels = getRequestTimestamp('since');
 
         reply = withClient(function (client) {
-            var names = listPublicChannelNames(client);
-            var summaries = [];
             var ownAlias = user.number > 0 ? user.alias : '';
-            var index = 0;
-
-            for (index = 0; index < names.length; index += 1) {
-                summaries.push(summarizePublicChannel(client, names[index], sinceChannels, ownAlias));
-            }
-
-            summaries.sort(function (a, b) {
-                return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
-            });
-
             return {
-                channels: summaries,
+                channels: buildChannelSummaries(client, sinceChannels, ownAlias),
                 serverTime: Date.now()
             };
         });
         break;
 
-    case 'motd':
-        var motdChannel = hasRequestParam('channel') ? sanitizeChannel(getRequestValue('channel', 'motd'), 'motd') : 'motd';
+    case 'sync':
+        /* Combined poll: everything the reconcile loop needs in ONE JSONClient
+           connection instead of one per sub-request. Each section can be turned
+           off with <name>=0; `history` is opt-IN (pass history=1) since the client
+           usually only needs it on the active channel. */
+        var syncChannel = getChannel();
+        var syncSince = getRequestTimestamp('since');
+        var syncWantChannels = flagDefaultsOn('channels');
+        var syncWantWho = flagDefaultsOn('who');
+        var syncWantPrivate = flagDefaultsOn('private');
+        var syncWantHistory = hasRequestParam('history') && getRequestValue('history', '0') !== '0';
+        var syncWantPresence = hasRequestParam('presence') && getRequestValue('presence', '0') !== '0';
+        var syncHistoryCount = 60;
+
+        if (hasRequestParam('count')) {
+            var syncRequestedCount = parseInt(getRequestValue('count', ''), 10);
+            if (!isNaN(syncRequestedCount) && syncRequestedCount > 0 && syncRequestedCount <= Math.max(60, _maxHistory)) {
+                syncHistoryCount = syncRequestedCount;
+            }
+        }
 
         reply = withClient(function (client) {
-            var history = getRecentHistory(client, 'channels.' + motdChannel + '.history', 10);
-            var latest = null;
-            var index = 0;
+            var ownAlias = user.number > 0 ? user.alias : '';
+            var isAuthed = user.number > 0 && user.alias !== settings.guest;
+            var channelReadable = isRegisteredPublicChannel(client, syncChannel);
+            var out = { channel: syncChannel, serverTime: Date.now() };
 
-            for (index = history.length - 1; index >= 0; index -= 1) {
-                if (!isPrivateMessage(history[index])) {
-                    latest = history[index];
-                    break;
+            if (syncWantChannels) {
+                out.channels = buildChannelSummaries(client, syncSince, ownAlias);
+            }
+            if (syncWantWho && channelReadable) {
+                out.who = { channel: syncChannel, users: buildWhoUsers(client, syncChannel) };
+            }
+            if (syncWantHistory && channelReadable) {
+                out.history = { channel: syncChannel, messages: buildPublicHistory(client, syncChannel, syncHistoryCount, ownAlias) };
+            }
+            if (syncWantPrivate && isAuthed) {
+                out.private = { threads: summarizePrivateThreads(client, user.alias, syncSince) };
+            }
+            if (syncWantPresence) {
+                /* who-users across occupied public rooms (+ the active one), all on
+                   this one connection - replaces the client's per-room who fan-out. */
+                var presenceNames = [];
+                var presenceSeen = {};
+                var presenceUsers = [];
+                var pi = 0;
+
+                function presenceAdd(nm) {
+                    var key = String(nm || '').toUpperCase();
+                    if (!nm || presenceSeen[key]) { return; }
+                    presenceSeen[key] = true;
+                    presenceNames.push(nm);
                 }
+
+                if (out.channels) {
+                    for (pi = 0; pi < out.channels.length; pi += 1) {
+                        if ((out.channels[pi].userCount || 0) > 0) { presenceAdd(out.channels[pi].name); }
+                    }
+                } else {
+                    var allPresenceNames = listPublicChannelNames(client);
+                    for (pi = 0; pi < allPresenceNames.length; pi += 1) { presenceAdd(allPresenceNames[pi]); }
+                }
+                if (channelReadable) { presenceAdd(syncChannel); }
+
+                for (pi = 0; pi < presenceNames.length; pi += 1) {
+                    presenceUsers = presenceUsers.concat(buildWhoUsers(client, presenceNames[pi]));
+                }
+                out.presence = presenceUsers;
             }
 
-            var ownAlias = user.number > 0 ? user.alias : '';
-            var formatted = latest ? formatChatMessage(latest, ownAlias) : null;
-
-            return {
-                channel: motdChannel,
-                message: formatted,
-                previewText: formatted ? trimText(formatted.text) : '',
-                timestamp: formatted && formatted.timestamp ? formatted.timestamp : 0,
-                serverTime: Date.now()
-            };
+            return out;
         });
         break;
 
@@ -704,6 +808,9 @@ switch (action) {
         var motdChannel = hasRequestParam('channel') ? sanitizeChannel(getRequestValue('channel', 'motd'), 'motd') : 'motd';
 
         reply = withClient(function (client) {
+            if (motdChannel !== 'motd' && !isRegisteredPublicChannel(client, motdChannel)) {
+                return { error: 'not found' };
+            }
             var history = getRecentHistory(client, 'channels.' + motdChannel + '.history', 10);
             var latest = null;
             var index = 0;
@@ -778,6 +885,9 @@ switch (action) {
 
         var createChannelName = getChannel();
         reply = withClient(function (client) {
+            if (!isWritablePublicChannel(client, createChannelName)) {
+                return { error: 'invalid channel' };
+            }
             ensureHistoryArray(client, 'channels.' + createChannelName + '.history');
             registerPublicChannel(client, createChannelName);
             return {
@@ -814,6 +924,9 @@ switch (action) {
         messageText = messageText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 
         reply = withClient(function (client) {
+            if (!isWritablePublicChannel(client, sendChannel)) {
+                return { error: 'invalid channel' };
+            }
             var packet = {
                 nick: buildOwnNick(),
                 str: messageText,

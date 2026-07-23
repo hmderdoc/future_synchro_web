@@ -194,7 +194,8 @@
         if (iframe) return;
         iframe = document.createElement('iframe');
         iframe.id = 'terminal-iframe';
-        iframe.src = './terminal-iframe.html';
+        iframe.src = './terminal-iframe.html?_v=' +
+            encodeURIComponent(cfg.webBuildToken || Date.now());
         iframe.style.cssText =
             'border:none;width:100%;height:100%;display:block;background:#000;';
         iframe.tabIndex = -1;

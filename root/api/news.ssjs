@@ -18,11 +18,11 @@ load('http.js');
 var MODS_DIR = system.mods_dir || (js.exec_dir + '../mods/');
 if (MODS_DIR.slice(-1) !== '/' && MODS_DIR.slice(-1) !== '\\') MODS_DIR += '/';
 
-var INI_PATH  = MODS_DIR + 'future_shell/config/newsreader.ini';
+var INI_PATH  = MODS_DIR + 'fshell_ts/config/newsreader.ini';
 var CACHE_PATH = system.data_dir + 'newsreader_web.json';
 var FAV_DIR   = MODS_DIR + 'future_shell/data/newsreader/';
-var ICON_DIR  = MODS_DIR + 'future_shell/assets/newsreader/';
-var ASSETS_DIR = MODS_DIR + 'future_shell/assets/';
+var ICON_DIR  = system.text_dir + 'icons/newsreader/';
+var ASSETS_DIR = system.text_dir + 'icons/';
 
 /* ── helpers ────────────────────────────────────────────────────────── */
 

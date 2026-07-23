@@ -19,6 +19,7 @@ load('sbbsdefs.js');
 var settings = load('modopts.js', 'web');
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
+var NewsflipContent = load('newsflip_content.js');  // shared full-text extractor (web + BBS)
 
 var CACHE_DIR = system.data_dir + 'newsflip/';
 var ARTICLES_PATH  = CACHE_DIR + 'articles.json';
@@ -72,55 +73,8 @@ function asciiSafeJson(str) {
     return out;
 }
 
-function cleanStr(s) {
-    if (!s) return '';
-    var out = '';
-    for (var i = 0; i < s.length; i++) {
-        var c = s.charCodeAt(i);
-        if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) {
-            out += ' ';
-        } else if (c === 0x7f) {
-            /* skip DEL */
-        } else {
-            out += s.charAt(i);
-        }
-    }
-    return out;
-}
-
-function decodeEntities(s) {
-    if (!s) return s;
-    return s.replace(/&#(\d+);/g, function (m, c) { return String.fromCharCode(parseInt(c, 10)); })
-            .replace(/&#x([0-9a-fA-F]+);/g, function (m, c) { return String.fromCharCode(parseInt(c, 16)); })
-            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-            .replace(/&rsquo;/g, '\u2019').replace(/&lsquo;/g, '\u2018')
-            .replace(/&rdquo;/g, '\u201D').replace(/&ldquo;/g, '\u201C')
-            .replace(/&mdash;/g, '\u2014').replace(/&ndash;/g, '\u2013')
-            .replace(/&hellip;/g, '\u2026').replace(/&nbsp;/g, ' ');
-}
-
-/* ── XML helpers (used by get-article-content) ────────────────────── */
-
-function extractTag(xml, tagName) {
-    var re1 = new RegExp('<' + tagName + '[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</' + tagName + '>', 'i');
-    var m1 = xml.match(re1);
-    if (m1) return m1[1].trim();
-    var re2 = new RegExp('<' + tagName + '[^>]*>([\\s\\S]*?)</' + tagName + '>', 'i');
-    var m2 = xml.match(re2);
-    return m2 ? m2[1].trim() : '';
-}
-
-function extractLink(xml) {
-    var atom = xml.match(/<link[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i);
-    if (atom) return atom[1];
-    atom = xml.match(/<link[^>]*href=["']([^"']+)["'][^>]*rel=["']alternate["']/i);
-    if (atom) return atom[1];
-    atom = xml.match(/<link[^>]*href=["']([^"']+)["']/i);
-    if (atom) return atom[1];
-    var rss = xml.match(/<link>([^<]+)<\/link>/i);
-    if (rss) return rss[1].trim();
-    return '';
-}
+/* Full-article content extraction (fetch + Readability, RSS fallback) now
+ * lives in the shared newsflip_content.js module; see get-article-content. */
 
 /* ── article loading (cache-only) ─────────────────────────────────── */
 
@@ -262,89 +216,24 @@ case 'get-article-content': {
         : '';
     if (!artId) { jsonReply({ error: 'missing id' }); break; }
 
-    /* Check content cache first */
-    mkdirp(CONTENT_DIR);
-    var cPath = CONTENT_DIR + artId + '.json';
-    if (file_exists(cPath)) {
-        try {
-            var cf = new File(cPath);
-            if (cf.open('r')) {
-                var cached = cf.read();
-                cf.close();
-                http_reply.header['Content-Type'] = 'application/json; charset=utf-8';
-                write(cached);
-                break;
-            }
-        } catch(e) {}
-    }
-
-    /* Find article in main cache */
+    /* Find article in main cache so the extractor has link/feedUrl/meta. */
     var allArts = loadArticles();
     var art = null;
     for (var ai = 0; ai < allArts.length; ai++) {
         if (allArts[ai].id === artId) { art = allArts[ai]; break; }
     }
-    if (!art) { jsonReply({ error: 'not found' }); break; }
 
-    /* Fetch the feed and extract full content */
-    var content = '';
-    if (art.feedUrl) {
-        try {
-            load('http.js');
-            var req2 = new HTTPRequest();
-            req2.recv_timeout = 15;  /* 15-second timeout */
-            var xml2 = req2.Get(art.feedUrl);
-            if (xml2 && xml2.length > 50) {
-                /* Find matching item by link */
-                var itemPat2 = /<item[\s>]([\s\S]*?)<\/item>/gi;
-                var xmlItems2 = xml2.match(itemPat2);
-                if (!xmlItems2) {
-                    itemPat2 = /<entry[\s>]([\s\S]*?)<\/entry>/gi;
-                    xmlItems2 = xml2.match(itemPat2);
-                }
-                if (xmlItems2) {
-                    for (var xi = 0; xi < xmlItems2.length; xi++) {
-                        var xLink = extractLink(xmlItems2[xi]);
-                        if (xLink === art.link) {
-                            content = extractTag(xmlItems2[xi], 'content:encoded');
-                            if (!content) {
-                                var altContent = extractTag(xmlItems2[xi], 'content');
-                                var altDesc = extractTag(xmlItems2[xi], 'description') || extractTag(xmlItems2[xi], 'summary');
-                                content = (altContent && altContent.length > (altDesc || '').length) ? altContent : (altDesc || '');
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch(e) {
-            log(LOG_WARNING, 'newsflip: content fetch error: ' + e.message);
-        }
-    }
+    /* Cache-only fallback: if the story aged out of the main cache but we
+     * already extracted its content, serve that rather than 404. */
+    if (!art) { art = { id: artId }; }
 
-    content = decodeEntities(content) || '';
-    var textOnly = content.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-
-    var result = {
-        id: artId,
-        title: art.title,
-        link: art.link,
-        source: art.source,
-        timestamp: art.timestamp,
-        image: art.image,
-        content: cleanStr(content),
-        hasContent: textOnly.length > 200
-    };
-
-    var cacheJson = asciiSafeJson(JSON.stringify(result));
-    var wf = new File(cPath);
-    if (wf.open('w')) {
-        wf.write(cacheJson);
-        wf.close();
-    }
+    /* Shared extractor: article URL + Mozilla Readability, falling back to the
+     * RSS content tag. Reads/writes content/<id>.json (shared with the BBS). */
+    var result = NewsflipContent.getArticleContent(art);
+    if (!result) { jsonReply({ error: 'not found' }); break; }
 
     http_reply.header['Content-Type'] = 'application/json; charset=utf-8';
-    write(cacheJson);
+    write(NewsflipContent.asciiSafeJson(JSON.stringify(result)));
     break;
 }
 

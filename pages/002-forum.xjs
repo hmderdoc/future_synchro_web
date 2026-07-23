@@ -6,9 +6,7 @@
     locale.section = 'page_forum';
 
     /* Icon resolution for breadcrumbs */
-    var _fIconDir = system.mods_dir;
-    if (_fIconDir && _fIconDir.slice(-1) !== '/' && _fIconDir.slice(-1) !== '\\') _fIconDir += '/';
-    _fIconDir += 'future_shell/assets/';
+    var _fIconDir = system.text_dir + 'icons/';
     function _fIconFind(name, fallback) {
         if (!name) name = fallback;
         var names = [name];

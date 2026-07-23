@@ -41,7 +41,7 @@ if (uf.exists && uf.open('r')) {
     uf.close();
 }
 
-var iconsDir = modsDir + 'future_shell/assets/';
+var iconsDir = system.text_dir + 'icons/';
 var gameIcons = {};
 try {
     var binList = directory(iconsDir + '*.bin') || [];

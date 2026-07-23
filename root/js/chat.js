@@ -1309,40 +1309,44 @@
         });
     }
 
+    function applyRoomSummaries(summaries, serverTime, silent) {
+        summaries = Array.isArray(summaries) ? summaries : [];
+        serverTime = serverTime || Date.now();
+        var nextRooms = [];
+
+        summaries.forEach(function (summary) {
+            var room = ensureRoom(summary.name);
+            room.userCount = summary.userCount || 0;
+            room.lastTimestamp = summary.lastTimestamp || 0;
+            room.newCount = summary.newCount || 0;
+
+            if (
+                !_realtimeHealthy &&
+                (summary.newCount || 0) > 0 &&
+                !(normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name))
+            ) {
+                _unreadChannels[normalizeUpper(summary.name)] = (_unreadChannels[normalizeUpper(summary.name)] || 0) + summary.newCount;
+            }
+
+            if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name)) {
+                _unreadChannels[normalizeUpper(summary.name)] = 0;
+            }
+
+            nextRooms.push(room);
+        });
+
+        _rooms = nextRooms.length ? nextRooms : [ensureRoom(_currentChannel)];
+        ensureRoom(_currentChannel);
+        _lastRoomPollAt = serverTime;
+        _serviceHealthy = true;
+        if (!silent) refreshStatus();
+        dispatchRooms();
+    }
+
     function loadRoomSummaries(silent) {
         var url = './api/chat.ssjs?action=channels';
         return fetchJSON(url + (_lastRoomPollAt > 0 ? '&since=' + encodeURIComponent(String(_lastRoomPollAt)) : '')).then(function (response) {
-            var summaries = response && Array.isArray(response.channels) ? response.channels : [];
-            var serverTime = response && response.serverTime ? response.serverTime : Date.now();
-            var nextRooms = [];
-
-            summaries.forEach(function (summary) {
-                var room = ensureRoom(summary.name);
-                room.userCount = summary.userCount || 0;
-                room.lastTimestamp = summary.lastTimestamp || 0;
-                room.newCount = summary.newCount || 0;
-
-                if (
-                    !_realtimeHealthy &&
-                    (summary.newCount || 0) > 0 &&
-                    !(normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name))
-                ) {
-                    _unreadChannels[normalizeUpper(summary.name)] = (_unreadChannels[normalizeUpper(summary.name)] || 0) + summary.newCount;
-                }
-
-                if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name)) {
-                    _unreadChannels[normalizeUpper(summary.name)] = 0;
-                }
-
-                nextRooms.push(room);
-            });
-
-            _rooms = nextRooms.length ? nextRooms : [ensureRoom(_currentChannel)];
-            ensureRoom(_currentChannel);
-            _lastRoomPollAt = serverTime;
-            _serviceHealthy = true;
-            if (!silent) refreshStatus();
-            dispatchRooms();
+            applyRoomSummaries(response && response.channels, response && response.serverTime, silent);
             return true;
         }).catch(function () {
             _serviceHealthy = false;
@@ -1360,52 +1364,7 @@
 
         var url = './api/chat.ssjs?action=private';
         return fetchJSON(url + (_lastPrivatePollAt > 0 ? '&since=' + encodeURIComponent(String(_lastPrivatePollAt)) : '')).then(function (response) {
-            var threads = response && Array.isArray(response.threads) ? response.threads : [];
-            var serverTime = response && response.serverTime ? response.serverTime : Date.now();
-            var nextThreads = [];
-            var seen = {};
-
-            threads.forEach(function (summary) {
-                var thread = upsertPrivateThread(summary);
-                var key = buildThreadKey(thread.name, thread.system || '');
-
-                if (
-                    !_realtimeHealthy &&
-                    (summary.newCount || 0) > 0 &&
-                    !(normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey())
-                ) {
-                    _unreadPrivate[key] = (_unreadPrivate[key] || 0) + summary.newCount;
-                }
-
-                if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey()) {
-                    _unreadPrivate[key] = 0;
-                }
-
-                if (!seen[key]) {
-                    seen[key] = true;
-                    nextThreads.push(thread);
-                }
-            });
-
-            if (normalizeUpper(_activeView.type) === 'PRIVATE') {
-                if (!nextThreads.some(function (thread) {
-                    return buildThreadKey(thread.name, thread.system || '') === getCurrentPrivateKey();
-                })) {
-                    nextThreads.push({
-                        name: _activeView.name,
-                        system: _activeView.system || '',
-                        avatar: _activeView.avatar || undefined,
-                        lastTimestamp: 0,
-                        preview: ''
-                    });
-                }
-            }
-
-            _privateThreads = nextThreads;
-            _lastPrivatePollAt = serverTime;
-            _serviceHealthy = true;
-            if (!silent) refreshStatus();
-            dispatchPrivateThreads();
+            applyPrivateThreads(response && response.threads, response && response.serverTime, silent);
             return true;
         }).catch(function () {
             _serviceHealthy = false;
@@ -1414,25 +1373,74 @@
         });
     }
 
+    function applyPrivateThreads(threads, serverTime, silent) {
+        threads = Array.isArray(threads) ? threads : [];
+        serverTime = serverTime || Date.now();
+        var nextThreads = [];
+        var seen = {};
+
+        threads.forEach(function (summary) {
+            var thread = upsertPrivateThread(summary);
+            var key = buildThreadKey(thread.name, thread.system || '');
+
+            if (
+                !_realtimeHealthy &&
+                (summary.newCount || 0) > 0 &&
+                !(normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey())
+            ) {
+                _unreadPrivate[key] = (_unreadPrivate[key] || 0) + summary.newCount;
+            }
+
+            if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey()) {
+                _unreadPrivate[key] = 0;
+            }
+
+            if (!seen[key]) {
+                seen[key] = true;
+                nextThreads.push(thread);
+            }
+        });
+
+        if (normalizeUpper(_activeView.type) === 'PRIVATE') {
+            if (!nextThreads.some(function (thread) {
+                return buildThreadKey(thread.name, thread.system || '') === getCurrentPrivateKey();
+            })) {
+                nextThreads.push({
+                    name: _activeView.name,
+                    system: _activeView.system || '',
+                    avatar: _activeView.avatar || undefined,
+                    lastTimestamp: 0,
+                    preview: ''
+                });
+            }
+        }
+
+        _privateThreads = nextThreads;
+        _lastPrivatePollAt = serverTime;
+        _serviceHealthy = true;
+        if (!silent) refreshStatus();
+        dispatchPrivateThreads();
+    }
+
+    function applyPublicHistory(response, silent) {
+        var nextMessages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
+        var messagesChanged = !messagesMatch(_messages, nextMessages);
+        if (messagesChanged) {
+            _messages = nextMessages;
+        }
+        if (_chatPageActive) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
+        _serviceHealthy = true;
+        if (!silent) refreshStatus();
+        if (messagesChanged) {
+            dispatchMessages();
+        }
+        dispatchRooms();
+    }
+
     function loadPublicHistory(silent) {
         return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)).then(function (response) {
-            var nextMessages;
-            var messagesChanged;
-
             if (response && response.error) throw new Error(String(response.error));
-
-            nextMessages = normalizeMessages(response && Array.isArray(response.messages) ? response.messages : []);
-            messagesChanged = !messagesMatch(_messages, nextMessages);
-            if (messagesChanged) {
-                _messages = nextMessages;
-            }
-            if (_chatPageActive) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
-            _serviceHealthy = true;
-            if (!silent) refreshStatus();
-            if (messagesChanged) {
-                dispatchMessages();
-            }
-            dispatchRooms();
+            applyPublicHistory(response, silent);
             return true;
         }).catch(function () {
             _serviceHealthy = false;
@@ -1496,14 +1504,18 @@
         return loadPublicHistory(silent);
     }
 
+    function applyUsers(users, silent) {
+        _users = Array.isArray(users) ? users : [];
+        _serviceHealthy = true;
+        if (!silent) refreshStatus();
+        dispatchUsers();
+    }
+
     function loadUsers(channel, silent) {
         var ch = sanitizeChannelName(channel || _currentChannel);
         return fetchJSON('./api/chat.ssjs?action=who&channel=' + encodeURIComponent(ch)).then(function (response) {
             if (response && response.error) throw new Error(String(response.error));
-            _users = response && Array.isArray(response.users) ? response.users : [];
-            _serviceHealthy = true;
-            if (!silent) refreshStatus();
-            dispatchUsers();
+            applyUsers(response && response.users, silent);
             return true;
         }).catch(function () {
             _serviceHealthy = false;
@@ -1540,15 +1552,19 @@
                 }
             });
 
-            rebuildOnlinePresence(combined);
-            _serviceHealthy = true;
-            if (!silent) refreshStatus();
+            applyPresence(combined, silent);
             return true;
         }).catch(function () {
             _serviceHealthy = false;
             if (!silent) refreshStatus();
             return false;
         });
+    }
+
+    function applyPresence(combined, silent) {
+        rebuildOnlinePresence(Array.isArray(combined) ? combined : []);
+        _serviceHealthy = true;
+        if (!silent) refreshStatus();
     }
 
     function sendPublicMessage(text) {
@@ -1595,25 +1611,61 @@
     function reconcileState(forceUsers) {
         // Skip when visualizer is active — reduce background work
         if (!forceUsers && document.body.classList.contains('viz-open')) return;
-        return loadRoomSummaries(true).then(function () {
-            var work = [
-                loadPrivateThreads(true),
-                loadActiveHistory(true),
-                loadPresenceMap(true)
-            ];
 
-            _usersRefreshTick += 1;
-            if (forceUsers || _chatPageActive || _usersRefreshTick >= 2) {
-                _usersRefreshTick = 0;
-                work.push(loadUsers(_currentChannel, true));
+        // One combined ?action=sync request per tick instead of the old fan-out
+        // (channels + private + history + presence(one who PER room) + who). The
+        // server bundles all of those over a single JSONClient connection, which is
+        // what was churning the JSON service. Private-thread history is the only
+        // piece still fetched on its own, and only while a DM is open.
+        _usersRefreshTick += 1;
+        var wantUsers = forceUsers || _chatPageActive || _usersRefreshTick >= 2;
+        if (wantUsers) _usersRefreshTick = 0;
+
+        var isPrivateView = normalizeUpper(_activeView.type) === 'PRIVATE';
+        var since = Math.min(_lastRoomPollAt || 0, _lastPrivatePollAt || 0);
+
+        var url = './api/chat.ssjs?action=sync'
+            + '&channel=' + encodeURIComponent(_currentChannel)
+            + '&who=' + (wantUsers ? '1' : '0')
+            + '&presence=1'
+            + '&history=' + (isPrivateView ? '0' : '1')
+            + (since > 0 ? '&since=' + encodeURIComponent(String(since)) : '');
+
+        return fetchJSON(url).then(function (response) {
+            if (!response || response.error) {
+                _serviceHealthy = false;
+                return false;
             }
 
-            return Promise.all(work).then(function () {
-                return true;
-            }).catch(function () {
-                return false;
-            });
+            applyRoomSummaries(response.channels, response.serverTime, true);
+
+            if (response.private) {
+                applyPrivateThreads(response.private.threads, response.serverTime, true);
+            } else if (!isLoggedIn()) {
+                applyPrivateThreads([], response.serverTime, true);
+            }
+
+            if (wantUsers && response.who) {
+                applyUsers(response.who.users, true);
+            }
+
+            if (response.presence) {
+                applyPresence(response.presence, true);
+            }
+
+            if (!isPrivateView && response.history) {
+                applyPublicHistory(response.history, true);
+            }
+
+            _serviceHealthy = true;
+
+            // sync only carries public-channel history; refresh an open DM thread on its own.
+            if (isPrivateView) {
+                return loadPrivateHistory(true).then(function () { return true; }).catch(function () { return false; });
+            }
+            return true;
         }).catch(function () {
+            _serviceHealthy = false;
             return false;
         });
     }

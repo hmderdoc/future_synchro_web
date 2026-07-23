@@ -56,6 +56,7 @@
             rootDir + 'index.xjs',
             rootDir + 'sw.ssjs',
             rootDir + 'terminal-iframe.html',
+            rootDir + 'js/ansi-music.js',
             rootDir + 'js/mobile-input.js',
             rootDir + 'js/terminal.js',
             rootDir + 'js/spa.js',
@@ -226,9 +227,7 @@
 
 <!-- BIN icon data (server-side encoded) -->
 <?xjs
-    var _binIconDir = system.mods_dir;
-    if (_binIconDir && _binIconDir.slice(-1) !== '/' && _binIconDir.slice(-1) !== '\\') _binIconDir += '/';
-    _binIconDir += 'future_shell/assets/';
+    var _binIconDir = system.text_dir + 'icons/';
     var _binIconMap = {
         home: 'home2', forum: 'forum_lda', files: 'floppy_disk_icon_final',
         games: 'games', chat: 'json_chat_lda', terminal: 'monitor',
