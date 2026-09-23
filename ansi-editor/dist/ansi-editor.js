@@ -450,7 +450,8 @@ var AnsiEditorModule = (() => {
       const changes = this.undoStack.pop();
       const redo = [];
       const affected = [];
-      for (const ch of changes) {
+      for (let i = changes.length - 1; i >= 0; i--) {
+        const ch = changes[i];
         const idx = ch.y * this.columns + ch.x;
         redo.push({ x: ch.x, y: ch.y, old: { ...this.data[idx] } });
         this.data[idx] = { ...ch.old };
@@ -465,7 +466,8 @@ var AnsiEditorModule = (() => {
       const changes = this.redoStack.pop();
       const undo = [];
       const affected = [];
-      for (const ch of changes) {
+      for (let i = changes.length - 1; i >= 0; i--) {
+        const ch = changes[i];
         const idx = ch.y * this.columns + ch.x;
         undo.push({ x: ch.x, y: ch.y, old: { ...this.data[idx] } });
         this.data[idx] = { ...ch.old };

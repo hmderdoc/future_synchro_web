@@ -1,0 +1,1 @@
+/sbbs/xtrn/wiki/dist/wiki-core.js

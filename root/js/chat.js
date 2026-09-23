@@ -13,6 +13,8 @@
     var TOAST_DURATION = 30000;
     var MAX_TOASTS = 4;
     var RECONCILE_INTERVAL = 15000;
+    var BRIDGE_POLL_INTERVAL = 4000;
+    var _bridgeTimer = null;
     var RECONNECT_DELAY = 4000;
     var LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
     var LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
@@ -216,7 +218,13 @@
             return buildBitmapPreview(parsed);
         }
 
-        return String(text || '');
+        // Mystic/MRC pipe colour codes (|00-|23) colour the bubble on the chat
+        // page (chat-embeds.js); a toast or thread preview is plain text, so
+        // drop them rather than show "|22". Control markers keep their pipes.
+        if (/^\s*\[(BITMAP|TVTUNER)\|/.test(String(text || ''))) {
+            return String(text || '');
+        }
+        return String(text || '').replace(/\|(0[0-9]|1[0-9]|2[0-3])/g, '');
     }
 
     function buildBitmapKey(text) {
@@ -864,6 +872,217 @@
         return record;
     }
 
+    // CP437 positions that terminals interpret as control codes rather than
+    // display; their glyphs can't survive a plain .ans byte stream.
+    var ANS_UNSAFE_BYTES = { 7: 1, 8: 1, 9: 1, 10: 1, 12: 1, 13: 1, 26: 1, 27: 1 };
+
+    /**
+     * Serialize a decoded bitmap record into .ans body bytes: CP437 chars
+     * with ANSI SGR color sequences. fg/bg in record.bitmap are xterm-order,
+     * which is exactly the SGR 30-37/40-47 color order.
+     * Returns { bytes: number[], ice: boolean } - ice is true when any
+     * bright background is used (rendered as blink + SAUCE iCE flag).
+     */
+    function encodeBitmapAnsBody(record) {
+        var bytes = [];
+        var cur = { bold: false, blink: false, fg: 7, bg: 0 };
+        var ice = false;
+        var width = record.width;
+        var height = record.height;
+        var y;
+        var x;
+        var last;
+        var cell;
+        var bold;
+        var blink;
+        var fg;
+        var bg;
+        var code;
+        var params;
+
+        function sgr(list) {
+            var seq = '[' + list.join(';') + 'm';
+            var index;
+            bytes.push(27);
+            for (index = 0; index < seq.length; index += 1) {
+                bytes.push(seq.charCodeAt(index));
+            }
+        }
+
+        for (y = 0; y < height; y += 1) {
+            // Trim trailing spaces on the default background; SAUCE keeps
+            // the true dimensions either way.
+            last = width - 1;
+            while (last >= 0) {
+                cell = record.bitmap[y * width + last];
+                if (cell && ((cell.charCode || 32) !== 32 || (cell.bg || 0) !== 0)) {
+                    break;
+                }
+                last -= 1;
+            }
+
+            for (x = 0; x <= last; x += 1) {
+                cell = record.bitmap[y * width + x] || { charCode: 32, fg: 7, bg: 0 };
+                bold = (cell.fg & 8) !== 0;
+                blink = (cell.bg & 8) !== 0;
+                fg = cell.fg & 7;
+                bg = cell.bg & 7;
+                if (blink) {
+                    ice = true;
+                }
+
+                params = [];
+                if ((cur.bold && !bold) || (cur.blink && !blink)) {
+                    params.push('0');
+                    cur.bold = false;
+                    cur.blink = false;
+                    cur.fg = 7;
+                    cur.bg = 0;
+                }
+                if (bold && !cur.bold) params.push('1');
+                if (blink && !cur.blink) params.push('5');
+                if (fg !== cur.fg) params.push('3' + fg);
+                if (bg !== cur.bg) params.push('4' + bg);
+                if (params.length) {
+                    sgr(params);
+                    cur.bold = bold;
+                    cur.blink = blink;
+                    cur.fg = fg;
+                    cur.bg = bg;
+                }
+
+                code = (cell.charCode || 32) & 0xFF;
+                bytes.push(ANS_UNSAFE_BYTES[code] ? 32 : code);
+            }
+
+            // Full-width rows get no CRLF: viewers wrap at the SAUCE width
+            // and treat an explicit newline after the wrap as a blank row
+            // (Moebius's exporter follows the same convention).
+            if (y < height - 1 && last + 1 < width) {
+                if (cur.bg !== 0 || cur.blink) {
+                    sgr(['0']);
+                    cur.bold = false;
+                    cur.blink = false;
+                    cur.fg = 7;
+                    cur.bg = 0;
+                }
+                bytes.push(13, 10);
+            }
+        }
+
+        sgr(['0']);
+        return { bytes: bytes, ice: ice };
+    }
+
+    /**
+     * Build the 129-byte trailer: EOF (0x1A) + a SAUCE00 record.
+     * DataType 1/FileType 1 = Character/ANSi, TInfo1 = width in chars,
+     * TInfo2 = line count, TFlags = iCE colors + 8-pixel font.
+     */
+    function buildSauceTrailer(opts) {
+        var buf = new Uint8Array(129);
+        var i;
+
+        function putStr(offset, str, len, padByte) {
+            var s = String(str || '');
+            var index;
+            for (index = 0; index < len; index += 1) {
+                buf[offset + index] = index < s.length ? (s.charCodeAt(index) & 0xFF) : padByte;
+            }
+        }
+
+        buf[0] = 26;
+        putStr(1, 'SAUCE00', 7, 32);
+        putStr(8, opts.title, 35, 32);
+        putStr(43, opts.author, 20, 32);
+        putStr(63, opts.group, 20, 32);
+        putStr(83, opts.date, 8, 32);
+        for (i = 0; i < 4; i += 1) {
+            buf[91 + i] = (opts.fileSize >>> (i * 8)) & 0xFF;
+        }
+        buf[95] = 1;
+        buf[96] = 1;
+        buf[97] = opts.width & 0xFF;
+        buf[98] = (opts.width >>> 8) & 0xFF;
+        buf[99] = opts.height & 0xFF;
+        buf[100] = (opts.height >>> 8) & 0xFF;
+        buf[106] = (opts.ice ? 1 : 0) | 2;
+        putStr(107, 'IBM VGA', 22, 0);
+        return buf;
+    }
+
+    /**
+     * Save a bitmap chat message as a .ans file (CP437 + SGR colors + SAUCE).
+     * timestampMs (the message time) becomes the SAUCE date when provided.
+     */
+    function downloadBitmapAns(record, timestampMs) {
+        var body;
+        var date;
+        var sauce;
+        var out;
+        var name;
+        var url;
+        var link;
+
+        try {
+            decodeBitmapRecord(record);
+        } catch (_err) {
+            return;
+        }
+        if (!record.bitmap || !record.width || !record.height) {
+            return;
+        }
+
+        body = encodeBitmapAnsBody(record);
+        date = timestampMs ? new Date(timestampMs) : new Date();
+        sauce = buildSauceTrailer({
+            title: 'webchat drawing',
+            author: String(record.fromName || '').slice(0, 20),
+            group: String((window.sbbsConfig && window.sbbsConfig.systemName) || '').slice(0, 20),
+            date: String(date.getFullYear()) +
+                ('0' + (date.getMonth() + 1)).slice(-2) +
+                ('0' + date.getDate()).slice(-2),
+            fileSize: body.bytes.length,
+            width: record.width,
+            height: record.height,
+            ice: body.ice
+        });
+
+        out = new Uint8Array(body.bytes.length + sauce.length);
+        out.set(body.bytes, 0);
+        out.set(sauce, body.bytes.length);
+
+        name = String(record.fromName || '').replace(/[^A-Za-z0-9_-]+/g, '') || 'chat';
+        url = URL.createObjectURL(new Blob([out], { type: 'application/octet-stream' }));
+        link = document.createElement('a');
+        link.href = url;
+        link.download = name + '-' + record.width + 'x' + record.height + '.ans';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    function buildBitmapDownloadButton(el, record) {
+        var button = document.createElement('button');
+        var ts = parseInt(el.getAttribute('data-chat-bitmap-ts') || '', 10) || 0;
+
+        button.type = 'button';
+        button.className = 'chat-bitmap-download';
+        button.title = 'Download .ans';
+        button.setAttribute('aria-label', 'Download as ANSI file');
+        button.innerHTML =
+            '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">' +
+            '<path d="M7.25 1.5h1.5v6.63l2.44-2.44 1.06 1.06L8 11 3.75 6.75l1.06-1.06 2.44 2.44V1.5z"/>' +
+            '<path d="M2.5 12.5h11V14h-11v-1.5z"/></svg>';
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            downloadBitmapAns(record, ts);
+        });
+        return button;
+    }
+
     function updateBitmapElement(el, record) {
         var text;
         var placeholder;
@@ -898,6 +1117,7 @@
             img.src = record.dataURL;
             el.classList.add('is-ready');
             el.appendChild(img);
+            el.appendChild(buildBitmapDownloadButton(el, record));
             return;
         }
 
@@ -1214,6 +1434,8 @@
         return _rooms.map(function (room) {
             return {
                 name: room.name,
+                bridge: room.bridge || '',
+                label: room.label || '',
                 userCount: room.userCount || 0,
                 lastTimestamp: room.lastTimestamp || 0,
                 newCount: room.newCount || 0,
@@ -1316,6 +1538,10 @@
 
         summaries.forEach(function (summary) {
             var room = ensureRoom(summary.name);
+            // DDial / MRC rooms (served by their multiplexer): the page shows
+            // these as network TABS, not as entries in the room list.
+            room.bridge = summary.bridge || '';
+            room.label = summary.label || '';
             room.userCount = summary.userCount || 0;
             room.lastTimestamp = summary.lastTimestamp || 0;
             room.newCount = summary.newCount || 0;
@@ -1438,7 +1664,8 @@
     }
 
     function loadPublicHistory(silent) {
-        return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)).then(function (response) {
+        return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)
+            + '&active=' + (_chatPageActive ? '1' : '0')).then(function (response) {
             if (response && response.error) throw new Error(String(response.error));
             applyPublicHistory(response, silent);
             return true;
@@ -1629,6 +1856,10 @@
             + '&who=' + (wantUsers ? '1' : '0')
             + '&presence=1'
             + '&history=' + (isPrivateView ? '0' : '1')
+            // Bridged rooms: on MRC a poll IS the user's presence on the
+            // network, so the server only keeps that alive while the chat
+            // page itself is showing - not while they read the forum.
+            + '&active=' + (_chatPageActive ? '1' : '0')
             + (since > 0 ? '&since=' + encodeURIComponent(String(since)) : '');
 
         return fetchJSON(url).then(function (response) {
@@ -1675,6 +1906,22 @@
         _reconcileTimer = setInterval(function () {
             reconcileState(false);
         }, RECONCILE_INTERVAL);
+        // DDial / MRC rooms are served by their multiplexer, not the JSON chat
+        // service, so they have no push channel: while one is open on the chat
+        // page, fetch it on a short loop instead of waiting for the 15s sync.
+        if (!_bridgeTimer) {
+            _bridgeTimer = setInterval(function () {
+                if (!_chatPageActive || document.hidden) return;
+                if (normalizeUpper(_activeView.type) === 'PRIVATE') return;
+                if (!isBridgeRoom(_currentChannel)) return;
+                loadPublicHistory(true);
+            }, BRIDGE_POLL_INTERVAL);
+        }
+    }
+
+    function isBridgeRoom(name) {
+        var key = normalizeUpper(name);
+        return key === 'DDIAL' || key === 'MRC';
     }
 
     function scheduleHistoryRefresh() {

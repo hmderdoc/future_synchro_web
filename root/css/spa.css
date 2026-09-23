@@ -4304,3 +4304,10 @@ body.avatar-settings-modal-open {
         margin: 0.5rem auto;
     }
 }
+
+/* Play-count badge on library rows (Most Played sort / top songs) */
+.rl-track-plays {
+    background: rgba(255, 255, 85, 0.08);
+    color: #FFFF55;
+    margin-left: 4px;
+}

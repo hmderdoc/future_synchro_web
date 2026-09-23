@@ -15,6 +15,7 @@
 - COOL CUSTOM ICONS: Use ANSI graphics (in .bin format) as icons for the web
 - FILE AREA: Added File previews (mp3,bitmaps, ansi)
 - AVATAR CHAT: Chat interbbs using JSON-CHAT and synchronet avatars.
+- CHAT LINK & MEDIA EMBEDS: bare image/video/audio URLs pasted in chat render inline cards; YouTube/Vimeo links become click-to-play poster cards; any other link gets an OpenGraph preview card (title/description/thumbnail) via an auth-gated, SSRF-guarded server-side fetcher with disk caching (`root/api/link-preview.ssjs` + `lib/link-preview.js`). Playback opens in a floating dock that survives chat re-renders and SPA navigation (`root/js/chat-embeds.js`; tests: `node test-chat-embeds.js`, `jsexec test-link-preview.js`).
 - AVATAR MADNESS: Avatar based user lists, last callers, one liners and chat components.
 - LOOK AT ART ON THE WEB: Web version of ANSI viewer.
 - FTELNET monkey patching: make responsive and process packets faster.

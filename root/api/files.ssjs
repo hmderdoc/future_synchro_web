@@ -6,6 +6,9 @@ load(settings.web_lib + 'auth.js');
 load(settings.web_lib + 'files.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
 var Filebase = require({}, 'filebase.js', 'OldFileBase');
+// Shared play-count store (also used by the fl_records door).
+try { load(system.mods_dir + 'load/fl_playcounts.js'); } catch (playCountLoadErr) { }
+var playCounts = (typeof FLPlayCounts !== 'undefined') ? FLPlayCounts : null;
 
 var CHUNK_SIZE = 1024;
 var TRACK_META_READ_BYTES = 262144;
@@ -709,13 +712,17 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				if (fb.open()) {
 					var flist = fb.get_list('*.mp3', FileBase.DETAIL.NORM, 0, true, FileBase.SORT.DATE_D);
 					var overrides = loadTrackOverrides();
+					var listCounts = playCounts ? playCounts.counts() : {};
 					fb.close();
 					reply = [];
 					for (var fi = 0; fi < flist.length; fi++) {
+						var listCount = listCounts[String(flist[fi].name).toLowerCase()];
 						reply.push({
 							name: flist[fi].name,
 							desc: flist[fi].desc || '',
 							added: flist[fi].added || 0,
+							plays: listCount ? listCount.plays : 0,
+							last_played: listCount ? listCount.last_played : 0,
 							tags: (function(t, e) { var c = loadCharOverride(file_area.dir[ldir].path + e.name); if (c) t.character = c; return t; })(copyTags(overrides[trackOverrideSection(flist[fi].name)] || {}), flist[fi])
 						});
 					}
@@ -809,6 +816,96 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 					: 'Could not update track metadata';
 			}
 			break;
+		case 'record-play':
+			// A client reports it has heard `listened` seconds of `file`
+			// (`duration` = track length). The shared store decides whether
+			// that is a play (30s rule) and throttles repeat counts per user.
+			var pdir = request.get_param('dir');
+			if (http_request.method !== 'POST') {
+				reply.error = 'POST required';
+				break;
+			}
+			if (!validateCsrfToken()) {
+				reply.error = 'Invalid CSRF token';
+				break;
+			}
+			if (pdir === undefined
+				|| file_area.dir[pdir] === undefined
+				|| !file_area.dir[pdir].can_download
+				|| !user.compare_ars(file_area.dir[pdir].download_ars)
+			) {
+				reply.error = 'Invalid directory or access denied';
+				break;
+			}
+			if (!playCounts) {
+				reply.error = 'Play counting unavailable';
+				break;
+			}
+			var playFile = trimText(getRequestValue('file', ''));
+			if (!playFile.length) {
+				reply.error = 'Track file is required';
+				break;
+			}
+			var playRecord = findFileRecord(pdir, playFile);
+			if (!playRecord || !playRecord.path) {
+				reply.error = 'File not found';
+				break;
+			}
+			try {
+				var playResult = playCounts.record(playRecord.name, {
+					source: 'web',
+					user: user.number,
+					listened: Number(getRequestValue('listened', '0')) || 0,
+					duration: Number(getRequestValue('duration', '0')) || 0
+				});
+				reply = {
+					success: true,
+					file: playRecord.name,
+					counted: !!playResult.counted,
+					plays: playResult.plays || 0,
+					last_played: playResult.last_played || 0
+				};
+				if (playResult.reason) reply.reason = playResult.reason;
+			} catch (playErr) {
+				log(LOG_ERR, 'files.ssjs record-play error: ' + playErr);
+				reply.error = 'Could not record play';
+			}
+			break;
+		case 'top-tracks':
+			// Most-played tracks still present in the directory.
+			var tdir = request.get_param('dir');
+			if (tdir === undefined
+				|| file_area.dir[tdir] === undefined
+				|| !file_area.dir[tdir].can_download
+				|| !user.compare_ars(file_area.dir[tdir].download_ars)
+			) {
+				reply.error = 'Invalid directory or access denied';
+				break;
+			}
+			if (!playCounts) {
+				reply = [];
+				break;
+			}
+			var topLimit = parseInt(getRequestValue('limit', '10'), 10);
+			if (!(topLimit > 0)) topLimit = 10;
+			if (topLimit > 100) topLimit = 100;
+			var topBase = new FileBase(tdir);
+			var topPresent = {};
+			if (topBase.open()) {
+				var topNames = topBase.get_names('*.mp3') || [];
+				topBase.close();
+				for (var ti = 0; ti < topNames.length; ti++) topPresent[String(topNames[ti]).toLowerCase()] = topNames[ti];
+			}
+			reply = playCounts.top(topLimit, function (name) {
+				return topPresent[String(name).toLowerCase()] !== undefined;
+			}).map(function (entry) {
+				return {
+					name: topPresent[String(entry.name).toLowerCase()] || entry.name,
+					plays: entry.plays,
+					last_played: entry.last_played
+				};
+			});
+			break;
 		case 'delete-track':
 			var ddir = request.get_param('dir');
 			if (http_request.method !== 'POST') {
@@ -857,6 +954,9 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				if (file_exists(delLrc)) file_remove(delLrc);
 				if (file_exists(delChar)) file_remove(delChar);
 				writeTrackOverride(delRecord.name, {});
+				if (playCounts) {
+					try { playCounts.remove(delRecord.name); } catch (delCountErr) { }
+				}
 				reply = { success: true, deleted: delRecord.name };
 			} catch (delErr) {
 				log(LOG_ERR, 'files.ssjs delete-track error: ' + delErr);

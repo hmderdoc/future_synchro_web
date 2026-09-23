@@ -15,7 +15,11 @@
     var DIR_CODE = 'originalcontent_mp3s';
     var API_URL  = './api/files.ssjs?call=list-files&dir=' + DIR_CODE;
     var UPDATE_TRACK_META_URL = './api/files.ssjs?call=update-track-meta&dir=' + DIR_CODE;
+    var RECORD_PLAY_URL = './api/files.ssjs?call=record-play&dir=' + DIR_CODE;
     var FILE_URL = './radio-stream/';
+    // A play counts once the listener has heard this much of a track
+    // (or 90% of a shorter track). The server applies the same rule.
+    var PLAY_COUNT_MIN_SEC = 30;
     var META_RANGE_BYTES = 262144;
     var PANEL_PREFS_KEY = 'sbbs-radio-library-prefs-v1';
     var SAVED_PLAYLISTS_KEY = 'sbbs-radio-library-playlists-v1';
@@ -48,6 +52,8 @@
     var _playStartCtx  = 0;
     var _playOffset    = 0;
     var _trackEnded    = false;
+    var _playCountGen  = -1;     // _loadGen whose play has been reported (one count per load)
+    var _playCountTimer = 0;
     var savedPlaylists = [];
     var playMode = 'shuffle';
     var libraryPanelOpen = false;
@@ -262,6 +268,8 @@
             name: item && item.name ? String(item.name) : '',
             desc: item && item.desc ? String(item.desc) : '',
             added: item && item.added ? item.added : 0,
+            plays: item && item.plays ? Number(item.plays) || 0 : 0,
+            lastPlayed: item && item.last_played ? Number(item.last_played) || 0 : 0,
             tags: copyTrackTags(overrideTags),
             baseTags: {},
             overrideTags: overrideTags,
@@ -416,6 +424,7 @@
                 '<option value="artist-desc">Artist Z\u2192A</option>',
                 '<option value="newest">Newest First</option>',
                 '<option value="oldest">Oldest First</option>',
+                '<option value="plays-desc">Most Played</option>',
               '</select>',
               '<div class="rl-toolbar-right">',
                 '<div class="rl-playmode" role="group" aria-label="Playback order">',
@@ -1005,6 +1014,10 @@
                 var idx = trackIndexByName[filename];
                 return typeof idx === 'number' && playlist[idx] ? copyTrackTags(playlist[idx].tags) : {};
             },
+            getPlayCountByFile: function (filename) {
+                var idx = trackIndexByName[filename];
+                return typeof idx === 'number' && playlist[idx] ? (playlist[idx].plays || 0) : 0;
+            },
             playByFile: playByFile,
             togglePlay: togglePlay,
             toggleLibraryPanel: toggleLibraryPanel,
@@ -1113,6 +1126,8 @@
         if (!track || !item) return;
         track.desc = item.desc ? String(item.desc) : track.desc;
         track.added = item.added || track.added || 0;
+        if (typeof item.plays === 'number' && item.plays > (track.plays || 0)) track.plays = item.plays;
+        if (item.last_played && item.last_played > (track.lastPlayed || 0)) track.lastPlayed = item.last_played;
         updateTrackOverrides(track, item.tags || {});
         if (currentTrack() && currentTrack().name === track.name) {
             lcdUpdate(trackDisplayLabel(track), false);
@@ -2224,6 +2239,7 @@
         document.dispatchEvent(new CustomEvent('radio:statechange', { detail: { playing: true } }));
         syncPlayButtonState();
         startViz();
+        ensurePlayCountTimer();
 
         if (!_firstPlayFired) {
             _firstPlayFired = true;
@@ -2234,6 +2250,71 @@
                 }
             }
         }
+    }
+
+    // =========================================================
+    //  Play counting: report a play once the listener has heard
+    //  PLAY_COUNT_MIN_SEC of the current load (position == time heard,
+    //  since this player never seeks; pauses freeze the position).
+    // =========================================================
+    function playCountThresholdSec(durationSec) {
+        var d = Number(durationSec) || 0;
+        if (d <= 0) return PLAY_COUNT_MIN_SEC;
+        return Math.min(PLAY_COUNT_MIN_SEC, Math.max(1, d * 0.9));
+    }
+
+    function ensurePlayCountTimer() {
+        if (_playCountTimer) return;
+        _playCountTimer = setInterval(checkPlayCount, 1000);
+    }
+
+    function checkPlayCount() {
+        var track = currentTrack();
+        var listened, duration;
+        if (!isPlaying || !_decodedBuffer || !track) return;
+        if (_playCountGen === _loadGen) return;
+        listened = window.sbbsRadio ? Number(window.sbbsRadio.currentTime) || 0 : 0;
+        duration = _decodedBuffer.duration || 0;
+        if (listened < playCountThresholdSec(duration)) return;
+        _playCountGen = _loadGen;
+        submitPlayCount(track, listened, duration);
+    }
+
+    function submitPlayCount(track, listened, duration) {
+        var body = new URLSearchParams();
+        var csrfToken = window.sbbsConfig && window.sbbsConfig.csrfToken
+            ? String(window.sbbsConfig.csrfToken)
+            : '';
+        body.set('file', track.name);
+        body.set('listened', String(Math.round(listened)));
+        body.set('duration', String(Math.round(duration)));
+        fetch(RECORD_PLAY_URL, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-csrf-token': csrfToken
+            },
+            body: body
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (!data || data.error) {
+                    console.warn('[radio] play count not recorded:', data && data.error);
+                    return;
+                }
+                if (typeof data.plays === 'number' && data.plays > (track.plays || 0)) track.plays = data.plays;
+                if (data.last_played) track.lastPlayed = data.last_played;
+                if (data.counted) {
+                    document.dispatchEvent(new CustomEvent('radio:playcounted', {
+                        detail: { name: track.name, plays: track.plays, lastPlayed: track.lastPlayed }
+                    }));
+                    if (libraryPanelOpen) renderPanel();
+                }
+            })
+            .catch(function (err) {
+                console.warn('[radio] play count error:', err);
+            });
     }
 
     function loadTrack(idx) {
@@ -2540,6 +2621,10 @@
                 case 'oldest':
                     return (ta.added || 0) - (tb.added || 0)
                         || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
+                case 'plays-desc':
+                    return (tb.plays || 0) - (ta.plays || 0)
+                        || (tb.lastPlayed || 0) - (ta.lastPlayed || 0)
+                        || trackTitle(ta).toLowerCase().localeCompare(trackTitle(tb).toLowerCase());
                 default:
                     return 0;
             }
@@ -2617,6 +2702,14 @@
                 chip.className = 'rl-track-chip';
                 chip.textContent = genre;
                 body.appendChild(chip);
+            }
+
+            if (track.plays > 0) {
+                var playsChip = document.createElement('span');
+                playsChip.className = 'rl-track-chip rl-track-plays';
+                playsChip.textContent = '▶ ' + track.plays;
+                playsChip.title = track.plays + ' play' + (track.plays === 1 ? '' : 's');
+                body.appendChild(playsChip);
             }
 
             item.appendChild(body);

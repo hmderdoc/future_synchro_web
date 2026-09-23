@@ -16,6 +16,7 @@
 var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
+load(settings.web_lib + 'avatar-profiles.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
 load('json-client.js');
 
@@ -286,6 +287,12 @@ function formatChatMessage(message, ownAlias) {
         peer = resolvePrivatePeerNick(message, ownAlias);
     }
 
+    /* Sysop placeholder avatars + cross-network name links (terminal-side
+       tools): fills avatar/userNumber unless the sender sent an avatar inline. */
+    var profiled = AvatarProfiles.apply(
+        { userNumber: userNumber, avatar: nick && nick.avatar ? String(nick.avatar) : '' }, sender);
+    userNumber = profiled.userNumber;
+
     return {
         sender: sender,
         system: systemName,
@@ -293,7 +300,7 @@ function formatChatMessage(message, ownAlias) {
         timestamp: message && message.time ? message.time : 0,
         userNumber: userNumber,
         isSelf: isSelf,
-        avatar: nick && nick.avatar ? String(nick.avatar) : undefined,
+        avatar: profiled.avatar ? profiled.avatar : undefined,
         private: isPrivateMessage(message),
         peerName: peer && peer.name ? peer.name : undefined,
         peerSystem: peer && peer.host ? peer.host : undefined,
@@ -404,7 +411,6 @@ function summarizePublicChannel(client, channelName, sinceTimestamp, ownAlias) {
     var index = 0;
     var lastTimestamp = 0;
     var newCount = 0;
-    var users = {};
     var whoCount = 0;
 
     for (index = 0; index < history.length; index += 1) {
@@ -431,8 +437,7 @@ function summarizePublicChannel(client, channelName, sinceTimestamp, ownAlias) {
     }
 
     try {
-        users = client.who('chat', 'channels.' + channelName + '.messages') || {};
-        whoCount = getKeys(users).length;
+        whoCount = buildWhoUsers(client, channelName).length;
     } catch (_whoError) {
         whoCount = 0;
     }
@@ -610,6 +615,7 @@ function buildPrivateMessage(sender, recipient, text, timestamp) {
 function buildWhoUsers(client, channel) {
     var users = [];
     var whoResult = client.who('chat', 'channels.' + channel + '.messages') || {};
+    var seen = {};
     var key;
 
     for (key in whoResult) {
@@ -621,18 +627,37 @@ function buildWhoUsers(client, channel) {
         var nickObj = normalizeNick(entry && entry.nick && typeof entry.nick === 'object' ? entry.nick : null);
         var nickName = nickObj && nickObj.name ? nickObj.name : String(entry && entry.nick ? entry.nick : key);
         var systemName = nickObj && nickObj.host ? nickObj.host : String(entry && entry.system ? entry.system : '');
+        var qwkid = nickObj && nickObj.qwkid ? nickObj.qwkid : '';
+        var identityKey = '$' + normalizeUpper(nickName) + '|' + normalizeUpper(qwkid || systemName);
         var userNumber = 0;
+        var existingIndex = seen[identityKey];
 
         if (nickName.length) {
             try { userNumber = system.matchuser(nickName) || 0; } catch (_matchUserError) {}
         }
 
+        if (typeof existingIndex === 'number') {
+            if (!users[existingIndex].avatar && nickObj && nickObj.avatar) {
+                users[existingIndex].avatar = nickObj.avatar;
+            }
+            if (!users[existingIndex].qwkid && qwkid) {
+                users[existingIndex].qwkid = qwkid;
+            }
+            if (!users[existingIndex].userNumber && userNumber) {
+                users[existingIndex].userNumber = userNumber;
+            }
+            continue;
+        }
+
+        seen[identityKey] = users.length;
+        var whoProfile = AvatarProfiles.apply(
+            { userNumber: userNumber, avatar: nickObj && nickObj.avatar ? String(nickObj.avatar) : '' }, nickName);
         users.push({
             nick: nickName,
             system: systemName,
-            userNumber: userNumber,
-            avatar: nickObj && nickObj.avatar ? nickObj.avatar : undefined,
-            qwkid: nickObj && nickObj.qwkid ? nickObj.qwkid : undefined
+            userNumber: whoProfile.userNumber,
+            avatar: whoProfile.avatar ? whoProfile.avatar : undefined,
+            qwkid: qwkid || undefined
         });
     }
 
@@ -670,6 +695,228 @@ function buildChannelSummaries(client, since, ownAlias) {
     return summaries;
 }
 
+/* Message CONTENT and member NAMES are for signed-in users. Anonymous web
+   visitors run as the Guest account (user.number > 0), so a bare
+   `user.number > 0` test does not exclude them. Guests still get each public
+   room's user count and last-message time (buildChannelSummaries) so the page
+   can show that a room is alive without showing what is said in it. This has
+   to be enforced here: hiding it in the page would leave the API readable. */
+function isAuthedUser() {
+    return user.number > 0 && user.alias !== settings.guest;
+}
+
+function lockedHistory(channelName) {
+    return { channel: channelName, messages: [], locked: true };
+}
+
+function lockedWho(client, channelName) {
+    var count = 0;
+    try { count = buildWhoUsers(client, channelName).length; } catch (_countError) { count = 0; }
+    return { channel: channelName, users: [], userCount: count, locked: true };
+}
+
+/* ------------------------------------------------------------------------
+   Bridged rooms: DDial and MRC on the website.
+
+   These two "channels" do not live in the JSON chat database. They are served
+   by the fshell_ts multiplexers (the same long-lived services terminal users
+   ride), which answer one-shot loopback requests authenticated by a shared
+   secret in mods/fshell_ts/config/web-bridge.ini. This API has already
+   authenticated the user (session cookie) and VOUCHES for the alias it
+   passes; the browser never sees the secret or talks to a mux. No secret
+   configured = the rooms simply do not exist.
+
+   - ddial: each web user gets their OWN line under their own alias while
+     they have the room open (so their name - and avatar - is the real one).
+     A bare read (room counts, another page of the site) takes no line.
+   - mrc:   each web user gets their own `<FL>Alias` identity, created when
+     they open the room and logged off ~90s after their tab stops polling.
+   ------------------------------------------------------------------------ */
+var BRIDGE_ROOMS = {
+    ddial: { label: 'DDial', portKey: 'ddial_port', port: 5001 },
+    mrc: { label: 'MRC', portKey: 'mrc_port', port: 5000 }
+};
+var _bridgeConfig;
+
+function bridgeConfig() {
+    if (_bridgeConfig !== undefined) { return _bridgeConfig; }
+    _bridgeConfig = null;
+    try {
+        var f = new File(system.mods_dir + 'fshell_ts/config/web-bridge.ini');
+        if (f.exists && f.open('r')) {
+            var root = f.iniGetObject() || {};
+            f.close();
+            var secret = typeof root.secret === 'string' ? root.secret.replace(/^\s+|\s+$/g, '') : '';
+            if (secret.length >= 16) { _bridgeConfig = { secret: secret, root: root }; }
+        }
+    } catch (_bridgeConfigError) { _bridgeConfig = null; }
+    return _bridgeConfig;
+}
+
+function bridgeRoomFor(channelName) {
+    var key = String(channelName || '').toLowerCase();
+    return BRIDGE_ROOMS.hasOwnProperty(key) && bridgeConfig() ? key : '';
+}
+
+/* DDial and MRC are 8-bit BBS networks: browser punctuation would arrive as
+   CP437 garbage. Fold the common offenders to ASCII and drop the rest. */
+function bridgeWireText(text) {
+    return String(text || '')
+        .replace(/[\u2018\u2019\u201A\u2032]/g, "'").replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+        .replace(/[\u2013\u2014\u2212]/g, '-').replace(/\u2026/g, '...').replace(/\u00A0/g, ' ')
+        .replace(/[^\x20-\x7E]/g, '')
+        .replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '')
+        .substr(0, 400);
+}
+
+function bridgeRequest(room, payload) {
+    var config = bridgeConfig();
+    var def = BRIDGE_ROOMS[room];
+    if (!config || !def) { return null; }
+    var port = parseInt(config.root[def.portKey], 10);
+    if (isNaN(port) || port < 1 || port > 65535) { port = def.port; }
+    payload.service = 'web';
+    payload.secret = config.secret;
+    var sock = new Socket();
+    var line = null;
+    try {
+        if (!sock.connect('127.0.0.1', port, 2)) { return null; }
+        sock.send(JSON.stringify(payload) + '\n');
+        line = sock.recvline(262144, 3);
+    } catch (_bridgeSockError) {
+        line = null;
+    } finally {
+        try { sock.close(); } catch (_bridgeCloseError) {}
+    }
+    if (!line) { return null; }
+    try { return JSON.parse(line); } catch (_bridgeParseError) { return null; }
+}
+
+/* `[FL]Hm_Derdoc` / `<FL>Hm_Derdoc` / `Hm_Derdoc^11D` -> a local account number, or 0. */
+function bridgeLocalUserNumber(name) {
+    var plain = String(name || '')
+        .replace(/^(\[\w{1,4}\]|<\w{1,4}>|!\w{1,4}!)/, '')
+        .replace(/\^\(?[A-Za-z0-9]{1,8}\)?$/, '');
+    var found = 0;
+    try { found = system.matchuser(plain) || system.matchuser(plain.replace(/_/g, ' ')) || 0; } catch (_bridgeMatchError) { found = 0; }
+    return found;
+}
+
+/* Colour runs from the DDial mux ([{n, c:'#rrggbb'|''}]) -> the same, but only
+   if they are well formed and cover exactly `length` characters (after `pad`
+   uncoloured ones we prepended). Anything else is dropped, not repaired. */
+function bridgeColorRuns(runs, length, pad) {
+    if (!runs || typeof runs.length !== 'number' || !runs.length || runs.length > 512) { return null; }
+    var out = pad > 0 ? [{ n: pad, c: '' }] : [];
+    var total = 0;
+    for (var i = 0; i < runs.length; i += 1) {
+        var run = runs[i];
+        var n = run ? Math.floor(Number(run.n)) : 0;
+        var c = run ? String(run.c || '') : '';
+        if (!(n > 0) || (c.length && !/^#[0-9a-f]{6}$/.test(c))) { return null; }
+        total += n;
+        out.push({ n: n, c: c });
+    }
+    return total === length ? out : null;
+}
+
+function bridgeMessages(room, response, ownAlias) {
+    var out = [];
+    var events = response && response.events ? response.events : [];
+    var ownNick = response && response.nick ? String(response.nick) : '';
+    for (var i = 0; i < events.length; i += 1) {
+        var ev = events[i];
+        if (!ev || typeof ev.text !== 'string' || !ev.text.length) { continue; }
+        if (ev.kind !== 'chat') {
+            /* An empty sender renders as a centred system line on the page. */
+            out.push({ sender: '', system: '', text: ev.text.replace(/\|\w\w/g, ''), timestamp: ev.t || 0, userNumber: 0, isSelf: false });
+            continue;
+        }
+        var sender = String(ev.sender || '');
+        var isSelf = room === 'ddial'
+            ? (!!ev.web && normalizeUpper(sender) === normalizeUpper(ownAlias))
+            : (ownNick.length > 0 && normalizeUpper(sender) === normalizeUpper(ownNick));
+        /* `web` = one of OUR website users on their own DDial line: `sender` is
+           their account alias, so the local account (and its avatar) resolves.
+           Everyone else on DDial is a free-form handle with no account here;
+           the page resolves those through the avatar profile lookup. */
+        var privateTag = ev.private ? '(private) ' : '';
+        var bridged = {
+            sender: sender,
+            system: room === 'ddial' ? String(ev.origin || 'DDial') : String(ev.site || 'MRC').replace(/_/g, ' '),
+            text: privateTag + ev.text,
+            timestamp: ev.t || 0,
+            userNumber: bridgeLocalUserNumber(sender),
+            isSelf: isSelf,
+            private: false
+        };
+        /* DDial paints handles (and sometimes bodies) with ANSI; the mux hands
+           those over as exact hex runs aligned to sender / text. */
+        var senderColors = bridgeColorRuns(ev.senderColors, sender.length, 0);
+        var textColors = bridgeColorRuns(ev.textColors, ev.text.length, privateTag.length);
+        if (senderColors) { bridged.senderColors = senderColors; }
+        if (textColors) { bridged.textColors = textColors; }
+        out.push(AvatarProfiles.apply(bridged, sender));
+    }
+    return out;
+}
+
+function bridgeHistory(room, ownAlias) {
+    /* present = the user has this room open on the chat page right now. On
+       DDial that is what holds their line (on MRC any poll does, which is why
+       bridgePresenceAllowed gates MRC polls entirely). */
+    var present = hasRequestParam('active') && getRequestValue('active', '0') === '1';
+    var response = bridgeRequest(room, { op: 'poll', user: ownAlias, since: 0, present: present });
+    if (!response || !response.ok) {
+        var why = response && response.error ? response.error : (BRIDGE_ROOMS[room].label + ' is unavailable right now');
+        return { channel: room, messages: [{ sender: '', system: '', text: why, timestamp: Date.now(), userNumber: 0, isSelf: false }], bridge: room };
+    }
+    return { channel: room, messages: bridgeMessages(room, response, ownAlias), bridge: room, topic: response.topic || '' };
+}
+
+function bridgeWho(room, ownAlias) {
+    var response = bridgeRequest(room, { op: 'who', user: ownAlias });
+    var users = [];
+    var list = response && response.ok && response.users ? response.users : [];
+    for (var i = 0; i < list.length; i += 1) {
+        var entry = list[i];
+        var nick = typeof entry === 'string' ? entry : String(entry && entry.handle ? entry.handle : '');
+        if (!nick.length) { continue; }
+        users.push(AvatarProfiles.apply({
+            nick: nick,
+            system: typeof entry === 'string' ? 'MRC' : String(entry.origin || 'DDial'),
+            userNumber: bridgeLocalUserNumber(nick)
+        }, nick));
+    }
+    return { channel: room, users: users, bridge: room };
+}
+
+/* Room-list rows. DDial is summarised with a poll (costs nothing: no line is
+   taken). MRC is NOT polled here: a poll IS a login there, and listing the
+   room must not announce the user to the network - only opening it does. */
+/* On MRC every poll keeps the user logged in to the network. Only do that
+   while they are actually looking at the chat page (the client says so with
+   active=1); on any other page of the site the session is left to expire.
+   DDial reads take no line and announce nothing, so they are always fine. */
+function bridgePresenceAllowed(room) {
+    if (room !== 'mrc') { return true; }
+    return hasRequestParam('active') && getRequestValue('active', '0') === '1';
+}
+
+function bridgeSummaries(ownAlias) {
+    var out = [];
+    if (!bridgeConfig()) { return out; }
+    var ddial = bridgeRequest('ddial', { op: 'poll', user: ownAlias, since: 999999999 });
+    out.push({
+        name: 'ddial', label: 'DDial', bridge: 'ddial',
+        userCount: ddial && ddial.ok ? (ddial.userCount || 0) : 0,
+        lastTimestamp: ddial && ddial.ok ? (ddial.lastEventMs || 0) : 0,
+        newCount: 0
+    });
+    out.push({ name: 'mrc', label: 'MRC', bridge: 'mrc', userCount: 0, lastTimestamp: 0, newCount: 0 });
+    return out;
+}
+
 function flagDefaultsOn(name) {
     /* a sync sub-section is included unless the client explicitly passes name=0 */
     return hasRequestParam(name) ? getRequestValue(name, '1') !== '0' : true;
@@ -690,11 +937,25 @@ switch (action) {
             }
         }
 
+        if (bridgeRoomFor(historyChannel)) {
+            reply = !isAuthedUser() ? lockedHistory(historyChannel)
+                : bridgePresenceAllowed(bridgeRoomFor(historyChannel))
+                    ? bridgeHistory(bridgeRoomFor(historyChannel), user.alias)
+                    : { channel: historyChannel, messages: [], bridge: bridgeRoomFor(historyChannel) };
+            reply.serverTime = Date.now();
+            break;
+        }
+
         reply = withClient(function (client) {
             if (!isRegisteredPublicChannel(client, historyChannel)) {
                 return { error: 'not found' };
             }
             var ownAlias = user.number > 0 ? user.alias : '';
+            if (!isAuthedUser()) {
+                var lockedReply = lockedHistory(historyChannel);
+                lockedReply.serverTime = Date.now();
+                return lockedReply;
+            }
             return {
                 channel: historyChannel,
                 messages: buildPublicHistory(client, historyChannel, historyCount, ownAlias),
@@ -706,9 +967,22 @@ switch (action) {
     case 'who':
         var whoChannel = getChannel();
 
+        if (bridgeRoomFor(whoChannel)) {
+            reply = isAuthedUser()
+                ? bridgeWho(bridgeRoomFor(whoChannel), user.alias)
+                : { channel: whoChannel, users: [], userCount: 0, locked: true };
+            reply.serverTime = Date.now();
+            break;
+        }
+
         reply = withClient(function (client) {
             if (!isRegisteredPublicChannel(client, whoChannel)) {
                 return { error: 'not found' };
+            }
+            if (!isAuthedUser()) {
+                var lockedWhoReply = lockedWho(client, whoChannel);
+                lockedWhoReply.serverTime = Date.now();
+                return lockedWhoReply;
             }
             return {
                 channel: whoChannel,
@@ -724,7 +998,8 @@ switch (action) {
         reply = withClient(function (client) {
             var ownAlias = user.number > 0 ? user.alias : '';
             return {
-                channels: buildChannelSummaries(client, sinceChannels, ownAlias),
+                channels: buildChannelSummaries(client, sinceChannels, ownAlias)
+                    .concat(isAuthedUser() ? bridgeSummaries(ownAlias) : []),
                 serverTime: Date.now()
             };
         });
@@ -753,23 +1028,39 @@ switch (action) {
 
         reply = withClient(function (client) {
             var ownAlias = user.number > 0 ? user.alias : '';
-            var isAuthed = user.number > 0 && user.alias !== settings.guest;
-            var channelReadable = isRegisteredPublicChannel(client, syncChannel);
+            var isAuthed = isAuthedUser();
+            var syncBridge = isAuthed ? bridgeRoomFor(syncChannel) : '';
+            var channelReadable = !syncBridge && isRegisteredPublicChannel(client, syncChannel);
             var out = { channel: syncChannel, serverTime: Date.now() };
 
             if (syncWantChannels) {
-                out.channels = buildChannelSummaries(client, syncSince, ownAlias);
+                out.channels = buildChannelSummaries(client, syncSince, ownAlias)
+                    .concat(isAuthed ? bridgeSummaries(ownAlias) : []);
+            }
+            if (syncBridge) {
+                /* The open room is DDial/MRC: served by its mux, not the JSON DB.
+                   For MRC this poll is also the keep-alive for the user's session. */
+                if (bridgePresenceAllowed(syncBridge)) {
+                    if (syncWantHistory) { out.history = bridgeHistory(syncBridge, ownAlias); }
+                    if (syncWantWho) { out.who = bridgeWho(syncBridge, ownAlias); }
+                }
             }
             if (syncWantWho && channelReadable) {
-                out.who = { channel: syncChannel, users: buildWhoUsers(client, syncChannel) };
+                out.who = isAuthed
+                    ? { channel: syncChannel, users: buildWhoUsers(client, syncChannel) }
+                    : lockedWho(client, syncChannel);
             }
             if (syncWantHistory && channelReadable) {
-                out.history = { channel: syncChannel, messages: buildPublicHistory(client, syncChannel, syncHistoryCount, ownAlias) };
+                out.history = isAuthed
+                    ? { channel: syncChannel, messages: buildPublicHistory(client, syncChannel, syncHistoryCount, ownAlias) }
+                    : lockedHistory(syncChannel);
             }
             if (syncWantPrivate && isAuthed) {
                 out.private = { threads: summarizePrivateThreads(client, user.alias, syncSince) };
             }
-            if (syncWantPresence) {
+            if (syncWantPresence && !isAuthed) {
+                out.presence = []; /* names are for signed-in users */
+            } else if (syncWantPresence) {
                 /* who-users across occupied public rooms (+ the active one), all on
                    this one connection - replaces the client's per-room who fan-out. */
                 var presenceNames = [];
@@ -914,6 +1205,19 @@ switch (action) {
 
         if (!messageText.length) {
             reply = { error: 'empty message' };
+            break;
+        }
+
+        if (bridgeRoomFor(sendChannel)) {
+            var wireText = bridgeWireText(messageText);
+            if (!wireText.length || wireText.indexOf('[BITMAP|') === 0) {
+                reply = { error: 'Only plain text can be sent to ' + BRIDGE_ROOMS[bridgeRoomFor(sendChannel)].label };
+                break;
+            }
+            var bridgeSent = bridgeRequest(bridgeRoomFor(sendChannel), { op: 'send', user: user.alias, text: wireText });
+            reply = bridgeSent && bridgeSent.ok
+                ? { success: true, channel: sendChannel, timestamp: Date.now(), serverTime: Date.now() }
+                : { error: bridgeSent && bridgeSent.error ? bridgeSent.error : 'That network is unavailable right now' };
             break;
         }
 

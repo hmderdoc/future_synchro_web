@@ -76,7 +76,7 @@ CDN_ASSETS.forEach(function (url) {
     combined += url + ':cdn-pinned\n';
 });
 
-var revision = md5_calc(combined + 'salt-20260328m-chat-cga-restyle', true).substr(0, 12);
+var revision = md5_calc(combined + 'salt-20260728-force-bust', true).substr(0, 12);
 var workerSource = [
     '// Dynamic service worker for webv4_custom.',
     '// Revision: ' + revision,
@@ -90,11 +90,15 @@ var workerSource = [
     'self.addEventListener("install", function (event) {',
     '    event.waitUntil(',
     '        caches.open(CACHE_NAME).then(function (cache) {',
-    '            return cache.addAll(PRECACHE_URLS);',
+    '            // cache: "no-cache" revalidates with the server so a new',
+    '            // revision can never be filled from a stale HTTP cache.',
+    '            return cache.addAll(PRECACHE_URLS.map(function (url) {',
+    '                return new Request(url, { cache: "no-cache" });',
+    '            }));',
     '        }).then(function () {',
     '            return caches.open(CACHE_NAME).then(function (cache) {',
     '                return Promise.all(SHELL_URLS.map(function (url) {',
-    '                    return cache.add(url).catch(function () {',
+    '                    return cache.add(new Request(url, { cache: "no-cache" })).catch(function () {',
     '                        console.log("[SW] Shell URL skipped:", url);',
     '                    });',
     '                }));',

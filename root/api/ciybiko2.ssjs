@@ -1,0 +1,1 @@
+/sbbs/xtrn/ctr_remake/web/ciybiko2.ssjs

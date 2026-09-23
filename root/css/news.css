@@ -330,64 +330,42 @@
 }
 
 
-/* ── Newsflip link ── */
-#news-fliplink {
+/* ── News tabs (shared by 009-news and 014-newsflip) ── */
+.news-tabs {
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.5rem;
+    margin: 0 0 1rem;
+    border: 1px solid #55FF55;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
 }
-.news-fliplink-btn {
+.news-tab {
+    flex: 1;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 4px 10px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
-    color: rgba(255,255,255,0.8);
-    font-size: 0.85rem;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 8px 0;
+    font-family: 'Spleen', ui-monospace, monospace;
+    font-size: 16px;
+    color: #55FF55;
     text-decoration: none;
-    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    border-right: 1px solid #55FF55;
+    transition: background 0.15s, color 0.15s;
 }
-.news-fliplink-btn:hover,
-.news-fliplink-btn:focus {
-    border-color: rgba(255,255,255,0.4);
-    background: rgba(255,255,255,0.08);
-    color: #fff;
-    text-decoration: none;
-}
-.news-fliplink-btn .bin-icon-img {
-    height: 18px;
-    width: auto;
-    image-rendering: pixelated;
-}
-
-
-/* ── Newsflip link ── */
-#news-fliplink {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.5rem;
-}
-.news-fliplink-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 4px 10px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
-    color: rgba(255,255,255,0.8);
-    font-size: 0.85rem;
-    text-decoration: none;
-    transition: border-color 0.2s, background 0.2s, color 0.2s;
-}
-.news-fliplink-btn:hover,
-.news-fliplink-btn:focus {
-    border-color: rgba(255,255,255,0.4);
-    background: rgba(255,255,255,0.08);
-    color: #fff;
+.news-tab:last-child { border-right: none; }
+.news-tab:hover,
+.news-tab:focus {
+    background: rgba(85, 255, 85, 0.08);
+    color: #AAFFAA;
     text-decoration: none;
 }
-.news-fliplink-btn .bin-icon-img {
+.news-tab.active {
+    background: rgba(85, 255, 85, 0.15);
+    color: #AAFFAA;
+    text-shadow: 0 0 8px rgba(85, 255, 85, 0.5);
+}
+.news-tab .bin-icon-img {
     height: 18px;
     width: auto;
     image-rendering: pixelated;

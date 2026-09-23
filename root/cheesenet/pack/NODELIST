@@ -1,8 +1,8 @@
 ;A FidoNet style nodelist for CheeseNet (Zone 3323)
 ;
-;Day number 192 : Sat, Jul 11, 2026
+;Day number 263 : Sun, Sep 20, 2026
 ;Compiled by  : Hm Derdoc, ZC of CheeseNet
-;Released     : 2026-07-11
+;Released     : 2026-09-20
 ;
 ;
 ;Format reference: FTS-0005
@@ -13,6 +13,8 @@
 ;  IBN     Internet BinkP available (default port 24554)
 ;  INA:    Internet Network Address (hostname)
 ;
+;Pvt nodes are poll-only (no inbound BinkP); reach them via the hub.
+;
 ;
 Zone,3323,CheeseNet,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
 Host,1,CheeseNet_Hub,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
@@ -20,5 +22,8 @@ Host,1,CheeseNet_Hub,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:fut
 ,3,Funtopia_BBS,Internet,Stephan_Gebbers,-Unpublished-,300,CM,XX,IBN,INA:funtopia.synchro.net
 ,4,Claudes_BBS,Internet,awehttam,-Unpublished-,300,CM,XX,IBN,INA:claudes.lovelybits.org
 ,5,Altair_IV_BBS,Internet,ogg,-Unpublished-,300,CM,XX,IBN,INA:altairiv.ddns.net
+,6,L33Test_Gaming,Internet,Skrawl,-Unpublished-,300,CM,XX,IBN,INA:binkterm.l33test.com
+,7,Pwecks_Retreat_BBS,Internet,pweck,-Unpublished-,300,CM,XX,IBN,INA:bbs.pwecksretreat.com
+Pvt,8,forum_sysops_finest,Prittriching,Michael_Selhof,-Unpublished-,300
 ,31,Postbus_7,Internet,Floris_van_Unen,-Unpublished-,300,CM,XX,IBN,INA:fido.unen.net
 ,100,futureland,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today

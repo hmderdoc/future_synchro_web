@@ -417,7 +417,16 @@ async function getMailBody(id) {
         tgt.hidden = false;
     } else {
         const data = await v4_get('./api/forum.ssjs?call=get-mail-body&number=' + id);
-        var str = data.body;
+        var str = '';
+        if (data.images && data.images.length > 0) {
+            str += data.images.map(function (e) {
+                return '<div style="margin:10px 0;">' +
+                    '<a href="' + e.url + '" target="_blank">' +
+                    '<img src="' + e.url + '" alt="' + e.name + '" title="' + e.name + '" loading="lazy" ' +
+                    'style="max-width:100%;height:auto;border-radius:4px;"></a></div>';
+            }).join('');
+        }
+        str += data.body;
         if (data.inlines && data.inlines.length > 0) {
             str += '<br>Inline attachments: ' + data.inlines.join('<br>') + '<br>';
         }

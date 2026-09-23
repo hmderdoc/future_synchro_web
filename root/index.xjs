@@ -94,6 +94,7 @@
     var more_nav_names = [
         'futureland-records',
         'futureland-gallery',
+        'wiki',
         'nodespy',
         'webmonitor'
     ];
@@ -101,8 +102,10 @@
     /* Pages hidden from nav entirely (accessed via other UI) */
     pullNavPage(nav_pages, 'newsflip');
 
-    /* Pages hidden from nav entirely (accessed via other UI) */
-    pullNavPage(nav_pages, 'newsflip');
+    /* News lands on the NewsFlip view; Browse Feeds is a tab from there */
+    nav_pages.forEach(function (item) {
+        if (item.name === 'news') item.page = '014-newsflip.xjs';
+    });
 
     function pullNavPage(list, name) {
         var idx = list.findIndex(function (item) {
@@ -239,12 +242,13 @@
         comment: 'chat_new', checkmark: 'checkmark', stop: 'stop_sign_icon',
         link: 'WALLETLINK', poll: 'bar_chart', group: 'group',
         oneliners: 'oneliner', nodespy: 'sbbslist', webmonitor: 'bar_chart',
+        wiki: 'doc_edit',
         fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
         heart: 'heart_normal',
         at_symbol: 'at_symbol',
         news: 'newsitems',
         more: 'group',
-        'futureland-records': 'headphones',
+        'futureland-records': 'stereo',
         'futureland-gallery': 'art_gallery',
         newsflip: 'rssfeed',
         music_note: 'music_note'
@@ -505,22 +509,10 @@
     </div>
 </div>
 
-<!-- Main content area -->
-<div class="container<? if (settings.layout_full_width) write('-fluid'); ?> spa-container">
-    <div class="row">
-<?xjs if (!_sidebarOff() && settings.layout_sidebar_left) { ?>
-        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
-<?xjs } ?>
-        <div class="col-md-<? write(_sidebarOff() ? '12' : '9'); ?>" id="content">
-            <? writePage(page); ?>
-        </div>
-<?xjs if (!_sidebarOff() && !settings.layout_sidebar_left) { ?>
-        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
-<?xjs } ?>
-    </div>
-</div>
-
-<!-- Config passed to client JS -->
+<!-- Config passed to client JS. This MUST come before the page body: a page's
+     inline script runs while the body is still being parsed, so on a full load
+     (not an in-site navigation) it would otherwise find no sbbsConfig and treat
+     a logged-in user as a guest. -->
 <script>
     window.sbbsConfig = {
         systemName: '<? write(system.name.replace(/'/g, "\\'")); ?>',
@@ -561,6 +553,26 @@
         webBuildToken: '<? write(build_info.token); ?>'
     };
 </script>
+
+<!-- Main content area -->
+<div class="container<? if (settings.layout_full_width) write('-fluid'); ?> spa-container">
+    <div class="row">
+<?xjs if (!_sidebarOff() && settings.layout_sidebar_left) { ?>
+        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
+<?xjs } ?>
+        <div class="col-md-<? write(_sidebarOff() ? '12' : '9'); ?>" id="content">
+            <? writePage(page); ?>
+        </div>
+<?xjs if (!_sidebarOff() && !settings.layout_sidebar_left) { ?>
+        <div class="col-md-3" id="sidebar"><? writeSidebarModules(); ?></div>
+<?xjs } ?>
+    </div>
+</div>
+
+
+<!-- Site-wide CSRF recovery: wraps fetch() before any app script loads, so a
+     stale token refreshes and the write replays instead of failing. -->
+<script src="./js/csrf-guard.js?_v=<? write(time()); ?>"></script>
 
 <!-- Scripts -->
 <?xjs if (settings.ftelnet) { ?>

@@ -10,6 +10,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/root"
 
+# root/sw.js is now a kill-switch worker that rescues clients stuck on
+# pre-sw.ssjs registrations (see its header).  Overwriting it with a full
+# worker would re-pin those clients.  Set FORCE_SW_SNAPSHOT=1 to override.
+if [[ "${FORCE_SW_SNAPSHOT:-0}" != "1" ]]; then
+    echo "REFUSING to overwrite root/sw.js — it is the stuck-client rescue worker."
+    echo "The live service worker is root/sw.ssjs (dynamic)."
+    echo "Set FORCE_SW_SNAPSHOT=1 if you really want a static snapshot."
+    exit 1
+fi
+
 # ─── Collect all local assets to cache ──────────────────────
 # JS, CSS, lib, images, fonts, HTML fragments
 ASSETS=()

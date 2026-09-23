@@ -419,25 +419,31 @@
                 }
             }
 
-            // If cache was mostly empty, fetch INIT_POOL per tier to be usable quickly
+            // Top up any tier sitting below INIT_POOL so every height can
+            // render before _bgLoad runs.  A raw cache-hit count can't gate
+            // this: a stale cache (fonts no longer in the map) parses fine
+            // yet fills no pools, leaving render() returning null all session.
             var proms = [];
-            if (cacheHits < 30) {
-                for (var h = 3; h <= 12; h++) {
-                    var pool = map[String(h)];
-                    if (!pool || !pool.length) continue;
-                    var picks = _pickN(pool, INIT_POOL);
-                    for (var pi = 0; pi < picks.length; pi++) {
-                        var name = picks[pi];
-                        if (self._tierLoaded[h][name]) continue;
-                        self._tierLoaded[h][name] = true;
-                        (function (hh, nn) {
-                            proms.push(
-                                self._fetchFont(nn).then(function (font) {
-                                    if (font) self._tierPool[hh].push(nn);
-                                })
-                            );
-                        })(h, name);
-                    }
+            for (var h = 3; h <= 12; h++) {
+                var pool = map[String(h)];
+                if (!pool || !pool.length) continue;
+                var need = INIT_POOL - self._tierPool[h].length;
+                if (need <= 0) continue;
+                var unloaded = [];
+                for (var i = 0; i < pool.length; i++) {
+                    if (!self._tierLoaded[h][pool[i]]) unloaded.push(pool[i]);
+                }
+                var picks = _pickN(unloaded, need);
+                for (var pi = 0; pi < picks.length; pi++) {
+                    var name = picks[pi];
+                    self._tierLoaded[h][name] = true;
+                    (function (hh, nn) {
+                        proms.push(
+                            self._fetchFont(nn).then(function (font) {
+                                if (font) self._tierPool[hh].push(nn);
+                            })
+                        );
+                    })(h, name);
                 }
             }
             return Promise.all(proms).then(function () { return cacheHits; });

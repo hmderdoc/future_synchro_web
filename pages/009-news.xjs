@@ -7,6 +7,15 @@
 
 <div id="news-app">
 
+    <nav class="news-tabs" aria-label="News views">
+        <a class="news-tab" href="./?page=014-newsflip.xjs">
+            <span class="bin-icon" data-icon="newsflip"></span><span>News Flip</span>
+        </a>
+        <a class="news-tab active" href="./?page=009-news.xjs" aria-current="page">
+            <span class="bin-icon" data-icon="news"></span><span>Browse Feeds</span>
+        </a>
+    </nav>
+
     <!-- Search -->
     <div id="news-search-bar" class="mb-3">
         <div class="input-group">
@@ -19,22 +28,6 @@
             <button class="btn btn-outline-secondary" type="button"
                     id="news-search-clear" title="Clear search">&times;</button>
         </div>
-    </div>
-
-    <!-- Newsflip link -->
-    <div id="news-fliplink">
-        <a href="./?page=014-newsflip.xjs" class="news-fliplink-btn">
-            <span class="bin-icon" data-icon="newsflip"></span>
-            <span>NewsFlip</span>
-        </a>
-    </div>
-
-    <!-- Newsflip link -->
-    <div id="news-fliplink">
-        <a href="./?page=014-newsflip.xjs" class="news-fliplink-btn">
-            <span class="bin-icon" data-icon="newsflip"></span>
-            <span>NewsFlip</span>
-        </a>
     </div>
 
     <!-- Breadcrumb -->

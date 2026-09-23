@@ -314,6 +314,106 @@
 .flrd-genre {
     color: #FFFF55;
 }
+.flrd-plays {
+    color: #FFFF55;
+    white-space: nowrap;
+}
+
+/* Top Tracks chart */
+.flrd-top-card .card-header {
+    display: flex;
+    align-items: center;
+}
+.flrd-top-title {
+    color: #FFFF55;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.flrd-top-sub {
+    color: #AAAAAA;
+    font-size: 0.85rem;
+    margin-left: 10px;
+}
+.flrd-top-body {
+    padding: 0.5rem 0.75rem;
+}
+.flrd-top-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.flrd-top-item + .flrd-top-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.flrd-top-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 4px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.flrd-top-button:hover,
+.flrd-top-button:focus-visible {
+    background: rgba(85, 255, 255, 0.07);
+    outline: none;
+}
+.flrd-top-item.is-playing .flrd-top-button {
+    background: rgba(85, 255, 85, 0.08);
+}
+.flrd-top-rank {
+    flex: 0 0 1.6em;
+    color: #FFFF55;
+    font-weight: 700;
+    text-align: right;
+}
+.flrd-top-art {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    color: #8DEBFF;
+    overflow: hidden;
+}
+.flrd-top-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.flrd-top-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.flrd-top-track {
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.flrd-top-artist {
+    color: #55FF55;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.flrd-top-plays {
+    flex: 0 0 auto;
+    color: #FFFF55;
+    font-variant-numeric: tabular-nums;
+}
 
 
 .flrd-actions {
@@ -1287,6 +1387,19 @@
         </div>
     </div>
 
+    <div class="card mb-3 flrd-top-card" id="flrd-top-card" hidden>
+        <div class="card-header">
+            <button type="button" class="flrc-card-toggle" id="flrd-top-toggle" aria-expanded="true" aria-controls="flrd-top-body" aria-label="Toggle top tracks">
+                <span class="flrc-card-toggle-icon" data-collapse-icon aria-hidden="true">▾</span>
+                <span class="flrd-top-title">Top Tracks</span>
+                <span class="flrd-top-sub">most played on the web and in the BBS</span>
+            </button>
+        </div>
+        <div class="card-body flrd-top-body" id="flrd-top-body">
+            <ol class="flrd-top-list" id="flrd-top-list"></ol>
+        </div>
+    </div>
+
     <div class="card mb-3 flrd-bios-card" id="flrd-bios-card">
         <div class="card-header">
             <button type="button" class="flrc-card-toggle" id="flrd-bios-toggle" aria-expanded="true" aria-controls="flrd-bios-body" aria-label="Toggle featured artist">
@@ -2040,9 +2153,28 @@
         return tagVal(track, 'title') || track.name.replace(/\.mp3$/i, '').replace(/_/g, ' ');
     }
 
+    /* Bounded-concurrency map (order preserved). Every track needs a range
+       fetch for its tags; firing all ~150 at once exceeds the web server's
+       MaxClients and 503s the rest of the page. */
+    var PARSE_CONCURRENCY = 4;
+    function mapWithLimit(items, limit, fn) {
+        var results = new Array(items.length);
+        var next = 0;
+        function worker() {
+            if (next >= items.length) return Promise.resolve();
+            var idx = next++;
+            return Promise.resolve().then(function() { return fn(items[idx]); })
+                .then(function(value) { results[idx] = value; })
+                .then(worker);
+        }
+        var workers = [];
+        for (var w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+        return Promise.all(workers).then(function() { return results; });
+    }
+
     /* ── Parse track list exactly like the radio player ── */
     function parseTrackList(list) {
-        return Promise.all(list.map(function(item) {
+        return mapWithLimit(list, PARSE_CONCURRENCY, function(item) {
             var url = STREAM_URL + encodeURIComponent(item.name);
             return fetch(url, {
                 headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
@@ -2065,7 +2197,7 @@
                 return { name: item.name, desc: item.desc || '',
                          tags: mergeTrackTags({}, item && item.tags ? item.tags : {}), artURL: '' };
             });
-        }));
+        });
     }
 
     /* ── Load ── */
@@ -2443,6 +2575,12 @@
     });
 
     bindCardCollapse({
+        cardId: 'flrd-top-card',
+        bodyId: 'flrd-top-body',
+        buttonId: 'flrd-top-toggle'
+    });
+
+    bindCardCollapse({
         cardId: 'flrsb-panel',
         bodyId: 'flrsb-body',
         buttonId: 'flrsb-panel-toggle'
@@ -2582,8 +2720,27 @@
         });
     }
 
+    /* Bounded-concurrency map (order preserved): the range fetch per track
+       must not fan out to all ~150 tracks at once, or the web server hits
+       MaxClients and 503s the sidebar and the next navigation. */
+    var PARSE_CONCURRENCY = 4;
+    function mapWithLimit(items, limit, fn) {
+        var results = new Array(items.length);
+        var next = 0;
+        function worker() {
+            if (next >= items.length) return Promise.resolve();
+            var idx = next++;
+            return Promise.resolve().then(function () { return fn(items[idx]); })
+                .then(function (value) { results[idx] = value; })
+                .then(worker);
+        }
+        var workers = [];
+        for (var w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+        return Promise.all(workers).then(function () { return results; });
+    }
+
     function parseTrackList(list) {
-        return Promise.all(list.map(function (item) {
+        return mapWithLimit(list, PARSE_CONCURRENCY, function (item) {
             var url = STREAM_URL + encodeURIComponent(item.name);
             return fetch(url, {
                 headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
@@ -2612,6 +2769,8 @@
                         name: item.name,
                         desc: item.desc || '',
                         added: item.added || 0,
+                        plays: Number(item.plays) || 0,
+                        lastPlayed: Number(item.last_played) || 0,
                         tags: tags,
                         artURL: artURL
                     };
@@ -2621,11 +2780,13 @@
                         name: item.name,
                         desc: item.desc || '',
                         added: item.added || 0,
+                        plays: Number(item.plays) || 0,
+                        lastPlayed: Number(item.last_played) || 0,
                         tags: mergeTrackTags({}, item && item.tags ? item.tags : {}),
                         artURL: ''
                     };
                 });
-        }));
+        });
     }
 
     function findTrackIndex(name) {
@@ -2783,8 +2944,74 @@
         if (year) html += '<span class="flrd-album-year">' + esc(year) + '</span>';
         if (year && genre) html += ' ';
         if (genre) html += '<span class="flrd-genre">' + esc(genre) + '</span>';
-        genreLineEl.innerHTML = html || '<span class="flrd-credit-sep">No genre metadata</span>';
+        if (!html) html = '<span class="flrd-credit-sep">No genre metadata</span>';
+        if (track.plays > 0) {
+            html += ' <span class="flrd-plays" title="Counted after 30 seconds of listening">▶ '
+                + esc(track.plays) + ' play' + (track.plays === 1 ? '' : 's') + '</span>';
+        }
+        genreLineEl.innerHTML = html;
     }
+
+    // Top Tracks card: the most-played songs in this library, click to play.
+    var topCard = document.getElementById('flrd-top-card');
+    var topList = document.getElementById('flrd-top-list');
+    var TOP_LIMIT = 10;
+
+    function renderTopTracks() {
+        var ranked;
+        if (!topCard || !topList) return;
+        ranked = tracks.filter(function (track) {
+            return track && track.plays > 0;
+        }).sort(function (a, b) {
+            return (b.plays - a.plays)
+                || ((b.lastPlayed || 0) - (a.lastPlayed || 0))
+                || trackTitle(a).toLowerCase().localeCompare(trackTitle(b).toLowerCase());
+        }).slice(0, TOP_LIMIT);
+
+        topList.innerHTML = '';
+        if (!ranked.length) {
+            topCard.hidden = true;
+            return;
+        }
+        topCard.hidden = false;
+        ranked.forEach(function (track, rank) {
+            var li = document.createElement('li');
+            var button = document.createElement('button');
+            var isCurrent = track.name === nowPlaying;
+            li.className = 'flrd-top-item' + (isCurrent ? ' is-playing' : '');
+            button.type = 'button';
+            button.className = 'flrd-top-button';
+            button.title = isCurrent ? 'Now playing' : 'Play ' + trackTitle(track);
+            button.innerHTML =
+                '<span class="flrd-top-rank">' + (rank + 1) + '</span>'
+                + '<span class="flrd-top-art">' + (track.artURL ? '<img src="' + esc(track.artURL) + '" alt="">' : '♫') + '</span>'
+                + '<span class="flrd-top-meta">'
+                +   '<span class="flrd-top-track">' + esc(trackTitle(track)) + '</span>'
+                +   '<span class="flrd-top-artist">' + esc(trackArtist(track) || '') + '</span>'
+                + '</span>'
+                + '<span class="flrd-top-plays">' + (isCurrent ? '▶ ' : '') + esc(track.plays) + '</span>';
+            button.addEventListener('click', function () {
+                var idx = findTrackIndex(track.name);
+                if (idx < 0) return;
+                cur = idx;
+                render();
+                playSelectedTrack();
+            });
+            li.appendChild(button);
+            topList.appendChild(li);
+        });
+    }
+
+    // The radio reports a counted play; keep the chart and the plays line live.
+    document.addEventListener('radio:playcounted', function (event) {
+        var detail = event.detail || {};
+        var idx = detail.name ? findTrackIndex(detail.name) : -1;
+        if (idx < 0) return;
+        if (typeof detail.plays === 'number' && detail.plays > (tracks[idx].plays || 0)) tracks[idx].plays = detail.plays;
+        if (detail.lastPlayed) tracks[idx].lastPlayed = detail.lastPlayed;
+        renderTopTracks();
+        if (idx === cur && tracks.length) renderGenreline(tracks[cur]);
+    });
 
     function renderArt(track) {
         if (track.artURL) {
@@ -2833,6 +3060,7 @@
             el.removeAttribute('disabled');
         });
         renderPlayState(track);
+        renderTopTracks();
     }
 
     function playSelectedTrack() {

@@ -1,0 +1,1 @@
+/sbbs/xtrn/wiki/web/root/api/wiki.ssjs

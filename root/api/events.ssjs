@@ -28,8 +28,26 @@ function emit(obj) {
     last_send = time();
 }
 
+function disposeCallback(name) {
+    var callback = callbacks[name];
+
+    if (!callback) {
+        return;
+    }
+
+    try {
+        if (typeof callback.dispose === 'function') {
+            callback.dispose();
+        } else if (typeof callback.disconnect === 'function') {
+            callback.disconnect();
+        }
+    } catch (err) {
+        log(LOG_ERR, 'Callback ' + name + ' dispose failed: ' + err);
+    }
+}
+
 var _isGuest = (user.number < 1 || user.alias === settings.guest);
-var _guestAllowed = { nodelist: true, forum: true };
+var _guestAllowed = { nodelist: true, forum: true, wiki: true };
 
 const callbacks = {};
 if (file_isdir(settings.web_lib + 'events')) {
@@ -47,17 +65,26 @@ if (file_isdir(settings.web_lib + 'events')) {
     }
 }
 
-ping();
-while (client.socket.is_connected) {
-    Object.keys(callbacks).forEach(function (e) {
-        try {
-            callbacks[e].cycle();
-        } catch (err) {
-            log(LOG_ERR, 'Callback ' + e + ' failed: ' + err);
-            delete callbacks[e];
-        }
-    });
-    js.gc();
-    mswait(1000);
+try {
     ping();
+    while (client.socket.is_connected) {
+        Object.keys(callbacks).forEach(function (e) {
+            try {
+                callbacks[e].cycle();
+            } catch (err) {
+                log(LOG_ERR, 'Callback ' + e + ' failed: ' + err);
+                disposeCallback(e);
+                delete callbacks[e];
+            }
+        });
+        js.gc();
+        mswait(1000);
+        ping();
+    }
+} finally {
+    /* The browser normally drops an SSE socket without sending an
+       application-level goodbye. Explicitly dispose each loaded module so
+       module-owned resources (notably JSON-service subscriptions) do not
+       survive as ghost users, even when a socket write throws. */
+    Object.keys(callbacks).forEach(disposeCallback);
 }
