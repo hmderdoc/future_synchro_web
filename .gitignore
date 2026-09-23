@@ -17,6 +17,9 @@ test-results/
 # User data - never commit
 root/api/data/
 
+# Chat drag-and-drop attachments (purged after a week by mods/chat-media-purge.sh)
+/root/chatmedia/
+
 # Generated deployment payloads and local editor backups
 root/updates/
 root/js/*.bak
