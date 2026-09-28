@@ -98,6 +98,53 @@ if (call === 'whoami') {
         reply({ ok: !!rendered.ok, html: rendered.ok ? rendered.html : '', error: rendered.ok ? '' : (rendered.message || 'render failed') });
     }
 
+} else if (call === 'ansi-bin') {
+    /* Cell grid of an ANSI creation for the browser's GraphicsConverter
+       (the same path that draws avatars and game icons), so galleries get
+       real thumbnails instead of a 100KB <pre> each. */
+    var bpath = Social.creationPath(request.get_param('dir'), request.get_param('name'));
+    if (!bpath || !/\.(ans|asc|bin)$/i.test(bpath)) fail('No such file', '404 Not Found');
+    else {
+        load('graphic.js');
+        var Sauce = load({}, 'sauce_lib.js');
+        var sauce = Sauce.read(bpath);
+        var graphic;
+        var MAX_ROWS = 400;
+        try {
+            if (sauce && sauce.cols && sauce.rows) graphic = new Graphic(sauce.cols, Math.min(sauce.rows, MAX_ROWS));
+            else { graphic = new Graphic(80, 25); graphic.auto_extend = true; }
+            if (/\.bin$/i.test(bpath) && !(sauce && sauce.cols && sauce.rows)) throw new Error('BIN without SAUCE');
+            if (!graphic.load(bpath)) throw new Error('load failed');
+            var rows = Math.min(graphic.height, MAX_ROWS);
+            var bin = graphic.BIN.substr(0, graphic.width * rows * 2);
+            http_reply.header['Cache-Control'] = 'public, max-age=3600';
+            reply({ ok: true, cols: graphic.width, rows: rows, bin: base64_encode(bin) });
+        } catch (bErr) {
+            fail('Could not render: ' + bErr, '500 Internal Server Error');
+        }
+    }
+
+} else if (call === 'image') {
+    /* Serve a picture from the creation areas inline (download-file forces
+       an attachment). Only files with an image extension, only creation dirs. */
+    var ipath = Social.creationPath(request.get_param('dir'), request.get_param('name'));
+    var ext = ipath ? String(file_getext(ipath) || '').toLowerCase() : '';
+    var MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
+    if (!ipath || !MIME[ext]) fail('No such image', '404 Not Found');
+    else {
+        var imf = new File(ipath);
+        if (!imf.open('rb')) fail('Could not read', '500 Internal Server Error');
+        else {
+            var bytes = imf.read();
+            imf.close();
+            http_reply.header['Content-Type'] = MIME[ext];
+            http_reply.header['Content-Disposition'] = 'inline';
+            http_reply.header['Content-Length'] = bytes.length;
+            http_reply.header['Cache-Control'] = 'public, max-age=86400';
+            write(bytes);
+        }
+    }
+
 } else if (call === 'requests') {
     if (isGuest()) fail('Login required', '401 Unauthorized');
     else reply({ ok: true, incoming: Social.incomingRequests(me()), outgoing: Social.outgoingRequests(me()) });

@@ -90,8 +90,35 @@
     var updates = summary ? Social.feed(who, { kind: 'update', limit: 60 }) : [];
     var incoming = isSelf ? Social.incomingRequests(me) : [];
     var outgoing = isSelf ? Social.outgoingRequests(me) : [];
-    var tracks = [];
-    for (var ci = 0; ci < creations.length; ci++) if (creations[ci].kind === 'track') tracks.push(creations[ci]);
+    var tracks = [], ansiPieces = [], imagePieces = [], otherPieces = [];
+    for (var ci = 0; ci < creations.length; ci++) {
+        var ck = creations[ci].kind;
+        if (ck === 'track') tracks.push(creations[ci]);
+        else if (ck === 'ansi' || ck === 'art') ansiPieces.push(creations[ci]);
+        else if (ck === 'image') imagePieces.push(creations[ci]);
+        else otherPieces.push(creations[ci]);
+    }
+    /* Profile song leads the mini player. */
+    if (summary && summary.profile.song) {
+        var songName = summary.profile.song;
+        var lead = null;
+        for (var ti0 = 0; ti0 < tracks.length; ti0++) if (tracks[ti0].name === songName) { lead = tracks.splice(ti0, 1)[0]; break; }
+        tracks.unshift(lead || { kind: 'track', dir: 'originalcontent_mp3s', name: songName, desc: '', added: 0 });
+    }
+    function trackTitle(name) { try { return Social.trackMeta(name); } catch (_tm) { return { title: name.replace(/\.mp3$/i, '').replace(/_/g, ' '), artist: '' }; } }
+    /* The same 12x6 icon bins the games list draws (text/icons/<CODE>.bin). */
+    var playIcons = {};
+    if (summary) {
+        for (var pi0 = 0; pi0 < summary.topPrograms.length; pi0++) {
+            var code = String(summary.topPrograms[pi0].code || '').toUpperCase();
+            if (!/^[A-Z0-9_-]+$/.test(code)) continue;
+            var iconPath = system.text_dir + 'icons/' + code + '.bin';
+            if (!file_exists(iconPath)) iconPath = system.text_dir + 'icons/' + code.toLowerCase() + '.bin';
+            if (!file_exists(iconPath)) continue;
+            var bf = new File(iconPath);
+            if (bf.open('rb')) { playIcons[code] = base64_encode(bf.read()); bf.close(); }
+        }
+    }
 
     /* ---- theme ---- */
     var PRESETS = {
@@ -218,6 +245,41 @@
 .pp-status-line { min-height: 1.2em; color: var(--pp-accent); font-weight: bold; margin-top: 4px; }
 .pp-toggle { cursor: pointer; }
 .pp-hidden { display: none; }
+.pp-plays-title { margin-top: 8px; font-weight: bold; color: var(--pp-title); }
+.pp-plays { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.pp-play-row { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); padding: 3px 6px 3px 3px; background: var(--pp-box); }
+.pp-play-row:hover { border-color: var(--pp-accent); color: var(--pp-text); }
+.pp-play-icon { width: 48px; height: 48px; flex-shrink: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.pp-play-icon img { width: 48px; height: 48px; image-rendering: pixelated; display: block; }
+.pp-play-icon .pp-play-blank { width: 48px; height: 48px; background: #111; opacity: .5; }
+.pp-play-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+.pp-play-count { color: var(--pp-muted); font-size: 11px; white-space: nowrap; }
+.pp-player { display: flex; flex-direction: column; gap: 2px; }
+.pp-track { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-bottom: 1px dotted var(--pp-border); }
+.pp-track:last-of-type { border-bottom: none; }
+.pp-track-btn { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--pp-border); background: var(--pp-accent); color: #fff; cursor: pointer; font: inherit; line-height: 1; }
+.pp-track.is-playing { background: rgba(127,127,127,.12); }
+.pp-track.is-playing .pp-track-btn { background: var(--pp-title); }
+.pp-track-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pp-track-title { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-track-artist { color: var(--pp-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-track-tag { font-size: 10px; text-transform: uppercase; color: var(--pp-title-text); background: var(--pp-title); padding: 0 5px; white-space: nowrap; }
+.pp-player-status { color: var(--pp-muted); font-size: 11px; min-height: 1.2em; margin-top: 2px; }
+.pp-more-toggle { display: inline-block; margin-top: 6px; font-size: 11px; }
+.pp-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.pp-tile { display: flex; flex-direction: column; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); background: #000; overflow: hidden; }
+.pp-tile:hover { border-color: var(--pp-accent); color: var(--pp-text); }
+.pp-tile-art { display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #000; position: relative; }
+.pp-tile-art img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; image-rendering: auto; }
+.pp-tile-ansi .pp-tile-art img { image-rendering: pixelated; object-fit: cover; }
+.pp-tile-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 11px; letter-spacing: .1em; }
+.pp-tile-caption { font-size: 11px; padding: 3px 5px; background: var(--pp-box); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-top: 1px solid var(--pp-border); }
+.pp-other a { word-break: break-all; }
+.pp-lightbox { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; overflow: auto; padding: 16px; box-sizing: border-box; cursor: zoom-out; }
+.pp-lightbox img { max-width: none; image-rendering: pixelated; display: block; margin: auto; box-shadow: 0 0 24px #000; }
+.pp-lightbox img.pp-lightbox-photo { max-width: 100%; height: auto; image-rendering: auto; }
+.pp-lightbox-caption { color: #ccc; font-family: Verdana, Arial, sans-serif; font-size: 12px; padding: 8px 0 0; text-align: center; }
+.pp-lightbox-close { position: fixed; top: 10px; right: 16px; color: #fff; font-size: 28px; line-height: 1; cursor: pointer; background: none; border: none; }
 </style>
 
 <?xjs if (!summary) { ?>
@@ -307,15 +369,6 @@
             </div>
         </div>
 
-<?xjs if (songOnPage) { ?>
-        <div class="pp-box">
-            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Profile Song</div>
-            <div class="pp-box-body pp-song">
-                <button type="button" class="pp-btn pp-btn-primary pp-play" data-track="<?xjs write(esc(songOnPage)); ?>">&#9654; Play</button>
-                <span class="pp-song-name"><?xjs write(esc(songOnPage.replace(/\.mp3$/i, '').replace(/_/g, ' '))); ?></span>
-            </div>
-        </div>
-<?xjs } ?>
 
         <div class="pp-box">
             <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Details</div>
@@ -327,33 +380,22 @@
                     <tr><td>Posts</td><td><?xjs write(summary.posts); ?></td></tr>
                     <tr><td>Files</td><td><?xjs write(summary.uploads); ?> up / <?xjs write(summary.downloads); ?> down</td></tr>
                     <tr><td>Points</td><td><?xjs write(summary.points.balance); ?> <span class="pp-meta">(<?xjs write(summary.points.lifetime); ?> lifetime)</span></td></tr>
-<?xjs if (summary.topPrograms.length) { var tp = []; for (var ti = 0; ti < summary.topPrograms.length; ti++) tp.push(esc(summary.topPrograms[ti].name) + ' <span class="pp-meta">(' + summary.topPrograms[ti].count + ')</span>'); ?>
-                    <tr><td>Plays most</td><td><?xjs write(tp.join('<br>')); ?></td></tr>
-<?xjs } ?>
                 </table>
+<?xjs if (summary.topPrograms.length) { ?>
+                <div class="pp-plays-title">Plays most</div>
+                <div class="pp-plays" id="pp-plays">
+<?xjs for (var ti = 0; ti < summary.topPrograms.length; ti++) { var tpp = summary.topPrograms[ti]; ?>
+                    <a class="pp-play-row" href="./?page=003-games.xjs" title="<?xjs write(esc(tpp.name)); ?>">
+                        <span class="pp-play-icon" data-xtrn-icon="<?xjs write(esc(String(tpp.code).toUpperCase())); ?>"></span>
+                        <span class="pp-play-name"><?xjs write(esc(tpp.name)); ?></span>
+                        <span class="pp-play-count"><?xjs write(tpp.count); ?> play<?xjs write(tpp.count === 1 ? '' : 's'); ?></span>
+                    </a>
+<?xjs } ?>
+                </div>
+<?xjs } ?>
             </div>
         </div>
 
-        <div class="pp-box">
-            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Creations (<?xjs write(creations.length); ?>)</div>
-            <div class="pp-box-body" id="pp-creations">
-<?xjs if (!creations.length) { ?>
-                <p class="pp-note">Nothing in the file areas yet.</p>
-<?xjs } else { for (var cx = 0; cx < creations.length && cx < 40; cx++) { var c = creations[cx]; var viewable = c.kind === 'ansi' || c.kind === 'art'; ?>
-                <div class="pp-creation">
-                    <span class="pp-kind"><?xjs write(esc(c.kind === 'ansi' || c.kind === 'art' ? 'ansi' : c.kind)); ?></span>
-                    <span class="pp-name" title="<?xjs write(esc(c.desc || c.name)); ?>"><?xjs write(esc(c.name)); ?></span>
-<?xjs if (c.kind === 'track') { ?>
-                    <button type="button" class="pp-link-btn pp-play" data-track="<?xjs write(esc(c.name)); ?>">&#9654; play</button>
-<?xjs } else if (viewable) { ?>
-                    <button type="button" class="pp-link-btn pp-view-ansi" data-dir="<?xjs write(esc(c.dir)); ?>" data-name="<?xjs write(esc(c.name)); ?>">view</button>
-<?xjs } else if (c.kind === 'image') { ?>
-                    <a href="./api/files.ssjs?call=download-file&dir=<?xjs write(esc(c.dir)); ?>&file=<?xjs write(encodeURIComponent(c.name)); ?>" target="_blank" rel="noopener">open</a>
-<?xjs } ?>
-                </div>
-<?xjs } if (creations.length > 40) { ?><p class="pp-note">... and <?xjs write(creations.length - 40); ?> more in the <a href="./?page=006-files.xjs">file areas</a>.</p><?xjs } } ?>
-            </div>
-        </div>
     </div>
 
     <div class="pp-col">
@@ -407,6 +449,73 @@
                         <span class="pp-status-line" id="pp-edit-status"></span>
                     </div>
                 </form>
+            </div>
+        </div>
+<?xjs } ?>
+
+<?xjs if (tracks.length) { ?>
+        <div class="pp-box pp-media">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Music (<?xjs write(tracks.length); ?>)</div>
+            <div class="pp-box-body pp-player" id="pp-player">
+<?xjs for (var mi = 0; mi < tracks.length; mi++) { var mt = tracks[mi]; var meta = trackTitle(mt.name); var isSong = !!summary.profile.song && mt.name === summary.profile.song; ?>
+                <div class="pp-track<?xjs write(mi >= 8 ? ' pp-track-more pp-hidden' : ''); ?><?xjs write(isSong ? ' pp-track-song' : ''); ?>" data-track="<?xjs write(esc(mt.name)); ?>">
+                    <button type="button" class="pp-track-btn pp-play" data-track="<?xjs write(esc(mt.name)); ?>" title="Play">&#9654;</button>
+                    <span class="pp-track-text">
+                        <span class="pp-track-title"><?xjs write(esc(meta.title)); ?></span>
+                        <?xjs if (meta.artist) { ?><span class="pp-track-artist"><?xjs write(esc(meta.artist)); ?></span><?xjs } ?>
+                    </span>
+                    <?xjs if (isSong) { ?><span class="pp-track-tag">profile song</span><?xjs } ?>
+                </div>
+<?xjs } if (tracks.length > 8) { ?>
+                <a href="#" class="pp-more-toggle" data-more="pp-track-more">show all <?xjs write(tracks.length); ?> tracks</a>
+<?xjs } ?>
+                <div class="pp-player-status" id="pp-player-status"></div>
+            </div>
+        </div>
+<?xjs } ?>
+<?xjs if (ansiPieces.length) { ?>
+        <div class="pp-box pp-media">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s ANSI Gallery (<?xjs write(ansiPieces.length); ?>)</div>
+            <div class="pp-box-body">
+                <div class="pp-gallery" id="pp-gallery-ansi">
+<?xjs for (var ai = 0; ai < ansiPieces.length; ai++) { var ap = ansiPieces[ai]; ?>
+                    <a href="#" class="pp-tile pp-tile-ansi<?xjs write(ai >= 12 ? ' pp-ansi-more pp-hidden' : ''); ?>" data-dir="<?xjs write(esc(ap.dir)); ?>" data-name="<?xjs write(esc(ap.name)); ?>" title="<?xjs write(esc(ap.desc || ap.name)); ?>">
+                        <span class="pp-tile-art"><span class="pp-tile-wait">ANSI</span></span>
+                        <span class="pp-tile-caption"><?xjs write(esc(ap.desc || ap.name.replace(/\.(ans|asc|bin)$/i, '').replace(/_/g, ' '))); ?></span>
+                    </a>
+<?xjs } ?>
+                </div>
+<?xjs if (ansiPieces.length > 12) { ?>
+                <a href="#" class="pp-more-toggle" data-more="pp-ansi-more">show all <?xjs write(ansiPieces.length); ?> pieces</a>
+<?xjs } ?>
+            </div>
+        </div>
+<?xjs } ?>
+<?xjs if (imagePieces.length) { ?>
+        <div class="pp-box pp-media">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Pictures (<?xjs write(imagePieces.length); ?>)</div>
+            <div class="pp-box-body">
+                <div class="pp-gallery" id="pp-gallery-images">
+<?xjs for (var ii = 0; ii < imagePieces.length; ii++) { var ip = imagePieces[ii]; var isrc = './api/social.ssjs?call=image&dir=' + encodeURIComponent(ip.dir) + '&name=' + encodeURIComponent(ip.name); ?>
+                    <a href="<?xjs write(esc(isrc)); ?>" class="pp-tile pp-tile-image<?xjs write(ii >= 12 ? ' pp-image-more pp-hidden' : ''); ?>" data-src="<?xjs write(esc(isrc)); ?>" title="<?xjs write(esc(ip.desc || ip.name)); ?>">
+                        <span class="pp-tile-art"><img loading="lazy" src="<?xjs write(esc(isrc)); ?>" alt="<?xjs write(esc(ip.desc || ip.name)); ?>"></span>
+                        <span class="pp-tile-caption"><?xjs write(esc(ip.desc || ip.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))); ?></span>
+                    </a>
+<?xjs } ?>
+                </div>
+<?xjs if (imagePieces.length > 12) { ?>
+                <a href="#" class="pp-more-toggle" data-more="pp-image-more">show all <?xjs write(imagePieces.length); ?> pictures</a>
+<?xjs } ?>
+            </div>
+        </div>
+<?xjs } ?>
+<?xjs if (otherPieces.length) { ?>
+        <div class="pp-box pp-media">
+            <div class="pp-box-title">Other files by <?xjs write(esc(summary.alias)); ?> (<?xjs write(otherPieces.length); ?>)</div>
+            <div class="pp-box-body pp-other">
+<?xjs for (var oi = 0; oi < otherPieces.length && oi < 10; oi++) { var op = otherPieces[oi]; ?>
+                <a href="./api/files.ssjs?call=download-file&dir=<?xjs write(esc(op.dir)); ?>&file=<?xjs write(encodeURIComponent(op.name)); ?>"><?xjs write(esc(op.name)); ?></a><?xjs write(oi < Math.min(otherPieces.length, 10) - 1 ? ' &middot; ' : ''); ?>
+<?xjs } if (otherPieces.length > 10) { ?> <span class="pp-meta">and <?xjs write(otherPieces.length - 10); ?> more in the <a href="./?page=006-files.xjs">file areas</a></span><?xjs } ?>
             </div>
         </div>
 <?xjs } ?>
@@ -626,41 +735,163 @@
         });
     });
 
-    /* ANSI creations: render on demand under the row */
+    /* show-all toggles for the galleries and the player */
     root.addEventListener('click', function (e) {
-        var b = e.target.closest('.pp-view-ansi');
-        if (!b) return;
+        var t = e.target.closest('.pp-more-toggle');
+        if (!t) return;
         e.preventDefault();
-        var row = b.closest('.pp-creation');
-        var existing = row.nextElementSibling && row.nextElementSibling.classList.contains('pp-ansi-view') ? row.nextElementSibling : null;
-        if (existing) { existing.remove(); b.textContent = 'view'; return; }
-        b.textContent = 'loading...';
-        fetch(API + '?call=render-ansi&dir=' + encodeURIComponent(b.getAttribute('data-dir')) + '&name=' + encodeURIComponent(b.getAttribute('data-name')), { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-                b.textContent = res.ok ? 'hide' : 'view';
-                if (!res.ok) return;
-                var view = document.createElement('div');
-                view.className = 'pp-ansi-view';
-                view.innerHTML = res.html;
-                row.parentNode.insertBefore(view, row.nextSibling);
-            }).catch(function () { b.textContent = 'view'; });
+        Array.prototype.forEach.call(root.querySelectorAll('.' + t.getAttribute('data-more')), function (el) { el.classList.remove('pp-hidden'); });
+        t.remove();
+        drawAnsiTiles();
     });
 
-    /* play a track (profile song / creations / About Me embeds) through the site radio, else a bare audio element */
+    /* ---- lightbox (ANSI as a full-size PNG, photos at page width) ---- */
+    function openLightbox(src, caption, isPhoto) {
+        closeLightbox();
+        var box = document.createElement('div');
+        box.className = 'pp-lightbox';
+        box.id = 'pp-lightbox';
+        var close = document.createElement('button');
+        close.className = 'pp-lightbox-close';
+        close.innerHTML = '&times;';
+        var img = document.createElement('img');
+        img.src = src;
+        if (isPhoto) img.className = 'pp-lightbox-photo';
+        var cap = document.createElement('div');
+        cap.className = 'pp-lightbox-caption';
+        cap.textContent = caption || '';
+        box.appendChild(close); box.appendChild(img); box.appendChild(cap);
+        box.addEventListener('click', function (ev) { if (ev.target !== img) closeLightbox(); });
+        document.body.appendChild(box);
+        document.addEventListener('keydown', escClose);
+    }
+    function closeLightbox() {
+        var box = document.getElementById('pp-lightbox');
+        if (box) box.remove();
+        document.removeEventListener('keydown', escClose);
+    }
+    function escClose(ev) { if (ev.key === 'Escape') closeLightbox(); }
+    document.addEventListener('spa:beforeNavigate', closeLightbox);
+
+    /* ---- ANSI gallery: cell grids -> PNG through GraphicsConverter ---- */
+    var ansiCache = {};
+    function converter() {
+        return (window.GraphicsConverter && typeof GraphicsConverter.shared === 'function') ? GraphicsConverter.shared() : null;
+    }
+    function ansiKey(tile) { return tile.getAttribute('data-dir') + '/' + tile.getAttribute('data-name'); }
+    function renderAnsi(tile, done) {
+        var key = ansiKey(tile);
+        if (ansiCache[key]) { done(ansiCache[key]); return; }
+        var gc = converter();
+        if (!gc) { done(null); return; }
+        fetch(API + '?call=ansi-bin&dir=' + encodeURIComponent(tile.getAttribute('data-dir')) + '&name=' + encodeURIComponent(tile.getAttribute('data-name')), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res.ok) { done(null); return; }
+                gc.from_bin(atob(res.bin), res.cols, res.rows, function (dataURL) {
+                    ansiCache[key] = dataURL;
+                    done(dataURL);
+                }, true);
+            }).catch(function () { done(null); });
+    }
+    var drawQueue = [];
+    var drawing = false;
+    function drawNext() {
+        if (drawing || !drawQueue.length) return;
+        drawing = true;
+        var tile = drawQueue.shift();
+        renderAnsi(tile, function (dataURL) {
+            var art = tile.querySelector('.pp-tile-art');
+            if (dataURL && art) {
+                var img = new Image();
+                img.src = dataURL;
+                art.innerHTML = '';
+                art.appendChild(img);
+            } else if (art) {
+                var wait = art.querySelector('.pp-tile-wait');
+                if (wait) wait.textContent = 'n/a';
+            }
+            tile.setAttribute('data-drawn', '1');
+            drawing = false;
+            drawNext();
+        });
+    }
+    function drawAnsiTiles() {
+        Array.prototype.forEach.call(root.querySelectorAll('.pp-tile-ansi:not(.pp-hidden):not([data-drawn])'), function (tile) {
+            if (drawQueue.indexOf(tile) === -1) { tile.setAttribute('data-queued', '1'); drawQueue.push(tile); }
+        });
+        drawNext();
+    }
+    drawAnsiTiles();
+
+    root.addEventListener('click', function (e) {
+        var tile = e.target.closest('.pp-tile');
+        if (!tile) return;
+        e.preventDefault();
+        var caption = tile.getAttribute('title') || '';
+        if (tile.classList.contains('pp-tile-image')) { openLightbox(tile.getAttribute('data-src'), caption, true); return; }
+        renderAnsi(tile, function (dataURL) {
+            if (dataURL) openLightbox(dataURL, caption, false);
+        });
+    });
+
+    /* ---- "Plays most": the games list's 12x6 icon bins ---- */
+    (function () {
+        var icons = <?xjs write(JSON.stringify(playIcons).replace(/<\//g, '<\\/')); ?>;
+        var gc = converter();
+        Array.prototype.forEach.call(root.querySelectorAll('[data-xtrn-icon]'), function (el) {
+            var b64 = icons[el.getAttribute('data-xtrn-icon')];
+            if (!b64 || !gc) { el.innerHTML = '<span class="pp-play-blank"></span>'; return; }
+            gc.from_bin(atob(b64), 12, 6, function (dataURL) {
+                var img = new Image();
+                img.src = dataURL;
+                el.innerHTML = '';
+                el.appendChild(img);
+            }, true);
+        });
+    })();
+
+    /* ---- mini player: rows drive the site radio; falls back to an <audio> ---- */
     var fallbackAudio = null;
+    function radio() { return (window.sbbsRadio && typeof window.sbbsRadio.playByFile === 'function') ? window.sbbsRadio : null; }
+    function setPlayerStatus(text) { var el = document.getElementById('pp-player-status'); if (el) el.textContent = text || ''; }
+    function refreshNowPlaying() {
+        var r = radio();
+        var current = r ? r.currentTrackFile : (fallbackAudio && !fallbackAudio.paused ? fallbackAudio.getAttribute('data-track') : '');
+        var playing = r ? !!r.isPlaying : !!(fallbackAudio && !fallbackAudio.paused);
+        Array.prototype.forEach.call(root.querySelectorAll('.pp-track'), function (row) {
+            var mine = playing && row.getAttribute('data-track') === current;
+            row.classList.toggle('is-playing', mine);
+            var btn = row.querySelector('.pp-track-btn');
+            if (btn) btn.innerHTML = mine ? '&#10074;&#10074;' : '&#9654;';
+        });
+        if (r && playing && current) setPlayerStatus('Now playing: ' + (r.currentTrackTitle || current));
+        else if (!playing) setPlayerStatus('');
+    }
     root.addEventListener('click', function (e) {
         var b = e.target.closest('.pp-play, .wiki-track-play');
         if (!b) return;
         e.preventDefault();
         var name = b.getAttribute('data-track');
-        if (window.sbbsRadio && typeof window.sbbsRadio.playByFile === 'function' && window.sbbsRadio.playByFile(name)) return;
-        if (!fallbackAudio) { fallbackAudio = document.createElement('audio'); fallbackAudio.controls = true; fallbackAudio.style.width = '100%'; }
+        var r = radio();
+        if (r) {
+            if (r.currentTrackFile === name && typeof r.togglePlay === 'function') { r.togglePlay(); window.setTimeout(refreshNowPlaying, 200); return; }
+            if (r.playByFile(name)) { window.setTimeout(refreshNowPlaying, 300); return; }
+            setPlayerStatus('That track is not in the radio library yet; playing it directly.');
+        }
+        if (!fallbackAudio) { fallbackAudio = document.createElement('audio'); fallbackAudio.controls = true; fallbackAudio.style.width = '100%'; fallbackAudio.addEventListener('play', refreshNowPlaying); fallbackAudio.addEventListener('pause', refreshNowPlaying); }
+        if (fallbackAudio.getAttribute('data-track') === name && !fallbackAudio.paused) { fallbackAudio.pause(); return; }
+        fallbackAudio.setAttribute('data-track', name);
         fallbackAudio.src = './radio-stream/' + encodeURIComponent(name);
-        var box = b.closest('.pp-box-body');
-        if (box && !fallbackAudio.parentNode) box.appendChild(fallbackAudio);
+        var host = document.getElementById('pp-player') || b.closest('.pp-box-body');
+        if (host && !fallbackAudio.parentNode) host.appendChild(fallbackAudio);
         fallbackAudio.play().catch(function () { /* autoplay blocked: the controls are there */ });
     });
+    var nowPlayingTimer = window.setInterval(function () {
+        if (!document.body.contains(root)) { window.clearInterval(nowPlayingTimer); return; }
+        refreshNowPlaying();
+    }, 1000);
+    refreshNowPlaying();
 
     /* profile editor */
     var edit = document.getElementById('pp-edit-form');
