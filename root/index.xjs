@@ -386,6 +386,9 @@
                             <span class="bin-icon" data-icon="mail"></span><? write(locale.strings.main.menu_item_mail); ?>
                             <span class="badge bg-danger" id="badge-unread-mail-inner"></span>
                         </a></li>
+                        <li><a class="dropdown-item" href="./?page=013-profile.xjs&amp;user=<? write(encodeURIComponent(user.alias)); ?>">
+                            <span class="bin-icon" data-icon="account"></span><? write(locale.strings.main.menu_item_profile || 'My Profile'); ?>
+                        </a></li>
                         <li><a class="dropdown-item" href="./?page=010-settings.xjs">
                             <span class="bin-icon" data-icon="gear"></span><? write(locale.strings.main.menu_item_settings); ?>
                         </a></li>

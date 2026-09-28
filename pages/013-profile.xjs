@@ -27,30 +27,48 @@
     function isGuest() { return user.number < 1 || user.alias === settings.guest; }
     var me = isGuest() ? 0 : user.number;
 
-    /* Pipe colour codes (|00-|15 fg, |16-|23 bg) -> spans; same fixed tables
-       as the chat renderer, so nothing typed reaches a style attribute. */
-    var CGA_HEX = ['#555555', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA',
-        '#555555', '#5555FF', '#55FF55', '#55FFFF', '#FF5555', '#FF55FF', '#FFFF55', '#FFFFFF'];
-    var CGA_BG_HEX = ['#000000', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA'];
+    /* Synchronet Ctrl-A colour codes (\x01 + letter/digit) and Mystic pipe
+       codes (|00-|23) -> spans. Colours come from fixed tables, so nothing a
+       member types can reach a style attribute. Same rules as oneliners.js. */
+    var CGA_HEX = ['#000000', '#0000aa', '#00aa00', '#00aaaa', '#aa0000', '#aa00aa', '#aa5500', '#aaaaaa',
+        '#555555', '#5555ff', '#55ff55', '#55ffff', '#ff5555', '#ff55ff', '#ffff55', '#ffffff'];
+    var CTRLA_FG = { k: 0, b: 1, g: 2, c: 3, r: 4, m: 5, y: 6, w: 7 };
+    var CTRLA_BG = { '0': 0, '1': 4, '2': 2, '3': 6, '4': 1, '5': 5, '6': 3, '7': 7 };
     function pipeHtml(text) {
-        var source = String(text || '');
-        var out = '';
-        var fg = -1, bg = -1, last = 0, m;
-        var re = /\|(0[0-9]|1[0-9]|2[0-3])/g;
-        function run(chunk) {
-            var html = esc(chunk).replace(/\n/g, '<br>');
+        var src = String(text || '');
+        var out = '', fg = 7, bg = -1, high = false, run = '', i = 0;
+        function flush() {
+            if (!run.length) return;
+            var html = esc(run).replace(/\n/g, '<br>');
             var style = '';
-            if (fg >= 0) style += 'color:' + CGA_HEX[fg] + ';';
-            if (bg > 0) style += 'background-color:' + CGA_BG_HEX[bg] + ';';
-            return style ? '<span style="' + style + '">' + html + '</span>' : html;
+            if (fg !== 7 || high) style += 'color:' + CGA_HEX[high ? (fg | 8) : fg] + ';';
+            if (bg >= 0) style += 'background-color:' + CGA_HEX[bg] + ';';
+            out += style ? '<span style="' + style + '">' + html + '</span>' : html;
+            run = '';
         }
-        while ((m = re.exec(source)) !== null) {
-            if (m.index > last) out += run(source.substring(last, m.index));
-            var code = parseInt(m[1], 10);
-            if (code <= 15) fg = code; else bg = code === 16 ? -1 : code - 16;
-            last = m.index + m[0].length;
+        while (i < src.length) {
+            var ch = src.charAt(i);
+            if (ch === '\x01' && i + 1 < src.length) {
+                var code = src.charAt(i + 1), lower = code.toLowerCase();
+                flush(); i += 2;
+                if (lower === 'n' || code === '-' || code === '_') { fg = 7; bg = -1; high = false; }
+                else if (lower === 'h') high = true;
+                else if (CTRLA_FG.hasOwnProperty(lower)) fg = CTRLA_FG[lower];
+                else if (CTRLA_BG.hasOwnProperty(code)) bg = CTRLA_BG[code];
+                continue;
+            }
+            if (ch === '|' && /^[0-2][0-9]$/.test(src.substr(i + 1, 2))) {
+                var pipe = parseInt(src.substr(i + 1, 2), 10);
+                if (pipe <= 23) {
+                    flush(); i += 3;
+                    if (pipe <= 15) { fg = pipe & 7; high = !!(pipe & 8); }
+                    else bg = pipe === 16 ? -1 : pipe - 16;
+                    continue;
+                }
+            }
+            run += ch; i++;
         }
-        if (last < source.length) out += run(source.substring(last));
+        flush();
         return out;
     }
 
@@ -176,6 +194,22 @@
         writeln('</div>');
     }
 
+    /* Colour toolbar under a composer: Synchronet Ctrl-A codes, picked not typed. */
+    function writeColorToolbar() {
+        var fgCodes = 'krgybmcw';
+        var fgHex = ['#000000', '#aa0000', '#00aa00', '#aa5500', '#0000aa', '#aa00aa', '#00aaaa', '#aaaaaa'];
+        var hiHex = ['#555555', '#ff5555', '#55ff55', '#ffff55', '#5555ff', '#ff55ff', '#55ffff', '#ffffff'];
+        var dark = { 0: 1, 1: 1, 4: 1, 5: 1 };
+        var html = '<div class="pp-colors" title="Insert a colour at the cursor"><span class="pp-colors-label">text</span>';
+        for (var i = 0; i < 8; i++) html += '<button type="button" class="pp-color-btn" data-code="' + fgCodes.charAt(i) + '" style="background:' + fgHex[i] + ';color:' + (dark[i] ? '#ddd' : '#111') + '">' + fgCodes.charAt(i) + '</button>';
+        for (var j = 0; j < 8; j++) html += '<button type="button" class="pp-color-btn" data-code="h' + fgCodes.charAt(j) + '" style="background:' + hiHex[j] + ';color:#111">' + fgCodes.charAt(j).toUpperCase() + '</button>';
+        html += '<span class="pp-colors-label">back</span>';
+        for (var k = 0; k < 8; k++) html += '<button type="button" class="pp-color-btn" data-code="' + k + '" style="background:' + fgHex[k] + ';color:' + (dark[k] ? '#ddd' : '#111') + '">' + k + '</button>';
+        html += '<button type="button" class="pp-color-btn pp-color-reset" data-code="n" title="Back to normal">N</button></div>';
+        html += '<div class="pp-compose-preview"></div>';
+        writeln(html);
+    }
+
     function relationButton(rel) {
         if (rel === 'friends') return { label: 'Remove from Friends', action: 'unfriend', cls: 'pp-btn-quiet' };
         if (rel === 'incoming') return { label: 'Accept Friend Request', action: 'accept', cls: 'pp-btn-primary' };
@@ -251,6 +285,13 @@
 .pp-form input[type=text], .pp-form select { width: 100%; font: inherit; padding: 3px; border: 1px solid var(--pp-border); background: #fff; color: #000; box-sizing: border-box; }
 .pp-form label { display: block; font-weight: bold; margin-top: 6px; }
 .pp-form .pp-hint { color: var(--pp-muted); font-size: 11px; }
+.pp-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
+.pp-colors-label { font-size: 10px; text-transform: uppercase; color: var(--pp-muted); margin: 0 4px 0 2px; }
+.pp-color-btn { width: 22px; height: 20px; padding: 0; border: 1px solid #333; font: bold 10px/1 monospace; cursor: pointer; }
+.pp-color-btn:hover { outline: 2px solid var(--pp-accent); }
+.pp-color-reset { background: var(--pp-box); color: var(--pp-text); border-color: var(--pp-border); }
+.pp-compose-preview { min-height: 1.4em; padding: 3px 5px; margin-bottom: 4px; background: #000; color: #aaa; font-family: "Spleen", "VT323", monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.pp-compose-preview:empty { display: none; }
 .pp-note { color: var(--pp-muted); font-style: italic; }
 .pp-creation { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px dotted var(--pp-border); }
 .pp-creation:last-child { border-bottom: none; }
@@ -551,7 +592,8 @@
             <div class="pp-box-body">
 <?xjs if (isSelf) { ?>
                 <form class="pp-form <?xjs write(updates.length ? 'pp-hidden' : ''); ?>" id="pp-update-form" data-kind="update">
-                    <textarea name="body" maxlength="1000" placeholder="What are you up to? (|12pipe colours|07 work)"></textarea>
+                    <textarea name="body" maxlength="1000" placeholder="What are you up to?"></textarea>
+                    <?xjs writeColorToolbar(); ?>
                     <button type="submit" class="pp-btn pp-btn-primary">Post Update</button>
                     <span class="pp-status-line pp-form-status"></span>
                 </form>
@@ -620,6 +662,7 @@
 <?xjs if (canWall) { ?>
                 <form class="pp-form pp-hidden" id="pp-wall-form" data-kind="wall">
                     <textarea name="body" maxlength="1000" placeholder="Write something on <?xjs write(esc(summary.alias)); ?>'s wall"></textarea>
+                    <?xjs writeColorToolbar(); ?>
                     <button type="submit" class="pp-btn pp-btn-primary">Post</button>
                     <span class="pp-status-line pp-form-status"></span>
                 </form>
@@ -657,24 +700,46 @@
     function esc(s) {
         return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
-    var CGA = ['#555555', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA',
-        '#555555', '#5555FF', '#55FF55', '#55FFFF', '#FF5555', '#FF55FF', '#FFFF55', '#FFFFFF'];
-    var CGA_BG = ['#000000', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA'];
+    var CGA_HEX = ['#000000', '#0000aa', '#00aa00', '#00aaaa', '#aa0000', '#aa00aa', '#aa5500', '#aaaaaa',
+        '#555555', '#5555ff', '#55ff55', '#55ffff', '#ff5555', '#ff55ff', '#ffff55', '#ffffff'];
+    var CTRLA_FG = { k: 0, b: 1, g: 2, c: 3, r: 4, m: 5, y: 6, w: 7 };
+    var CTRLA_BG = { '0': 0, '1': 4, '2': 2, '3': 6, '4': 1, '5': 5, '6': 3, '7': 7 };
+    /* Ctrl-A + pipe colour codes -> spans (mirror of the server's pipeHtml). */
     function pipeHtml(text) {
-        var src = String(text || ''), out = '', fg = -1, bg = -1, last = 0, m;
-        var re = /\|(0[0-9]|1[0-9]|2[0-3])/g;
-        function run(chunk) {
-            var html = esc(chunk).replace(/\n/g, '<br>');
-            var style = (fg >= 0 ? 'color:' + CGA[fg] + ';' : '') + (bg > 0 ? 'background-color:' + CGA_BG[bg] + ';' : '');
-            return style ? '<span style="' + style + '">' + html + '</span>' : html;
+        var src = String(text || '');
+        var out = '', fg = 7, bg = -1, high = false, run = '', i = 0;
+        function flush() {
+            if (!run.length) return;
+            var html = esc(run).replace(/\n/g, '<br>');
+            var style = '';
+            if (fg !== 7 || high) style += 'color:' + CGA_HEX[high ? (fg | 8) : fg] + ';';
+            if (bg >= 0) style += 'background-color:' + CGA_HEX[bg] + ';';
+            out += style ? '<span style="' + style + '">' + html + '</span>' : html;
+            run = '';
         }
-        while ((m = re.exec(src)) !== null) {
-            if (m.index > last) out += run(src.substring(last, m.index));
-            var code = parseInt(m[1], 10);
-            if (code <= 15) fg = code; else bg = code === 16 ? -1 : code - 16;
-            last = m.index + m[0].length;
+        while (i < src.length) {
+            var ch = src.charAt(i);
+            if (ch === '\x01' && i + 1 < src.length) {
+                var code = src.charAt(i + 1), lower = code.toLowerCase();
+                flush(); i += 2;
+                if (lower === 'n' || code === '-' || code === '_') { fg = 7; bg = -1; high = false; }
+                else if (lower === 'h') high = true;
+                else if (CTRLA_FG.hasOwnProperty(lower)) fg = CTRLA_FG[lower];
+                else if (CTRLA_BG.hasOwnProperty(code)) bg = CTRLA_BG[code];
+                continue;
+            }
+            if (ch === '|' && /^[0-2][0-9]$/.test(src.substr(i + 1, 2))) {
+                var pipe = parseInt(src.substr(i + 1, 2), 10);
+                if (pipe <= 23) {
+                    flush(); i += 3;
+                    if (pipe <= 15) { fg = pipe & 7; high = !!(pipe & 8); }
+                    else bg = pipe === 16 ? -1 : pipe - 16;
+                    continue;
+                }
+            }
+            run += ch; i++;
         }
-        if (last < src.length) out += run(src.substring(last));
+        flush();
         return out;
     }
     function fmtDate(ms) {
@@ -722,6 +787,27 @@
         }).catch(function () { b.disabled = false; });
     });
 
+    /* colour toolbar: insert Ctrl-A codes at the cursor; live preview under the box */
+    Array.prototype.forEach.call(root.querySelectorAll('form[data-kind]'), function (form) {
+        var box = form.querySelector('textarea[name=body]');
+        var preview = form.querySelector('.pp-compose-preview');
+        function refresh() { if (preview) preview.innerHTML = box.value.length ? pipeHtml(box.value) : ''; }
+        box.addEventListener('input', refresh);
+        form.addEventListener('click', function (e) {
+            var b = e.target.closest('.pp-color-btn');
+            if (!b) return;
+            e.preventDefault();
+            var code = b.getAttribute('data-code');
+            var insert = '';
+            for (var i = 0; i < code.length; i++) insert += '\x01' + code.charAt(i);
+            var start = box.selectionStart || 0, end = box.selectionEnd || start;
+            box.value = box.value.substring(0, start) + insert + box.value.substring(end);
+            box.selectionStart = box.selectionEnd = start + insert.length;
+            box.focus();
+            refresh();
+        });
+    });
+
     /* wall + update forms */
     Array.prototype.forEach.call(root.querySelectorAll('form[data-kind]'), function (form) {
         form.addEventListener('submit', function (e) {
@@ -732,6 +818,7 @@
                 if (!res.ok) { status.textContent = res.error || res.reason || 'Could not post'; return; }
                 status.textContent = '';
                 form.querySelector('textarea[name=body]').value = '';
+                var pv = form.querySelector('.pp-compose-preview'); if (pv) pv.innerHTML = '';
                 var list = document.getElementById(form.getAttribute('data-kind') === 'wall' ? 'pp-wall' : 'pp-updates');
                 var note = list.querySelector('.pp-note');
                 if (note) note.remove();
