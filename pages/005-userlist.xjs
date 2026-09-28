@@ -686,13 +686,12 @@
     }
     .leaflet-control-attribution a { color: #777 !important; }
 
-    /* --- CGA color tint for CartoDB Dark Matter tiles --- */
-    .leaflet-tile-pane {
-        filter: saturate(0.3) brightness(1.1);
-    }
-    /* Labels overlay gets CGA cyan/green tint */
-    .leaflet-labels-pane {
-        filter: hue-rotate(140deg) saturate(2) brightness(1.4);
+    /* --- Local basemap: Natural Earth outlines drawn by Leaflet, CGA palette --- */
+    .leaflet-container { background: #000000; }
+    .usermap-label {
+        color: #55ffff; font-size: 10px; font-family: "VT323", monospace; letter-spacing: .04em;
+        text-transform: uppercase; text-shadow: 0 0 3px #000, 0 0 3px #000; white-space: nowrap;
+        pointer-events: none; opacity: .85;
     }
     </style>
 
@@ -829,29 +828,46 @@
             center: [30, 0],
             zoom: 2,
             minZoom: 2,
-            maxZoom: 12,
-            maxBounds: [[-60, -180], [75, 180]],
+            maxZoom: 7,
+            maxBounds: [[-60, -180], [85, 180]],
             maxBoundsViscosity: 0.9,
             worldCopyJump: false,
             zoomControl: true,
             attributionControl: true
         });
+        map.attributionControl.addAttribution('Natural Earth (public domain), drawn locally');
 
-        // CartoDB Dark Matter: dark base (no labels) + labels overlay
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://osm.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 19,
-            noWrap: true
-        }).addTo(map);
-
-        // Labels overlay (cities, countries) — no roads
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 19,
-            noWrap: true,
-            pane: 'shadowPane'
-        }).addTo(map);
+        // Basemap: Natural Earth country outlines served from this site
+        // (root/lib/geo/world.geojson). No tile server, no API key: the
+        // coastlines do not change on a human timescale. Countries are
+        // filled in a dark CGA blue on black, labels appear from zoom 3.
+        var graticule = L.layerGroup().addTo(map);
+        for (var glat = -60; glat <= 90; glat += 30) graticule.addLayer(L.polyline([[glat, -180], [glat, 180]], { color: '#1a1a3a', weight: 1, interactive: false }));
+        for (var glon = -180; glon <= 180; glon += 30) graticule.addLayer(L.polyline([[-90, glon], [90, glon]], { color: '#1a1a3a', weight: 1, interactive: false }));
+        var labelLayer = L.layerGroup();
+        function syncLabels() {
+            if (map.getZoom() >= 3) { if (!map.hasLayer(labelLayer)) labelLayer.addTo(map); }
+            else if (map.hasLayer(labelLayer)) map.removeLayer(labelLayer);
+        }
+        map.on('zoomend', syncLabels);
+        fetch('./lib/geo/world.geojson', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (world) {
+                L.geoJSON(world, {
+                    style: function () { return { color: '#5555ff', weight: 1, fillColor: '#0a0f2a', fillOpacity: 1 }; },
+                    interactive: false
+                }).addTo(map);
+                (world.features || []).forEach(function (f) {
+                    var p = f.properties || {};
+                    if (!p.name || typeof p.lx !== 'number' || typeof p.ly !== 'number') return;
+                    labelLayer.addLayer(L.marker([p.ly, p.lx], {
+                        icon: L.divIcon({ html: p.name, className: 'usermap-label', iconSize: null }),
+                        interactive: false, keyboard: false
+                    }));
+                });
+                syncLabels();
+            })
+            .catch(function (err) { console.warn('[usermap] basemap', err); });
 
         // Fetch geo data
         fetch('./api/user-geo.ssjs', { credentials: 'same-origin' })
@@ -867,7 +883,7 @@
                 // Auto-fit map to where the users actually are
                 var lats = geoUsers.map(function (u) { return [u.lat, u.lon]; });
                 if (lats.length) {
-                    map.fitBounds(lats, { padding: [30, 30], maxZoom: 8 });
+                    map.fitBounds(lats, { padding: [30, 30], maxZoom: 6 });
                 }
             })
             .catch(function (err) {
