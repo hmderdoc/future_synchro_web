@@ -919,10 +919,17 @@
     function setPlayerStatus(text) { var el = document.getElementById('pp-player-status'); if (el) el.textContent = text || ''; }
     var artCache = {};
     var artObserver = null;
-    function loadArt(el, name) {
+    function loadArt(el, name, attempt) {
         if (artCache[name] !== undefined) { if (artCache[name]) { el.innerHTML = '<img alt="">'; el.firstChild.src = artCache[name]; } return; }
+        /* On a full page load this script runs before ./js/id3parser.js (it
+           is included after the content); wait for it rather than caching
+           "no art" for whichever rows happened to be on screen first. */
+        if (typeof window.parseID3v2 !== 'function') {
+            attempt = (attempt || 0) + 1;
+            if (attempt <= 20) window.setTimeout(function () { loadArt(el, name, attempt); }, 250);
+            return;
+        }
         artCache[name] = '';
-        if (typeof window.parseID3v2 !== 'function') return;
         fetch('./radio-stream/' + encodeURIComponent(name), { headers: { Range: 'bytes=0-262143' }, credentials: 'same-origin' })
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
             .then(function (buf) {
