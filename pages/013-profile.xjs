@@ -106,11 +106,38 @@
         tracks.unshift(lead || { kind: 'track', dir: 'originalcontent_mp3s', name: songName, desc: '', added: 0 });
     }
     function trackTitle(name) { try { return Social.trackMeta(name); } catch (_tm) { return { title: name.replace(/\.mp3$/i, '').replace(/_/g, ' '), artist: '' }; } }
+    var playCounts = {};
+    try { load(system.mods_dir + 'load/fl_playcounts.js'); playCounts = FLPlayCounts.counts(); } catch (_pcErr) { playCounts = {}; }
+    function jsonForScript(value) { return JSON.stringify(value).replace(/<\//g, '<\\/'); }
+    var mediaTracks = [];
+    for (var mt0 = 0; mt0 < tracks.length; mt0++) {
+        var tk = tracks[mt0], tmeta = trackTitle(tk.name), pc = playCounts[String(tk.name).toLowerCase()];
+        mediaTracks.push({ name: tk.name, title: tmeta.title, artist: tmeta.artist, added: tk.added || 0, plays: pc ? pc.plays : 0,
+            song: !!(summary && summary.profile.song && tk.name === summary.profile.song) });
+    }
+    function caption(item) { return item.desc || item.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '); }
+    var mediaAnsi = [], mediaImages = [];
+    for (var ma0 = 0; ma0 < ansiPieces.length; ma0++) mediaAnsi.push({ dir: ansiPieces[ma0].dir, name: ansiPieces[ma0].name, caption: caption(ansiPieces[ma0]), added: ansiPieces[ma0].added || 0 });
+    for (var mi0 = 0; mi0 < imagePieces.length; mi0++) mediaImages.push({ dir: imagePieces[mi0].dir, name: imagePieces[mi0].name, caption: caption(imagePieces[mi0]), added: imagePieces[mi0].added || 0,
+        src: './api/social.ssjs?call=image&dir=' + encodeURIComponent(imagePieces[mi0].dir) + '&name=' + encodeURIComponent(imagePieces[mi0].name) });
+    /* Every program ever launched is too much for a sidebar box: keep the
+       union of the top 12 by time, by launches and by recency, which is all
+       the client's three sort views can ever show. */
+    var allPlays = [];
+    (function () {
+        var everything = summary ? Social.topPrograms(who, 0) : [];
+        var keep = {};
+        ['seconds', 'count', 'last'].forEach(function (key) {
+            everything.slice().sort(function (x, y) { return (y[key] || 0) - (x[key] || 0); }).slice(0, 12)
+                .forEach(function (entry) { keep[entry.code] = entry; });
+        });
+        for (var code in keep) if (keep.hasOwnProperty(code)) allPlays.push(keep[code]);
+    })();
     /* The same 12x6 icon bins the games list draws (text/icons/<CODE>.bin). */
     var playIcons = {};
     if (summary) {
-        for (var pi0 = 0; pi0 < summary.topPrograms.length; pi0++) {
-            var code = String(summary.topPrograms[pi0].code || '').toUpperCase();
+        for (var pi0 = 0; pi0 < allPlays.length && pi0 < 40; pi0++) {
+            var code = String(allPlays[pi0].code || '').toUpperCase();
             if (!/^[A-Z0-9_-]+$/.test(code)) continue;
             var iconPath = system.text_dir + 'icons/' + code + '.bin';
             if (!file_exists(iconPath)) iconPath = system.text_dir + 'icons/' + code.toLowerCase() + '.bin';
@@ -245,41 +272,63 @@
 .pp-status-line { min-height: 1.2em; color: var(--pp-accent); font-weight: bold; margin-top: 4px; }
 .pp-toggle { cursor: pointer; }
 .pp-hidden { display: none; }
-.pp-plays-title { margin-top: 8px; font-weight: bold; color: var(--pp-title); }
+.pp-box-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pp-title-link { color: var(--pp-title-text) !important; font-weight: normal; font-size: 11px; }
+.pp-sort { display: inline-flex; gap: 2px; }
+.pp-sort-btn { font: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; }
+.pp-sort-btn.is-active { background: var(--pp-accent); color: #fff; border-color: var(--pp-accent); }
+.pp-box-title .pp-sort-btn { border-color: rgba(255,255,255,.4); background: transparent; color: var(--pp-title-text); }
+.pp-box-title .pp-sort-btn.is-active { background: rgba(255,255,255,.25); }
+.pp-plays-head { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.pp-plays-title { font-weight: bold; color: var(--pp-title); }
 .pp-plays { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .pp-play-row { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); padding: 3px 6px 3px 3px; background: var(--pp-box); }
 .pp-play-row:hover { border-color: var(--pp-accent); color: var(--pp-text); }
+.pp-play-rank { width: 1.4em; text-align: right; color: var(--pp-muted); font-size: 11px; }
 .pp-play-icon { width: 48px; height: 48px; flex-shrink: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .pp-play-icon img { width: 48px; height: 48px; image-rendering: pixelated; display: block; }
 .pp-play-icon .pp-play-blank { width: 48px; height: 48px; background: #111; opacity: .5; }
 .pp-play-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
 .pp-play-count { color: var(--pp-muted); font-size: 11px; white-space: nowrap; }
-.pp-player { display: flex; flex-direction: column; gap: 2px; }
+.pp-player-body { padding: 4px 8px 8px; }
+.pp-player { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; }
 .pp-track { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-bottom: 1px dotted var(--pp-border); }
-.pp-track:last-of-type { border-bottom: none; }
-.pp-track-btn { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--pp-border); background: var(--pp-accent); color: #fff; cursor: pointer; font: inherit; line-height: 1; }
+.pp-track-art { width: 40px; height: 40px; flex-shrink: 0; background: #000; border: 1px solid var(--pp-border); display: flex; align-items: center; justify-content: center; color: #555; font-size: 16px; overflow: hidden; }
+.pp-track-art img { width: 40px; height: 40px; object-fit: cover; display: block; }
+.pp-track-btn { width: 26px; height: 26px; flex-shrink: 0; border: 1px solid var(--pp-border); background: var(--pp-accent); color: #fff; cursor: pointer; font: inherit; font-size: 11px; line-height: 1; }
 .pp-track.is-playing { background: rgba(127,127,127,.12); }
 .pp-track.is-playing .pp-track-btn { background: var(--pp-title); }
 .pp-track-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pp-track-title { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pp-track-artist { color: var(--pp-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-track-plays { color: var(--pp-muted); font-size: 11px; white-space: nowrap; }
 .pp-track-tag { font-size: 10px; text-transform: uppercase; color: var(--pp-title-text); background: var(--pp-title); padding: 0 5px; white-space: nowrap; }
+.pp-track-song { border: 1px solid var(--pp-accent); margin-bottom: 4px; }
+.pp-pager { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; font-size: 11px; }
+.pp-pager button { font: inherit; font-size: 11px; padding: 1px 8px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; }
+.pp-pager button:disabled { opacity: .4; cursor: default; }
 .pp-player-status { color: var(--pp-muted); font-size: 11px; min-height: 1.2em; margin-top: 2px; }
-.pp-more-toggle { display: inline-block; margin-top: 6px; font-size: 11px; }
-.pp-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-.pp-tile { display: flex; flex-direction: column; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); background: #000; overflow: hidden; }
+.pp-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.pp-tile { display: flex; flex-direction: column; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); background: #000; overflow: hidden; cursor: pointer; }
 .pp-tile:hover { border-color: var(--pp-accent); color: var(--pp-text); }
 .pp-tile-art { display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #000; position: relative; }
-.pp-tile-art img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; image-rendering: auto; }
-.pp-tile-ansi .pp-tile-art img { image-rendering: pixelated; object-fit: cover; }
+.pp-tile-art img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.pp-tile-ansi .pp-tile-art img { image-rendering: pixelated; }
 .pp-tile-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 11px; letter-spacing: .1em; }
-.pp-tile-caption { font-size: 11px; padding: 3px 5px; background: var(--pp-box); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-top: 1px solid var(--pp-border); }
+.pp-tile-caption { font-size: 10px; padding: 2px 4px; background: var(--pp-box); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-top: 1px solid var(--pp-border); }
+.pp-tile-more .pp-tile-art { display: flex; align-items: center; justify-content: center; color: var(--pp-accent); font-weight: bold; font-size: 13px; background: var(--pp-box); }
 .pp-other a { word-break: break-all; }
-.pp-lightbox { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; overflow: auto; padding: 16px; box-sizing: border-box; cursor: zoom-out; }
-.pp-lightbox img { max-width: none; image-rendering: pixelated; display: block; margin: auto; box-shadow: 0 0 24px #000; }
-.pp-lightbox img.pp-lightbox-photo { max-width: 100%; height: auto; image-rendering: auto; }
-.pp-lightbox-caption { color: #ccc; font-family: Verdana, Arial, sans-serif; font-size: 12px; padding: 8px 0 0; text-align: center; }
-.pp-lightbox-close { position: fixed; top: 10px; right: 16px; color: #fff; font-size: 28px; line-height: 1; cursor: pointer; background: none; border: none; }
+.pp-carousel { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.94); display: flex; flex-direction: column; font-family: Verdana, Arial, sans-serif; color: #ddd; }
+.pp-carousel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; font-size: 12px; background: #111; border-bottom: 1px solid #333; }
+.pp-carousel-bar button, .pp-carousel-nav { font: inherit; color: #fff; background: #222; border: 1px solid #555; padding: 3px 10px; cursor: pointer; }
+.pp-carousel-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: auto; padding: 12px; }
+.pp-carousel-stage img { display: block; margin: auto; box-shadow: 0 0 24px #000; }
+.pp-carousel-stage img.pp-ansi-full { image-rendering: pixelated; max-width: none; }
+.pp-carousel-stage img.pp-photo-full { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pp-carousel-stage .pp-carousel-wait { color: #777; }
+.pp-carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 24px; line-height: 1; padding: 12px 10px; opacity: .8; }
+.pp-carousel-nav.prev { left: 8px; } .pp-carousel-nav.next { right: 8px; }
+.pp-carousel-caption { padding: 8px 14px; font-size: 12px; text-align: center; background: #111; border-top: 1px solid #333; }
 </style>
 
 <?xjs if (!summary) { ?>
@@ -381,17 +430,16 @@
                     <tr><td>Files</td><td><?xjs write(summary.uploads); ?> up / <?xjs write(summary.downloads); ?> down</td></tr>
                     <tr><td>Points</td><td><?xjs write(summary.points.balance); ?> <span class="pp-meta">(<?xjs write(summary.points.lifetime); ?> lifetime)</span></td></tr>
                 </table>
-<?xjs if (summary.topPrograms.length) { ?>
-                <div class="pp-plays-title">Plays most</div>
-                <div class="pp-plays" id="pp-plays">
-<?xjs for (var ti = 0; ti < summary.topPrograms.length; ti++) { var tpp = summary.topPrograms[ti]; ?>
-                    <a class="pp-play-row" href="./?page=003-games.xjs" title="<?xjs write(esc(tpp.name)); ?>">
-                        <span class="pp-play-icon" data-xtrn-icon="<?xjs write(esc(String(tpp.code).toUpperCase())); ?>"></span>
-                        <span class="pp-play-name"><?xjs write(esc(tpp.name)); ?></span>
-                        <span class="pp-play-count"><?xjs write(tpp.count); ?> play<?xjs write(tpp.count === 1 ? '' : 's'); ?></span>
-                    </a>
-<?xjs } ?>
+<?xjs if (allPlays.length) { ?>
+                <div class="pp-plays-head">
+                    <span class="pp-plays-title">Plays most</span>
+                    <span class="pp-sort" data-sort-for="plays">
+                        <button type="button" class="pp-sort-btn is-active" data-sort="seconds">time</button>
+                        <button type="button" class="pp-sort-btn" data-sort="count">launches</button>
+                        <button type="button" class="pp-sort-btn" data-sort="last">recent</button>
+                    </span>
                 </div>
+                <div class="pp-plays" id="pp-plays"></div>
 <?xjs } ?>
             </div>
         </div>
@@ -453,59 +501,37 @@
         </div>
 <?xjs } ?>
 
-<?xjs if (tracks.length) { ?>
+<?xjs if (mediaTracks.length) { ?>
         <div class="pp-box pp-media">
-            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Music (<?xjs write(tracks.length); ?>)</div>
-            <div class="pp-box-body pp-player" id="pp-player">
-<?xjs for (var mi = 0; mi < tracks.length; mi++) { var mt = tracks[mi]; var meta = trackTitle(mt.name); var isSong = !!summary.profile.song && mt.name === summary.profile.song; ?>
-                <div class="pp-track<?xjs write(mi >= 8 ? ' pp-track-more pp-hidden' : ''); ?><?xjs write(isSong ? ' pp-track-song' : ''); ?>" data-track="<?xjs write(esc(mt.name)); ?>">
-                    <button type="button" class="pp-track-btn pp-play" data-track="<?xjs write(esc(mt.name)); ?>" title="Play">&#9654;</button>
-                    <span class="pp-track-text">
-                        <span class="pp-track-title"><?xjs write(esc(meta.title)); ?></span>
-                        <?xjs if (meta.artist) { ?><span class="pp-track-artist"><?xjs write(esc(meta.artist)); ?></span><?xjs } ?>
-                    </span>
-                    <?xjs if (isSong) { ?><span class="pp-track-tag">profile song</span><?xjs } ?>
-                </div>
-<?xjs } if (tracks.length > 8) { ?>
-                <a href="#" class="pp-more-toggle" data-more="pp-track-more">show all <?xjs write(tracks.length); ?> tracks</a>
-<?xjs } ?>
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Music (<?xjs write(mediaTracks.length); ?>)</span>
+                <span class="pp-sort" data-sort-for="tracks">
+                    <button type="button" class="pp-sort-btn is-active" data-sort="plays">top</button>
+                    <button type="button" class="pp-sort-btn" data-sort="name">name</button>
+                    <button type="button" class="pp-sort-btn" data-sort="added">newest</button>
+                </span>
+            </div>
+            <div class="pp-box-body pp-player-body">
+                <div class="pp-player" id="pp-player"></div>
+                <div class="pp-pager" id="pp-player-pager"></div>
                 <div class="pp-player-status" id="pp-player-status"></div>
             </div>
         </div>
 <?xjs } ?>
-<?xjs if (ansiPieces.length) { ?>
+<?xjs if (mediaAnsi.length) { ?>
         <div class="pp-box pp-media">
-            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s ANSI Gallery (<?xjs write(ansiPieces.length); ?>)</div>
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s ANSI Gallery (<?xjs write(mediaAnsi.length); ?>)</span>
+                <a href="#" class="pp-title-link pp-open-carousel" data-gallery="ansi">view all &raquo;</a></div>
             <div class="pp-box-body">
-                <div class="pp-gallery" id="pp-gallery-ansi">
-<?xjs for (var ai = 0; ai < ansiPieces.length; ai++) { var ap = ansiPieces[ai]; ?>
-                    <a href="#" class="pp-tile pp-tile-ansi<?xjs write(ai >= 12 ? ' pp-ansi-more pp-hidden' : ''); ?>" data-dir="<?xjs write(esc(ap.dir)); ?>" data-name="<?xjs write(esc(ap.name)); ?>" title="<?xjs write(esc(ap.desc || ap.name)); ?>">
-                        <span class="pp-tile-art"><span class="pp-tile-wait">ANSI</span></span>
-                        <span class="pp-tile-caption"><?xjs write(esc(ap.desc || ap.name.replace(/\.(ans|asc|bin)$/i, '').replace(/_/g, ' '))); ?></span>
-                    </a>
-<?xjs } ?>
-                </div>
-<?xjs if (ansiPieces.length > 12) { ?>
-                <a href="#" class="pp-more-toggle" data-more="pp-ansi-more">show all <?xjs write(ansiPieces.length); ?> pieces</a>
-<?xjs } ?>
+                <div class="pp-strip" id="pp-strip-ansi"></div>
             </div>
         </div>
 <?xjs } ?>
-<?xjs if (imagePieces.length) { ?>
+<?xjs if (mediaImages.length) { ?>
         <div class="pp-box pp-media">
-            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Pictures (<?xjs write(imagePieces.length); ?>)</div>
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Pictures (<?xjs write(mediaImages.length); ?>)</span>
+                <a href="#" class="pp-title-link pp-open-carousel" data-gallery="images">view all &raquo;</a></div>
             <div class="pp-box-body">
-                <div class="pp-gallery" id="pp-gallery-images">
-<?xjs for (var ii = 0; ii < imagePieces.length; ii++) { var ip = imagePieces[ii]; var isrc = './api/social.ssjs?call=image&dir=' + encodeURIComponent(ip.dir) + '&name=' + encodeURIComponent(ip.name); ?>
-                    <a href="<?xjs write(esc(isrc)); ?>" class="pp-tile pp-tile-image<?xjs write(ii >= 12 ? ' pp-image-more pp-hidden' : ''); ?>" data-src="<?xjs write(esc(isrc)); ?>" title="<?xjs write(esc(ip.desc || ip.name)); ?>">
-                        <span class="pp-tile-art"><img loading="lazy" src="<?xjs write(esc(isrc)); ?>" alt="<?xjs write(esc(ip.desc || ip.name)); ?>"></span>
-                        <span class="pp-tile-caption"><?xjs write(esc(ip.desc || ip.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))); ?></span>
-                    </a>
-<?xjs } ?>
-                </div>
-<?xjs if (imagePieces.length > 12) { ?>
-                <a href="#" class="pp-more-toggle" data-more="pp-image-more">show all <?xjs write(imagePieces.length); ?> pictures</a>
-<?xjs } ?>
+                <div class="pp-strip" id="pp-strip-images"></div>
             </div>
         </div>
 <?xjs } ?>
@@ -735,126 +761,162 @@
         });
     });
 
-    /* show-all toggles for the galleries and the player */
-    root.addEventListener('click', function (e) {
-        var t = e.target.closest('.pp-more-toggle');
-        if (!t) return;
-        e.preventDefault();
-        Array.prototype.forEach.call(root.querySelectorAll('.' + t.getAttribute('data-more')), function (el) { el.classList.remove('pp-hidden'); });
-        t.remove();
-        drawAnsiTiles();
-    });
-
-    /* ---- lightbox (ANSI as a full-size PNG, photos at page width) ---- */
-    function openLightbox(src, caption, isPhoto) {
-        closeLightbox();
-        var box = document.createElement('div');
-        box.className = 'pp-lightbox';
-        box.id = 'pp-lightbox';
-        var close = document.createElement('button');
-        close.className = 'pp-lightbox-close';
-        close.innerHTML = '&times;';
-        var img = document.createElement('img');
-        img.src = src;
-        if (isPhoto) img.className = 'pp-lightbox-photo';
-        var cap = document.createElement('div');
-        cap.className = 'pp-lightbox-caption';
-        cap.textContent = caption || '';
-        box.appendChild(close); box.appendChild(img); box.appendChild(cap);
-        box.addEventListener('click', function (ev) { if (ev.target !== img) closeLightbox(); });
-        document.body.appendChild(box);
-        document.addEventListener('keydown', escClose);
-    }
-    function closeLightbox() {
-        var box = document.getElementById('pp-lightbox');
-        if (box) box.remove();
-        document.removeEventListener('keydown', escClose);
-    }
-    function escClose(ev) { if (ev.key === 'Escape') closeLightbox(); }
-    document.addEventListener('spa:beforeNavigate', closeLightbox);
-
-    /* ---- ANSI gallery: cell grids -> PNG through GraphicsConverter ---- */
-    var ansiCache = {};
+    /* ---- media data (rendered here, 20 per page, so the page stays light) ---- */
+    var MEDIA = {
+        tracks: <?xjs write(jsonForScript(mediaTracks)); ?>,
+        ansi: <?xjs write(jsonForScript(mediaAnsi)); ?>,
+        images: <?xjs write(jsonForScript(mediaImages)); ?>,
+        plays: <?xjs write(jsonForScript(allPlays)); ?>,
+        icons: <?xjs write(jsonForScript(playIcons)); ?>
+    };
+    var PAGE = 20, STRIP = 6;
     function converter() {
         return (window.GraphicsConverter && typeof GraphicsConverter.shared === 'function') ? GraphicsConverter.shared() : null;
     }
-    function ansiKey(tile) { return tile.getAttribute('data-dir') + '/' + tile.getAttribute('data-name'); }
-    function renderAnsi(tile, done) {
-        var key = ansiKey(tile);
-        if (ansiCache[key]) { done(ansiCache[key]); return; }
-        var gc = converter();
-        if (!gc) { done(null); return; }
-        fetch(API + '?call=ansi-bin&dir=' + encodeURIComponent(tile.getAttribute('data-dir')) + '&name=' + encodeURIComponent(tile.getAttribute('data-name')), { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-                if (!res.ok) { done(null); return; }
-                gc.from_bin(atob(res.bin), res.cols, res.rows, function (dataURL) {
-                    ansiCache[key] = dataURL;
-                    done(dataURL);
-                }, true);
-            }).catch(function () { done(null); });
+    function fmtDate(ms) {
+        var d = new Date(ms);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
-    var drawQueue = [];
-    var drawing = false;
-    function drawNext() {
-        if (drawing || !drawQueue.length) return;
-        drawing = true;
-        var tile = drawQueue.shift();
-        renderAnsi(tile, function (dataURL) {
-            var art = tile.querySelector('.pp-tile-art');
-            if (dataURL && art) {
-                var img = new Image();
-                img.src = dataURL;
-                art.innerHTML = '';
-                art.appendChild(img);
-            } else if (art) {
-                var wait = art.querySelector('.pp-tile-wait');
-                if (wait) wait.textContent = 'n/a';
-            }
-            tile.setAttribute('data-drawn', '1');
-            drawing = false;
-            drawNext();
+    function fmtSeconds(sec) {
+        var m = Math.floor((sec || 0) / 60);
+        if (m >= 60) return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+        return m + 'm';
+    }
+    function bindSort(container, onChange) {
+        Array.prototype.forEach.call(container.querySelectorAll('.pp-sort-btn'), function (btn) {
+            btn.addEventListener('click', function () {
+                Array.prototype.forEach.call(container.querySelectorAll('.pp-sort-btn'), function (b) { b.classList.toggle('is-active', b === btn); });
+                onChange(btn.getAttribute('data-sort'));
+            });
         });
     }
-    function drawAnsiTiles() {
-        Array.prototype.forEach.call(root.querySelectorAll('.pp-tile-ansi:not(.pp-hidden):not([data-drawn])'), function (tile) {
-            if (drawQueue.indexOf(tile) === -1) { tile.setAttribute('data-queued', '1'); drawQueue.push(tile); }
-        });
-        drawNext();
-    }
-    drawAnsiTiles();
 
-    root.addEventListener('click', function (e) {
-        var tile = e.target.closest('.pp-tile');
-        if (!tile) return;
-        e.preventDefault();
-        var caption = tile.getAttribute('title') || '';
-        if (tile.classList.contains('pp-tile-image')) { openLightbox(tile.getAttribute('data-src'), caption, true); return; }
-        renderAnsi(tile, function (dataURL) {
-            if (dataURL) openLightbox(dataURL, caption, false);
-        });
-    });
-
-    /* ---- "Plays most": the games list's 12x6 icon bins ---- */
+    /* ---- "Plays most": sort by time / launches / recent ---- */
     (function () {
-        var icons = <?xjs write(JSON.stringify(playIcons).replace(/<\//g, '<\\/')); ?>;
+        var host = document.getElementById('pp-plays');
+        if (!host || !MEDIA.plays.length) return;
         var gc = converter();
-        Array.prototype.forEach.call(root.querySelectorAll('[data-xtrn-icon]'), function (el) {
-            var b64 = icons[el.getAttribute('data-xtrn-icon')];
+        var iconCache = {};
+        function drawIcon(el, code) {
+            var b64 = MEDIA.icons[code];
+            if (iconCache[code]) { var im = new Image(); im.src = iconCache[code]; el.appendChild(im); return; }
             if (!b64 || !gc) { el.innerHTML = '<span class="pp-play-blank"></span>'; return; }
             gc.from_bin(atob(b64), 12, 6, function (dataURL) {
-                var img = new Image();
-                img.src = dataURL;
-                el.innerHTML = '';
-                el.appendChild(img);
+                iconCache[code] = dataURL;
+                var img = new Image(); img.src = dataURL; el.innerHTML = ''; el.appendChild(img);
             }, true);
-        });
+        }
+        function render(by) {
+            var list = MEDIA.plays.slice().sort(function (a, b) { return (b[by] || 0) - (a[by] || 0); }).slice(0, 8);
+            host.innerHTML = '';
+            list.forEach(function (p, i) {
+                var value = by === 'count' ? p.count + ' launch' + (p.count === 1 ? '' : 'es')
+                    : by === 'last' ? (p.last ? fmtDate(p.last) : '-') : fmtSeconds(p.seconds);
+                var row = document.createElement('a');
+                row.className = 'pp-play-row';
+                row.href = './?page=003-games.xjs';
+                row.title = p.name;
+                row.innerHTML = '<span class="pp-play-rank">' + (i + 1) + '</span><span class="pp-play-icon"></span>' +
+                    '<span class="pp-play-name">' + esc(p.name) + '</span><span class="pp-play-count">' + esc(value) + '</span>';
+                host.appendChild(row);
+                drawIcon(row.querySelector('.pp-play-icon'), String(p.code || '').toUpperCase());
+            });
+        }
+        bindSort(root.querySelector('[data-sort-for="plays"]') || host, render);
+        render('seconds');
     })();
 
-    /* ---- mini player: rows drive the site radio; falls back to an <audio> ---- */
+    /* ---- mini player: sorted, paged, album art for rows on screen ---- */
     var fallbackAudio = null;
     function radio() { return (window.sbbsRadio && typeof window.sbbsRadio.playByFile === 'function') ? window.sbbsRadio : null; }
     function setPlayerStatus(text) { var el = document.getElementById('pp-player-status'); if (el) el.textContent = text || ''; }
+    var artCache = {};
+    var artObserver = null;
+    function loadArt(el, name) {
+        if (artCache[name] !== undefined) { if (artCache[name]) { el.innerHTML = '<img alt="">'; el.firstChild.src = artCache[name]; } return; }
+        artCache[name] = '';
+        if (typeof window.parseID3v2 !== 'function') return;
+        fetch('./radio-stream/' + encodeURIComponent(name), { headers: { Range: 'bytes=0-262143' }, credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+            .then(function (buf) {
+                var tags = {};
+                try { tags = window.parseID3v2(buf) || {}; } catch (_) { tags = {}; }
+                if (tags.picture && tags.picture.blob) {
+                    artCache[name] = URL.createObjectURL(tags.picture.blob);
+                    if (document.body.contains(el)) { el.innerHTML = '<img alt="">'; el.firstChild.src = artCache[name]; }
+                }
+            }).catch(function () { /* no art: the note stays */ });
+    }
+    (function () {
+        var host = document.getElementById('pp-player');
+        var pager = document.getElementById('pp-player-pager');
+        if (!host || !MEDIA.tracks.length) return;
+        var by = 'plays', page = 0;
+        if ('IntersectionObserver' in window) {
+            artObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (!en.isIntersecting) return;
+                    artObserver.unobserve(en.target);
+                    loadArt(en.target, en.target.getAttribute('data-art'));
+                });
+            }, { root: host, rootMargin: '80px' });
+        }
+        function sorted() {
+            var list = MEDIA.tracks.filter(function (t) { return !t.song; });
+            list.sort(function (a, b) {
+                if (by === 'name') return a.title.toLowerCase() < b.title.toLowerCase() ? -1 : a.title.toLowerCase() > b.title.toLowerCase() ? 1 : 0;
+                if (by === 'added') return (b.added || 0) - (a.added || 0);
+                return (b.plays || 0) - (a.plays || 0) || (b.added || 0) - (a.added || 0);
+            });
+            return list;
+        }
+        function rowHtml(t, tag) {
+            return '<span class="pp-track-art" data-art="' + esc(t.name) + '">&#9835;</span>' +
+                '<button type="button" class="pp-track-btn pp-play" data-track="' + esc(t.name) + '" title="Play">&#9654;</button>' +
+                '<span class="pp-track-text"><span class="pp-track-title">' + esc(t.title) + '</span>' +
+                (t.artist ? '<span class="pp-track-artist">' + esc(t.artist) + '</span>' : '') + '</span>' +
+                (tag ? '<span class="pp-track-tag">' + tag + '</span>' : '') +
+                '<span class="pp-track-plays">' + (t.plays || 0) + ' play' + ((t.plays || 0) === 1 ? '' : 's') + '</span>';
+        }
+        function render() {
+            var list = sorted();
+            var pages = Math.max(1, Math.ceil(list.length / PAGE));
+            page = Math.max(0, Math.min(page, pages - 1));
+            host.innerHTML = '';
+            MEDIA.tracks.filter(function (t) { return t.song; }).forEach(function (t) {
+                var row = document.createElement('div');
+                row.className = 'pp-track pp-track-song';
+                row.setAttribute('data-track', t.name);
+                row.innerHTML = rowHtml(t, 'profile song');
+                host.appendChild(row);
+            });
+            list.slice(page * PAGE, page * PAGE + PAGE).forEach(function (t) {
+                var row = document.createElement('div');
+                row.className = 'pp-track';
+                row.setAttribute('data-track', t.name);
+                row.innerHTML = rowHtml(t, '');
+                host.appendChild(row);
+            });
+            Array.prototype.forEach.call(host.querySelectorAll('.pp-track-art'), function (el) {
+                if (artObserver) artObserver.observe(el); else loadArt(el, el.getAttribute('data-art'));
+            });
+            host.scrollTop = 0;
+            pager.innerHTML = pages > 1
+                ? '<button type="button" data-page="prev"' + (page === 0 ? ' disabled' : '') + '>&lsaquo; prev</button>' +
+                  '<span>page ' + (page + 1) + ' of ' + pages + '</span>' +
+                  '<button type="button" data-page="next"' + (page >= pages - 1 ? ' disabled' : '') + '>next &rsaquo;</button>'
+                : '';
+            refreshNowPlaying();
+        }
+        pager.addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-page]');
+            if (!b) return;
+            page += b.getAttribute('data-page') === 'next' ? 1 : -1;
+            render();
+        });
+        bindSort(root.querySelector('[data-sort-for="tracks"]'), function (key) { by = key; page = 0; render(); });
+        render();
+    })();
     function refreshNowPlaying() {
         var r = radio();
         var current = r ? r.currentTrackFile : (fallbackAudio && !fallbackAudio.paused ? fallbackAudio.getAttribute('data-track') : '');
@@ -883,15 +945,139 @@
         if (fallbackAudio.getAttribute('data-track') === name && !fallbackAudio.paused) { fallbackAudio.pause(); return; }
         fallbackAudio.setAttribute('data-track', name);
         fallbackAudio.src = './radio-stream/' + encodeURIComponent(name);
-        var host = document.getElementById('pp-player') || b.closest('.pp-box-body');
-        if (host && !fallbackAudio.parentNode) host.appendChild(fallbackAudio);
+        var host = document.getElementById('pp-player-pager') || b.closest('.pp-box-body');
+        if (host && !fallbackAudio.parentNode) host.parentNode.insertBefore(fallbackAudio, host);
         fallbackAudio.play().catch(function () { /* autoplay blocked: the controls are there */ });
     });
     var nowPlayingTimer = window.setInterval(function () {
         if (!document.body.contains(root)) { window.clearInterval(nowPlayingTimer); return; }
         refreshNowPlaying();
     }, 1000);
-    refreshNowPlaying();
+
+    /* ---- ANSI thumbnails: cell grid -> PNG, cached per piece ---- */
+    var ansiCache = {};
+    function renderAnsi(item, done) {
+        var key = item.dir + '/' + item.name;
+        if (ansiCache[key]) { done(ansiCache[key]); return; }
+        var gc = converter();
+        if (!gc) { done(null); return; }
+        fetch(API + '?call=ansi-bin&dir=' + encodeURIComponent(item.dir) + '&name=' + encodeURIComponent(item.name), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res.ok) { done(null); return; }
+                gc.from_bin(atob(res.bin), res.cols, res.rows, function (dataURL) { ansiCache[key] = dataURL; done(dataURL); }, true);
+            }).catch(function () { done(null); });
+    }
+    var drawQueue = [], drawing = false;
+    function drawNext() {
+        if (drawing || !drawQueue.length) return;
+        drawing = true;
+        var job = drawQueue.shift();
+        renderAnsi(job.item, function (dataURL) {
+            if (dataURL && document.body.contains(job.el)) { job.el.innerHTML = '<img alt="">'; job.el.firstChild.src = dataURL; }
+            else if (job.el.querySelector('.pp-tile-wait')) job.el.querySelector('.pp-tile-wait').textContent = dataURL ? '' : 'n/a';
+            drawing = false;
+            drawNext();
+        });
+    }
+
+    /* ---- gallery strips: the first few, then "view all" opens the carousel ---- */
+    function buildStrip(kind) {
+        var host = document.getElementById('pp-strip-' + kind);
+        var items = MEDIA[kind];
+        if (!host || !items.length) return;
+        items.slice(0, STRIP).forEach(function (item, i) {
+            var tile = document.createElement('a');
+            tile.href = '#';
+            tile.className = 'pp-tile' + (kind === 'ansi' ? ' pp-tile-ansi' : ' pp-tile-image');
+            tile.title = item.caption;
+            tile.innerHTML = '<span class="pp-tile-art">' + (kind === 'ansi' ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') + '</span>' +
+                '<span class="pp-tile-caption">' + esc(item.caption) + '</span>';
+            if (kind === 'images') tile.querySelector('img').src = item.src;
+            else drawQueue.push({ item: item, el: tile.querySelector('.pp-tile-art') });
+            tile.addEventListener('click', function (e) { e.preventDefault(); openCarousel(kind, i); });
+            host.appendChild(tile);
+        });
+        if (items.length > STRIP) {
+            var more = document.createElement('a');
+            more.href = '#';
+            more.className = 'pp-tile pp-tile-more';
+            more.innerHTML = '<span class="pp-tile-art">+' + (items.length - STRIP) + ' more</span><span class="pp-tile-caption">view all</span>';
+            more.addEventListener('click', function (e) { e.preventDefault(); openCarousel(kind, STRIP); });
+            host.appendChild(more);
+        }
+        drawNext();
+    }
+    buildStrip('ansi');
+    buildStrip('images');
+    root.addEventListener('click', function (e) {
+        var t = e.target.closest('.pp-open-carousel');
+        if (!t) return;
+        e.preventDefault();
+        openCarousel(t.getAttribute('data-gallery'), 0);
+    });
+
+    /* ---- carousel: one piece at a time, arrows / keys, loads as you go ---- */
+    var carousel = null;
+    function openCarousel(kind, index) {
+        closeCarousel();
+        var items = MEDIA[kind];
+        if (!items || !items.length) return;
+        var box = document.createElement('div');
+        box.className = 'pp-carousel';
+        box.innerHTML = '<div class="pp-carousel-bar"><span class="pp-carousel-title"></span><span><span class="pp-carousel-count"></span> <button type="button" data-act="close">close &times;</button></span></div>' +
+            '<div class="pp-carousel-stage"><button type="button" class="pp-carousel-nav prev" data-act="prev">&lsaquo;</button><div class="pp-carousel-view"></div><button type="button" class="pp-carousel-nav next" data-act="next">&rsaquo;</button></div>' +
+            '<div class="pp-carousel-caption"></div>';
+        document.body.appendChild(box);
+        carousel = { box: box, kind: kind, items: items, index: index };
+        box.addEventListener('click', function (ev) {
+            var b = ev.target.closest('[data-act]');
+            if (b) { ev.preventDefault(); if (b.getAttribute('data-act') === 'close') closeCarousel(); else step(b.getAttribute('data-act') === 'next' ? 1 : -1); return; }
+            if (ev.target === box.querySelector('.pp-carousel-stage')) closeCarousel();
+        });
+        document.addEventListener('keydown', carouselKeys);
+        showCurrent();
+    }
+    function carouselKeys(ev) {
+        if (!carousel) return;
+        if (ev.key === 'Escape') closeCarousel();
+        else if (ev.key === 'ArrowRight') step(1);
+        else if (ev.key === 'ArrowLeft') step(-1);
+    }
+    function step(delta) {
+        if (!carousel) return;
+        carousel.index = (carousel.index + delta + carousel.items.length) % carousel.items.length;
+        showCurrent();
+    }
+    function showCurrent() {
+        var c = carousel;
+        if (!c) return;
+        var item = c.items[c.index];
+        var view = c.box.querySelector('.pp-carousel-view');
+        c.box.querySelector('.pp-carousel-title').textContent = (c.kind === 'ansi' ? 'ANSI Gallery' : 'Pictures') + ' - ' + alias;
+        c.box.querySelector('.pp-carousel-count').textContent = (c.index + 1) + ' / ' + c.items.length;
+        c.box.querySelector('.pp-carousel-caption').textContent = item.caption + (item.added ? '  (' + fmtDate(item.added * 1000) + ')' : '');
+        if (c.kind === 'images') {
+            view.innerHTML = '<img class="pp-photo-full" alt="">';
+            view.firstChild.src = item.src;
+            return;
+        }
+        view.innerHTML = '<div class="pp-carousel-wait">loading...</div>';
+        var wanted = c.index;
+        renderAnsi(item, function (dataURL) {
+            if (!carousel || carousel.index !== wanted) return;
+            if (dataURL) { view.innerHTML = '<img class="pp-ansi-full" alt="">'; view.firstChild.src = dataURL; }
+            else view.innerHTML = '<div class="pp-carousel-wait">could not render this piece</div>';
+        });
+        /* warm the next one */
+        var next = c.items[(c.index + 1) % c.items.length];
+        if (next) renderAnsi(next, function () {});
+    }
+    function closeCarousel() {
+        if (carousel) { carousel.box.remove(); carousel = null; }
+        document.removeEventListener('keydown', carouselKeys);
+    }
+    document.addEventListener('spa:beforeNavigate', closeCarousel);
 
     /* profile editor */
     var edit = document.getElementById('pp-edit-form');
