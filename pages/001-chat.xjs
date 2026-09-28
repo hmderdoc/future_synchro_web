@@ -2,6 +2,7 @@
 <script type="text/javascript" src="./js/ansi-editor.js"></script>
 <script type="text/javascript" src="./js/ansi-editor-modal.js"></script>
 <script type="text/javascript" src="./js/chat-embeds.js"></script>
+<script type="text/javascript" src="./js/person-menu.js"></script>
 <script type="text/javascript" src="./js/chat-upload.js"></script>
 <link rel="stylesheet" href="./css/ansi-editor-modal.css">
 <style>
@@ -241,8 +242,61 @@ textarea.chat-web-input {
     min-height: 0;
     overflow: hidden;
 }
-.chat-web-page .chat-motd-bar.is-empty {
+/* No MOTD/topic text: hide the ticker, keep the bar when it has actions. */
+.chat-web-page .chat-motd-bar.is-empty .chat-motd-label,
+.chat-web-page .chat-motd-bar.is-empty .chat-motd-window {
     display: none;
+}
+.chat-web-page .chat-motd-bar.is-empty:not(.has-actions) {
+    display: none;
+}
+/* Join / Leave / Switch rooms, beside the room's MOTD or topic. */
+.chat-web-page .chat-motd-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.chat-web-page .chat-motd-actions:empty {
+    display: none;
+}
+.chat-web-page .chat-motd-action {
+    background: transparent;
+    color: #AAAAAA;
+    border: 1px solid #555;
+    border-radius: 0;
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.chat-web-page .chat-motd-action:hover {
+    border-color: #55FFFF;
+    color: #55FFFF;
+}
+.chat-web-page .chat-motd-action.is-primary {
+    border-color: #55FFFF;
+    color: #55FFFF;
+    font-weight: bold;
+}
+.chat-web-page .chat-motd-action.is-leave:hover {
+    border-color: #FF5555;
+    color: #FF5555;
+}
+/* Parked in a room without being in any: the offer to join. */
+.chat-web-page .chat-web-norooms {
+    margin: 8px;
+    padding: 8px 10px;
+    border: 1px dashed #AA5500;
+    color: #FFFF55;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 .chat-web-page .chat-motd-label {
     font-size: 0.72rem;
@@ -439,6 +493,106 @@ textarea.chat-web-input {
     max-width: 100%;
     max-height: 100%;
     image-rendering: pixelated;
+}
+/* A thread row is a div (it holds its own dismiss button), styled as the
+   button rows around it. */
+.chat-web-page .chat-web-nav-item.chat-web-thread {
+    position: relative;
+    cursor: pointer;
+    padding-right: 24px;
+    font: inherit;
+}
+.chat-web-page .chat-web-nav-item.chat-web-thread:focus-visible {
+    outline: 1px solid #55FFFF;
+    outline-offset: -1px;
+}
+.chat-web-page .chat-web-thread-dismiss {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    background: transparent;
+    border: 0;
+    color: #555555;
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 5px;
+    cursor: pointer;
+    opacity: 0;
+}
+.chat-web-page .chat-web-thread:hover .chat-web-thread-dismiss,
+.chat-web-page .chat-web-thread:focus-within .chat-web-thread-dismiss {
+    opacity: 1;
+}
+.chat-web-page .chat-web-thread-dismiss:hover {
+    color: #FF5555;
+}
+@media (hover: none) {
+    .chat-web-page .chat-web-thread-dismiss {
+        opacity: 0.7;
+    }
+}
+/* Which network a private thread runs over (MRC / DDial); local ones have none. */
+.chat-web-page .chat-web-net-pill {
+    flex: none;
+    font-size: 0.66rem;
+    line-height: 1.3;
+    border: 1px solid #AA00AA;
+    color: #FF55FF;
+    padding: 0 4px;
+    margin-left: 4px;
+    letter-spacing: 0.02em;
+}
+.chat-web-page .chat-web-thread .chat-web-nav-top {
+    justify-content: flex-start;
+}
+.chat-web-page .chat-web-thread .chat-web-badge.is-unread {
+    margin-left: auto;
+}
+
+/* Room rows: divs (they carry their own leave / switch buttons). */
+.chat-web-page .chat-web-nav-item.chat-web-room {
+    cursor: pointer;
+    font: inherit;
+}
+.chat-web-page .chat-web-nav-item.chat-web-room:focus-visible {
+    outline: 1px solid #55FFFF;
+    outline-offset: -1px;
+}
+.chat-web-page .chat-web-room .chat-web-nav-top {
+    justify-content: flex-start;
+}
+.chat-web-page .chat-web-room .chat-web-badge.is-unread {
+    margin-left: auto;
+}
+.chat-web-page .chat-web-room .chat-web-nav-icons {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+.chat-web-page .chat-web-room .chat-web-badge.is-unread + .chat-web-nav-icons {
+    margin-left: 4px;
+}
+.chat-web-page .chat-web-nav-icon {
+    background: transparent;
+    border: 0;
+    color: #555555;
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0 4px;
+    cursor: pointer;
+}
+.chat-web-page .chat-web-nav-icon:hover {
+    color: #55FFFF;
+}
+.chat-web-page .chat-web-nav-icon.is-leave:hover {
+    color: #FF5555;
+}
+.chat-web-page .chat-web-room .chat-web-presence-dot {
+    flex: none;
+    margin-right: 6px;
 }
 
 /* ── Modals ── */
@@ -765,36 +919,44 @@ textarea.chat-web-input {
     color: #FF55FF;
 }
 
-/* ── Network tabs: this BBS's chat | DDial | MRC ── */
-.chat-web-page .chat-net-tabs {
+/* Room picker (join a local room / change MRC room) */
+.chat-web-page .chat-picker-room-list {
     display: flex;
-    gap: 0;
-    background: #000;
-    border-bottom: 1px solid var(--chat-border);
+    flex-direction: column;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid #222;
 }
-.chat-web-page .chat-net-tabs[hidden] {
-    display: none;
-}
-.chat-web-page .chat-net-tab {
-    background: #000;
-    color: #AAAAAA;
+.chat-web-page .chat-picker-room {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
     border: 0;
-    border-right: 1px solid var(--chat-border);
-    border-bottom: 2px solid transparent;
-    padding: 6px 14px;
+    border-bottom: 1px solid #222;
+    color: var(--chat-fg);
+    padding: 6px 8px;
     font: inherit;
+    text-align: left;
     cursor: pointer;
 }
-.chat-web-page .chat-net-tab:hover {
+.chat-web-page .chat-picker-room:hover {
+    background: rgba(85, 255, 255, 0.05);
+}
+.chat-web-page .chat-picker-room.is-current {
+    border-left: 2px solid #55FFFF;
+    background: rgba(85, 255, 255, 0.08);
+}
+.chat-web-page .chat-picker-room-name {
     color: #FFFFFF;
+    font-weight: bold;
 }
-.chat-web-page .chat-net-tab.is-active {
-    color: #FFFF55;
-    border-bottom-color: #FFFF55;
-}
-.chat-web-page .chat-net-tab-count {
+.chat-web-page .chat-picker-room-count {
     color: #55FFFF;
-    margin-left: 6px;
+    font-size: 0.8rem;
+}
+.chat-web-page .chat-picker-room .chat-web-nav-state {
+    margin-left: auto;
 }
 
 /* ── Logged-out view: the room's pulse, not its contents ── */
@@ -1241,6 +1403,9 @@ textarea.chat-web-input {
     font-size: 0.82rem;
     white-space: nowrap;
 }
+.chat-web-page .chat-ansi-toggle[hidden] {
+    display: none;
+}
 .chat-web-page .chat-ansi-toggle:hover {
     border-color: #FF55FF;
     color: #FF55FF;
@@ -1436,28 +1601,18 @@ textarea.chat-web-input {
             <aside class="chat-web-sidebar" data-mobile-panel="">
                 <div class="chat-web-mobile-strip" aria-label="Chat navigation">
                     <button id="chat-mobile-rooms-toggle" class="chat-web-mobile-toggle" type="button" aria-expanded="false" aria-controls="chat-rooms-panel">
-                        <span>Public Rooms</span>
+                        <span>Rooms</span>
                         <span class="chat-web-mobile-chevron" aria-hidden="true"></span>
                     </button>
                     <button id="chat-mobile-private-toggle" class="chat-web-mobile-toggle" type="button" aria-expanded="false" aria-controls="chat-private-panel">
                         <span>Private Chats</span>
                         <span class="chat-web-mobile-chevron" aria-hidden="true"></span>
                     </button>
-<?xjs if (user.number > 0) { ?>
-                    <button id="chat-room-open-mobile" class="chat-web-mobile-create" data-chat-room-open type="button">Create Room</button>
-<?xjs } else { ?>
-                    <button id="chat-room-open-mobile" class="chat-web-mobile-create" data-chat-room-open type="button" disabled>Create Room</button>
-<?xjs } ?>
                 </div>
                 <div id="chat-rooms-panel" class="chat-web-sidebar-section" data-panel="rooms">
                     <div class="chat-web-sidebar-header">
-                        <h4 class="chat-web-sidebar-heading">Public Rooms</h4>
+                        <h4 class="chat-web-sidebar-heading">Rooms</h4>
                     </div>
-<?xjs if (user.number > 0) { ?>
-                    <button id="chat-room-open" class="chat-web-sidebar-button chat-web-sidebar-create-desktop" data-chat-room-open type="button">Create Room</button>
-<?xjs } else { ?>
-                    <button id="chat-room-open" class="chat-web-sidebar-button chat-web-sidebar-create-desktop" data-chat-room-open type="button" disabled>Create Room</button>
-<?xjs } ?>
                     <div id="chat-rooms" class="chat-web-nav-list"></div>
                 </div>
 
@@ -1471,20 +1626,20 @@ textarea.chat-web-input {
 
             <div class="chat-web-main">
                 <div class="chat-web-chatpanel">
-                    <div id="chat-net-tabs" class="chat-net-tabs" role="tablist" aria-label="Chat network" hidden></div>
                     <div id="chat-status" class="chat-web-status" role="alert" aria-live="polite">
                         <div id="chat-status-text"></div>
                         <button id="chat-status-retry" class="chat-web-status-button" type="button">Retry now</button>
                     </div>
 
                     <div id="chat-motd" class="chat-motd-bar is-empty">
-                        <span class="chat-motd-label">MOTD</span>
+                        <span id="chat-motd-label" class="chat-motd-label">MOTD</span>
                         <div id="chat-motd-window" class="chat-motd-window">
                             <div id="chat-motd-track" class="chat-motd-track">
                                 <span id="chat-motd-primary" class="chat-motd-item"></span>
                                 <span id="chat-motd-clone" class="chat-motd-item chat-motd-item-clone" aria-hidden="true"></span>
                             </div>
                         </div>
+                        <span id="chat-motd-actions" class="chat-motd-actions"></span>
                     </div>
 
                     <div id="chat-messages" class="chat-web-messages chat-messages">
@@ -1520,19 +1675,35 @@ textarea.chat-web-input {
     </div>
 
 <?xjs if (user.number > 0) { ?>
-    <div id="chat-room-modal" class="chat-web-modal" aria-hidden="true">
-        <div class="chat-web-modal-card">
+    <div id="chat-room-picker-modal" class="chat-web-modal" aria-hidden="true">
+        <div class="chat-web-modal-card" role="dialog" aria-modal="true" aria-labelledby="chat-room-picker-title">
             <div class="chat-web-modal-header">
-                <h4 class="chat-web-modal-title">Create Room</h4>
-                <button id="chat-room-close" class="chat-web-users-close" type="button">&times;</button>
+                <h4 id="chat-room-picker-title" class="chat-web-modal-title">Join a Room</h4>
+                <button id="chat-room-picker-close" class="chat-web-users-close" type="button">&times;</button>
             </div>
-            <p class="chat-web-modal-text">Pick a short public room name using letters, numbers, `_` or `-`.</p>
-            <form id="chat-room-form" class="chat-web-sidebar-form" autocomplete="off">
-                <input id="chat-room-input" class="chat-web-sidebar-input" type="text" maxlength="32" placeholder="new-room">
-                <button class="chat-web-sidebar-button" type="submit">Create</button>
+            <p id="chat-room-picker-text" class="chat-web-modal-text"></p>
+            <div id="chat-room-picker-list" class="chat-picker-room-list"></div>
+            <form id="chat-room-picker-form" class="chat-web-sidebar-form" autocomplete="off">
+                <input id="chat-room-picker-input" class="chat-web-sidebar-input" type="text" maxlength="32" placeholder="new-room">
+                <button id="chat-room-picker-submit" class="chat-web-sidebar-button" type="submit">Join</button>
             </form>
             <div class="chat-web-modal-actions">
-                <button id="chat-room-cancel" class="chat-web-sidebar-button" type="button">Cancel</button>
+                <button id="chat-room-picker-cancel" class="chat-web-sidebar-button" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-norooms-modal" class="chat-web-modal" aria-hidden="true">
+        <div class="chat-web-modal-card" role="dialog" aria-modal="true" aria-labelledby="chat-norooms-title">
+            <div class="chat-web-modal-header">
+                <h4 id="chat-norooms-title" class="chat-web-modal-title">No rooms joined</h4>
+                <button id="chat-norooms-close" class="chat-web-users-close" type="button">&times;</button>
+            </div>
+            <p class="chat-web-modal-text">You are not connected to any chat rooms. Would you like to join #main?</p>
+            <div class="chat-web-modal-actions">
+                <button id="chat-norooms-main" class="chat-web-sidebar-button" type="button">Join #main</button>
+                <button id="chat-norooms-pick" class="chat-web-sidebar-button" type="button">Pick a room</button>
+                <button id="chat-norooms-cancel" class="chat-web-sidebar-button" type="button">Not now</button>
             </div>
         </div>
     </div>
@@ -1553,14 +1724,25 @@ textarea.chat-web-input {
     var sidebar = document.querySelector('.chat-web-sidebar');
     var roomsList = document.getElementById('chat-rooms');
     var privateList = document.getElementById('chat-private');
-    var roomOpenButtons = Array.prototype.slice.call(document.querySelectorAll('[data-chat-room-open]'));
     var mobileRoomsToggle = document.getElementById('chat-mobile-rooms-toggle');
     var mobilePrivateToggle = document.getElementById('chat-mobile-private-toggle');
-    var roomForm = document.getElementById('chat-room-form');
-    var roomInput = document.getElementById('chat-room-input');
-    var roomModal = document.getElementById('chat-room-modal');
-    var roomClose = document.getElementById('chat-room-close');
-    var roomCancel = document.getElementById('chat-room-cancel');
+    var pickerModal = document.getElementById('chat-room-picker-modal');
+    var pickerTitle = document.getElementById('chat-room-picker-title');
+    var pickerText = document.getElementById('chat-room-picker-text');
+    var pickerList = document.getElementById('chat-room-picker-list');
+    var pickerForm = document.getElementById('chat-room-picker-form');
+    var pickerInput = document.getElementById('chat-room-picker-input');
+    var pickerSubmit = document.getElementById('chat-room-picker-submit');
+    var pickerClose = document.getElementById('chat-room-picker-close');
+    var pickerCancel = document.getElementById('chat-room-picker-cancel');
+    var pickerMode = ''; /* 'local' (join a room here) | 'mrc' (change MRC room) */
+    var pickerRefreshTimer = 0;
+    var motdActions = document.getElementById('chat-motd-actions');
+    var noRoomsModal = document.getElementById('chat-norooms-modal');
+    var noRoomsMain = document.getElementById('chat-norooms-main');
+    var noRoomsPick = document.getElementById('chat-norooms-pick');
+    var noRoomsClose = document.getElementById('chat-norooms-close');
+    var noRoomsCancel = document.getElementById('chat-norooms-cancel');
     var usersModal = document.getElementById('chat-users-modal');
     var viewLabel = document.getElementById('chat-view-label');
     var userCount = document.getElementById('chat-user-count');
@@ -1725,15 +1907,26 @@ textarea.chat-web-input {
             return {
                 channel: 'main',
                 privateName: '',
-                privateSystem: ''
+                privateSystem: '',
+                privateBridge: ''
             };
         }
 
         return {
             channel: sanitizeChannelName(params.get('channel') || 'main'),
             privateName: sanitizeAlias(params.get('private') || ''),
-            privateSystem: trimText(params.get('system') || '')
+            privateSystem: trimText(params.get('system') || ''),
+            privateBridge: normalizeBridge(params.get('bridge') || '')
         };
+    }
+
+    function normalizeBridge(raw) {
+        var key = String(raw || '').toLowerCase();
+        return key === 'mrc' || key === 'ddial' ? key : '';
+    }
+
+    function bridgeLabel(net) {
+        return net === 'mrc' ? 'MRC' : (net === 'ddial' ? 'DDial' : '');
     }
 
     function escapeHtml(str) {
@@ -1953,6 +2146,15 @@ textarea.chat-web-input {
         };
     }
 
+    /* BBS name beside a sender; MRC boards colour theirs with Mystic pipe
+       codes (`systemPipe`). */
+    function renderSystemName(message) {
+        if (message.systemPipe && window.ChatEmbeds && ChatEmbeds.colorizePipeLabel) {
+            return ChatEmbeds.colorizePipeLabel(message.systemPipe);
+        }
+        return escapeHtml(message.system);
+    }
+
     function getCurrentChannelName() {
         var activeView = getActiveView();
         return sanitizeChannelName(activeView.currentChannel || (activeView.type === 'channel' ? activeView.name : 'main') || 'main');
@@ -1974,10 +2176,16 @@ textarea.chat-web-input {
             } else {
                 next.searchParams.delete('system');
             }
+            if (view.bridge) {
+                next.searchParams.set('bridge', view.bridge);
+            } else {
+                next.searchParams.delete('bridge');
+            }
         } else {
             next.searchParams.set('channel', view.name || 'main');
             next.searchParams.delete('private');
             next.searchParams.delete('system');
+            next.searchParams.delete('bridge');
         }
 
         window.history.replaceState({}, '', next.toString());
@@ -2168,12 +2376,25 @@ textarea.chat-web-input {
         }
     }
 
+    /* DDial / MRC rooms relay plain text: the ANSI editor's bitmap posts
+       can't cross those networks, so the button is hidden there. */
+    function currentBridge() {
+        var view = getActiveView();
+        if (view.type === 'private') return '';
+        var current = normalizeUpper(getCurrentChannelName());
+        var room = getRooms().filter(function (r) { return normalizeUpper(r.name) === current; })[0];
+        return room && room.bridge ? String(room.bridge) : '';
+    }
+
     function updateComposer() {
         var activeView = getActiveView();
+        var ansiButton = document.getElementById('chat-ansi-toggle');
+        if (ansiButton) ansiButton.hidden = !!currentBridge();
         if (!chatText) return;
 
         if (activeView.type === 'private') {
-            chatText.placeholder = 'Message @' + activeView.name + '...';
+            chatText.placeholder = 'Message @' + activeView.name +
+                (activeView.bridge ? ' on ' + bridgeLabel(activeView.bridge) : '') + '...';
             return;
         }
 
@@ -2185,117 +2406,250 @@ textarea.chat-web-input {
 
         if (!viewLabel) return;
         if (activeView.type === 'private') {
-            viewLabel.textContent = '@' + activeView.name;
+            viewLabel.textContent = '@' + activeView.name + (activeView.bridge ? ' (' + bridgeLabel(activeView.bridge) + ')' : '');
         } else {
             viewLabel.textContent = '#' + (activeView.name || 'main');
         }
     }
 
-    /* Network tabs. The room list below belongs to THIS BBS's chat; DDial and
-       MRC are other networks reached through it, so they get tabs across the
-       top of the chat window instead of hiding in that list (where a room
-       with no counted users is filtered out - which is how they went missing).
-       The tabs only exist when the server offers bridged rooms: logged in,
-       bridge configured. */
-    var lastLocalChannel = 'main';
-
-    function bridgeRooms() {
-        return getRooms().filter(function (room) { return !!room.bridge; });
-    }
-
-    function currentBridge() {
-        var current = normalizeUpper(getCurrentChannelName());
-        var found = '';
-        bridgeRooms().forEach(function (room) {
-            if (normalizeUpper(room.name) === current) { found = room.name; }
-        });
-        return found;
-    }
-
-    function renderNetTabs() {
-        var bar = document.getElementById('chat-net-tabs');
-        var rooms = bridgeRooms();
-        var active = currentBridge();
+    /* Room picker. One modal, two jobs: join-or-create a room of this BBS
+       (the list is every public room, from the room summaries), or change
+       MRC room (the server's LIST reply, cached by the mux; it trickles in,
+       so a pending answer is re-asked). */
+    function renderPickerList(mode, result) {
+        var current = mode === 'mrc'
+            ? normalizeUpper(result.room || chatService.getBridgeRoom('mrc') || '')
+            : normalizeUpper(getCurrentChannelName());
+        var rooms = result.rooms || [];
         var html = '';
 
-        if (!bar) { return; }
-        if (!isLoggedIn || !rooms.length) {
-            bar.hidden = true;
-            bar.innerHTML = '';
+        if (!pickerList) return;
+        if (!rooms.length) {
+            html = '<div class="chat-web-nav-empty">' +
+                (mode === 'mrc'
+                    ? (result.pending ? 'Asking MRC for its room list...' : 'MRC did not list any rooms. Type one below.')
+                    : 'No public rooms yet. Type a name below to create one.') + '</div>';
+        } else {
+            rooms.forEach(function (room) {
+                var isCurrent = normalizeUpper(room.name) === current;
+                var state = isCurrent ? 'Current' : (room.joined ? 'Joined' : '');
+                html += '<button type="button" class="chat-picker-room' + (isCurrent ? ' is-current' : '') +
+                    '" data-picker-room="' + escapeAttr(room.name) + '">' +
+                    '<span class="chat-picker-room-name">#' + escapeHtml(room.name) + '</span>' +
+                    (typeof room.userCount === 'number'
+                        ? '<span class="chat-picker-room-count">' + escapeHtml(String(room.userCount)) + ' user' + (room.userCount === 1 ? '' : 's') + '</span>'
+                        : '') +
+                    (state ? '<span class="chat-web-nav-state">' + state + '</span>' : '') +
+                    '</button>';
+            });
+            if (result.pending) {
+                html += '<div class="chat-web-nav-empty">Refreshing...</div>';
+            }
+        }
+        pickerList.innerHTML = html;
+    }
+
+    function loadPickerRooms(mode, retries) {
+        if (pickerRefreshTimer) {
+            clearTimeout(pickerRefreshTimer);
+            pickerRefreshTimer = 0;
+        }
+        if (mode === 'local') {
+            var local = getRooms().filter(function (room) { return !room.bridge; }).map(function (room) {
+                return { name: room.name, userCount: room.userCount || 0, joined: !!room.joined };
+            });
+            local.sort(function (a, b) {
+                if ((a.userCount || 0) !== (b.userCount || 0)) return (b.userCount || 0) - (a.userCount || 0);
+                return String(a.name).localeCompare(String(b.name));
+            });
+            renderPickerList('local', { rooms: local, pending: false });
             return;
         }
-        if (!active && getActiveView().type !== 'private') {
-            lastLocalChannel = getCurrentChannelName() || lastLocalChannel;
-        }
-        html += '<button type="button" role="tab" class="chat-net-tab' + (active ? '' : ' is-active') +
-            '" data-net-tab="">' + escapeHtml(userSystemName || 'Chat') + '</button>';
-        rooms.forEach(function (room) {
-            var isActive = normalizeUpper(room.name) === normalizeUpper(active);
-            html += '<button type="button" role="tab" class="chat-net-tab' + (isActive ? ' is-active' : '') +
-                '" data-net-tab="' + escapeAttr(room.name) + '">' + escapeHtml(room.label || room.name) +
-                ((room.userCount || 0) > 0 ? '<span class="chat-net-tab-count">' + escapeHtml(String(room.userCount)) + '</span>' : '') +
-                '</button>';
+        chatService.fetchBridgeRooms('mrc').then(function (result) {
+            if (!pickerModal || !pickerModal.classList.contains('is-open') || pickerMode !== 'mrc') return;
+            renderPickerList('mrc', result);
+            if (result.pending && retries > 0) {
+                pickerRefreshTimer = setTimeout(function () { loadPickerRooms('mrc', retries - 1); }, 2500);
+            }
+        }).catch(function (error) {
+            if (pickerList) {
+                pickerList.innerHTML = '<div class="chat-web-nav-empty">' +
+                    escapeHtml(error && error.message ? error.message : 'MRC is unavailable right now') + '</div>';
+            }
         });
-        bar.innerHTML = html;
-        bar.hidden = false;
     }
 
-    function onNetTabClick(event) {
-        var button = event.target.closest('[data-net-tab]');
-        var target;
-        if (!button) { return; }
-        target = button.getAttribute('data-net-tab');
-        chatService.setActiveChannel(target.length ? target : (lastLocalChannel || 'main'));
-        renderNetTabs();
+    function isPickerOpen() {
+        return !!(pickerModal && pickerModal.classList.contains('is-open'));
     }
 
+    function openRoomPicker(mode) {
+        if (!pickerModal) return;
+        pickerMode = mode === 'mrc' ? 'mrc' : 'local';
+        if (pickerTitle) pickerTitle.textContent = pickerMode === 'mrc' ? 'MRC Rooms' : 'Join a Room';
+        if (pickerText) {
+            pickerText.textContent = pickerMode === 'mrc'
+                ? 'Your MRC session moves to the room you pick.'
+                : 'Pick a room, or type a new name (letters, numbers, _ or -) to create one.';
+        }
+        if (pickerInput) {
+            pickerInput.value = '';
+            pickerInput.placeholder = pickerMode === 'mrc' ? '#room' : 'new-room';
+            pickerInput.maxLength = pickerMode === 'mrc' ? 30 : 32;
+        }
+        if (pickerSubmit) pickerSubmit.textContent = pickerMode === 'mrc' ? 'Go' : 'Join';
+        pickerModal.classList.add('is-open');
+        pickerModal.setAttribute('aria-hidden', 'false');
+        if (pickerList && pickerMode === 'mrc') {
+            pickerList.innerHTML = '<div class="chat-web-nav-empty">Asking MRC for its room list...</div>';
+        }
+        loadPickerRooms(pickerMode, 2);
+        if (pickerInput) pickerInput.focus();
+    }
+
+    function closeRoomPicker() {
+        if (!pickerModal) return;
+        if (pickerRefreshTimer) {
+            clearTimeout(pickerRefreshTimer);
+            pickerRefreshTimer = 0;
+        }
+        pickerModal.classList.remove('is-open');
+        pickerModal.setAttribute('aria-hidden', 'true');
+        pickerMode = '';
+    }
+
+    function pickRoom(name) {
+        if (pickerMode === 'mrc') {
+            var mrcName = String(name || '').replace(/^#/, '').replace(/[^A-Za-z0-9_.-]/g, '').substr(0, 30);
+            if (!mrcName.length) return;
+            closeRoomPicker();
+            chatService.setBridgeRoom('mrc', mrcName);
+            collapseMobileSidebarPanels();
+            return;
+        }
+        var raw = trimText(String(name || '').replace(/^#/, ''));
+        var next = sanitizeChannelName(raw);
+        if (!raw.length || !next.length) return;
+        chatService.joinRoom(next).then(function (ok) {
+            if (!ok) return;
+            closeRoomPicker();
+            collapseMobileSidebarPanels();
+        });
+    }
+
+    /* Leave one of this BBS's rooms; when it was the last one, offer #main. */
+    function leaveLocalRoom(name) {
+        chatService.leaveRoom(name).then(function () {
+            if (!chatService.hasJoinedRooms()) {
+                openNoRoomsModal();
+            }
+        });
+    }
+
+    function openNoRoomsModal() {
+        if (!noRoomsModal) return;
+        noRoomsModal.classList.add('is-open');
+        noRoomsModal.setAttribute('aria-hidden', 'false');
+        if (noRoomsMain) noRoomsMain.focus();
+    }
+
+    function closeNoRoomsModal() {
+        if (!noRoomsModal) return;
+        noRoomsModal.classList.remove('is-open');
+        noRoomsModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function isNoRoomsOpen() {
+        return !!(noRoomsModal && noRoomsModal.classList.contains('is-open'));
+    }
+
+    /* Banner above the transcript while the user is in no room at all. */
+    function renderNoRoomsBanner() {
+        var view = getActiveView();
+        if (!isLoggedIn || view.type !== 'channel' || currentBridge() || chatService.hasJoinedRooms()) {
+            return '';
+        }
+        return '<div class="chat-web-norooms">You are not in any chat rooms.' +
+            '<button type="button" class="chat-motd-action is-primary" data-join-main>Join #main</button>' +
+            '<button type="button" class="chat-motd-action" data-open-picker>Pick a room</button></div>';
+    }
+
+    function roomRowTitle(room) {
+        if (room.bridge === 'mrc') return 'MRC' + (room.room ? ' #' + room.room : '');
+        if (room.bridge === 'ddial') return 'DDial';
+        return '#' + room.name;
+    }
+
+    /* The sidebar is the switcher: every room the user is in (joined local
+       rooms + the networks), unread first, then most recent; the open one is
+       highlighted. Local rows get an X to leave; MRC gets a room switch and,
+       while on the network, an X to log off; DDial is select-only. */
     function renderRooms() {
-        renderNetTabs();
-        var rooms = getRooms().filter(function (room) {
-            if (room.bridge) { return false; } // a tab, not a room of this BBS
-            return normalizeUpper(room.name) === normalizeUpper(getCurrentChannelName()) || (room.userCount || 0) > 0 || (room.unreadCount || 0) > 0;
-        }).slice();
+        var rooms = getRooms().filter(function (room) { return room.joined || room.bridge; }).slice();
         var html = '';
         var currentChannel = getCurrentChannelName();
+        var inPrivate = getActiveView().type === 'private';
 
+        /* This BBS's own rooms first, the networks after; within each,
+           unread, then most recent. */
         rooms.sort(function (a, b) {
-            var aCurrent = normalizeUpper(a.name) === normalizeUpper(currentChannel) ? 1 : 0;
-            var bCurrent = normalizeUpper(b.name) === normalizeUpper(currentChannel) ? 1 : 0;
+            var aNet = a.bridge ? 1 : 0;
+            var bNet = b.bridge ? 1 : 0;
+            var aUnread = (a.unreadCount || 0) > 0 ? 1 : 0;
+            var bUnread = (b.unreadCount || 0) > 0 ? 1 : 0;
 
-            if (aCurrent !== bCurrent) {
-                return bCurrent - aCurrent;
+            if (aNet !== bNet) {
+                return aNet - bNet;
             }
-            if ((a.unreadCount || 0) !== (b.unreadCount || 0)) {
-                return (b.unreadCount || 0) - (a.unreadCount || 0);
+            if (aUnread !== bUnread) {
+                return bUnread - aUnread;
             }
-            return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+            if ((a.lastTimestamp || 0) !== (b.lastTimestamp || 0)) {
+                return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+            }
+            return String(a.name).localeCompare(String(b.name));
         });
 
         if (!rooms.length) {
-            roomsList.innerHTML = '<div class="chat-web-nav-empty">No public rooms yet.</div>';
+            roomsList.innerHTML = '<div class="chat-web-nav-empty">No rooms yet.</div>';
             updateUserCountButton();
             return;
         }
 
-        var inPrivate = getActiveView().type === 'private';
-
         rooms.forEach(function (room) {
             var isCurrent = !inPrivate && normalizeUpper(room.name) === normalizeUpper(currentChannel);
+            var isMain = !room.bridge && normalizeUpper(room.name) === 'MAIN';
+            var label = roomRowTitle(room);
 
-            html += '<div class="chat-web-nav-item' + (isCurrent ? ' is-active' : '') + '">';
+            html += '<div class="chat-web-nav-item chat-web-room' + (isCurrent ? ' is-active' : '') +
+                '" role="button" tabindex="0" data-room-open="' + escapeAttr(room.name) + '">';
             html += '<div class="chat-web-nav-top">';
-            html += '<span class="chat-web-nav-title">#' + escapeHtml(room.name) + '</span>';
+            if (room.bridge) {
+                html += '<span class="chat-web-presence-dot ' + (room.held ? 'is-online' : 'is-offline') + '" aria-hidden="true" title="' +
+                    (room.held ? 'You are on this network' : 'Not connected') + '"></span>';
+            }
+            html += '<span class="chat-web-nav-title">' + escapeHtml(label) + '</span>';
+            if (room.bridge) {
+                html += '<span class="chat-web-net-pill">' + escapeHtml(bridgeLabel(room.bridge)) + '</span>';
+            }
             if ((room.unreadCount || 0) > 0) {
                 html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(room.unreadCount)) + '</span>';
             }
-            html += '</div>';
-            html += '<div class="chat-web-nav-secondary">' + escapeHtml(String(room.userCount || 0)) + ' user' + ((room.userCount || 0) === 1 ? '' : 's') + '</div>';
-            html += '<div class="chat-web-nav-actions">';
-            if (isCurrent) {
-                html += '<span class="chat-web-nav-state">Current</span>';
-            } else {
-                html += '<button type="button" class="chat-web-nav-action is-primary" data-room-join="' + escapeAttr(room.name) + '">Join</button>';
+            html += '<span class="chat-web-nav-icons">';
+            if (room.bridge === 'mrc') {
+                html += '<button type="button" class="chat-web-nav-icon" data-room-switch="mrc" title="Change MRC room" aria-label="Change MRC room">&#8644;</button>';
             }
+            if (!room.bridge && !isMain) {
+                html += '<button type="button" class="chat-web-nav-icon is-leave" data-room-leave="' + escapeAttr(room.name) + '" title="Leave #' + escapeAttr(room.name) + '" aria-label="Leave #' + escapeAttr(room.name) + '">&times;</button>';
+            }
+            if (room.bridge === 'mrc' && room.held) {
+                html += '<button type="button" class="chat-web-nav-icon is-leave" data-room-leave="mrc" title="Log off MRC" aria-label="Log off MRC">&times;</button>';
+            }
+            html += '</span>';
+            html += '</div>';
+            html += '<div class="chat-web-nav-secondary">' + escapeHtml(String(room.userCount || 0)) + ' user' + ((room.userCount || 0) === 1 ? '' : 's') +
+                (isCurrent ? ' \u00b7 Current' : '') + '</div>';
+            html += '<div class="chat-web-nav-actions">';
             html += '<button type="button" class="chat-web-nav-action" data-room-users="' + escapeAttr(room.name) + '">Users</button>';
             html += '</div>';
             html += '</div>';
@@ -2309,20 +2663,24 @@ textarea.chat-web-input {
         var threads = getPrivateThreads().slice();
         var html = '';
 
+        /* Unread first, then whoever is online, then most recent; the open
+           thread only breaks ties (it is highlighted wherever it lands). */
         threads.sort(function (a, b) {
+            var aUnread = (a.unreadCount || 0) > 0 ? 1 : 0;
+            var bUnread = (b.unreadCount || 0) > 0 ? 1 : 0;
             var aOnline = a.isOnline ? 1 : 0;
             var bOnline = b.isOnline ? 1 : 0;
 
+            if (aUnread !== bUnread) {
+                return bUnread - aUnread;
+            }
             if (aOnline !== bOnline) {
                 return bOnline - aOnline;
             }
-            if ((a.isActive ? 1 : 0) !== (b.isActive ? 1 : 0)) {
-                return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
+            if ((a.lastTimestamp || 0) !== (b.lastTimestamp || 0)) {
+                return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
             }
-            if ((a.unreadCount || 0) !== (b.unreadCount || 0)) {
-                return (b.unreadCount || 0) - (a.unreadCount || 0);
-            }
-            return (b.lastTimestamp || 0) - (a.lastTimestamp || 0);
+            return (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0);
         });
 
         if (!threads.length) {
@@ -2333,8 +2691,11 @@ textarea.chat-web-input {
         threads.forEach(function (thread) {
             var initial = thread.name ? thread.name.charAt(0).toUpperCase() : '?';
             var statusClass = thread.isOnline ? 'is-online' : 'is-offline';
+            var attrs = ' data-private-nav="' + escapeAttr(thread.name) + '" data-private-system="' + escapeAttr(thread.system || '') +
+                '" data-private-bridge="' + escapeAttr(thread.bridge || '') + '" data-private-avatar="' + escapeAttr(thread.avatar || '') + '"';
 
-            html += '<button type="button" class="chat-web-nav-item' + (thread.isActive ? ' is-active' : '') + '" data-private-nav="' + escapeAttr(thread.name) + '" data-private-system="' + escapeAttr(thread.system || '') + '" data-private-avatar="' + escapeAttr(thread.avatar || '') + '">';
+            /* A div, not a button: the row carries its own dismiss button. */
+            html += '<div class="chat-web-nav-item chat-web-thread' + (thread.isActive ? ' is-active' : '') + '" role="button" tabindex="0"' + attrs + '>';
             html += '<div class="chat-web-thread-row">';
             html += '<span class="chat-web-presence-dot ' + statusClass + '" aria-hidden="true"></span>';
             html += '<div class="chat-web-thread-avatar">';
@@ -2347,6 +2708,9 @@ textarea.chat-web-input {
             html += '<div>';
             html += '<div class="chat-web-nav-top">';
             html += '<span class="chat-web-nav-title is-user">@' + escapeHtml(thread.name) + '</span>';
+            if (thread.bridge) {
+                html += '<span class="chat-web-net-pill">' + escapeHtml(bridgeLabel(thread.bridge)) + '</span>';
+            }
             if ((thread.unreadCount || 0) > 0) {
                 html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(thread.unreadCount)) + '</span>';
             }
@@ -2359,7 +2723,8 @@ textarea.chat-web-input {
             }
             html += '</div>';
             html += '</div>';
-            html += '</button>';
+            html += '<button type="button" class="chat-web-thread-dismiss" data-private-dismiss aria-label="Dismiss chat with ' + escapeAttr(thread.name) + '" title="Dismiss (comes back on a new message)">&times;</button>';
+            html += '</div>';
         });
 
         privateList.innerHTML = html;
@@ -2392,7 +2757,7 @@ textarea.chat-web-input {
         visibleUsers.forEach(function (entry) {
             var initial = entry.nick ? entry.nick.charAt(0).toUpperCase() : '?';
 
-            html += '<button type="button" class="chat-web-user" data-private-user="' + escapeAttr(entry.nick || '') + '" data-private-system="' + escapeAttr(entry.system || '') + '" data-private-avatar="' + escapeAttr(entry.avatar || '') + '">';
+            html += '<button type="button" class="chat-web-user" data-private-user="' + escapeAttr(entry.nick || '') + '" data-private-system="' + escapeAttr(entry.system || '') + '" data-private-bridge="' + escapeAttr(entry.bridge || '') + '" data-private-avatar="' + escapeAttr(entry.avatar || '') + '">';
             html += '<div class="chat-web-user-avatar">';
             if (entry.avatar) {
                 html += '<div data-avatar-bin="' + escapeAttr(entry.avatar) + '"></div>';
@@ -2403,7 +2768,9 @@ textarea.chat-web-input {
             }
             html += '</div>';
             html += '<div>';
-            html += '<div><strong class="chat-web-user-name">' + escapeHtml(entry.nick || 'Unknown') + '</strong></div>';
+            var nameHtml = (entry.nick && entry.nickColors && window.ChatEmbeds && ChatEmbeds.colorizeRuns)
+                ? ChatEmbeds.colorizeRuns(entry.nick, entry.nickColors, escapeHtml) : null;
+            html += '<div><strong class="chat-web-user-name">' + (nameHtml || escapeHtml(entry.nick || 'Unknown')) + '</strong></div>';
             if (entry.system) {
                 html += '<div class="chat-web-channel chat-web-system-name">' + escapeHtml(entry.system) + '</div>';
             }
@@ -2424,6 +2791,7 @@ textarea.chat-web-input {
 
         return ' data-private-user="' + escapeAttr(message.sender) + '"' +
             ' data-private-system="' + escapeAttr(message.system || '') + '"' +
+            ' data-private-bridge="' + escapeAttr(message.bridge || '') + '"' +
             ' data-private-avatar="' + escapeAttr(message.avatar || '') + '"';
     }
 
@@ -2712,14 +3080,18 @@ textarea.chat-web-input {
         }
 
         if (!msgs.length) {
-            msgContainer.innerHTML = '<div class="chat-web-empty">No messages yet. Say hello.</div>';
+            msgContainer.innerHTML = renderNoRoomsBanner() + '<div class="chat-web-empty">No messages yet. Say hello.</div>';
             messageBottomLocked = true;
             forceMessageScrollToBottom = false;
             queueMessageScrollToBottom();
             return;
         }
+        html += renderNoRoomsBanner();
 
+        var hiddenBySender = 0;
         msgs.forEach(function (message) {
+            // The ignore list is shared with the terminal shell (person menu > Ignore).
+            if (!message.isSelf && message.sender && window.PersonMenu && PersonMenu.isIgnored(message.sender, message.bridge || 'local')) { hiddenBySender++; return; }
             var displaySender = message.sender || message.bitmapFromName || '';
             if (!displaySender && message.kind === 'bitmap' && message.bitmapKey) {
                 displaySender = 'Image';
@@ -2782,7 +3154,7 @@ textarea.chat-web-input {
                     ? ChatEmbeds.colorizeRuns(displaySender, message.senderColors, escapeHtml) : null;
                 html += '<strong class="chat-sender-name">' + (senderHtml === null ? escapeHtml(displaySender) : senderHtml) + '</strong>';
                 if (message.system) {
-                    html += ' <span class="chat-web-channel chat-web-system-name">' + escapeHtml(message.system) + '</span>';
+                    html += ' <span class="chat-web-channel chat-web-system-name">' + renderSystemName(message) + '</span>';
                 }
                 html += ' <small class="chat-timestamp">' + escapeHtml(formatTime(message.timestamp)) + '</small>';
                 if (actorAttrs.length) {
@@ -2846,9 +3218,10 @@ textarea.chat-web-input {
             if (
                 activeView.type !== 'private' ||
                 normalizeUpper(activeView.name || '') !== normalizeUpper(route.privateName) ||
-                normalizeUpper(activeView.system || '') !== normalizeUpper(route.privateSystem)
+                normalizeUpper(activeView.system || '') !== normalizeUpper(route.privateSystem) ||
+                (activeView.bridge || '') !== route.privateBridge
             ) {
-                chatService.openPrivateThread(route.privateName, route.privateSystem, '');
+                chatService.openPrivateThread(route.privateName, route.privateSystem, '', route.privateBridge);
                 return true;
             }
             return false;
@@ -2871,6 +3244,15 @@ textarea.chat-web-input {
 
     function onRoomsUpdated() {
         renderRooms();
+        refreshMotdBar();
+        updateComposer();
+        if (isPickerOpen() && pickerMode === 'local') loadPickerRooms('local', 0);
+        /* Membership changed under the transcript: add or drop the banner. */
+        if (msgContainer) {
+            var bannerShown = msgContainer.querySelector('.chat-web-norooms') !== null;
+            var bannerWanted = renderNoRoomsBanner().length > 0;
+            if (bannerShown !== bannerWanted) renderMessages();
+        }
     }
 
     function onPrivateUpdated() {
@@ -2898,6 +3280,7 @@ textarea.chat-web-input {
         forceMessageScrollToBottom = true;
         renderViewLabel(view);
         renderRooms();
+        refreshMotdBar();
         renderPrivateThreads();
         updateQueryString(view);
         updateComposer();
@@ -2919,32 +3302,22 @@ textarea.chat-web-input {
         chatService.openPrivateThread(
             name,
             button.getAttribute('data-private-system'),
-            button.getAttribute('data-private-avatar')
+            button.getAttribute('data-private-avatar'),
+            button.getAttribute('data-private-bridge')
         );
         collapseMobileSidebarPanels();
     }
 
-    function openRoomModal() {
-        if (!roomModal) {
+    function dismissThreadFromButton(button) {
+        var row = button ? button.closest('[data-private-nav]') : null;
+        if (!row || !chatService || !chatService.dismissPrivateThread) {
             return;
         }
-        roomModal.classList.add('is-open');
-        roomModal.setAttribute('aria-hidden', 'false');
-        if (roomInput) {
-            roomInput.focus();
-            roomInput.select();
-        }
-    }
-
-    function closeRoomModal() {
-        if (!roomModal) {
-            return;
-        }
-        roomModal.classList.remove('is-open');
-        roomModal.setAttribute('aria-hidden', 'true');
-        if (roomInput) {
-            roomInput.value = '';
-        }
+        chatService.dismissPrivateThread(
+            row.getAttribute('data-private-nav'),
+            row.getAttribute('data-private-system'),
+            row.getAttribute('data-private-bridge')
+        );
     }
 
     if (!chatService) {
@@ -2998,34 +3371,124 @@ textarea.chat-web-input {
     }
 
     if (roomsList) {
-        var netTabs = document.getElementById('chat-net-tabs');
-        if (netTabs) { netTabs.addEventListener('click', onNetTabClick); }
-
         roomsList.addEventListener('click', function (event) {
-            var joinButton = event.target.closest('[data-room-join]');
+            var switchButton = event.target.closest('[data-room-switch]');
+            var leaveButton = event.target.closest('[data-room-leave]');
             var usersButton = event.target.closest('[data-room-users]');
+            var row = event.target.closest('[data-room-open]');
 
-            if (joinButton) {
-                chatService.setActiveChannel(joinButton.getAttribute('data-room-join'));
-                collapseMobileSidebarPanels();
+            if (switchButton) {
+                event.stopPropagation();
+                openRoomPicker('mrc');
                 return;
             }
-
-            if (usersButton) {
-                openUsersPanelForRoom(usersButton.getAttribute('data-room-users'));
+            if (leaveButton) {
+                event.stopPropagation();
+                var leaving = leaveButton.getAttribute('data-room-leave');
+                if (normalizeBridge(leaving)) {
+                    chatService.leaveBridge(leaving);
+                } else {
+                    leaveLocalRoom(leaving);
+                }
+                return;
             }
+            if (usersButton) {
+                event.stopPropagation();
+                openUsersPanelForRoom(usersButton.getAttribute('data-room-users'));
+                return;
+            }
+            if (row) {
+                chatService.setActiveChannel(row.getAttribute('data-room-open'));
+                collapseMobileSidebarPanels();
+            }
+        });
+        /* Room rows are divs: keyboard-open them. */
+        roomsList.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            if (event.target.closest('button')) return;
+            var row = event.target.closest('[data-room-open]');
+            if (!row) return;
+            event.preventDefault();
+            chatService.setActiveChannel(row.getAttribute('data-room-open'));
+            collapseMobileSidebarPanels();
         });
     }
 
     if (privateList) {
         privateList.addEventListener('click', function (event) {
+            var dismiss = event.target.closest('[data-private-dismiss]');
+            if (dismiss) {
+                event.stopPropagation();
+                dismissThreadFromButton(dismiss);
+                return;
+            }
             openPrivateFromButton(event.target.closest('[data-private-nav]'));
+        });
+        /* Thread rows are divs (see renderPrivateThreads): keyboard-open them. */
+        privateList.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            if (event.target.closest('[data-private-dismiss]')) return;
+            var row = event.target.closest('[data-private-nav]');
+            if (!row) return;
+            event.preventDefault();
+            openPrivateFromButton(row);
         });
     }
 
-    if (usersList) {
-        usersList.addEventListener('click', function (event) {
-            openPrivateFromButton(event.target.closest('[data-private-user]'));
+    if (pickerList) {
+        pickerList.addEventListener('click', function (event) {
+            var pick = event.target.closest('[data-picker-room]');
+            if (pick) {
+                pickRoom(pick.getAttribute('data-picker-room'));
+            }
+        });
+    }
+    if (pickerForm) {
+        pickerForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            pickRoom(pickerInput ? pickerInput.value : '');
+        });
+    }
+    if (pickerClose) {
+        pickerClose.addEventListener('click', closeRoomPicker);
+    }
+    if (pickerCancel) {
+        pickerCancel.addEventListener('click', closeRoomPicker);
+    }
+    if (pickerModal) {
+        pickerModal.addEventListener('click', function (event) {
+            if (event.target === pickerModal) {
+                closeRoomPicker();
+            }
+        });
+    }
+    if (motdActions) {
+        motdActions.addEventListener('click', function (event) {
+            var target = event.target.closest('button');
+            if (!target) return;
+            if (target.hasAttribute('data-motd-switch')) { openRoomPicker('mrc'); return; }
+            if (target.hasAttribute('data-motd-join')) { openRoomPicker('local'); return; }
+            if (target.hasAttribute('data-motd-join-this')) { chatService.joinRoom(target.getAttribute('data-motd-join-this')); return; }
+            if (target.hasAttribute('data-motd-leave')) { leaveLocalRoom(target.getAttribute('data-motd-leave')); }
+        });
+    }
+    if (noRoomsMain) {
+        noRoomsMain.addEventListener('click', function () {
+            closeNoRoomsModal();
+            chatService.joinRoom('main');
+        });
+    }
+    if (noRoomsPick) {
+        noRoomsPick.addEventListener('click', function () {
+            closeNoRoomsModal();
+            openRoomPicker('local');
+        });
+    }
+    if (noRoomsClose) noRoomsClose.addEventListener('click', closeNoRoomsModal);
+    if (noRoomsCancel) noRoomsCancel.addEventListener('click', closeNoRoomsModal);
+    if (noRoomsModal) {
+        noRoomsModal.addEventListener('click', function (event) {
+            if (event.target === noRoomsModal) closeNoRoomsModal();
         });
     }
 
@@ -3047,50 +3510,36 @@ textarea.chat-web-input {
                 playChatAudioCard(audioButton);
                 return;
             }
+            if (event.target.closest('[data-join-main]')) { chatService.joinRoom('main'); return; }
+            if (event.target.closest('[data-open-picker]')) { openRoomPicker('local'); return; }
             openPrivateFromButton(event.target.closest('[data-private-user]'));
         });
     }
 
+    /* Avatar / name / roster-row click -> the person menu (profile, PM,
+       ignore, sysop overrides), like the terminal's. Capture phase so the
+       older "click = open PM" handlers below it do not fire first. */
+    document.addEventListener('click', function (event) {
+        var actor = event.target.closest('.chat-web-actor, .chat-web-sender-button, .chat-web-user');
+        if (!actor || !window.PersonMenu || !actor.getAttribute('data-private-user')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        PersonMenu.open({
+            name: actor.getAttribute('data-private-user'),
+            network: actor.getAttribute('data-private-bridge') || 'local',
+            system: actor.getAttribute('data-private-system') || '',
+            avatar: actor.getAttribute('data-private-avatar') || '',
+            x: event.clientX, y: event.clientY,
+            onPrivate: function () { openPrivateFromButton(actor); }
+        });
+    }, true);
+    if (window.PersonMenu) {
+        PersonMenu.loadIgnored();
+        document.addEventListener('person-menu:ignored-changed', function () { renderMessages(); });
+    }
+
     document.addEventListener('radio:trackchange', onRadioPlaybackChanged);
     document.addEventListener('radio:statechange', onRadioPlaybackChanged);
-
-    if (roomForm) {
-        roomForm.addEventListener('submit', function (event) {
-            var raw = roomInput ? trimText(roomInput.value) : '';
-            var nextRoom = sanitizeChannelName(raw);
-
-            event.preventDefault();
-            if (!raw.length || !nextRoom.length) {
-                return;
-            }
-
-            chatService.createRoom(nextRoom).then(function (ok) {
-                if (!ok) return;
-                closeRoomModal();
-                collapseMobileSidebarPanels();
-            });
-        });
-    }
-
-    roomOpenButtons.forEach(function (button) {
-        button.addEventListener('click', openRoomModal);
-    });
-
-    if (roomClose) {
-        roomClose.addEventListener('click', closeRoomModal);
-    }
-
-    if (roomCancel) {
-        roomCancel.addEventListener('click', closeRoomModal);
-    }
-
-    if (roomModal) {
-        roomModal.addEventListener('click', function (event) {
-            if (event.target === roomModal) {
-                closeRoomModal();
-            }
-        });
-    }
 
     if (usersModal) {
         usersModal.addEventListener('click', function (event) {
@@ -3352,17 +3801,56 @@ textarea.chat-web-input {
         window.requestAnimationFrame(syncMotdTicker);
     }
 
+    /* The bar shows this BBS's chat MOTD, except in the MRC room, where it
+       shows MRC's own room topic instead (empty topic = hidden bar). */
+    var motdLabel = document.getElementById('chat-motd-label');
+    var jsonMotdText = '';
+
+    function refreshMotdBar() {
+        var view = getActiveView();
+        var current = normalizeUpper(getCurrentChannelName());
+        var room = null;
+        if (view.type !== 'private') {
+            room = getRooms().filter(function (r) { return normalizeUpper(r.name) === current; })[0] || null;
+        }
+        var isMrc = !!(room && room.bridge === 'mrc');
+        if (motdLabel) motdLabel.textContent = isMrc ? 'TOPIC' : 'MOTD';
+        renderMotdActions(view, room);
+        renderMotdBar(isMrc ? (room.topic || '') : jsonMotdText);
+    }
+
+    /* The room controls sit beside the MOTD / topic, where it is clear what
+       they act on: Join / Leave for a room of this BBS (Join #name when the
+       viewed room is not joined), Switch rooms on MRC, nothing on DDial or in
+       a private thread. */
+    function renderMotdActions(view, room) {
+        var html = '';
+        if (!motdActions) return;
+        if (isLoggedIn && view.type === 'channel' && room) {
+            if (room.bridge === 'mrc') {
+                html = '<button type="button" class="chat-motd-action" data-motd-switch title="Change MRC room">Switch rooms</button>';
+            } else if (!room.bridge) {
+                if (room.joined) {
+                    html = '<button type="button" class="chat-motd-action" data-motd-join title="Join another room">Join</button>' +
+                        '<button type="button" class="chat-motd-action is-leave" data-motd-leave="' + escapeAttr(room.name) + '" title="Leave #' + escapeAttr(room.name) + '">Leave</button>';
+                } else {
+                    html = '<button type="button" class="chat-motd-action is-primary" data-motd-join-this="' + escapeAttr(room.name) + '">Join #' + escapeHtml(room.name) + '</button>' +
+                        '<button type="button" class="chat-motd-action" data-motd-join title="Join another room">Other rooms</button>';
+                }
+            }
+        }
+        if (motdActions.innerHTML !== html) motdActions.innerHTML = html;
+        if (motdBar) motdBar.classList.toggle('has-actions', html.length > 0);
+    }
+
     function loadMotd() {
         window.fetch('./api/chat.ssjs?action=motd', { credentials: 'include' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                if (data && data.previewText) {
-                    renderMotdBar(data.previewText);
-                } else {
-                    renderMotdBar('');
-                }
+                jsonMotdText = data && data.previewText ? String(data.previewText) : '';
+                refreshMotdBar();
             })
-            .catch(function () { renderMotdBar(''); });
+            .catch(function () { jsonMotdText = ''; refreshMotdBar(); });
     }
 
     loadMotd();
@@ -3381,13 +3869,18 @@ textarea.chat-web-input {
             closeUsersModal();
             return;
         }
-        if (event.key === 'Escape' && roomModal && roomModal.classList.contains('is-open')) {
-            closeRoomModal();
+        if (event.key === 'Escape' && isPickerOpen()) {
+            closeRoomPicker();
+            return;
+        }
+        if (event.key === 'Escape' && isNoRoomsOpen()) {
+            closeNoRoomsModal();
         }
     });
 
     function cleanup() {
         if (ansiEditorActive) closeAnsiEditor();
+        if (pickerRefreshTimer) clearTimeout(pickerRefreshTimer);
         window.removeEventListener('chat:messagesUpdated', onMessagesUpdated);
         window.removeEventListener('chat:roomsUpdated', onRoomsUpdated);
         window.removeEventListener('chat:privateUpdated', onPrivateUpdated);

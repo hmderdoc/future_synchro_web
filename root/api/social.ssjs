@@ -8,6 +8,8 @@
  * GET  ?call=creations&user=..[&kind=track|ansi|image|text|art]
  * GET  ?call=render-ansi&dir=<code>&name=<file> HTML for one ANSI creation
  * GET  ?call=requests                            my incoming / outgoing requests
+ * GET  ?call=person&name=<nick>&network=local|mrc|ddial|irc   who a chat handle is (menu data)
+ * GET  ?call=ignored                             my ignore list (shared with the terminal shell)
  * GET  ?call=whoami                              { number, alias, csrf_token }
  *
  * POST (x-csrf-token header; JSON body)
@@ -16,6 +18,8 @@
  *   ?call=delete-post { user, id }
  *   ?call=save-profile { headline?, mood?, song?, featured?, wallPolicy?, theme? }
  *   ?call=upload-ansi { name, data (base64 CP437 ANSI), desc? }  -> my ANSI dir
+ *   ?call=ignore      { name, network, on }
+ *   ?call=placeholder { name, action: set|clear|link|unlink|notlocal|unnotlocal, collection?, index?, main? }  (sysop)
  *
  * Guests can read profiles of members only as far as the page allows (the
  * page itself is member-gated in webctrl.ini); every write needs a login.
@@ -142,6 +146,87 @@ if (call === 'whoami') {
             http_reply.header['Content-Length'] = bytes.length;
             http_reply.header['Cache-Control'] = 'public, max-age=86400';
             write(bytes);
+        }
+    }
+
+} else if (call === 'person') {
+    /* Who is this chat handle, for the avatar context menu: local account
+       (through the sysop link map, so a DDial nick can open a profile),
+       relation to me, ignore state, and the sysop override state. */
+    var pname = String(request.get_param('name') || '').replace(/[\x00-\x1f]/g, '').substr(0, 60);
+    var pnet = String(request.get_param('network') || '').toLowerCase();
+    if (pnet !== 'mrc' && pnet !== 'ddial' && pnet !== 'irc') pnet = 'local';
+    if (!pname.length) fail('Name required', '400 Bad Request');
+    else {
+        var pnum = Social.resolveLocalUser(pname, pnet);
+        var pacct = pnum ? Social.account(pnum) : null;
+        var out = {
+            ok: true, name: pname, network: pnet,
+            userNumber: pacct ? pacct.number : 0, alias: pacct ? pacct.alias : '',
+            self: !!(pacct && me() && pacct.number === me()),
+            relation: pacct && me() ? Social.relation(me(), pacct.number) : 'none',
+            ignored: me() ? Social.isIgnored(me(), pname, pnet) : false,
+            sysop: !!user.is_sysop
+        };
+        if (user.is_sysop) {
+            var pinfo = Social.placeholderInfo(pname);
+            var realAvatar = false;
+            try {
+                if (pacct) { var alib = load({}, 'avatar_lib.js'); var av = alib.read_localuser(pacct.number); realAvatar = !!(av && av.data && !av.disabled); }
+            } catch (_avErr) { realAvatar = false; }
+            out.avatarKind = realAvatar ? 'real' : pinfo.hasPlaceholder ? 'placeholder' : 'none';
+            out.placeholderSource = pinfo.placeholderSource;
+            out.linkedTo = pinfo.linkedTo;
+            out.notLocal = pinfo.notLocal;
+        }
+        reply(out);
+    }
+
+} else if (call === 'ignored') {
+    if (isGuest()) fail('Login required', '401 Unauthorized');
+    else reply({ ok: true, ignored: Social.ignoreList(me()) });
+
+} else if (call === 'ignore') {
+    if (writeGate()) {
+        var ib = postJson() || {};
+        var inet = String(ib.network || '').toLowerCase();
+        if (inet !== 'mrc' && inet !== 'ddial' && inet !== 'irc' && inet !== '') inet = 'local';
+        var iname = String(ib.name || '').replace(/[\x00-\x1f]/g, '').substr(0, 60);
+        if (!iname.length) fail('Name required', '400 Bad Request');
+        else if (iname.toLowerCase() === String(user.alias).toLowerCase()) fail('That would be you', '400 Bad Request');
+        else reply(Social.setIgnored(me(), iname, inet, ib.on !== false));
+    }
+
+} else if (call === 'placeholder') {
+    /* Sysop overrides, same three tools as the terminal person menu. A real
+       local avatar is never replaced: the resolvers only use these to fill gaps. */
+    if (writeGate()) {
+        if (!user.is_sysop) fail('Sysop only', '403 Forbidden');
+        else {
+            var sb2 = postJson() || {};
+            var sname = String(sb2.name || '').replace(/[\x00-\x1f]/g, '').substr(0, 60);
+            var saction = String(sb2.action || '');
+            var sok = false;
+            if (!sname.length) fail('Name required', '400 Bad Request');
+            else {
+                if (saction === 'set') {
+                    var coll = String(sb2.collection || '');
+                    var idx = parseInt(String(sb2.index), 10);
+                    var cpath = /^[A-Za-z0-9][A-Za-z0-9._-]*\.bin$/.test(coll) ? system.text_dir + 'avatars/' + coll : '';
+                    var raster = '';
+                    if (cpath && file_exists(cpath) && idx >= 0) {
+                        var cf = new File(cpath);
+                        if (cf.open('rb')) { cf.position = idx * 120; raster = cf.read(120) || ''; cf.close(); }
+                    }
+                    sok = raster.length === 120 ? Social.setPlaceholder(sname, base64_encode(raster), coll + '#' + (idx + 1)) : false;
+                } else if (saction === 'clear') sok = Social.clearPlaceholder(sname);
+                else if (saction === 'link') sok = Social.linkHandle(sname, String(sb2.main || ''));
+                else if (saction === 'unlink') sok = Social.linkHandle(sname, '');
+                else if (saction === 'notlocal') sok = Social.setNotLocal(sname, true, user.alias);
+                else if (saction === 'unnotlocal') sok = Social.setNotLocal(sname, false, user.alias);
+                else { fail('Unknown action', '400 Bad Request'); sok = null; }
+                if (sok !== null) reply({ ok: !!sok, action: saction, info: Social.placeholderInfo(sname) });
+            }
         }
     }
 
