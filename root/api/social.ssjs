@@ -158,7 +158,8 @@ if (call === 'whoami') {
     if (pnet !== 'mrc' && pnet !== 'ddial' && pnet !== 'irc') pnet = 'local';
     if (!pname.length) fail('Name required', '400 Bad Request');
     else {
-        var pnum = Social.resolveLocalUser(pname, pnet);
+        var pnum = /^\d+$/.test(pname) ? (Social.account(parseInt(pname, 10)) ? parseInt(pname, 10) : 0) : Social.resolveLocalUser(pname, pnet);
+        if (/^\d+$/.test(pname) && pnum) pname = Social.aliasOf(pnum);
         var pacct = pnum ? Social.account(pnum) : null;
         var out = {
             ok: true, name: pname, network: pnet,

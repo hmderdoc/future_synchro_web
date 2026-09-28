@@ -153,7 +153,7 @@
             e.preventDefault();
             var act = b.getAttribute('data-act');
             if (act === 'profile') { close(); navigate('./?page=013-profile.xjs&user=' + encodeURIComponent(state.alias)); return; }
-            if (act === 'pm') { close(); if (typeof opts.onPrivate === 'function') opts.onPrivate(opts); return; }
+            if (act === 'pm') { close(); (typeof opts.onPrivate === 'function' ? opts.onPrivate : defaultPrivate)(opts); return; }
             if (act === 'friend') {
                 var action = state.relation === 'friends' ? 'unfriend' : state.relation === 'incoming' ? 'accept' : state.relation === 'outgoing' ? 'cancel' : 'request';
                 post('friend', { user: state.alias, action: action }).then(refresh);
@@ -264,6 +264,37 @@
         }
         return false;
     }
+
+    /* Outside chat, "Private message" lands in the chat page's private thread. */
+    function defaultPrivate(opts) {
+        var href = './?page=001-chat.xjs&private=' + encodeURIComponent(opts.name);
+        if (opts.system) href += '&system=' + encodeURIComponent(opts.system);
+        if (opts.network && opts.network !== 'local') href += '&bridge=' + encodeURIComponent(opts.network);
+        navigate(href);
+    }
+
+    /* Site-wide: any drawn avatar (div[data-avatar="<alias|number>"], as
+       Avatars.draw fills them) opens the menu. Chat's own actor buttons stop
+       propagation before this runs, so its richer wiring still wins there.
+       Oneliners key remote people as "alias@QWKID"; the QWK id rides along as
+       the system name and the alias is what gets resolved. */
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('[data-avatar]');
+        if (!el) return;
+        var raw = String(el.getAttribute('data-avatar') || '').replace(/^\s+|\s+$/g, '');
+        if (!raw.length || el.closest('.person-menu, .person-picker')) return;
+        var name = raw, system = '';
+        var at = raw.indexOf('@');
+        if (at > 0) { name = raw.substring(0, at); system = raw.substring(at + 1); }
+        e.preventDefault();
+        e.stopPropagation();
+        open({ name: name, system: system, network: 'local', x: e.clientX, y: e.clientY, onPrivate: defaultPrivate });
+    });
+    (function () {
+        var style = document.createElement('style');
+        style.textContent = '[data-avatar]:not(:empty){cursor:pointer}';
+        document.head.appendChild(style);
+    })();
 
     window.PersonMenu = { open: open, close: close, loadIgnored: loadIgnored, isIgnored: isIgnored, ignored: ignored };
 })();
