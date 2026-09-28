@@ -118,7 +118,7 @@
             <div data-avatar="<?xjs write(un); ?>" class="avatar-inline"></div>
 <?xjs } ?>
             <div class="rv-details">
-                <div class="rv-alias"><?xjs write(alias); ?></div>
+                <div class="rv-alias"><?xjs if (un > 0) { ?><a class="rv-profile-link" href="./?page=013-profile.xjs&amp;user=<?xjs write(encodeURIComponent(e.user.alias)); ?>" title="View profile"><?xjs write(alias); ?></a><?xjs } else { write(alias); } ?></div>
                 <div class="rv-when"><?xjs write(when); ?></div>
 <?xjs if (loc || conn) { ?>
                 <div><?xjs if (loc) { ?><span class="rv-loc"><?xjs write(loc); ?></span><?xjs } if (loc && conn) { ?> <span class="rv-conn">&middot;</span> <?xjs } if (conn) { ?><span class="rv-conn"><?xjs write(conn); ?></span><?xjs } ?></div>

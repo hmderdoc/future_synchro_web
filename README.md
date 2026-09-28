@@ -20,3 +20,20 @@ This version is a lot more graphical than earlier versions:
 
 # If this interests you...
 Not trying to hoard these changes but also do not want to submit a hard fork to sbbs repo such that I wind up being the support system or only maintainer of something that's not my baby and is part of some major plumbing.  But I do think a lot of the thing here could be good to have supported out of the box for what it's worth so I guess if anyone has some will to see this be unsiloed, play around with it, run some tests, write some code, surgically update the sbbs web code, i'm not sure what next steps would be, but i share this tech stack that's working for me, for whatever it's worth.  
+
+## Profiles, Friends and media embeds
+
+- `?page=013-profile.xjs&user=<alias>` (short link `/u/?<alias>`): a member's
+  profile page in the spirit of the classic two-column social profile
+  (avatar, mood, latest update, details, contact box, profile song,
+  creations, About Me from their wiki page, friends, wall). Members only
+  (`webctrl.ini`). Owners edit headline / mood / song / featured friends /
+  wall policy / theme + colours inline. Data: `root/api/social.ssjs` over
+  the shared store `mods/load/social_lib.js` (the terminal shell uses the
+  same one, so friendships and posts are common).
+- Wiki pages accept media embeds: `![ansi](file.ans)`, `![track](song.mp3)`,
+  `![image](pic.png)`, `![avatar](Alias)` (`![kind:label](..)` for a caption,
+  `dir_code:file` for other creation areas). `lib/wiki-embeds.js` renders them
+  server-side and only ever resolves targets inside the creation directories.
+  The wiki editor gets an "Insert my art / track" picker and "Draw ANSI"
+  (ANSI editor -> your ANSI area -> embed).

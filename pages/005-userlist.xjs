@@ -245,14 +245,16 @@
             writeln('<article class="userlist-card">');
             writeln(
                 '<div class="userlist-name">' +
+                    '<a class="userlist-profile-link" href="./?page=013-profile.xjs&amp;user=' + encodeURIComponent(users[i].alias) + '" title="View profile">' +
                     escapeHtml(users[i].alias) +
+                    '</a>' +
                     '<span class="userlist-number">#' + users[i].number + '</span>' +
                 '</div>'
             );
             writeln(
-                '<div class="userlist-avatar-shell">' +
+                '<a class="userlist-avatar-shell" href="./?page=013-profile.xjs&amp;user=' + encodeURIComponent(users[i].alias) + '" title="View profile">' +
                     '<div class="userlist-avatar" data-avatar="' + escapeAttr(users[i].alias) + '"></div>' +
-                '</div>'
+                '</a>'
             );
             writeln(
                 '<div class="userlist-location' + (users[i].location === '' ? ' is-empty' : '') + '">' +
@@ -394,6 +396,18 @@
     line-height: 1.2;
     word-break: break-word;
     min-height: 2.4em;
+}
+.userlist-page .userlist-profile-link {
+    color: inherit;
+    text-decoration: none;
+}
+.userlist-page .userlist-profile-link:hover {
+    color: var(--userlist-white);
+    text-decoration: underline;
+}
+.userlist-page a.userlist-avatar-shell {
+    text-decoration: none;
+    cursor: pointer;
 }
 .userlist-page .userlist-number {
     margin-left: 0.35rem;

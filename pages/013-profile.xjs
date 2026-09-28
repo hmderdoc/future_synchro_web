@@ -1,0 +1,688 @@
+<!--HIDDEN:Profile-->
+<?xjs
+    /* 013-profile.xjs - a member's profile page (?user=<alias|number>, default: you)
+     *
+     * Two-column layout in the spirit of the classic social-network profile:
+     * the left column is the person (avatar, mood, details, contact, song,
+     * creations), the right column is what they and their friends wrote
+     * (updates, About Me from their wiki page, friends, wall). Every action
+     * goes through root/api/social.ssjs, which shares its store with the
+     * terminal shell. Theme presets + per-user colours come from the profile.
+     */
+    load('sbbsdefs.js');
+    load(system.mods_dir + 'load/social_lib.js');
+    var request = require({}, settings.web_lib + 'request.js', 'request');
+
+    var WIKI_DIR = '/sbbs/xtrn/wiki/';
+    var wikiCore = null;
+    var embedRenderer = undefined;
+    try { load(WIKI_DIR + 'dist/wiki-core.js'); wikiCore = WikiCore; } catch (_wikiLoadError) { wikiCore = null; }
+    try { load(settings.web_lib + 'wiki-embeds.js'); embedRenderer = WikiEmbeds.renderer(settings); } catch (_embedLoadError) { embedRenderer = undefined; }
+
+    function esc(value) {
+        return String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function isGuest() { return user.number < 1 || user.alias === settings.guest; }
+    var me = isGuest() ? 0 : user.number;
+
+    /* Pipe colour codes (|00-|15 fg, |16-|23 bg) -> spans; same fixed tables
+       as the chat renderer, so nothing typed reaches a style attribute. */
+    var CGA_HEX = ['#555555', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA',
+        '#555555', '#5555FF', '#55FF55', '#55FFFF', '#FF5555', '#FF55FF', '#FFFF55', '#FFFFFF'];
+    var CGA_BG_HEX = ['#000000', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA'];
+    function pipeHtml(text) {
+        var source = String(text || '');
+        var out = '';
+        var fg = -1, bg = -1, last = 0, m;
+        var re = /\|(0[0-9]|1[0-9]|2[0-3])/g;
+        function run(chunk) {
+            var html = esc(chunk).replace(/\n/g, '<br>');
+            var style = '';
+            if (fg >= 0) style += 'color:' + CGA_HEX[fg] + ';';
+            if (bg > 0) style += 'background-color:' + CGA_BG_HEX[bg] + ';';
+            return style ? '<span style="' + style + '">' + html + '</span>' : html;
+        }
+        while ((m = re.exec(source)) !== null) {
+            if (m.index > last) out += run(source.substring(last, m.index));
+            var code = parseInt(m[1], 10);
+            if (code <= 15) fg = code; else bg = code === 16 ? -1 : code - 16;
+            last = m.index + m[0].length;
+        }
+        if (last < source.length) out += run(source.substring(last));
+        return out;
+    }
+
+    function fmtDate(ms) {
+        if (!ms) return '';
+        return strftime('%b %d, %Y', Math.floor(ms / 1000));
+    }
+    function fmtAgo(seconds) {
+        if (!seconds) return 'never';
+        var delta = time() - seconds;
+        if (delta < 60) return 'just now';
+        if (delta < 3600) return Math.floor(delta / 60) + ' min ago';
+        if (delta < 86400) return Math.floor(delta / 3600) + ' hours ago';
+        if (delta < 86400 * 14) return Math.floor(delta / 86400) + ' days ago';
+        return strftime('%b %d, %Y', seconds);
+    }
+    function fmtMinutes(minutes) {
+        var m = Math.max(0, Math.floor(minutes || 0));
+        if (m >= 1440) return Math.floor(m / 1440) + 'd ' + Math.floor((m % 1440) / 60) + 'h';
+        if (m >= 60) return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+        return m + 'm';
+    }
+    function profileUrl(alias) { return './?page=013-profile.xjs&user=' + encodeURIComponent(alias); }
+
+    /* ---- who ---- */
+    var rawUser = request.has_param('user') ? String(request.get_param('user')) : '';
+    var who = 0;
+    if (!rawUser.length) who = me;
+    else if (/^\d+$/.test(rawUser)) who = Social.account(parseInt(rawUser, 10)) ? parseInt(rawUser, 10) : 0;
+    else who = Social.localUserByAlias(rawUser);
+    var summary = who ? Social.summary(who, me) : null;
+    var isSelf = !!summary && me > 0 && me === who;
+    if (summary && !isSelf) Social.recordView(who, me);
+
+    var creations = summary ? Social.creations(who, {}) : [];
+    var wall = summary ? Social.feed(who, { kind: 'wall', limit: 60 }) : [];
+    var updates = summary ? Social.feed(who, { kind: 'update', limit: 60 }) : [];
+    var incoming = isSelf ? Social.incomingRequests(me) : [];
+    var outgoing = isSelf ? Social.outgoingRequests(me) : [];
+    var tracks = [];
+    for (var ci = 0; ci < creations.length; ci++) if (creations[ci].kind === 'track') tracks.push(creations[ci]);
+
+    /* ---- theme ---- */
+    var PRESETS = {
+        classic:  { bg: '#ffffff', box: '#ffffff', border: '#6699cc', title: '#6699cc', titleText: '#ffffff', text: '#000000', link: '#003399', accent: '#ff6600', muted: '#666666' },
+        midnight: { bg: '#0b0f1a', box: '#121a2b', border: '#33415c', title: '#1e2a44', titleText: '#ffffff', text: '#d0d6e0', link: '#7fb3ff', accent: '#ffcc00', muted: '#8892a6' },
+        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#aaaaaa', link: '#55ffff', accent: '#ffff55', muted: '#555555' },
+        sunset:   { bg: '#2b1b17', box: '#3a231d', border: '#b5573c', title: '#c1440e', titleText: '#fff3e0', text: '#f5e6d3', link: '#ffb347', accent: '#ff6b35', muted: '#c9a48f' },
+        terminal: { bg: '#000000', box: '#000000', border: '#00aa00', title: '#005500', titleText: '#55ff55', text: '#55ff55', link: '#55ffff', accent: '#ffff55', muted: '#00aa00' }
+    };
+    var themeSpec = summary ? summary.profile.theme : { preset: 'classic', accent: '', background: '', text: '', link: '' };
+    var preset = PRESETS[themeSpec.preset] || PRESETS.classic;
+    function hex(v, fallback) { return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v || '')) ? String(v) : fallback; }
+    var theme = {
+        bg: hex(themeSpec.background, preset.bg), box: preset.box, border: preset.border,
+        title: hex(themeSpec.accent, preset.title), titleText: preset.titleText,
+        text: hex(themeSpec.text, preset.text), link: hex(themeSpec.link, preset.link),
+        accent: hex(themeSpec.accent, preset.accent), muted: preset.muted
+    };
+    if (themeSpec.background && !themeSpec.accent) theme.box = theme.bg;
+
+    function writePost(p, ownerNumber) {
+        var canDelete = me > 0 && (me === ownerNumber || me === p.author || user.is_sysop);
+        writeln('<div class="pp-post" data-post-id="' + esc(p.id) + '">');
+        writeln('  <div class="pp-post-head"><a href="' + esc(profileUrl(p.alias)) + '" class="pp-post-author">' + esc(p.alias) + '</a>' +
+            '<span class="pp-post-date">' + esc(fmtDate(p.at)) + '</span>' +
+            (canDelete ? '<button type="button" class="pp-link-btn pp-post-delete" data-post-id="' + esc(p.id) + '" title="Delete">delete</button>' : '') + '</div>');
+        writeln('  <div class="pp-post-body">' + pipeHtml(p.body) + '</div>');
+        writeln('</div>');
+    }
+
+    function relationButton(rel) {
+        if (rel === 'friends') return { label: 'Remove from Friends', action: 'unfriend', cls: 'pp-btn-quiet' };
+        if (rel === 'incoming') return { label: 'Accept Friend Request', action: 'accept', cls: 'pp-btn-primary' };
+        if (rel === 'outgoing') return { label: 'Request Pending (withdraw)', action: 'cancel', cls: 'pp-btn-quiet' };
+        return { label: 'Add to Friends', action: 'request', cls: 'pp-btn-primary' };
+    }
+?>
+<style>
+.profile-page {
+    --pp-bg: <?xjs write(theme.bg); ?>;
+    --pp-box: <?xjs write(theme.box); ?>;
+    --pp-border: <?xjs write(theme.border); ?>;
+    --pp-title: <?xjs write(theme.title); ?>;
+    --pp-title-text: <?xjs write(theme.titleText); ?>;
+    --pp-text: <?xjs write(theme.text); ?>;
+    --pp-link: <?xjs write(theme.link); ?>;
+    --pp-accent: <?xjs write(theme.accent); ?>;
+    --pp-muted: <?xjs write(theme.muted); ?>;
+    background: var(--pp-bg);
+    color: var(--pp-text);
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 12px;
+    border: 1px solid var(--pp-border);
+}
+.profile-page a { color: var(--pp-link); text-decoration: underline; }
+.profile-page a:hover { color: var(--pp-accent); }
+.profile-page h1, .profile-page h2, .profile-page h3 { margin: 0; font-family: inherit; }
+.pp-topbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px; }
+.pp-topbar h1 { font-size: 22px; font-weight: bold; color: var(--pp-text); }
+.pp-topbar .pp-headline { font-size: 13px; font-weight: bold; color: var(--pp-accent); }
+.pp-topbar .pp-online { font-size: 11px; font-weight: bold; color: #ffffff; background: #1a9e3c; padding: 1px 7px; border-radius: 3px; }
+.pp-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+@media (max-width: 860px) { .pp-grid { grid-template-columns: 1fr; } }
+.pp-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pp-box { background: var(--pp-box); border: 1px solid var(--pp-border); }
+.pp-box-title { background: var(--pp-title); color: var(--pp-title-text); font-weight: bold; font-size: 12px; padding: 3px 8px; }
+.pp-box-body { padding: 8px; }
+.pp-box-body p { margin: 0 0 6px; }
+.pp-avatar-box { text-align: center; }
+.pp-avatar { display: flex; justify-content: center; margin: 4px 0 8px; }
+.pp-avatar img { width: 160px; height: auto; image-rendering: pixelated; border: 1px solid var(--pp-border); background: #000; }
+.pp-mood { font-style: italic; color: var(--pp-muted); }
+.pp-status { margin-top: 4px; }
+.pp-meta { color: var(--pp-muted); font-size: 11px; }
+.pp-details { width: 100%; border-collapse: collapse; }
+.pp-details td { padding: 3px 4px; vertical-align: top; border-bottom: 1px dotted var(--pp-border); }
+.pp-details td:first-child { background: var(--pp-title); color: var(--pp-title-text); width: 38%; font-weight: bold; }
+.pp-btn { display: inline-block; padding: 4px 10px; margin: 2px 4px 2px 0; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); font: inherit; font-weight: bold; cursor: pointer; }
+.pp-btn-primary { background: var(--pp-accent); color: #ffffff; border-color: var(--pp-accent); }
+.pp-btn-quiet { opacity: 0.85; }
+.pp-btn:disabled { opacity: 0.5; cursor: default; }
+.pp-link-btn { background: none; border: none; color: var(--pp-link); text-decoration: underline; cursor: pointer; font: inherit; font-size: 11px; padding: 0; margin-left: 8px; }
+.pp-contact { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.pp-contact .pp-btn { margin: 0; text-align: center; }
+.pp-song { display: flex; align-items: center; gap: 8px; }
+.pp-song .pp-song-name { font-weight: bold; word-break: break-all; }
+.pp-friends-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+@media (max-width: 500px) { .pp-friends-grid { grid-template-columns: repeat(2, 1fr); } }
+.pp-friend { font-size: 11px; word-break: break-word; }
+.pp-friend .pp-friend-avatar { display: flex; justify-content: center; min-height: 48px; }
+.pp-friend img { image-rendering: pixelated; width: 80px; height: auto; border: 1px solid var(--pp-border); background: #000; }
+.pp-friend a { font-weight: bold; }
+.pp-friend .pp-friend-online { color: #1a9e3c; font-weight: bold; }
+.pp-post { border-bottom: 1px dotted var(--pp-border); padding: 6px 0; }
+.pp-post:last-child { border-bottom: none; }
+.pp-post-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.pp-post-author { font-weight: bold; }
+.pp-post-date { color: var(--pp-muted); font-size: 11px; }
+.pp-post-body { white-space: pre-wrap; word-break: break-word; }
+.pp-form textarea { width: 100%; min-height: 60px; font: inherit; padding: 4px; border: 1px solid var(--pp-border); background: #fff; color: #000; box-sizing: border-box; }
+.pp-form input[type=text], .pp-form select { width: 100%; font: inherit; padding: 3px; border: 1px solid var(--pp-border); background: #fff; color: #000; box-sizing: border-box; }
+.pp-form label { display: block; font-weight: bold; margin-top: 6px; }
+.pp-form .pp-hint { color: var(--pp-muted); font-size: 11px; }
+.pp-note { color: var(--pp-muted); font-style: italic; }
+.pp-creation { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px dotted var(--pp-border); }
+.pp-creation:last-child { border-bottom: none; }
+.pp-creation .pp-kind { font-size: 10px; font-weight: bold; text-transform: uppercase; color: var(--pp-title-text); background: var(--pp-title); padding: 0 4px; }
+.pp-creation .pp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-ansi-view { margin: 4px 0 8px; overflow-x: auto; background: #000; }
+.pp-ansi-view pre.ansi { margin: 0; font-family: "Spleen", "VT323", monospace; font-size: 12px; line-height: 1; }
+.pp-about .wiki-body, .pp-about { word-break: break-word; }
+.pp-about .wiki-embed-ansi { display: block; margin: 6px 0; overflow-x: auto; background: #000; }
+.pp-about .wiki-embed-ansi pre.ansi { margin: 0; font-family: "Spleen", "VT323", monospace; font-size: 12px; line-height: 1; }
+.pp-about .wiki-embed-image img { max-width: 100%; height: auto; }
+.pp-about .wiki-embed-avatar img { image-rendering: pixelated; height: 48px; width: auto; vertical-align: middle; }
+.pp-about .wiki-track-play { font: inherit; cursor: pointer; }
+.pp-about .wiki-embed-missing { opacity: .7; font-style: italic; }
+.pp-about img, .pp-about pre { max-width: 100%; }
+.pp-requests { background: #fff8d6; color: #333; border: 1px solid #e0c060; padding: 8px; margin-bottom: 12px; }
+.pp-requests .pp-btn { color: #000; background: #fff; border-color: #999; }
+.pp-requests .pp-btn-primary { background: #ff6600; border-color: #ff6600; color: #fff; }
+.pp-status-line { min-height: 1.2em; color: var(--pp-accent); font-weight: bold; margin-top: 4px; }
+.pp-toggle { cursor: pointer; }
+.pp-hidden { display: none; }
+</style>
+
+<?xjs if (!summary) { ?>
+<div class="profile-page"><div class="pp-box"><div class="pp-box-title">Profile</div><div class="pp-box-body">
+<?xjs if (!who && !rawUser.length && !me) { ?>
+    <p>Log in to see your own profile, or open someone's from the <a href="./?page=005-userlist.xjs">user list</a>.</p>
+<?xjs } else { ?>
+    <p>There is no member called <b><?xjs write(esc(rawUser)); ?></b> here.</p>
+    <p><a href="./?page=005-userlist.xjs">Back to the user list</a></p>
+<?xjs } ?>
+</div></div></div>
+<?xjs } else {
+    var rel = summary.relation;
+    var relBtn = relationButton(rel);
+    var canWall = me > 0 && !isSelf && Social.canPostWall(who, me);
+    var songOnPage = summary.profile.song;
+?>
+<div class="profile-page" id="pp-root"
+     data-user="<?xjs write(esc(summary.alias)); ?>" data-number="<?xjs write(summary.number); ?>"
+     data-self="<?xjs write(isSelf ? '1' : '0'); ?>" data-me="<?xjs write(me); ?>"
+     data-song="<?xjs write(esc(songOnPage)); ?>">
+
+<?xjs if (isSelf && incoming.length) { ?>
+    <div class="pp-requests" id="pp-requests">
+        <b><?xjs write(incoming.length); ?> friend request<?xjs write(incoming.length === 1 ? '' : 's'); ?> waiting:</b>
+<?xjs for (var ri = 0; ri < incoming.length; ri++) { var rq = incoming[ri]; ?>
+        <div class="pp-request" data-user="<?xjs write(esc(rq.fromAlias)); ?>">
+            <a href="<?xjs write(esc(profileUrl(rq.fromAlias))); ?>"><?xjs write(esc(rq.fromAlias)); ?></a>
+            <?xjs if (rq.message) { ?><span class="pp-meta">&ldquo;<?xjs write(esc(rq.message)); ?>&rdquo;</span><?xjs } ?>
+            <button type="button" class="pp-btn pp-btn-primary pp-friend-btn" data-action="accept" data-user="<?xjs write(esc(rq.fromAlias)); ?>">Accept</button>
+            <button type="button" class="pp-btn pp-friend-btn" data-action="decline" data-user="<?xjs write(esc(rq.fromAlias)); ?>">Decline</button>
+        </div>
+<?xjs } ?>
+    </div>
+<?xjs } ?>
+
+    <div class="pp-topbar">
+        <h1><?xjs write(esc(summary.alias)); ?></h1>
+        <?xjs if (summary.profile.headline) { ?><span class="pp-headline">&ldquo;<?xjs write(esc(summary.profile.headline)); ?>&rdquo;</span><?xjs } ?>
+        <?xjs if (summary.online) { ?><span class="pp-online">ONLINE NOW</span><?xjs } ?>
+        <?xjs if (isSelf) { ?><a href="#" class="pp-toggle" data-toggle="pp-edit">Edit my profile</a><?xjs } ?>
+    </div>
+
+    <div class="pp-grid">
+    <div class="pp-col">
+        <div class="pp-box pp-avatar-box">
+            <div class="pp-box-body">
+                <div class="pp-avatar"><div data-avatar="<?xjs write(esc(summary.alias)); ?>"></div></div>
+                <?xjs if (summary.profile.mood) { ?><div class="pp-mood">feeling <?xjs write(esc(summary.profile.mood)); ?></div><?xjs } ?>
+                <?xjs if (summary.latestUpdate) { ?><div class="pp-status">&ldquo;<?xjs write(pipeHtml(summary.latestUpdate.body)); ?>&rdquo;
+                    <div class="pp-meta"><?xjs write(esc(fmtDate(summary.latestUpdate.at))); ?></div></div><?xjs } ?>
+                <div class="pp-meta">
+                    <?xjs if (summary.location) { ?><?xjs write(esc(summary.location)); ?><br><?xjs } ?>
+                    Last login: <?xjs write(esc(fmtAgo(summary.lastOn))); ?><br>
+                    Member since <?xjs write(esc(summary.firstOn ? strftime('%b %Y', summary.firstOn) : '?')); ?>
+                    &middot; <?xjs write(summary.profile.views); ?> profile views
+                </div>
+            </div>
+        </div>
+
+        <div class="pp-box">
+            <div class="pp-box-title">Contacting <?xjs write(esc(summary.alias)); ?></div>
+            <div class="pp-box-body">
+<?xjs if (isSelf) { ?>
+                <div class="pp-contact">
+                    <a class="pp-btn pp-toggle" href="#" data-toggle="pp-edit">Edit Profile</a>
+                    <a class="pp-btn pp-toggle" href="#" data-toggle="pp-update-form">Post an Update</a>
+                    <a class="pp-btn" href="./?page=010-wiki.xjs#wiki/<?xjs write(esc(summary.about.slug)); ?>/edit">Edit About Me</a>
+                    <a class="pp-btn" href="./?page=010-settings.xjs">Change Avatar</a>
+                </div>
+<?xjs } else if (me > 0) { ?>
+                <div class="pp-contact">
+                    <button type="button" class="pp-btn <?xjs write(relBtn.cls); ?> pp-friend-btn" id="pp-friend-main"
+                        data-action="<?xjs write(relBtn.action); ?>" data-user="<?xjs write(esc(summary.alias)); ?>"><?xjs write(esc(relBtn.label)); ?></button>
+                    <?xjs if (canWall) { ?><a class="pp-btn pp-toggle" href="#" data-toggle="pp-wall-form">Write on Wall</a><?xjs } else { ?><span class="pp-btn" style="opacity:.5" title="Only friends can write here">Wall: friends only</span><?xjs } ?>
+                    <a class="pp-btn" href="./?page=001-chat.xjs">Send a Message</a>
+                    <?xjs if (summary.about.exists) { ?><a class="pp-btn" href="./?page=010-wiki.xjs#wiki/<?xjs write(esc(summary.about.slug)); ?>">Wiki Page</a><?xjs } ?>
+                </div>
+<?xjs } else { ?>
+                <p class="pp-note">Log in to add <?xjs write(esc(summary.alias)); ?> as a friend or write on their wall.</p>
+<?xjs } ?>
+                <div class="pp-status-line" id="pp-friend-status"><?xjs
+                    if (rel === 'friends') write('You are friends.');
+                    else if (rel === 'incoming') write(esc(summary.alias) + ' wants to be your friend.');
+                    else if (rel === 'outgoing') write('Your friend request is waiting.');
+                ?></div>
+            </div>
+        </div>
+
+<?xjs if (songOnPage) { ?>
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Profile Song</div>
+            <div class="pp-box-body pp-song">
+                <button type="button" class="pp-btn pp-btn-primary pp-play" data-track="<?xjs write(esc(songOnPage)); ?>">&#9654; Play</button>
+                <span class="pp-song-name"><?xjs write(esc(songOnPage.replace(/\.mp3$/i, '').replace(/_/g, ' '))); ?></span>
+            </div>
+        </div>
+<?xjs } ?>
+
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Details</div>
+            <div class="pp-box-body">
+                <table class="pp-details">
+                    <tr><td>Member since</td><td><?xjs write(esc(summary.firstOn ? strftime('%b %d, %Y', summary.firstOn) : '-')); ?></td></tr>
+                    <tr><td>Logons</td><td><?xjs write(summary.logons); ?></td></tr>
+                    <tr><td>Time online</td><td><?xjs write(esc(fmtMinutes(summary.timeOnMinutes))); ?></td></tr>
+                    <tr><td>Posts</td><td><?xjs write(summary.posts); ?></td></tr>
+                    <tr><td>Files</td><td><?xjs write(summary.uploads); ?> up / <?xjs write(summary.downloads); ?> down</td></tr>
+                    <tr><td>Points</td><td><?xjs write(summary.points.balance); ?> <span class="pp-meta">(<?xjs write(summary.points.lifetime); ?> lifetime)</span></td></tr>
+<?xjs if (summary.topPrograms.length) { var tp = []; for (var ti = 0; ti < summary.topPrograms.length; ti++) tp.push(esc(summary.topPrograms[ti].name) + ' <span class="pp-meta">(' + summary.topPrograms[ti].count + ')</span>'); ?>
+                    <tr><td>Plays most</td><td><?xjs write(tp.join('<br>')); ?></td></tr>
+<?xjs } ?>
+                </table>
+            </div>
+        </div>
+
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Creations (<?xjs write(creations.length); ?>)</div>
+            <div class="pp-box-body" id="pp-creations">
+<?xjs if (!creations.length) { ?>
+                <p class="pp-note">Nothing in the file areas yet.</p>
+<?xjs } else { for (var cx = 0; cx < creations.length && cx < 40; cx++) { var c = creations[cx]; var viewable = c.kind === 'ansi' || c.kind === 'art'; ?>
+                <div class="pp-creation">
+                    <span class="pp-kind"><?xjs write(esc(c.kind === 'ansi' || c.kind === 'art' ? 'ansi' : c.kind)); ?></span>
+                    <span class="pp-name" title="<?xjs write(esc(c.desc || c.name)); ?>"><?xjs write(esc(c.name)); ?></span>
+<?xjs if (c.kind === 'track') { ?>
+                    <button type="button" class="pp-link-btn pp-play" data-track="<?xjs write(esc(c.name)); ?>">&#9654; play</button>
+<?xjs } else if (viewable) { ?>
+                    <button type="button" class="pp-link-btn pp-view-ansi" data-dir="<?xjs write(esc(c.dir)); ?>" data-name="<?xjs write(esc(c.name)); ?>">view</button>
+<?xjs } else if (c.kind === 'image') { ?>
+                    <a href="./api/files.ssjs?call=download-file&dir=<?xjs write(esc(c.dir)); ?>&file=<?xjs write(encodeURIComponent(c.name)); ?>" target="_blank" rel="noopener">open</a>
+<?xjs } ?>
+                </div>
+<?xjs } if (creations.length > 40) { ?><p class="pp-note">... and <?xjs write(creations.length - 40); ?> more in the <a href="./?page=006-files.xjs">file areas</a>.</p><?xjs } } ?>
+            </div>
+        </div>
+    </div>
+
+    <div class="pp-col">
+<?xjs if (isSelf) { ?>
+        <div class="pp-box pp-hidden" id="pp-edit">
+            <div class="pp-box-title">Edit My Profile</div>
+            <div class="pp-box-body pp-form">
+                <form id="pp-edit-form">
+                    <label>Headline <span class="pp-hint">(one line under your name)</span></label>
+                    <input type="text" name="headline" maxlength="60" value="<?xjs write(esc(summary.profile.headline)); ?>">
+                    <label>Mood <span class="pp-hint">(shows as "feeling ...")</span></label>
+                    <input type="text" name="mood" maxlength="40" value="<?xjs write(esc(summary.profile.mood)); ?>">
+                    <label>Profile song <span class="pp-hint">(one of your tracks)</span></label>
+                    <select name="song">
+                        <option value="">(none)</option>
+<?xjs for (var si = 0; si < tracks.length; si++) { ?>
+                        <option value="<?xjs write(esc(tracks[si].name)); ?>"<?xjs write(tracks[si].name === summary.profile.song ? ' selected' : ''); ?>><?xjs write(esc(tracks[si].name)); ?></option>
+<?xjs } if (summary.profile.song && !tracks.some(function (t) { return t.name === summary.profile.song; })) { ?>
+                        <option value="<?xjs write(esc(summary.profile.song)); ?>" selected><?xjs write(esc(summary.profile.song)); ?></option>
+<?xjs } ?>
+                    </select>
+                    <label>Who can write on my wall</label>
+                    <select name="wallPolicy">
+                        <option value="friends"<?xjs write(summary.profile.wallPolicy === 'friends' ? ' selected' : ''); ?>>Friends</option>
+                        <option value="nobody"<?xjs write(summary.profile.wallPolicy === 'nobody' ? ' selected' : ''); ?>>Nobody (read-only)</option>
+                    </select>
+                    <label>Theme</label>
+                    <select name="preset">
+<?xjs var presetNames = ['classic', 'midnight', 'cga', 'sunset', 'terminal']; for (var pi = 0; pi < presetNames.length; pi++) { ?>
+                        <option value="<?xjs write(presetNames[pi]); ?>"<?xjs write(summary.profile.theme.preset === presetNames[pi] ? ' selected' : ''); ?>><?xjs write(presetNames[pi]); ?></option>
+<?xjs } ?>
+                    </select>
+                    <label>Colours <span class="pp-hint">(hex like #ff6600; blank keeps the theme's)</span></label>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+                        <input type="text" name="accent" placeholder="accent" maxlength="7" value="<?xjs write(esc(summary.profile.theme.accent)); ?>">
+                        <input type="text" name="background" placeholder="background" maxlength="7" value="<?xjs write(esc(summary.profile.theme.background)); ?>">
+                        <input type="text" name="text" placeholder="text" maxlength="7" value="<?xjs write(esc(summary.profile.theme.text)); ?>">
+                        <input type="text" name="link" placeholder="links" maxlength="7" value="<?xjs write(esc(summary.profile.theme.link)); ?>">
+                    </div>
+<?xjs if (summary.friends.length) { ?>
+                    <label>Featured friends <span class="pp-hint">(up to 8, shown first)</span></label>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:2px">
+<?xjs for (var fi = 0; fi < summary.friends.length; fi++) { var fr = summary.friends[fi]; ?>
+                        <label style="font-weight:normal;margin:0"><input type="checkbox" name="featured" value="<?xjs write(fr.number); ?>"<?xjs write(summary.profile.featured.indexOf(fr.number) !== -1 ? ' checked' : ''); ?>> <?xjs write(esc(fr.alias)); ?></label>
+<?xjs } ?>
+                    </div>
+<?xjs } ?>
+                    <div style="margin-top:8px">
+                        <button type="submit" class="pp-btn pp-btn-primary">Save</button>
+                        <a href="#" class="pp-btn pp-toggle" data-toggle="pp-edit">Cancel</a>
+                        <span class="pp-status-line" id="pp-edit-status"></span>
+                    </div>
+                </form>
+            </div>
+        </div>
+<?xjs } ?>
+
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Updates (<?xjs write(summary.updateCount); ?>)</div>
+            <div class="pp-box-body">
+<?xjs if (isSelf) { ?>
+                <form class="pp-form <?xjs write(updates.length ? 'pp-hidden' : ''); ?>" id="pp-update-form" data-kind="update">
+                    <textarea name="body" maxlength="1000" placeholder="What are you up to? (|12pipe colours|07 work)"></textarea>
+                    <button type="submit" class="pp-btn pp-btn-primary">Post Update</button>
+                    <span class="pp-status-line pp-form-status"></span>
+                </form>
+<?xjs } ?>
+                <div id="pp-updates">
+<?xjs if (!updates.length) { ?><p class="pp-note"><?xjs write(isSelf ? 'Nothing yet. Post what you are up to.' : 'No updates yet.'); ?></p><?xjs } ?>
+<?xjs for (var ui = 0; ui < updates.length; ui++) writePost(updates[ui], who); ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="pp-box">
+            <div class="pp-box-title">About <?xjs write(esc(summary.alias)); ?></div>
+            <div class="pp-box-body pp-about">
+<?xjs
+    var page = Social.wikiPage(who);
+    if (page.exists && wikiCore) {
+        var resolver = function (target) {
+            var slug = wikiCore.slugify(target);
+            return { href: './?page=010-wiki.xjs#wiki/' + slug, cls: 'wiki-link' };
+        };
+        var aboutHtml = '';
+        try { aboutHtml = wikiCore.renderHtml(wikiCore.parse(page.body), resolver, embedRenderer); } catch (_renderError) { aboutHtml = ''; }
+        if (aboutHtml) { writeln('<div class="wiki-body">' + aboutHtml + '</div>'); }
+        else { var pl = Social.plainLines(page.body, 0); for (var li = 0; li < pl.length; li++) writeln('<p>' + esc(pl[li]) + '</p>'); }
+        writeln('<div class="pp-meta">From their wiki page &middot; <a href="./?page=010-wiki.xjs#wiki/' + esc(page.slug) + '">open</a>' + (isSelf ? ' &middot; <a href="./?page=010-wiki.xjs#wiki/' + esc(page.slug) + '/edit">edit</a>' : '') + '</div>');
+    } else if (page.exists) {
+        var pl2 = Social.plainLines(page.body, 0);
+        for (var li2 = 0; li2 < pl2.length; li2++) writeln('<p>' + esc(pl2[li2]) + '</p>');
+    } else if (isSelf) {
+        writeln('<p class="pp-note">Nothing here yet. <a href="./?page=010-wiki.xjs#wiki/' + esc(summary.about.slug) + '/edit">Write your About Me</a> on your wiki page: headings, links, and embedded art all work.</p>');
+    } else {
+        writeln('<p class="pp-note">' + esc(summary.alias) + ' has not written an About Me yet.</p>');
+    }
+?>
+            </div>
+        </div>
+
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Friends (<?xjs write(summary.friendCount); ?>)</div>
+            <div class="pp-box-body">
+<?xjs if (!summary.friends.length) { ?>
+                <p class="pp-note"><?xjs write(isSelf ? 'No friends yet. Find people in the user list and add them.' : esc(summary.alias) + ' has no friends listed yet.'); ?></p>
+<?xjs } else { ?>
+                <div class="pp-friends-grid" id="pp-featured">
+<?xjs for (var ff = 0; ff < summary.featured.length; ff++) { var fe = summary.featured[ff]; ?>
+                    <div class="pp-friend">
+                        <div class="pp-friend-avatar"><div data-avatar="<?xjs write(esc(fe.alias)); ?>"></div></div>
+                        <a href="<?xjs write(esc(profileUrl(fe.alias))); ?>"><?xjs write(esc(fe.alias)); ?></a>
+                        <?xjs if (fe.online) { ?><div class="pp-friend-online">online</div><?xjs } ?>
+                    </div>
+<?xjs } ?>
+                </div>
+<?xjs if (summary.friends.length > summary.featured.length) { ?>
+                <p style="margin-top:8px"><a href="#" class="pp-toggle" data-toggle="pp-all-friends">View all of <?xjs write(esc(summary.alias)); ?>'s friends</a></p>
+                <div class="pp-hidden" id="pp-all-friends">
+<?xjs var names = []; for (var fa = 0; fa < summary.friends.length; fa++) names.push('<a href="' + esc(profileUrl(summary.friends[fa].alias)) + '">' + esc(summary.friends[fa].alias) + '</a>' + (summary.friends[fa].online ? ' <span class="pp-friend-online">(online)</span>' : '')); write(names.join(', ')); ?>
+                </div>
+<?xjs } } ?>
+            </div>
+        </div>
+
+        <div class="pp-box">
+            <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Wall (<?xjs write(summary.wallCount); ?>)</div>
+            <div class="pp-box-body">
+<?xjs if (canWall) { ?>
+                <form class="pp-form pp-hidden" id="pp-wall-form" data-kind="wall">
+                    <textarea name="body" maxlength="1000" placeholder="Write something on <?xjs write(esc(summary.alias)); ?>'s wall"></textarea>
+                    <button type="submit" class="pp-btn pp-btn-primary">Post</button>
+                    <span class="pp-status-line pp-form-status"></span>
+                </form>
+<?xjs } ?>
+                <div id="pp-wall">
+<?xjs if (!wall.length) { ?><p class="pp-note"><?xjs write(isSelf ? 'Friends can write here.' : (canWall ? 'Be the first to write something.' : 'Nothing here yet.')); ?></p><?xjs } ?>
+<?xjs for (var wi = 0; wi < wall.length; wi++) writePost(wall[wi], who); ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var root = document.getElementById('pp-root');
+    if (!root) return;
+    var alias = root.getAttribute('data-user');
+    var isSelf = root.getAttribute('data-self') === '1';
+    var me = parseInt(root.getAttribute('data-me') || '0', 10);
+    var API = './api/social.ssjs';
+
+    function csrf() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return (window.sbbsConfig && window.sbbsConfig.csrfToken) || (meta ? meta.getAttribute('content') : '') || '';
+    }
+    function post(call, body) {
+        return fetch(API + '?call=' + encodeURIComponent(call), {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf() },
+            body: JSON.stringify(body || {})
+        }).then(function (r) { return r.json(); });
+    }
+    function esc(s) {
+        return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    var CGA = ['#555555', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA',
+        '#555555', '#5555FF', '#55FF55', '#55FFFF', '#FF5555', '#FF55FF', '#FFFF55', '#FFFFFF'];
+    var CGA_BG = ['#000000', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA'];
+    function pipeHtml(text) {
+        var src = String(text || ''), out = '', fg = -1, bg = -1, last = 0, m;
+        var re = /\|(0[0-9]|1[0-9]|2[0-3])/g;
+        function run(chunk) {
+            var html = esc(chunk).replace(/\n/g, '<br>');
+            var style = (fg >= 0 ? 'color:' + CGA[fg] + ';' : '') + (bg > 0 ? 'background-color:' + CGA_BG[bg] + ';' : '');
+            return style ? '<span style="' + style + '">' + html + '</span>' : html;
+        }
+        while ((m = re.exec(src)) !== null) {
+            if (m.index > last) out += run(src.substring(last, m.index));
+            var code = parseInt(m[1], 10);
+            if (code <= 15) fg = code; else bg = code === 16 ? -1 : code - 16;
+            last = m.index + m[0].length;
+        }
+        if (last < src.length) out += run(src.substring(last));
+        return out;
+    }
+    function fmtDate(ms) {
+        var d = new Date(ms);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function relationLabel(rel) {
+        if (rel === 'friends') return { label: 'Remove from Friends', action: 'unfriend', cls: 'pp-btn-quiet', text: 'You are friends.' };
+        if (rel === 'incoming') return { label: 'Accept Friend Request', action: 'accept', cls: 'pp-btn-primary', text: alias + ' wants to be your friend.' };
+        if (rel === 'outgoing') return { label: 'Request Pending (withdraw)', action: 'cancel', cls: 'pp-btn-quiet', text: 'Your friend request is waiting.' };
+        return { label: 'Add to Friends', action: 'request', cls: 'pp-btn-primary', text: '' };
+    }
+
+    /* toggles */
+    root.addEventListener('click', function (e) {
+        var t = e.target.closest('.pp-toggle');
+        if (!t) return;
+        e.preventDefault();
+        var el = document.getElementById(t.getAttribute('data-toggle'));
+        if (el) { el.classList.toggle('pp-hidden'); if (!el.classList.contains('pp-hidden')) { var f = el.querySelector('textarea,input'); if (f) f.focus(); } }
+    });
+
+    /* friend buttons (contact box + request banner) */
+    root.addEventListener('click', function (e) {
+        var b = e.target.closest('.pp-friend-btn');
+        if (!b) return;
+        e.preventDefault();
+        var target = b.getAttribute('data-user');
+        var action = b.getAttribute('data-action');
+        b.disabled = true;
+        post('friend', { user: target, action: action }).then(function (res) {
+            b.disabled = false;
+            var status = document.getElementById('pp-friend-status');
+            if (!res.ok) { if (status) status.textContent = res.error || res.reason || 'Could not do that'; return; }
+            if (b.id === 'pp-friend-main') {
+                var next = relationLabel(res.relation);
+                b.textContent = next.label;
+                b.setAttribute('data-action', next.action);
+                b.className = 'pp-btn ' + next.cls + ' pp-friend-btn';
+                if (status) status.textContent = res.status === 'requested' ? 'Friend request sent.' : next.text;
+            } else {
+                var row = b.closest('.pp-request');
+                if (row) row.innerHTML = '<b>' + esc(target) + '</b>: ' + (action === 'accept' ? 'you are now friends.' : 'declined.');
+            }
+        }).catch(function () { b.disabled = false; });
+    });
+
+    /* wall + update forms */
+    Array.prototype.forEach.call(root.querySelectorAll('form[data-kind]'), function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var body = form.querySelector('textarea[name=body]').value;
+            var status = form.querySelector('.pp-form-status');
+            post('post', { user: alias, body: body }).then(function (res) {
+                if (!res.ok) { status.textContent = res.error || res.reason || 'Could not post'; return; }
+                status.textContent = '';
+                form.querySelector('textarea[name=body]').value = '';
+                var list = document.getElementById(form.getAttribute('data-kind') === 'wall' ? 'pp-wall' : 'pp-updates');
+                var note = list.querySelector('.pp-note');
+                if (note) note.remove();
+                var p = res.post;
+                var div = document.createElement('div');
+                div.className = 'pp-post';
+                div.setAttribute('data-post-id', p.id);
+                div.innerHTML = '<div class="pp-post-head"><a class="pp-post-author" href="./?page=013-profile.xjs&user=' + encodeURIComponent(p.alias) + '">' + esc(p.alias) + '</a>' +
+                    '<span class="pp-post-date">' + esc(fmtDate(p.at)) + '</span>' +
+                    '<button type="button" class="pp-link-btn pp-post-delete" data-post-id="' + esc(p.id) + '">delete</button></div>' +
+                    '<div class="pp-post-body">' + pipeHtml(p.body) + '</div>';
+                list.insertBefore(div, list.firstChild);
+                if (form.getAttribute('data-kind') === 'wall') form.classList.add('pp-hidden');
+            });
+        });
+    });
+
+    /* delete a post */
+    root.addEventListener('click', function (e) {
+        var b = e.target.closest('.pp-post-delete');
+        if (!b) return;
+        e.preventDefault();
+        if (!window.confirm('Delete this post?')) return;
+        var id = b.getAttribute('data-post-id');
+        post('delete-post', { user: alias, id: id }).then(function (res) {
+            if (res.ok) { var el = root.querySelector('.pp-post[data-post-id="' + id + '"]'); if (el) el.remove(); }
+        });
+    });
+
+    /* ANSI creations: render on demand under the row */
+    root.addEventListener('click', function (e) {
+        var b = e.target.closest('.pp-view-ansi');
+        if (!b) return;
+        e.preventDefault();
+        var row = b.closest('.pp-creation');
+        var existing = row.nextElementSibling && row.nextElementSibling.classList.contains('pp-ansi-view') ? row.nextElementSibling : null;
+        if (existing) { existing.remove(); b.textContent = 'view'; return; }
+        b.textContent = 'loading...';
+        fetch(API + '?call=render-ansi&dir=' + encodeURIComponent(b.getAttribute('data-dir')) + '&name=' + encodeURIComponent(b.getAttribute('data-name')), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                b.textContent = res.ok ? 'hide' : 'view';
+                if (!res.ok) return;
+                var view = document.createElement('div');
+                view.className = 'pp-ansi-view';
+                view.innerHTML = res.html;
+                row.parentNode.insertBefore(view, row.nextSibling);
+            }).catch(function () { b.textContent = 'view'; });
+    });
+
+    /* play a track (profile song / creations / About Me embeds) through the site radio, else a bare audio element */
+    var fallbackAudio = null;
+    root.addEventListener('click', function (e) {
+        var b = e.target.closest('.pp-play, .wiki-track-play');
+        if (!b) return;
+        e.preventDefault();
+        var name = b.getAttribute('data-track');
+        if (window.sbbsRadio && typeof window.sbbsRadio.playByFile === 'function' && window.sbbsRadio.playByFile(name)) return;
+        if (!fallbackAudio) { fallbackAudio = document.createElement('audio'); fallbackAudio.controls = true; fallbackAudio.style.width = '100%'; }
+        fallbackAudio.src = './radio-stream/' + encodeURIComponent(name);
+        var box = b.closest('.pp-box-body');
+        if (box && !fallbackAudio.parentNode) box.appendChild(fallbackAudio);
+        fallbackAudio.play().catch(function () { /* autoplay blocked: the controls are there */ });
+    });
+
+    /* profile editor */
+    var edit = document.getElementById('pp-edit-form');
+    if (edit) {
+        edit.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var status = document.getElementById('pp-edit-status');
+            var featured = [];
+            Array.prototype.forEach.call(edit.querySelectorAll('input[name=featured]:checked'), function (cb) { featured.push(parseInt(cb.value, 10)); });
+            var patch = {
+                headline: edit.headline.value, mood: edit.mood.value, song: edit.song.value,
+                wallPolicy: edit.wallPolicy.value, featured: featured.slice(0, 8),
+                theme: { preset: edit.preset.value, accent: edit.accent.value, background: edit.background.value, text: edit.text.value, link: edit.link.value }
+            };
+            post('save-profile', patch).then(function (res) {
+                if (!res.ok) { status.textContent = res.error || res.reason || 'Could not save'; return; }
+                status.textContent = 'Saved. Reloading...';
+                if (window.spaNavigate) window.spaNavigate('./?page=013-profile.xjs&user=' + encodeURIComponent(alias) + '&_=' + Date.now());
+                else location.reload();
+            });
+        });
+    }
+})();
+</script>
+<?xjs } ?>
