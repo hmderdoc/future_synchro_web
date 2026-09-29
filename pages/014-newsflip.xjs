@@ -150,10 +150,9 @@
 /* ── Article cards ── */
 .nf-feed {
     padding: 0 0 40px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 6px;
-    align-items: stretch;
 }
 
 .nf-card {
@@ -171,8 +170,7 @@
 .nf-card:hover { border-color: #333; }
 .nf-card:active { transform: scale(0.995); }
 
-/* Hero card (first article): the full row */
-.nf-card-hero { grid-column: 1 / -1; }
+/* Hero card (first article) */
 .nf-card-hero .nf-card-img {
     width: 100%;
     height: 320px;
@@ -364,8 +362,6 @@
 }
 .nf-article-header {
     padding: 20px 24px 12px;
-    max-width: 1200px;
-    margin: 0 auto;
 }
 .nf-article-header h1 {
     font-size: 32px;
@@ -386,8 +382,6 @@
 /* Rich content rendering */
 .nf-article-content {
     padding: 0 24px 48px;
-    max-width: 1200px;   /* long lines read badly; the reader fills to this, then centres */
-    margin: 0 auto;
     font-size: 19px;
     line-height: 1.65;
     color: #d8d8d8;
@@ -558,9 +552,7 @@
     .nf-article-header h1 { font-size: 20px; }
     .nf-article-content { font-size: 15px; }
 }
-@media (max-width: 640px) {
-    .nf-feed { grid-template-columns: 1fr; }
-}
+
 </style>
 
 <nav class="news-tabs" aria-label="News views">
