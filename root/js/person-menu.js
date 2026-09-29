@@ -147,24 +147,46 @@
         var loggedIn = !!(window.sbbsConfig && window.sbbsConfig.isLoggedIn);
         menuEl = document.createElement('div');
         menuEl.className = 'person-menu';
-        menuEl.innerHTML =
-            '<div class="person-menu-head"><div class="person-menu-avatar"></div><div style="min-width:0">' +
-            '<div class="person-menu-name">' + esc(opts.name) + '</div>' +
-            '<div class="person-menu-sub">' + esc(opts.system || opts.host || 'another BBS') + (opts.host && opts.host !== opts.system ? ' &middot; ' + esc(opts.host) : '') + '</div></div></div>' +
-            (loggedIn
-                ? '<button type="button" class="person-menu-item" data-act="ibbs-telegram">Send InterBBS telegram</button>'
-                : '<div class="person-menu-note">Log in to send them an InterBBS telegram.</div>') +
-            (opts.host ? '<a class="person-menu-item" href="telnet://' + esc(opts.host) + '">Visit ' + esc(opts.system || opts.host) + ' (telnet)</a>' : '');
+        /* Their board's website (Synchronet boards serve one on the same host). */
+        var site = opts.host ? 'http://' + opts.host + '/' : '';
+        function build(info) {
+            var local = info && info.userNumber > 0 && info.alias ? info : null;
+            return '<div class="person-menu-head"><div class="person-menu-avatar"></div><div style="min-width:0">' +
+                '<div class="person-menu-name">' + esc(opts.name) + '</div>' +
+                '<div class="person-menu-sub">' + esc(opts.system || opts.host || 'another BBS') + (opts.host && opts.host !== opts.system ? ' &middot; ' + esc(opts.host) : '') +
+                (local ? ' &middot; ' + esc(local.alias) + ' here' : '') + '</div></div></div>' +
+                (local ? '<button type="button" class="person-menu-item" data-act="ibbs-profile">View ' + esc(local.alias) + "'s profile</button>" : '') +
+                (loggedIn
+                    ? '<button type="button" class="person-menu-item" data-act="ibbs-telegram">Send InterBBS telegram</button>'
+                    : '<div class="person-menu-note">Log in to send them an InterBBS telegram.</div>') +
+                (site ? '<a class="person-menu-item" href="' + esc(site) + '" target="_blank" rel="noopener">Visit ' + esc(opts.system || opts.host) + '</a>' : '');
+        }
+        menuEl.innerHTML = build(null);
         place(menuEl, opts.x || 20, opts.y || 20);
         drawAvatar(menuEl.querySelector('.person-menu-avatar'), opts, { userNumber: 0 });
         document.addEventListener('click', onDocClick, true);
         document.addEventListener('keydown', onKey);
+        var localInfo = null;
         menuEl.addEventListener('click', function (e) {
-            var b = e.target.closest('[data-act="ibbs-telegram"]');
+            var b = e.target.closest('[data-act]');
             if (!b) return;
-            close();
-            sendInterBbsTelegram(opts);
+            var act = b.getAttribute('data-act');
+            if (act === 'ibbs-telegram') { close(); sendInterBbsTelegram(opts); }
+            else if (act === 'ibbs-profile' && localInfo) { close(); navigate('./?page=013-profile.xjs&user=' + encodeURIComponent(localInfo.alias)); }
         });
+        /* The same name may hold an account here (the sysop link map counts
+           too): offer their profile when it does. */
+        var mine = menuEl;
+        get(API + '?call=person&name=' + encodeURIComponent(opts.name) + '&network=local').then(function (info) {
+            if (menuEl !== mine || !info || !info.ok || !(info.userNumber > 0)) return;
+            localInfo = info;
+            var avatarBox = menuEl.querySelector('.person-menu-avatar');
+            var art = avatarBox ? avatarBox.innerHTML : '';
+            menuEl.innerHTML = build(info);
+            var box = menuEl.querySelector('.person-menu-avatar');
+            if (box) { if (art) box.innerHTML = art; else drawAvatar(box, opts, info); }
+            place(menuEl, opts.x || 20, opts.y || 20);
+        }).catch(function () { /* stays a plain remote caller */ });
     }
 
     /* The site's telegram modal (common.js sendTelegram), posted to the InterBBS API instead. */
