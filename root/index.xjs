@@ -269,6 +269,19 @@
 </head>
 <body>
 
+<script>
+/* --navbar-h drives the content offset (spa.css) and the terminal panel; measure the
+   fixed navbar as soon as it exists and again whenever the window changes. */
+(function () {
+    function measure() {
+        var nav = document.querySelector('.navbar.fixed-top');
+        if (nav) document.documentElement.style.setProperty('--navbar-h', nav.getBoundingClientRect().height + 'px');
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', measure); else measure();
+    window.addEventListener('load', measure);
+    window.addEventListener('resize', measure);
+})();
+</script>
 <!-- Early scripts: needed before inline scripts in sidebar/content -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 <script src="./js/graphics-converter.js?_v=<? write(time()); ?>"></script>

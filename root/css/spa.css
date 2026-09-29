@@ -1,49 +1,46 @@
 /* spa.css - SPA-specific styles for Synchronet webv4 */
 
 
-/* Push content below fixed navbar */
+/* Push content below the fixed navbar: exactly its height, no gap
+   (terminal.js measures it into --navbar-h). */
 .spa-container {
-    padding-top: 70px;
+    padding-top: var(--navbar-h, 55px);
 }
 
 /* Edge to edge: the shell runs full width (layout_full_width) with 8px of
    window at each side. The sidebar keeps the width it had inside the old
    1320px container; every extra pixel goes to the content column. */
-.navbar > .container-fluid,
-.spa-container.container-fluid {
+.navbar > .container-fluid {
     --bs-gutter-x: 0;
     padding-left: 8px;
     padding-right: 8px;
 }
+.spa-container.container-fluid {
+    --bs-gutter-x: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
 .spa-container.container-fluid > .row {
-    --bs-gutter-x: 16px;
-    margin-left: -8px;
-    margin-right: -8px;
+    --bs-gutter-x: 0;
+    margin-left: 0;
+    margin-right: 0;
 }
 .spa-container.container-fluid > .row > #sidebar,
 .spa-container.container-fluid > .row > #content {
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: 0;
+    padding-right: 0;
 }
 @media (min-width: 768px) {
     .spa-container.container-fluid > .row > #sidebar {
         flex: 0 0 330px;
         width: 330px;
         max-width: 330px;
-        /* cards sit flush with the column: no gap to the content, none to the window edge beyond the 8px */
-        padding-left: 0;
-        padding-right: 0;
     }
     .spa-container.container-fluid > .row > #content {
         flex: 1 1 0;
         width: auto;
         max-width: none;
         min-width: 0;
-        padding-right: 0;
-    }
-    .spa-container.container-fluid > .row > #sidebar + #content {
-        padding-left: 0;
-        padding-right: 8px;
     }
 }
 
@@ -393,7 +390,7 @@ body.terminal-open {
     }
 
     .spa-container {
-        padding-top: 60px;
+        padding-top: var(--navbar-h, 55px);
     }
 
     #sidebar {
