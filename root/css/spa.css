@@ -1764,10 +1764,10 @@ div.message .ansi-canvas-img {
 
 @media (min-width: 768px) {
     .spa-container > .row:has(> #content > .ol-page) {
-        height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+        height: calc(100vh - var(--navbar-h, 55px));
     }
     .spa-container > .row:has(> #content > .ol-page) > #content {
-        height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+        height: calc(100vh - var(--navbar-h, 55px));
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -1775,9 +1775,9 @@ div.message .ansi-canvas-img {
     }
     .spa-container > .row:has(> #content > .ol-page) > #sidebar {
         position: sticky;
-        top: calc(var(--navbar-h, 56px) + 0.75rem);
+        top: var(--navbar-h, 55px);
         align-self: flex-start;
-        max-height: calc(100vh - var(--navbar-h, 56px) - 1.5rem);
+        max-height: calc(100vh - var(--navbar-h, 55px));
         overflow: hidden;
     }
 }

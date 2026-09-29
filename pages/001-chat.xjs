@@ -15,17 +15,17 @@
     --chat-fg: #AAAAAA;
     color: var(--chat-fg);
     min-height: 0;
-    padding: 0 0 0.25rem;
+    padding: 0;
 }
 
 /* Beside a taller site sidebar the content column stretches to the sidebar's
    height, so scrolling the page used to carry the chat off the top and leave
-   the column blank. Pin it where it already sits (.spa-container's 70px
-   navbar offset). Desktop only: below md the sidebar stacks underneath. */
+   the column blank. Pin it right under the navbar (.spa-container's offset,
+   --navbar-h). Desktop only: below md the sidebar stacks underneath. */
 @media (min-width: 768px) {
     .chat-web-page {
         position: sticky;
-        top: 70px;
+        top: var(--navbar-h, 55px);
     }
 }
 
@@ -34,8 +34,8 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    height: calc(100vh - 140px);
-    height: calc(100dvh - 140px);
+    height: calc(100vh - var(--navbar-h, 55px));
+    height: calc(100dvh - var(--navbar-h, 55px));
     min-height: 0;
     overflow: hidden;
     padding: 0;
@@ -1312,10 +1312,8 @@ textarea.chat-web-input {
 /* ── Responsive ── */
 @media (max-width: 980px) {
     .chat-web-page {
-        width: calc(100% + 1rem);
+        width: 100%;
         max-width: 100vw;
-        margin-left: -0.5rem;
-        margin-right: -0.5rem;
     }
     .chat-web-page .chat-web-shell {
         border-left: none;
@@ -1372,9 +1370,7 @@ textarea.chat-web-input {
 }
 @media (max-width: 768px) {
     .chat-web-page {
-        width: calc(100% + 1.5rem);
-        margin-left: -0.75rem;
-        margin-right: -0.75rem;
+        width: 100%;
         padding-top: 0;
         padding-bottom: 0;
     }
@@ -1385,8 +1381,8 @@ textarea.chat-web-input {
         min-height: 2.3rem;
     }
     .chat-web-page .chat-web-shell {
-        height: calc(100vh - 120px);
-        height: calc(100dvh - 120px);
+        height: calc(100vh - var(--navbar-h, 55px) - 50px);
+        height: calc(100dvh - var(--navbar-h, 55px) - 50px);
     }
     .chat-web-page .chat-msg-group,
     .chat-web-page .chat-web-group {
