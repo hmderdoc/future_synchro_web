@@ -89,13 +89,18 @@
 
     /* Build page list for nav */
     var nav_pages = getPageList();
-    /* Pages to move into "More" dropdown */
-    /* Pages to move into "More" dropdown */
-    var more_nav_names = [
-        'futureland-records',
-        'futureland-gallery',
-        'wiki'
-    ];
+    /* Everything sits in the top bar (no "More" menu); labels hide at
+       narrow widths, so the bar leans on short names. */
+    var more_nav_names = [];
+    var nav_short_titles = {
+        userlist: 'Users',
+        oneliners: 'Quips',
+        'futureland-records': 'Music',
+        'futureland-gallery': 'Gallery'
+    };
+    function navLabel(e) {
+        return nav_short_titles[e.name] || e.title;
+    }
     /* Sysop tools live in the account menu (only sysops have them in the list). */
     var sysop_nav_names = ['nodespy', 'webmonitor'];
 
@@ -159,13 +164,13 @@
         } else if (e.type == 'link') {
 ?>
     <li class="nav-item">
-        <a class="nav-link" href="<? write(navHref(e, path)); ?>" target="_blank"><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span></a>
+        <a class="nav-link" href="<? write(navHref(e, path)); ?>" target="_blank" title="<? write(e.title); ?>"><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(navLabel(e)); ?></span></a>
     </li>
 <?xjs
         } else {
 ?>
     <li class="nav-item">
-        <a class="nav-link<? if (e.name === 'chat') write(' nav-link-chat'); ?>" href="<? write(navHref(e, path)); ?>"<?xjs if (e.name === 'chat') { ?> id="nav-link-chat"<?xjs } ?>><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(e.title); ?></span><?xjs if (e.name === 'chat') { ?><span class="badge bg-danger" id="badge-chat-unread" style="display:none;"></span><?xjs } ?></a>
+        <a class="nav-link<? if (e.name === 'chat') write(' nav-link-chat'); ?>" href="<? write(navHref(e, path)); ?>" title="<? write(e.title); ?>"<?xjs if (e.name === 'chat') { ?> id="nav-link-chat"<?xjs } ?>><span class="bin-icon" data-icon="<? write(navIcon(e)); ?>"></span><span class="nav-label"><? write(navLabel(e)); ?></span><?xjs if (e.name === 'chat') { ?><span class="badge bg-danger" id="badge-chat-unread" style="display:none;"></span><?xjs } ?></a>
     </li>
 <?xjs
         }
