@@ -224,6 +224,13 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 		if (!handled && http_request.query.call[0] === 'node-list') {
 			var sessions = directory(system.data_dir + 'user/*.web');
 			var usr = new User(1);
+			/* The member's chat handle colours (Settings > Chat handle) on their name, as [{n, c}] runs. */
+			var nameStyleLib = null;
+			try { nameStyleLib = load({}, system.mods_dir + 'load/chat_style_lib.js').getChatStyle(); } catch (_nsErr) { nameStyleLib = null; }
+			function nameRuns(number, alias) {
+				if (!nameStyleLib || !(number > 0)) return null;
+				try { return nameStyleLib.webRuns(alias, nameStyleLib.forName(number, alias).colors); } catch (_nrErr) { return null; }
+			}
 			reply = system.node_list.reduce(function (a, c, i) {
 				if (c.status !== NODE_INUSE) return a;
 				usr.number = c.useron;
@@ -233,7 +240,8 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 					status: format(NodeStatus[c.status], c.aux, c.extaux),
 					action: friendlyNodeStatus(c, i),
 					user: usr.alias,
-					connection: usr.connection
+					connection: usr.connection,
+					colors: nameRuns(c.useron, usr.alias)
 				});
 				return a;
 			}, []);
@@ -253,7 +261,8 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 					status: '',
 					action: webAction || '',
 					user: usr.alias,
-					connection: 'Web'
+					connection: 'Web',
+					colors: nameRuns(usr.number, usr.alias)
 				});
 			});
 		usr = undefined;

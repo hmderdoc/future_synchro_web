@@ -147,7 +147,20 @@
             }
             var nameSpan = document.createElement('span');
             nameSpan.className = 'nl-username';
-            nameSpan.textContent = c.user;
+            if (c.colors && c.colors.length) {
+                /* Their chat handle colours, one span per run. */
+                var at = 0;
+                c.colors.forEach(function (run) {
+                    var piece = document.createElement('span');
+                    piece.textContent = String(c.user).substr(at, run.n);
+                    if (/^#[0-9a-f]{6}$/i.test(run.c || '')) piece.style.color = run.c;
+                    nameSpan.appendChild(piece);
+                    at += run.n;
+                });
+                if (at < String(c.user).length) nameSpan.appendChild(document.createTextNode(String(c.user).substr(at)));
+            } else {
+                nameSpan.textContent = c.user;
+            }
             userWrap.appendChild(nameSpan);
             if (g.entries.length > 1) {
                 var badge = document.createElement('span');

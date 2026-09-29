@@ -105,10 +105,27 @@
         <div class="p-2" style="color:#AA0000;">No recent visitors</div>
 <?xjs
     }
+    /* Their chat handle colours (Settings > Chat handle) on the name. */
+    var rvStyleLib = null;
+    try { rvStyleLib = load({}, system.mods_dir + 'load/chat_style_lib.js').getChatStyle(); } catch (_rvErr) { rvStyleLib = null; }
+    function styledAlias(un, raw) {
+        var text = String(raw || '');
+        var plain = text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        var st, out = '', i, c;
+        if (!rvStyleLib || !(un > 0)) return plain;
+        try { st = rvStyleLib.forName(un, text); } catch (_e) { return plain; }
+        if (!st || !st.styled) return plain;
+        for (i = 0; i < text.length; i++) {
+            c = st.colors[i] || '';
+            var ch = text.charAt(i).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            out += c ? '<span style="color:' + c + '">' + ch + '</span>' : ch;
+        }
+        return out;
+    }
     ll.forEach(function (e) {
         var un = (e.user && e.user.number) ? e.user.number : 0;
         if (un > 0 && avatarNumbers.indexOf(un) < 0) avatarNumbers.push(un);
-        var alias = e.user ? e.user.alias.replace(/</g, '&lt;') : 'Unknown';
+        var alias = e.user ? styledAlias(un, e.user.alias) : 'Unknown';
         var loc = e.user && e.user.location ? e.user.location.replace(/</g, '&lt;') : '';
         var conn = e.user ? (e.user.connection || e.protocol || '') : '';
         var when = system.timestr(e.time);
