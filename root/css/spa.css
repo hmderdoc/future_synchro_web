@@ -30,12 +30,20 @@
         flex: 0 0 330px;
         width: 330px;
         max-width: 330px;
+        /* cards sit flush with the column: no gap to the content, none to the window edge beyond the 8px */
+        padding-left: 0;
+        padding-right: 0;
     }
     .spa-container.container-fluid > .row > #content {
         flex: 1 1 0;
         width: auto;
         max-width: none;
         min-width: 0;
+        padding-right: 0;
+    }
+    .spa-container.container-fluid > .row > #sidebar + #content {
+        padding-left: 0;
+        padding-right: 8px;
     }
 }
 
