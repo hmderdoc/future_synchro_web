@@ -10,6 +10,9 @@
  * GET  ?call=requests                            my incoming / outgoing requests
  * GET  ?call=person&name=<nick>&network=local|mrc|ddial|irc   who a chat handle is (menu data)
  * GET  ?call=ignored                             my ignore list (shared with the terminal shell)
+ * GET  ?call=forum&user=..[&page=N][&per=N]      a page of their forum posts (alias + linked handles, every
+ *                                                sub you may read) with the web thread key + forum icon
+ * GET  ?call=forum-post&sub=<code>&number=N      one post rendered as forum HTML (the expand control)
  * GET  ?call=whoami                              { number, alias, csrf_token }
  *
  * POST (x-csrf-token header; JSON body)
@@ -92,6 +95,63 @@ if (call === 'whoami') {
         // Never hand out disk paths.
         for (var i = 0; i < list.length; i++) delete list[i].path;
         reply({ ok: true, creations: list });
+    }
+
+} else if (call === 'forum') {
+    var fu = targetUser(request.get_param('user'));
+    if (!fu) fail('No such user', '404 Not Found');
+    else {
+        var fpage = parseInt(String(request.get_param('page') || '0'), 10) || 0;
+        var fper = parseInt(String(request.get_param('per') || '10'), 10) || 10;
+        var activity = Social.forumActivity(fu, me(), { page: fpage, per: fper });
+        /* The forum page keys threads the way lib/forum.js groups them
+           (subject merging, thread_id, thread_back), so the deep link asks
+           the same code which thread each message landed in. One scan per
+           sub on this page, cached for the request. */
+        load(settings.web_lib + 'forum.js');
+        var threadKeys = {};
+        function threadKeyFor(sub, number) {
+            var t, k, threads;
+            if (!threadKeys.hasOwnProperty(sub)) {
+                threadKeys[sub] = {};
+                try {
+                    threads = getMessageThreads(sub, settings.max_messages);
+                    for (t in threads.thread) {
+                        if (!threads.thread.hasOwnProperty(t)) continue;
+                        for (k in threads.thread[t].messages) if (threads.thread[t].messages.hasOwnProperty(k)) threadKeys[sub][k] = threads.thread[t].id;
+                    }
+                } catch (_te) { }
+            }
+            return threadKeys[sub][String(number)] || 0;
+        }
+        var iconCache = {};
+        for (var fi = 0; fi < activity.items.length; fi++) {
+            var fit = activity.items[fi];
+            fit.threadKey = threadKeyFor(fit.sub, fit.number);
+            if (!iconCache.hasOwnProperty(fit.sub)) {
+                try { iconCache[fit.sub] = _forumResolveIcon(fit.sub, fit.group) || ''; } catch (_ie) { iconCache[fit.sub] = ''; }
+            }
+            fit.icon = iconCache[fit.sub];
+        }
+        reply({ ok: true, forum: activity });
+    }
+
+} else if (call === 'forum-post') {
+    var fpost = Social.forumPost(String(request.get_param('sub') || ''), parseInt(String(request.get_param('number') || '0'), 10) || 0);
+    if (!fpost) fail('No such post', '404 Not Found');
+    else {
+        load(settings.web_lib + 'forum.js');
+        var html = '';
+        try {
+            var pmb = new MsgBase(fpost.sub);
+            if (pmb.open()) {
+                var rawBody = pmb.get_msg_body(false, fpost.number) || '';
+                pmb.close();
+                html = formatMessage(rawBody, /\x1b\[/.test(rawBody));
+            }
+        } catch (_pe) { html = ''; }
+        fpost.html = html;
+        reply({ ok: true, post: fpost });
     }
 
 } else if (call === 'render-ansi') {

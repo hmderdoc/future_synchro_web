@@ -31,6 +31,13 @@ Not trying to hoard these changes but also do not want to submit a hard fork to 
   wall policy / theme + colours inline. Data: `root/api/social.ssjs` over
   the shared store `mods/load/social_lib.js` (the terminal shell uses the
   same one, so friendships and posts are common).
+- Forum Activity box on the profile: `?call=forum&user=..&page=N` lists their
+  posts across every sub the viewer may read (alias + sysop-linked network
+  handles, so posts from other boards under their handle are included),
+  10 per page with the sub's forum icon, date, network/sub, recipient and a
+  snippet; Expand fetches `?call=forum-post` (the forum's own HTML renderer);
+  "Open thread" deep-links into `002-forum.xjs` using the same thread keying
+  as the forum page and highlights the message once the thread renders.
 - Wiki pages accept media embeds: `![ansi](file.ans)`, `![track](song.mp3)`,
   `![image](pic.png)`, `![avatar](Alias)` (`![kind:label](..)` for a caption,
   `dir_code:file` for other creation areas). `lib/wiki-embeds.js` renders them

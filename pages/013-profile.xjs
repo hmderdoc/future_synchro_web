@@ -310,6 +310,9 @@
 .pp-about .wiki-embed-missing { opacity: .7; font-style: italic; }
 .pp-about img, .pp-about pre { max-width: 100%; }
 .pp-requests { background: #fff8d6; color: #333; border: 1px solid #e0c060; padding: 8px; margin-bottom: 12px; }
+/* Fixed light box: pin every descendant dark, or the site's CGA theme (white <b>) and the
+   profile's own light link/muted colours leak in and vanish on the cream background. */
+.pp-requests b, .pp-requests strong, .profile-page .pp-requests a, .pp-requests .pp-meta { color: #333 !important; }
 .pp-requests .pp-btn { color: #000; background: #fff; border-color: #999; }
 .pp-requests .pp-btn-primary { background: #ff6600; border-color: #ff6600; color: #fff; }
 .pp-status-line { min-height: 1.2em; color: var(--pp-accent); font-weight: bold; margin-top: 4px; }
@@ -350,6 +353,27 @@
 .pp-pager { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; font-size: 11px; }
 .pp-pager button { font: inherit; font-size: 11px; padding: 1px 8px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; }
 .pp-pager button:disabled { opacity: .4; cursor: default; }
+.pp-forum { display: flex; flex-direction: column; }
+.pp-forum-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px dotted var(--pp-border); }
+.pp-forum-row:last-child { border-bottom: none; }
+.pp-forum-icon { width: 48px; height: 24px; flex-shrink: 0; background: #000; border: 1px solid var(--pp-border); overflow: hidden; }
+.pp-forum-icon img { width: 48px; height: 24px; display: block; image-rendering: pixelated; }
+.pp-forum-icon.is-blank { background: var(--pp-title); }
+.pp-forum-main { flex: 1; min-width: 0; }
+.pp-forum-head { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 11px; color: var(--pp-muted); }
+.pp-forum-where { color: var(--pp-title); font-weight: bold; }
+.pp-forum-origin { font-style: italic; }
+.pp-forum-subject { font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
+.pp-forum-subject a { color: var(--pp-link); }
+.pp-forum-snippet { font-size: 12px; color: var(--pp-text); word-break: break-word; }
+.pp-forum-full { margin-top: 4px; padding: 6px 8px; border: 1px solid var(--pp-border); background: rgba(127,127,127,.06); font-size: 12px; max-height: 60vh; overflow: auto; }
+.pp-forum-full .message { white-space: pre-wrap; word-break: break-word; font-family: monospace; }
+.pp-forum-full pre { margin: 0; }
+.pp-forum-tools { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
+.pp-forum-tools button, .pp-forum-tools a.pp-forum-open { font: inherit; font-size: 11px; padding: 1px 8px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; text-decoration: none; }
+.pp-forum-tools a.pp-forum-open { color: var(--pp-link); }
+.pp-forum-tools button.is-open { background: var(--pp-title); color: var(--pp-title-text); }
+.pp-forum-hint { font-weight: normal; color: var(--pp-title-text); opacity: .75; font-size: 10px; }
 .pp-player-status { color: var(--pp-muted); font-size: 11px; min-height: 1.2em; margin-top: 2px; }
 .pp-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
 .pp-tile { display: flex; flex-direction: column; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); background: #000; overflow: hidden; cursor: pointer; }
@@ -599,6 +623,16 @@
             </div>
         </div>
 <?xjs } ?>
+
+        <div class="pp-box" id="pp-forum-box">
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Forum Activity <span id="pp-forum-count"></span></span>
+                <span class="pp-meta pp-forum-hint">alias + linked handles, every board you can read</span>
+            </div>
+            <div class="pp-box-body">
+                <div class="pp-forum" id="pp-forum"><span class="pp-meta">Looking through the message bases...</span></div>
+                <div class="pp-pager" id="pp-forum-pager"></div>
+            </div>
+        </div>
 
         <div class="pp-box">
             <div class="pp-box-title"><?xjs write(esc(summary.alias)); ?>'s Updates (<?xjs write(summary.updateCount); ?>)</div>
@@ -1221,6 +1255,128 @@
         document.removeEventListener('keydown', carouselKeys);
     }
     document.addEventListener('spa:beforeNavigate', closeCarousel);
+
+    /* ---- Forum Activity: a page of their posts, expand in place, deep link ---- */
+    (function () {
+        var host = document.getElementById('pp-forum');
+        var pager = document.getElementById('pp-forum-pager');
+        var countEl = document.getElementById('pp-forum-count');
+        if (!host || !pager) return;
+        var page = 0, PER = 10, current = null;
+        var gc = converter();
+        var iconCache = {};
+        function forumUrl(item) {
+            var url = './?page=002-forum.xjs&sub=' + encodeURIComponent(item.sub);
+            return item.threadKey ? url + '&thread=' + encodeURIComponent(item.threadKey) : url;
+        }
+        function netLabel(item) {
+            if (item.netType === 'fidonet') return 'FTN';
+            if (item.netType === 'qwknet') return 'QWK';
+            if (item.netType === 'internet') return 'NNTP';
+            if (item.netType === 'postlink') return 'PostLink';
+            return 'local';
+        }
+        function drawIcon(el, item) {
+            if (!item.icon || !gc) { el.classList.add('is-blank'); return; }
+            if (iconCache[item.sub]) { var im = new Image(); im.src = iconCache[item.sub]; el.appendChild(im); return; }
+            gc.from_bin(atob(item.icon), 12, 6, function (dataURL) {
+                iconCache[item.sub] = dataURL;
+                var img = new Image(); img.src = dataURL; el.innerHTML = ''; el.appendChild(img);
+            }, true);
+        }
+        function rowHtml(item) {
+            var where = esc(item.group ? item.group + ' \u203a ' + item.subName : item.subName);
+            return '<span class="pp-forum-icon"></span><div class="pp-forum-main">' +
+                '<div class="pp-forum-head"><span class="pp-forum-date">' + esc(fmtDate(item.at)) + '</span>' +
+                '<span class="pp-forum-where" title="' + esc(netLabel(item)) + '">' + where + '</span>' +
+                '<span class="pp-forum-to">to ' + esc(item.to || 'All') + '</span>' +
+                (item.origin ? '<span class="pp-forum-origin">from ' + esc(item.origin) + '</span>' : '') + '</div>' +
+                '<div class="pp-forum-subject"><a href="' + esc(forumUrl(item)) + '" class="pp-forum-open-link" data-number="' + item.number + '">' + esc(item.subject || '(no subject)') + '</a>' +
+                (item.poll ? ' <span class="pp-meta">(poll)</span>' : '') + '</div>' +
+                '<div class="pp-forum-snippet">' + esc(item.snippet || '') + '</div>' +
+                '<div class="pp-forum-full" hidden></div>' +
+                '<div class="pp-forum-tools"><button type="button" class="pp-forum-expand">Expand</button>' +
+                '<a class="pp-forum-open pp-forum-open-link" data-number="' + item.number + '" href="' + esc(forumUrl(item)) + '">Open thread</a></div></div>';
+        }
+        function render(data) {
+            current = data;
+            host.innerHTML = '';
+            if (countEl) countEl.textContent = '(' + data.total + ')';
+            if (!data.items.length) {
+                host.innerHTML = '<span class="pp-meta">' + (data.total ? 'Nothing on this page.' : 'No posts yet.') + '</span>';
+            }
+            data.items.forEach(function (item) {
+                var row = document.createElement('div');
+                row.className = 'pp-forum-row';
+                row.innerHTML = rowHtml(item);
+                row.querySelector('.pp-forum-expand').addEventListener('click', function () { toggle(row, item, this); });
+                host.appendChild(row);
+                drawIcon(row.querySelector('.pp-forum-icon'), item);
+            });
+            pager.innerHTML = '';
+            if (data.pages > 1) {
+                var prev = document.createElement('button'); prev.type = 'button'; prev.textContent = '\u2039 newer'; prev.disabled = data.page <= 0;
+                var next = document.createElement('button'); next.type = 'button'; next.textContent = 'older \u203a'; next.disabled = data.page >= data.pages - 1;
+                var label = document.createElement('span'); label.textContent = 'Page ' + (data.page + 1) + ' of ' + data.pages;
+                prev.addEventListener('click', function () { load(page - 1); });
+                next.addEventListener('click', function () { load(page + 1); });
+                pager.appendChild(prev); pager.appendChild(label); pager.appendChild(next);
+            }
+        }
+        function toggle(row, item, btn) {
+            var full = row.querySelector('.pp-forum-full');
+            var snippet = row.querySelector('.pp-forum-snippet');
+            if (!full.hidden) { full.hidden = true; snippet.hidden = false; btn.textContent = 'Expand'; btn.classList.remove('is-open'); return; }
+            btn.disabled = true;
+            fetch('./api/social.ssjs?call=forum-post&sub=' + encodeURIComponent(item.sub) + '&number=' + item.number, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    btn.disabled = false;
+                    if (!res.ok || !res.post) { full.innerHTML = '<span class="pp-meta">That post can no longer be read.</span>'; }
+                    else if (res.post.html) full.innerHTML = '<div class="message">' + res.post.html + '</div>';
+                    else full.innerHTML = '<div class="message">' + esc(res.post.body || '') + '</div>';
+                    full.hidden = false; snippet.hidden = true; btn.textContent = 'Collapse'; btn.classList.add('is-open');
+                }).catch(function () { btn.disabled = false; });
+        }
+        function load(next) {
+            page = Math.max(0, next);
+            host.innerHTML = '<span class="pp-meta">Looking through the message bases...</span>';
+            fetch('./api/social.ssjs?call=forum&user=' + encodeURIComponent(alias) + '&page=' + page + '&per=' + PER, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    if (!res.ok) { host.innerHTML = '<span class="pp-meta">' + esc(res.error || 'Forum activity is unavailable.') + '</span>'; return; }
+                    page = res.forum.page;
+                    render(res.forum);
+                }).catch(function () { host.innerHTML = '<span class="pp-meta">Forum activity is unavailable.</span>'; });
+        }
+        /* Deep link: the SPA drops the URL hash, so remember the message and
+           highlight it once the thread has rendered (messages load async). */
+        host.addEventListener('click', function (e) {
+            var a = e.target.closest('a.pp-forum-open-link');
+            if (!a) return;
+            window.__pendingForumMessage = parseInt(a.getAttribute('data-number'), 10) || 0;
+        });
+        if (!window.__forumJumpBound) {
+            window.__forumJumpBound = true;
+            document.addEventListener('spa:afterNavigate', function () {
+                var number = window.__pendingForumMessage;
+                if (!number) return;
+                window.__pendingForumMessage = 0;
+                var tries = 0;
+                (function look() {
+                    var el = document.getElementById('forum-message-' + number);
+                    if (el) {
+                        Array.prototype.forEach.call(document.querySelectorAll('.forum-message-card.current'), function (c) { c.classList.remove('current'); });
+                        el.classList.add('current');
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return;
+                    }
+                    if (++tries < 40) window.setTimeout(look, 250);
+                })();
+            });
+        }
+        load(0);
+    })();
 
     /* profile editor */
     var edit = document.getElementById('pp-edit-form');
