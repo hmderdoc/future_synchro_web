@@ -16,7 +16,9 @@
     </div>
 
     <? load(xjs_compile(settings.web_components + 'avatar-settings.xjs')); ?>
+    <? load(xjs_compile(settings.web_components + 'chat-style-settings.xjs')); ?>
 </div>
+<script type="text/javascript" src="./js/chat-style-settings.js?_v=<?xjs write(time()); ?>"></script>
 
 <script>
     if (typeof initAvatarSettingsWidgets === 'function') initAvatarSettingsWidgets(document);

@@ -253,6 +253,7 @@
 .pp-topbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px; }
 .pp-topbar h1 { font-size: 22px; font-weight: bold; color: var(--pp-text); }
 .pp-topbar .pp-headline { font-size: 13px; font-weight: bold; color: var(--pp-accent); }
+.pp-nick-tag { display: inline-block; margin-left: 8px; padding: 0 6px; font-size: 12px; font-weight: normal; line-height: 1.5; border: 1px solid var(--pp-border); border-radius: 2px; vertical-align: middle; }
 .pp-topbar .pp-online { font-size: 11px; font-weight: bold; color: #ffffff; background: #1a9e3c; padding: 1px 7px; border-radius: 3px; }
 .pp-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
 @media (max-width: 860px) { .pp-grid { grid-template-columns: 1fr; } }
@@ -460,7 +461,20 @@
 <?xjs } ?>
 
     <div class="pp-topbar">
-        <h1><?xjs write(esc(summary.alias)); ?></h1>
+        <h1><?xjs
+            var ns = summary.nickStyle;
+            if (ns && ns.styled) {
+                for (var nsi = 0; nsi < summary.alias.length; nsi++) {
+                    var nsc = ns.colors[nsi] || '';
+                    write(nsc ? '<span style="color:' + nsc + '">' + esc(summary.alias.charAt(nsi)) + '</span>' : esc(summary.alias.charAt(nsi)));
+                }
+                if (ns.tag && ns.tag.text) {
+                    write('<span class="pp-nick-tag" style="' + (ns.tag.fg ? 'color:' + ns.tag.fg + ';border-color:' + ns.tag.fg + ';' : '') + (ns.tag.bg ? 'background:' + ns.tag.bg + ';' : '') + '">' + esc(ns.tag.text) + '</span>');
+                }
+            } else {
+                write(esc(summary.alias));
+            }
+        ?></h1>
         <?xjs if (summary.profile.headline) { ?><span class="pp-headline">&ldquo;<?xjs write(esc(summary.profile.headline)); ?>&rdquo;</span><?xjs } ?>
         <?xjs if (summary.online) { ?><span class="pp-online">ONLINE NOW</span><?xjs } ?>
         <?xjs if (isSelf) { ?><a href="#" class="pp-toggle" data-toggle="pp-edit">Edit my profile</a><?xjs } ?>

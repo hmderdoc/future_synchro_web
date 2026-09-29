@@ -25,6 +25,10 @@ load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
 load(settings.web_lib + 'avatar-profiles.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
+/* Members' chat handle styles (per-letter colours + tag): the record the
+   terminal shell and the web Settings page both edit. */
+var ChatStyleLib = null;
+try { ChatStyleLib = load({}, system.mods_dir + 'load/chat_style_lib.js').getChatStyle(); } catch (_chatStyleErr) { ChatStyleLib = null; }
 load('json-client.js');
 
 var _host = '127.0.0.1';
@@ -237,8 +241,20 @@ function normalizeNick(nick) {
         avatar: trimText(nick.avatar),
         /* 'mrc' | 'ddial' when this person is reached over a bridged network
            (see "Bridged rooms" below); '' for this BBS's own chat. */
-        bridge: bridgeName(nick.bridge)
+        bridge: bridgeName(nick.bridge),
+        /* The sender's chat handle style, as they sent it (validated on read). */
+        style: ChatStyleLib && nick.style && typeof nick.style === 'object' ? ChatStyleLib.normalize(nick.style) : null
     };
+}
+
+/* senderColors runs + tag for a message whose nick carries a handle style. */
+function styledSender(target, nick, sender) {
+    var style = nick && nick.style ? nick.style : null;
+    if (!style || !ChatStyleLib) { return target; }
+    var runs = ChatStyleLib.webRuns(sender, style.colors);
+    if (runs && !target.senderColors) { target.senderColors = runs; }
+    if (style.tag && style.tag.text) { target.tag = { text: style.tag.text, fg: style.tag.fg || '', bg: style.tag.bg || '' }; }
+    return target;
 }
 
 function bridgeName(raw) {
@@ -328,7 +344,7 @@ function formatChatMessage(message, ownAlias) {
         { userNumber: userNumber, avatar: nick && nick.avatar ? String(nick.avatar) : '' }, sender);
     userNumber = profiled.userNumber;
 
-    return {
+    return styledSender({
         sender: sender,
         system: systemName,
         text: message && message.str ? String(message.str) : '',
@@ -342,7 +358,7 @@ function formatChatMessage(message, ownAlias) {
         peerSystem: peer && peer.host ? peer.host : undefined,
         peerAvatar: peer && peer.avatar ? peer.avatar : undefined,
         peerBridge: peer && peer.bridge ? peer.bridge : undefined
-    };
+    }, nick, sender);
 }
 
 function getMailboxMessagesPath(alias) {
@@ -804,14 +820,24 @@ function loadPrivateHistory(client, ownAlias, targetName, targetSystem, targetBr
 function buildOwnNick() {
     var avatarLib = load({}, 'avatar_lib.js');
     var avatarObj = avatarLib.read_localuser(user.number) || {};
-
-    return {
+    var nick = {
         name: user.alias,
         host: system.name,
         ip: user.ip_address || '0.0.0.0',
         qwkid: system.qwk_id,
         avatar: avatarObj && avatarObj.data ? String(avatarObj.data) : undefined
     };
+    /* Our handle style rides on every message we write (the terminal shell
+       does the same), trimmed to the alias. */
+    if (ChatStyleLib) {
+        var own = ChatStyleLib.forName(user.number, user.alias);
+        if (own && own.styled) {
+            var colors = own.colors.slice();
+            while (colors.length && !colors[colors.length - 1].length) colors.pop();
+            nick.style = { colors: colors, tag: own.tag };
+        }
+    }
+    return nick;
 }
 
 function buildPrivateMessage(sender, recipient, text, timestamp) {

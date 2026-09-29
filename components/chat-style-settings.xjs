@@ -1,0 +1,67 @@
+<?xjs
+/* Chat handle: per-letter colours + tag, one record shared with the terminal
+   shell (mods/load/chat_style_lib.js). Filled in by js/chat-style-settings.js. */
+?>
+<style>
+.chat-style-widget .card-body { display: flex; flex-direction: column; gap: 10px; }
+.chat-style-letters { display: flex; flex-wrap: wrap; gap: 2px; }
+.chat-style-letter {
+    width: 34px; height: 40px; padding: 0; border: 1px solid #555; background: #000; color: #fff;
+    font: bold 20px/1 'Spleen', ui-monospace, monospace; cursor: pointer; position: relative;
+}
+.chat-style-letter.is-active { outline: 2px solid #55ffff; outline-offset: -2px; }
+.chat-style-letter.is-space { color: #555; }
+.chat-style-letter input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.chat-style-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chat-style-row label { margin: 0; font-size: 12px; opacity: .8; }
+.chat-style-row input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid #555; background: none; cursor: pointer; }
+.chat-style-row input[type=text] { width: 140px; }
+.chat-style-hint { font-size: 11px; opacity: .65; }
+.chat-style-previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; }
+.chat-style-preview { border: 1px solid #333; background: #000; padding: 6px 8px; font: 14px/1.4 'Spleen', ui-monospace, monospace; color: #aaa; }
+.chat-style-preview-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .55; margin-bottom: 2px; }
+.chat-style-preview .cs-name { font-weight: bold; }
+.chat-style-preview .cs-tag { display: inline-block; margin-left: 4px; padding: 0 4px; font-size: .8em; border: 1px solid #555; border-radius: 2px; color: #aaa; vertical-align: middle; }
+.chat-style-status { min-height: 1.2em; font-size: 12px; color: #55ff55; }
+</style>
+<div class="card chat-style-widget" data-chat-style-settings data-alias="<?xjs write(user.alias.replace(/"/g, '&quot;')); ?>">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><span class="bin-icon" data-icon="chat"></span>Chat handle</span>
+        <span class="chat-style-hint">shows in avatar chat, DDial, your MRC alias and on your profile; the terminal's Chat Settings edits the same thing</span>
+    </div>
+    <div class="card-body">
+        <div>
+            <label>Letter colours <span class="chat-style-hint">(click a letter to pick its colour)</span></label>
+            <div class="chat-style-letters" data-letters></div>
+        </div>
+        <div class="chat-style-row">
+            <label>Fill</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="solid">Solid</button>
+            <input type="color" data-solid value="#55ffff" title="Solid colour">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="gradient">Gradient</button>
+            <input type="color" data-grad-a value="#ff5555" title="Gradient start">
+            <input type="color" data-grad-b value="#5555ff" title="Gradient end">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="rainbow">Rainbow</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="clear">Clear colours</button>
+        </div>
+        <div class="chat-style-row">
+            <label>Tag</label>
+            <input type="text" class="form-control form-control-sm" data-tag-text maxlength="12" placeholder="e.g. sysop, dj, lurker">
+            <label>colour</label>
+            <input type="color" data-tag-fg value="#ffff55">
+            <label>background</label>
+            <input type="color" data-tag-bg value="#000000">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-tag-clear>No tag</button>
+            <span class="chat-style-hint">not sent to DDial (your handle is your identity there)</span>
+        </div>
+        <div class="chat-style-previews">
+            <div class="chat-style-preview"><span class="chat-style-preview-label">Avatar chat / DDial (truecolor)</span><span data-preview="true"></span></div>
+            <div class="chat-style-preview"><span class="chat-style-preview-label">MRC (nearest of 16)</span><span data-preview="cga"></span></div>
+            <div class="chat-style-preview"><span class="chat-style-preview-label">Profile</span><span data-preview="profile"></span></div>
+        </div>
+        <div class="chat-style-row">
+            <button type="button" class="btn btn-sm btn-primary" data-save>Save</button>
+            <span class="chat-style-status" data-status></span>
+        </div>
+    </div>
+</div>

@@ -32,6 +32,12 @@ Not trying to hoard these changes but also do not want to submit a hard fork to 
   the shared store `mods/load/social_lib.js` (the terminal shell uses the
   same one, so friendships and posts are common). Unset themes default to
   the CGA preset.
+- Chat handle (Settings): per-letter colours (system colour pickers, solid /
+  gradient / rainbow presets) and a tag, saved through
+  `root/api/chat-style.ssjs` into the record the terminal shell edits too
+  (`mods/load/chat_style_lib.js`). Chat messages carry it on the nick
+  (`senderColors` runs + `tag` in the API), the profile name is painted with
+  it, and the MRC/DDial bridges paint web users' handles from it.
 - Music credit: a track is the member's when the MP3's composer tag (or the
   records override) names them, then the featured artist ("feat. X"), the
   uploader, the filename suffix. Being only the lead artist (the house bot

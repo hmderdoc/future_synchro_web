@@ -859,6 +859,18 @@ textarea.chat-web-input {
 .chat-web-page .chat-sender-name {
     color: #55FFFF;
 }
+/* A member's tag (Settings > Chat handle) after their name. */
+.chat-web-page .chat-web-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 0.8em;
+    line-height: 1.4;
+    border: 1px solid #555555;
+    border-radius: 2px;
+    color: #AAAAAA;
+    vertical-align: middle;
+}
 
 /* ── Avatars (message bubbles) ── */
 .chat-web-page .chat-avatar {
@@ -3189,6 +3201,11 @@ textarea.chat-web-input {
                 var senderHtml = (message.senderColors && window.ChatEmbeds && ChatEmbeds.colorizeRuns)
                     ? ChatEmbeds.colorizeRuns(displaySender, message.senderColors, escapeHtml) : null;
                 html += '<strong class="chat-sender-name">' + (senderHtml === null ? escapeHtml(displaySender) : senderHtml) + '</strong>';
+                if (message.tag && message.tag.text) {
+                    var tagStyle = (/^#[0-9a-f]{6}$/i.test(message.tag.fg || '') ? 'color:' + message.tag.fg + ';border-color:' + message.tag.fg + ';' : '')
+                        + (/^#[0-9a-f]{6}$/i.test(message.tag.bg || '') ? 'background:' + message.tag.bg + ';' : '');
+                    html += '<span class="chat-web-tag"' + (tagStyle ? ' style="' + tagStyle + '"' : '') + '>' + escapeHtml(message.tag.text) + '</span>';
+                }
                 if (message.system) {
                     html += ' <span class="chat-web-channel chat-web-system-name">' + renderSystemName(message) + '</span>';
                 }
