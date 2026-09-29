@@ -1252,3 +1252,13 @@
 	        </script>
 
 <? } ?>
+<script type="text/javascript">
+    (function () {
+        /* Person menu > Email / Netmail: arrive on the mail sub with the
+           recipient pending and open the composer straight away. */
+        var pending = window.__pendingCompose;
+        var params = new URLSearchParams(window.location.search);
+        var sub = params.get('sub') || (pending && pending.sub) || '';
+        if (pending && sub === 'mail' && typeof addNew === 'function') addNew('mail');
+    })();
+</script>

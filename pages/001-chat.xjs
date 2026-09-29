@@ -1900,6 +1900,20 @@ textarea.chat-web-input {
     function parseRoute() {
         var params;
 
+        /* The person menu sets this just before navigating here; the SPA
+           pushes the new URL only after this page's scripts ran, so the
+           query string is not yet trustworthy at init. */
+        var handed = window.__pendingPrivateThread;
+        if (handed && typeof handed === 'object' && handed.name) {
+            window.__pendingPrivateThread = null;
+            return {
+                channel: 'main',
+                privateName: sanitizeAlias(handed.name),
+                privateSystem: trimText(handed.system || ''),
+                privateBridge: normalizeBridge(handed.bridge || '')
+            };
+        }
+
         try {
             params = new URLSearchParams(window.location.search);
         } catch (_error) {

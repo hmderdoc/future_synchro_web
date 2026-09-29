@@ -98,21 +98,28 @@
             '<div class="person-menu-name">' + esc(opts.name) + '</div>' +
             '<div class="person-menu-sub">' + esc(opts.network === 'local' ? (opts.system || 'this BBS') : opts.network.toUpperCase() + (opts.system ? ' @ ' + opts.system : '')) +
             (info.alias && info.alias.toLowerCase() !== String(opts.name).toLowerCase() ? ' &middot; ' + esc(info.alias) + ' here' : '') + '</div></div></div>';
-        if (info.userNumber > 0) html += '<button type="button" class="person-menu-item" data-act="profile">View ' + (isSelf ? 'my' : esc(info.alias) + "'s") + ' profile</button>';
+        var loggedIn = !!(window.sbbsConfig && window.sbbsConfig.isLoggedIn);
+        var isLocal = info.userNumber > 0;
+        var onChatNet = opts.network !== 'local';          // MRC / DDial / IRC nick seen in chat
+        var remoteBoard = !isLocal && !onChatNet && !!opts.system; // seen from another BBS (forum netmail, oneliners)
+        if (isLocal) html += '<button type="button" class="person-menu-item" data-act="profile">View ' + (isSelf ? 'my' : esc(info.alias) + "'s") + ' profile</button>';
         if (!isSelf) {
-            html += '<button type="button" class="person-menu-item" data-act="pm">Private message</button>';
-            // Telegrams are a BBS thing: local accounts only (delivered at their next keypress / logon).
-            if (info.userNumber > 0 && window.sbbsConfig && window.sbbsConfig.isLoggedIn && typeof window.sendTelegram === 'function') {
-                html += '<button type="button" class="person-menu-item" data-act="telegram">Send telegram</button>';
-            }
-            if (info.userNumber > 0 && window.sbbsConfig && window.sbbsConfig.isLoggedIn) {
+            // Local members: everything this board can do. Chat-network nicks:
+            // a bridged private message. People from other boards: netmail.
+            if (isLocal || onChatNet) html += '<button type="button" class="person-menu-item" data-act="pm">Private message</button>';
+            if (isLocal && loggedIn && typeof window.sendTelegram === 'function') html += '<button type="button" class="person-menu-item" data-act="telegram">Send telegram</button>';
+            if (isLocal && loggedIn) html += '<button type="button" class="person-menu-item" data-act="email">Send email</button>';
+            if (remoteBoard && loggedIn) html += '<button type="button" class="person-menu-item" data-act="netmail">Send netmail (' + esc(opts.name + '@' + opts.system) + ')</button>';
+            if (isLocal && loggedIn) {
                 var rel = info.relation;
                 html += '<button type="button" class="person-menu-item" data-act="friend">' +
                     (rel === 'friends' ? 'Remove from Friends' : rel === 'incoming' ? 'Accept friend request' : rel === 'outgoing' ? 'Withdraw friend request' : 'Add to Friends') + '</button>';
             }
-            if (window.sbbsConfig && window.sbbsConfig.isLoggedIn) {
+            if (loggedIn && (isLocal || onChatNet)) {
                 html += '<button type="button" class="person-menu-item is-danger" data-act="ignore">' + (info.ignored ? 'Stop ignoring ' + esc(opts.name) : 'Ignore ' + esc(opts.name)) + '</button>';
             }
+            if (!isLocal && !onChatNet && !remoteBoard && !info.sysop) html += '<div class="person-menu-note">Not a member of this board.</div>';
+            if (!loggedIn) html += '<div class="person-menu-note">Log in to message or add people.</div>';
         }
         if (info.sysop) {
             html += '<div class="person-menu-sep"></div>';
@@ -159,6 +166,12 @@
             if (act === 'profile') { close(); navigate('./?page=013-profile.xjs&user=' + encodeURIComponent(state.alias)); return; }
             if (act === 'pm') { close(); (typeof opts.onPrivate === 'function' ? opts.onPrivate : defaultPrivate)(opts); return; }
             if (act === 'telegram') { close(); window.sendTelegram(state.alias); return; }
+            if (act === 'email' || act === 'netmail') {
+                close();
+                window.__pendingCompose = { sub: 'mail', to: act === 'email' ? state.alias : opts.name + '@' + opts.system, subject: '' };
+                navigate('./?page=002-forum.xjs&sub=mail');
+                return;
+            }
             if (act === 'friend') {
                 var action = state.relation === 'friends' ? 'unfriend' : state.relation === 'incoming' ? 'accept' : state.relation === 'outgoing' ? 'cancel' : 'request';
                 post('friend', { user: state.alias, action: action }).then(refresh);
@@ -270,10 +283,12 @@
         return false;
     }
 
-    /* Outside chat, "Private message" lands in the chat page's private thread. */
+    /* Outside chat, "Private message" lands in the chat page's private
+       thread. The SPA pushes the URL only after the page's scripts ran, so
+       the target is handed over in a global the chat page reads at init. */
     function defaultPrivate(opts) {
+        window.__pendingPrivateThread = { name: opts.name, system: opts.network === 'local' ? '' : (opts.system || ''), bridge: opts.network === 'local' ? '' : opts.network };
         var href = './?page=001-chat.xjs&private=' + encodeURIComponent(opts.name);
-        if (opts.system) href += '&system=' + encodeURIComponent(opts.system);
         if (opts.network && opts.network !== 'local') href += '&bridge=' + encodeURIComponent(opts.network);
         navigate(href);
     }

@@ -111,6 +111,17 @@ async function addNew(sub) {
 	document.getElementById('newmessage').scrollIntoView({ behavior: 'smooth', block: 'end' });
 	nmb.onkeydown = evt => evt.stopImmediatePropagation();
 
+    // The person menu (Email / Netmail) lands here with the recipient chosen:
+    // window.__pendingCompose = { to, subject } set just before navigating.
+    var pending = window.__pendingCompose;
+    if (pending && typeof pending === 'object') {
+        window.__pendingCompose = null;
+        var inputs = elem.querySelectorAll('input[type="text"]');
+        if (inputs[0] && pending.to) inputs[0].value = pending.to;
+        if (inputs[1] && pending.subject) inputs[1].value = pending.subject;
+        (inputs[1] && pending.to ? inputs[1] : inputs[0] || nmb).focus();
+    }
+
 }
 
 
