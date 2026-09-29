@@ -296,6 +296,13 @@
 .pp-form input[type=text], .pp-form select { width: 100%; font: inherit; padding: 3px; border: 1px solid var(--pp-border); background: #fff; color: #000; box-sizing: border-box; }
 .pp-form label { display: block; font-weight: bold; margin-top: 6px; }
 .pp-form .pp-hint { color: var(--pp-muted); font-size: 11px; }
+.pp-color-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 10px; }
+.pp-color-field { display: flex; align-items: center; gap: 6px; }
+.pp-color-pick { width: 34px; height: 24px; padding: 0; border: 1px solid #999; background: none; cursor: pointer; }
+.pp-color-name { flex: 1; font-size: 11px; }
+.pp-color-field.is-theme .pp-color-name::after { content: ' (theme)'; opacity: .6; }
+.pp-color-clear { width: 22px; height: 22px; padding: 0; border: 1px solid #999; background: #fff; color: #333; font: bold 13px/1 monospace; cursor: pointer; }
+.pp-color-field.is-theme .pp-color-clear { visibility: hidden; }
 .pp-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
 .pp-colors-label { font-size: 10px; text-transform: uppercase; color: var(--pp-muted); margin: 0 4px 0 2px; }
 .pp-color-btn { width: 22px; height: 20px; padding: 0; border: 1px solid #333; font: bold 10px/1 monospace; cursor: pointer; }
@@ -563,12 +570,16 @@
                         <option value="<?xjs write(presetNames[pi]); ?>"<?xjs write(summary.profile.theme.preset === presetNames[pi] ? ' selected' : ''); ?>><?xjs write(presetNames[pi]); ?></option>
 <?xjs } ?>
                     </select>
-                    <label>Colours <span class="pp-hint">(hex like #ff6600; blank keeps the theme's)</span></label>
-                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
-                        <input type="text" name="accent" placeholder="accent" maxlength="7" value="<?xjs write(esc(summary.profile.theme.accent)); ?>">
-                        <input type="text" name="background" placeholder="background" maxlength="7" value="<?xjs write(esc(summary.profile.theme.background)); ?>">
-                        <input type="text" name="text" placeholder="text" maxlength="7" value="<?xjs write(esc(summary.profile.theme.text)); ?>">
-                        <input type="text" name="link" placeholder="links" maxlength="7" value="<?xjs write(esc(summary.profile.theme.link)); ?>">
+                    <label>Colours <span class="pp-hint">(the page previews as you pick; x goes back to the theme's own)</span></label>
+                    <div class="pp-color-grid">
+<?xjs var colorFields = [['accent', 'accent'], ['background', 'background'], ['text', 'text'], ['link', 'links']]; for (var cfi = 0; cfi < colorFields.length; cfi++) { var cf = colorFields[cfi]; ?>
+                        <div class="pp-color-field" data-field="<?xjs write(cf[0]); ?>">
+                            <input type="color" class="pp-color-pick" aria-label="<?xjs write(cf[1]); ?> colour">
+                            <input type="hidden" name="<?xjs write(cf[0]); ?>" value="<?xjs write(esc(summary.profile.theme[cf[0]])); ?>">
+                            <span class="pp-color-name"><?xjs write(cf[1]); ?></span>
+                            <button type="button" class="pp-color-clear" title="Back to the theme's colour">&times;</button>
+                        </div>
+<?xjs } ?>
                     </div>
 <?xjs if (summary.friends.length) { ?>
                     <label>Featured friends <span class="pp-hint">(up to 8, shown first)</span></label>
@@ -1390,6 +1401,66 @@
     /* profile editor */
     var edit = document.getElementById('pp-edit-form');
     if (edit) {
+        /* theme: system colour pickers + live preview. Mirrors the server's
+           theme composition (preset, then the member's overrides) onto the
+           page's CSS variables; Cancel puts the saved theme back. */
+        (function () {
+            var PRESETS = <?xjs write(jsonForScript(PRESETS)); ?>;
+            var PRESET_KEY = { accent: 'accent', background: 'bg', text: 'text', link: 'link' };
+            var saved = <?xjs write(jsonForScript(summary.profile.theme)); ?>;
+            var pageRoot = document.getElementById('pp-root');
+            var fields = Array.prototype.slice.call(edit.querySelectorAll('.pp-color-field'));
+            function isHex(v) { return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v || '')); }
+            function hex(v, fallback) { return isHex(v) ? String(v) : fallback; }
+            function wide(v) { return /^#[0-9a-f]{3}$/i.test(v) ? '#' + v.charAt(1) + v.charAt(1) + v.charAt(2) + v.charAt(2) + v.charAt(3) + v.charAt(3) : v; }
+            function compose(spec) {
+                var preset = PRESETS[spec.preset] || PRESETS.classic;
+                var t = {
+                    bg: hex(spec.background, preset.bg), box: preset.box, border: preset.border,
+                    title: hex(spec.accent, preset.title), titleText: preset.titleText,
+                    text: hex(spec.text, preset.text), link: hex(spec.link, preset.link),
+                    accent: hex(spec.accent, preset.accent), muted: preset.muted,
+                    emph: preset.emph || hex(spec.accent, preset.title),
+                    button: preset.button || hex(spec.accent, preset.accent)
+                };
+                if (spec.background && !spec.accent) t.box = t.bg;
+                return t;
+            }
+            function apply(spec) {
+                if (!pageRoot) return;
+                var t = compose(spec);
+                var vars = { bg: 'bg', box: 'box', border: 'border', title: 'title', titleText: 'title-text', text: 'text', link: 'link', accent: 'accent', muted: 'muted', emph: 'emph', button: 'button' };
+                for (var k in vars) if (vars.hasOwnProperty(k)) pageRoot.style.setProperty('--pp-' + vars[k], t[k]);
+            }
+            function current() {
+                return { preset: edit.preset.value, accent: edit.accent.value, background: edit.background.value, text: edit.text.value, link: edit.link.value };
+            }
+            function refreshField(f) {
+                var name = f.getAttribute('data-field');
+                var hidden = f.querySelector('input[type=hidden]');
+                var pick = f.querySelector('.pp-color-pick');
+                var preset = PRESETS[edit.preset.value] || PRESETS.classic;
+                var custom = isHex(hidden.value);
+                f.classList.toggle('is-theme', !custom);
+                pick.value = wide(custom ? hidden.value : preset[PRESET_KEY[name]]);
+            }
+            function refreshAll() { fields.forEach(refreshField); apply(current()); }
+            fields.forEach(function (f) {
+                var hidden = f.querySelector('input[type=hidden]');
+                var pick = f.querySelector('.pp-color-pick');
+                pick.addEventListener('input', function () { hidden.value = pick.value; f.classList.remove('is-theme'); apply(current()); });
+                f.querySelector('.pp-color-clear').addEventListener('click', function () { hidden.value = ''; refreshField(f); apply(current()); });
+            });
+            edit.preset.addEventListener('change', refreshAll);
+            edit.addEventListener('click', function (e) {
+                var cancel = e.target.closest('.pp-toggle[data-toggle="pp-edit"]');
+                if (!cancel) return;
+                edit.preset.value = saved.preset;
+                fields.forEach(function (f) { f.querySelector('input[type=hidden]').value = saved[f.getAttribute('data-field')] || ''; });
+                refreshAll();
+            });
+            fields.forEach(refreshField);
+        })();
         edit.addEventListener('submit', function (e) {
             e.preventDefault();
             var status = document.getElementById('pp-edit-status');
