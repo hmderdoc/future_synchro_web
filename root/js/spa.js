@@ -30,16 +30,29 @@
            a moment, so a scrolled page reads the same as an unscrolled one),
            then pin each at its distance below the first: margins, flex gaps
            and wrapping all come out right and nothing jumps when it sticks. */
-        els.forEach(function (el) { el.style.position = 'static'; });
-        var tops = els.map(function (el) { return el.getBoundingClientRect().top; });
+        els.forEach(function (el) { el.style.position = 'static'; el.style.boxShadow = ''; });
+        var rects = els.map(function (el) { return el.getBoundingClientRect(); });
+        var fill = stickyFill(content);
         els.forEach(function (el, i) {
+            var next = rects[i + 1];
+            var gap = next ? next.top - rects[i].bottom : (parseFloat(getComputedStyle(el).marginBottom) || 0);
             el.style.position = '';
-            el.style.top = Math.max(0, tops[i] - tops[0]) + 'px';
+            el.style.top = Math.max(0, rects[i].top - rects[0].top) + 'px';
+            /* Paint the gap under each pinned element in the page colour so
+               scrolled content does not show through between them. */
+            el.style.boxShadow = gap > 0.5 ? '0 ' + Math.ceil(gap) + 'px 0 0 ' + fill : '';
         });
         if ('ResizeObserver' in window && els.length) {
             if (!stickyObserver) stickyObserver = new ResizeObserver(function () { scheduleStickyHeads(); });
             els.forEach(function (el) { stickyObserver.observe(el); });
         }
+    }
+    /* Background behind the page content: the column's, else the body's. */
+    function stickyFill(content) {
+        var c = getComputedStyle(content).backgroundColor;
+        if (c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') return c;
+        c = getComputedStyle(document.body).backgroundColor;
+        return c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)' ? c : '#555555';
     }
     var stickyTimer = null;
     function scheduleStickyHeads() {

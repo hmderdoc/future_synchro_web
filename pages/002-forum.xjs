@@ -121,6 +121,13 @@
     #forum-search-bar {
         margin-bottom: var(--forum-stack-gap);
     }
+    /* post / poll / scan buttons and the sort row: one pinned toolbar */
+    #forum-sub-toolbar {
+        display: flow-root;
+        padding-top: 2px;
+    }
+    #forum-sub-toolbar .pull-right { float: right; }
+    #forum-sub-toolbar #forum-sort-controls { display: flex; margin-top: 0.4rem; }
     #forum-search-bar .input-group {
         width: 100%;
         display: flex;
@@ -1055,6 +1062,7 @@
 
     <? var sub = msg_area.sub[request.get_param('sub')]; ?>
 
+    <div id="forum-sub-toolbar" class="stick-top stick-top-fill">
     <button class="btn btn-default icon" aria-label="<? locale.write('button_post_message'); ?>" title="<? locale.write('button_post_message'); ?>" onclick="addNew('<? write(sub.code); ?>')">
         <span class="bin-icon" data-icon="doc_edit"></span>
     </button>
@@ -1080,12 +1088,13 @@
         </button>
     </div>
 
-    <div id="forum-sort-controls" class="btn-group stick-top stick-top-fill" style="margin-bottom:0.75em;">
+    <div id="forum-sort-controls" class="btn-group" style="margin-bottom:0;">
         <button class="btn btn-default btn-sm active" data-sort="activity" onclick="setSort('activity')" title="Sort by most recent reply"><span class="bin-icon" data-icon="fire"></span>Activity</button>
         <button class="btn btn-default btn-sm" data-sort="started" onclick="setSort('started')" title="Sort by thread creation date"><span class="bin-icon" data-icon="calendar"></span>Started</button>
         <button class="btn btn-default btn-sm" data-sort="subject" onclick="setSort('subject')" title="Sort alphabetically by subject"><span class="bin-icon" data-icon="sysinfo"></span>Subject</button>
         <button class="btn btn-default btn-sm" data-sort="replies" onclick="setSort('replies')" title="Sort by number of replies"><span class="bin-icon" data-icon="chat_new"></span>Replies</button>
         <button class="btn btn-default btn-sm" data-sort="sender" onclick="setSort('sender')" title="Sort alphabetically by author"><span class="bin-icon" data-icon="users"></span>Sender</button>
+    </div>
     </div>
 
 	<div id="forum-list-container" class="list-group"></div>
