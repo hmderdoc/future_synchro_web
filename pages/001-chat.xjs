@@ -1903,15 +1903,34 @@ textarea.chat-web-input {
         return normalizeUpper(name).replace(/[^A-Z0-9]/g, '') + '|' + normalizeUpper(system);
     }
 
+    /* The person menu's handoff: the global (SPA navigation) or its
+       sessionStorage copy (survives the service-worker reload); either way
+       it is consumed once and only while fresh. */
+    function takeHandoff(key) {
+        var value = window[key] || null;
+        var raw = null;
+        window[key] = null;
+        try {
+            raw = window.sessionStorage.getItem('fl.' + key);
+            if (raw !== null) window.sessionStorage.removeItem('fl.' + key);
+        } catch (_e) { raw = null; }
+        if (value) return value;
+        if (!raw) return null;
+        try {
+            var parsed = JSON.parse(raw);
+            if (parsed && parsed.value && Date.now() - (parsed.at || 0) < 60000) return parsed.value;
+        } catch (_e2) { }
+        return null;
+    }
+
     function parseRoute() {
         var params;
 
         /* The person menu sets this just before navigating here; the SPA
            pushes the new URL only after this page's scripts ran, so the
            query string is not yet trustworthy at init. */
-        var handed = window.__pendingPrivateThread;
+        var handed = takeHandoff('__pendingPrivateThread');
         if (handed && typeof handed === 'object' && handed.name) {
-            window.__pendingPrivateThread = null;
             return {
                 channel: 'main',
                 privateName: sanitizeAlias(handed.name),

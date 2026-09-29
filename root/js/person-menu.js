@@ -168,8 +168,10 @@
             if (act === 'telegram') { close(); window.sendTelegram(state.alias); return; }
             if (act === 'email' || act === 'netmail') {
                 close();
-                window.__pendingCompose = { sub: 'mail', to: act === 'email' ? state.alias : opts.name + '@' + opts.system, subject: '' };
-                navigate('./?page=002-forum.xjs&sub=mail');
+                /* Mail has its own page (000-mail.xjs, root/js/forum.js);
+                   the forum page never renders a composer for "mail". */
+                handOff('__pendingCompose', { sub: 'mail', to: act === 'email' ? state.alias : opts.name + '@' + opts.system, subject: '' });
+                navigate('./?page=000-mail.xjs');
                 return;
             }
             if (act === 'friend') {
@@ -196,6 +198,15 @@
             }
         });
         refresh();
+    }
+
+    /* A target for the next page: a global for the SPA path, and a copy in
+       sessionStorage because the site shell reloads the whole page when a
+       new service worker takes over (right after a deploy), which would
+       otherwise lose the handoff. The reader clears both. */
+    function handOff(key, value) {
+        window[key] = value;
+        try { window.sessionStorage.setItem('fl.' + key, JSON.stringify({ at: Date.now(), value: value })); } catch (_e) { }
     }
 
     function navigate(href) {
@@ -287,7 +298,7 @@
        thread. The SPA pushes the URL only after the page's scripts ran, so
        the target is handed over in a global the chat page reads at init. */
     function defaultPrivate(opts) {
-        window.__pendingPrivateThread = { name: opts.name, system: opts.network === 'local' ? '' : (opts.system || ''), bridge: opts.network === 'local' ? '' : opts.network };
+        handOff('__pendingPrivateThread', { name: opts.name, system: opts.network === 'local' ? '' : (opts.system || ''), bridge: opts.network === 'local' ? '' : opts.network });
         var href = './?page=001-chat.xjs&private=' + encodeURIComponent(opts.name);
         if (opts.network && opts.network !== 'local') href += '&bridge=' + encodeURIComponent(opts.network);
         navigate(href);

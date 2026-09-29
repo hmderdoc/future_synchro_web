@@ -125,3 +125,24 @@
 <ul id="forum-list-container" class="list-group">
     <? _mail.headers.forEach(writeMessage); ?>
 </ul>
+<script type="text/javascript">
+    (function () {
+        /* Person menu > Email / Netmail lands here with the recipient chosen
+           (window.__pendingCompose = { to, subject }, set just before the
+           SPA navigated): open the composer and fill it in. */
+        var pending = window.__pendingCompose || null;
+        window.__pendingCompose = null;
+        try {
+            var raw = window.sessionStorage.getItem('fl.__pendingCompose');
+            if (raw !== null) window.sessionStorage.removeItem('fl.__pendingCompose');
+            if (!pending && raw) { var parsed = JSON.parse(raw); if (parsed && parsed.value && Date.now() - (parsed.at || 0) < 60000) pending = parsed.value; }
+        } catch (_e) { }
+        if (!pending || typeof pending !== 'object' || typeof addNew !== 'function') return;
+        addNew('mail');
+        var to = document.getElementById('newmessage-to');
+        var subject = document.getElementById('newmessage-subject');
+        if (to && pending.to) to.value = pending.to;
+        if (subject && pending.subject) subject.value = pending.subject;
+        (to && pending.to ? subject || to : to).focus();
+    })();
+</script>
