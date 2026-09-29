@@ -143,6 +143,20 @@
         var subject = document.getElementById('newmessage-subject');
         if (to && pending.to) to.value = pending.to;
         if (subject && pending.subject) subject.value = pending.subject;
-        (to && pending.to ? subject || to : to).focus();
+        try { (to && pending.to ? subject || to : to).focus({ preventScroll: true }); } catch (_f) { }
+        /* The composer sits under the whole mail list and the SPA scrolls
+           to the top once the page is in (then refreshes the sidebar), so
+           one scrollIntoView at insert time lands wherever the layout was
+           at that instant. Bring it into view again as things settle. */
+        function reveal() {
+            var box = document.getElementById('newmessage');
+            if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        reveal();
+        [300, 900, 1800].forEach(function (ms) { window.setTimeout(reveal, ms); });
+        window.addEventListener('spa:afterNavigate', function once() {
+            window.removeEventListener('spa:afterNavigate', once);
+            window.setTimeout(reveal, 50);
+        });
     })();
 </script>
