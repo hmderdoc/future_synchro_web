@@ -556,10 +556,11 @@
 
     /* --- Map user search --- */
     .usermap-search {
-        display: none;
+        display: flex;
         position: relative;
     }
-    body.map-fullscreen .usermap-search { display: flex; }
+    .userlist-page .userlist-card.is-filtered-out { display: none; }
+    .userlist-page .userlist-filter-note { color: var(--userlist-muted, #aaa); font-size: 12px; padding: 4px 0; }
     .usermap-search input {
         background: rgba(0,0,0,0.6);
         border: 1px solid var(--userlist-border, #5555ff);
@@ -704,7 +705,7 @@
                     <button class="userlist-view-tab" data-view="map">Map</button>
                 </div>
                 <div class="usermap-search">
-                    <input type="text" id="usermap-search-input" placeholder="Find user on map…" autocomplete="off" />
+                    <input type="text" id="usermap-search-input" placeholder="Find user…" autocomplete="off" />
                     <div class="usermap-search-results" id="usermap-search-results"></div>
                 </div>
                 <span class="userlist-total"><?xjs write(format('%u visible user%s', allUsers.length, allUsers.length === 1 ? '' : 's')); ?></span>
@@ -786,11 +787,44 @@
     var tabs = root.querySelectorAll('.userlist-view-tab');
     var map = null;
     var mapLoaded = false;
+    var currentView = 'grid';
+
+    /* Grid: the search box narrows the cards on this page by name. */
+    function initGridFilter() {
+        var input = document.getElementById('usermap-search-input');
+        var grid = root.querySelector('.userlist-grid');
+        if (!input || !grid) return;
+        var note = document.createElement('div');
+        note.className = 'userlist-filter-note';
+        note.hidden = true;
+        grid.parentNode.insertBefore(note, grid);
+        function apply() {
+            if (currentView !== 'grid') return;
+            var q = input.value.trim().toLowerCase();
+            var cards = grid.querySelectorAll('.userlist-card');
+            var shown = 0;
+            Array.prototype.forEach.call(cards, function (card) {
+                var link = card.querySelector('.userlist-profile-link');
+                var name = (link ? link.textContent : card.textContent).trim().toLowerCase();
+                var hit = !q || name.indexOf(q) >= 0;
+                card.classList.toggle('is-filtered-out', !hit);
+                if (hit) shown++;
+            });
+            note.hidden = !q;
+            note.textContent = q ? (shown ? shown + ' of ' + cards.length + ' on this page match "' + input.value.trim() + '"' : 'Nobody on this page matches "' + input.value.trim() + '"') : '';
+        }
+        input.addEventListener('input', apply);
+        input.addEventListener('keydown', function (e) { if (e.key === 'Escape') { input.value = ''; apply(); } });
+        window.__userlistGridFilter = apply;
+    }
+    initGridFilter();
 
     function showView(view) {
+        currentView = view;
         tabs.forEach(function (t) {
             t.classList.toggle('is-active', t.getAttribute('data-view') === view);
         });
+        if (view === 'grid' && window.__userlistGridFilter) window.__userlistGridFilter();
         gridParts.forEach(function (el) { el.style.display = view === 'grid' ? '' : 'none'; });
         mapPanel.classList.toggle('is-visible', view === 'map');
 
@@ -828,7 +862,7 @@
             center: [30, 0],
             zoom: 2,
             minZoom: 2,
-            maxZoom: 7,
+            maxZoom: 12,
             maxBounds: [[-60, -180], [85, 180]],
             maxBoundsViscosity: 0.9,
             worldCopyJump: false,
@@ -930,6 +964,15 @@
                 var marker = L.marker([u.lat, u.lon], { icon: icon })
                     .bindPopup(popupHtml, { maxWidth: 220 })
                     .addTo(map);
+                /* A click on the avatar opens the person menu (profile, PM,
+                   telegram...) like every other avatar on the site; the popup
+                   stays for the search's fly-to. */
+                marker.on('click', function (ev) {
+                    if (!window.PersonMenu) return;
+                    marker.closePopup();
+                    var oe = ev && ev.originalEvent ? ev.originalEvent : null;
+                    PersonMenu.open({ name: u.alias, network: 'local', x: oe ? oe.clientX : 40, y: oe ? oe.clientY : 40 });
+                });
 
                 markersByAlias[u.alias] = marker;
             });
@@ -987,7 +1030,7 @@
 
         input.addEventListener('input', function () {
             var q = input.value.trim().toLowerCase();
-            if (!q) { results.classList.remove('is-open'); return; }
+            if (!q || currentView !== 'map') { results.classList.remove('is-open'); return; }
             var matches = geoUserList.filter(function (u) {
                 return u.alias.toLowerCase().indexOf(q) >= 0;
             }).slice(0, 15);
