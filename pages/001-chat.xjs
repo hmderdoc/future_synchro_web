@@ -297,6 +297,12 @@ textarea.chat-web-input {
     gap: 8px;
     flex-wrap: wrap;
 }
+.chat-web-page .chat-rich-image-card.is-nsfw .chat-rich-image-preview { filter: blur(16px) brightness(.55); }
+.chat-web-page .chat-rich-image-card.is-nsfw.is-revealed .chat-rich-image-preview { filter: none; }
+.chat-web-page .chat-rich-image-card.is-nsfw.is-revealed .chat-rich-nsfw-veil { display: none; }
+.chat-web-page .chat-rich-nsfw-veil { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); font-weight: bold; letter-spacing: .12em; text-shadow: 0 0 6px #000; cursor: pointer; }
+.chat-web-page .chat-rich-nsfw-veil small { font-weight: normal; letter-spacing: 0; font-size: .75em; opacity: .85; }
+.chat-web-page .chat-rich-image-frame { position: relative; display: block; }
 .chat-web-page .chat-motd-label {
     font-size: 0.72rem;
     font-weight: bold;
@@ -2084,11 +2090,13 @@ textarea.chat-web-input {
             parts.push('<div class="chat-rich-text">' + linkify(trimText(embed.prefixText)) + '</div>');
         }
 
+        var nsfwImage = !!(window.ChatEmbeds && ChatEmbeds.isNsfwText && (ChatEmbeds.isNsfwText(embed.url) || ChatEmbeds.isNsfwText(embed.alt || '')));
         parts.push(
-            '<div class="chat-rich-image-card">' +
+            '<div class="chat-rich-image-card' + (nsfwImage ? ' is-nsfw' : '') + '">' +
                 '<a class="chat-rich-image-link" href="' + escapeAttr(embed.url) + '" target="_blank" rel="noopener">' +
                     '<span class="chat-rich-image-frame">' +
                         '<img class="chat-rich-image-preview" src="' + escapeAttr(embed.url) + '" alt="' + escapeAttr(embed.alt || 'Chat image') + '" loading="lazy">' +
+                        (nsfwImage ? '<span class="chat-rich-nsfw-veil" data-chat-nsfw-reveal>NSFW<small>click to reveal</small></span>' : '') +
                     '</span>' +
                     '<span class="chat-rich-image-fallback">Open image</span>' +
                 '</a>' +
@@ -3516,6 +3524,13 @@ textarea.chat-web-input {
             }
         }, true);
         msgContainer.addEventListener('click', function (event) {
+            var veil = event.target.closest('[data-chat-nsfw-reveal]');
+            if (veil) {
+                event.preventDefault();
+                var card = veil.closest('.chat-rich-image-card');
+                if (card) card.classList.add('is-revealed');
+                return;
+            }
             var audioButton = event.target.closest('[data-chat-audio-play]');
 
             if (audioButton) {

@@ -133,6 +133,16 @@
         }).join('');
     }
 
+    /* Short labels (an MRC board's name): foreground colours only, no links,
+       no highlight backgrounds. Same fixed table as linkify. */
+    function colorizePipeLabel(text) {
+        if (!hasPipeCodes(text)) return escapeHtml(text);
+        return parsePipeSegments(text).map(function (segment) {
+            var html = escapeHtml(segment.text);
+            return segment.fg >= 0 ? '<span class="chat-pipe-color" style="color:' + CGA_HEX[segment.fg] + ';">' + html + '</span>' : html;
+        }).join('');
+    }
+
     /* Bridged networks (DDial) colour text with ANSI, which reaches the page
        as runs [{n, c:'#rrggbb'|''}] covering the text exactly. Runs that do
        not add up, or carry anything but a hex colour, are ignored - the style
@@ -269,14 +279,29 @@
 
     /* --------------------------------------------------- card rendering */
 
-    function renderImageCardHtml(embed) {
+    /* Same whole-word keyword rule as the file areas (the list comes from
+       mods/load/social_lib.js via sbbsConfig): generated pictures land in
+       chat first, under the same file names, so they veil here too. */
+    function isNsfwText(text) {
+        var words = (window.sbbsConfig && window.sbbsConfig.nsfwKeywords) || [];
+        if (!words.length || !text) return false;
+        var decoded = String(text);
+        try { decoded = decodeURIComponent(decoded); } catch (_e) { /* keep as is */ }
+        var parts = decoded.toLowerCase().split(/[^a-z0-9]+/);
+        for (var i = 0; i < parts.length; i++) if (parts[i] && words.indexOf(parts[i]) !== -1) return true;
+        return false;
+    }
+
+    function renderImageCardHtml(embed, caption) {
         var name = urlFilename(embed.url);
         var file = mediaFile(embed.url);
-        return '<div class="chat-rich-image-card"' +
+        var nsfw = isNsfwText(embed.url) || isNsfwText(name) || isNsfwText(caption || '');
+        return '<div class="chat-rich-image-card' + (nsfw ? ' is-nsfw' : '') + '"' +
             (file ? ' data-chat-media="' + escapeAttr(file) + '"' : '') + '>' +
             '<a class="chat-rich-image-link" href="' + escapeAttr(embed.url) + '" target="_blank" rel="noopener">' +
                 '<span class="chat-rich-image-frame">' +
                     '<img class="chat-rich-image-preview" src="' + escapeAttr(embed.url) + '" alt="' + escapeAttr(name || 'Chat image') + '" loading="lazy">' +
+                    (nsfw ? '<span class="chat-rich-nsfw-veil" data-chat-nsfw-reveal>NSFW<small>click to reveal</small></span>' : '') +
                 '</span>' +
                 '<span class="chat-rich-image-fallback">Open image</span>' +
             '</a>' +
@@ -385,7 +410,7 @@
         var embeds = collectEmbeds(runHtml === null ? stripPipeCodes(text) : String(text || ''), opts);
         var parts = ['<div class="chat-rich-text">' + (runHtml === null ? linkify(text || '') : runHtml) + '</div>'];
         embeds.media.forEach(function (embed) {
-            if (embed.kind === 'image') parts.push(renderImageCardHtml(embed));
+            if (embed.kind === 'image') parts.push(renderImageCardHtml(embed, text));
             else if (embed.kind === 'ansi') parts.push(renderAnsiCardHtml(embed));
             else parts.push(renderMediaCardHtml(embed));
         });
@@ -576,23 +601,53 @@
 
     var DOCK_ID = 'chat-embed-dock';
     var DOCK_STYLE_ID = 'chat-embed-dock-style';
+    var DOCK_BOX_KEY = 'chat-embed-dock-box';
+    var DOCK_MARGIN = 12;          /* gap kept between the dock and every viewport edge */
+    var DOCK_MIN_WIDTH = 220;
+    var DOCK_MIN_HEIGHT = 130;
+    var DOCK_DEFAULT_WIDTH = 440;
+    var DOCK_BODY_RATIO = 9 / 16;  /* default player body height, as a share of the width */
+
+    /* Geometry is owned by JS (see placeDock): the dock used to be pinned with
+       `right`/`bottom`, which put its far edge under the iOS browser chrome and
+       let a player taller than the viewport hang off the top with no way to
+       reach it. Everything here is sized in a column so an explicit height can
+       flow into the player body. */
     var DOCK_CSS = '' +
-        '#chat-embed-dock{position:fixed;right:12px;bottom:12px;z-index:10050;' +
-            'width:min(440px,94vw);background:#050505;border:1px solid #333333;' +
+        '#chat-embed-dock{position:fixed;left:0;top:0;z-index:10050;box-sizing:border-box;' +
+            'display:flex;flex-direction:column;width:440px;' +
+            'background:#050505;border:1px solid #333333;' +
             'box-shadow:0 6px 24px rgba(0,0,0,0.6);font-size:0.85rem;}' +
+        '#chat-embed-dock *{box-sizing:border-box;}' +
         '#chat-embed-dock .chat-embed-dock-bar{display:flex;align-items:center;gap:8px;' +
-            'padding:6px 8px;border-bottom:1px solid #222222;color:#55FFFF;}' +
+            'flex:0 0 auto;padding:6px 8px;border-bottom:1px solid #222222;color:#55FFFF;' +
+            'cursor:move;touch-action:none;user-select:none;-webkit-user-select:none;}' +
         '#chat-embed-dock .chat-embed-dock-title{flex:1;min-width:0;overflow:hidden;' +
             'text-overflow:ellipsis;white-space:nowrap;}' +
         '#chat-embed-dock .chat-embed-dock-close{border:1px solid #333333;background:transparent;' +
-            'color:#AAAAAA;cursor:pointer;font:inherit;line-height:1;padding:2px 8px;}' +
+            'color:#AAAAAA;cursor:pointer;font:inherit;line-height:1;padding:2px 8px;' +
+            'touch-action:manipulation;}' +
         '#chat-embed-dock .chat-embed-dock-close:hover{color:#FFFFFF;border-color:#AAAAAA;}' +
-        '#chat-embed-dock .chat-embed-dock-body{background:#000000;}' +
-        '#chat-embed-dock .chat-embed-dock-frame{position:relative;padding-top:56.25%;}' +
+        '#chat-embed-dock .chat-embed-dock-body{background:#000000;position:relative;' +
+            'flex:1 1 auto;min-height:0;overflow:hidden;}' +
+        '#chat-embed-dock .chat-embed-dock-frame{position:absolute;inset:0;}' +
         '#chat-embed-dock .chat-embed-dock-frame>iframe,' +
         '#chat-embed-dock .chat-embed-dock-frame>video{position:absolute;inset:0;' +
             'width:100%;height:100%;border:0;background:#000000;}' +
-        '#chat-embed-dock audio{display:block;width:100%;}';
+        '#chat-embed-dock .chat-embed-dock-frame>video{object-fit:contain;}' +
+        '#chat-embed-dock audio{display:block;width:100%;}' +
+        /* Resize rail. A full-width strip under the body rather than a corner
+           overlay, which would land on the native video controls' fullscreen
+           button; the hatch marks just mark its right end. */
+        '#chat-embed-dock .chat-embed-dock-grip{flex:0 0 auto;height:16px;' +
+            'border-top:1px solid #222222;cursor:nwse-resize;touch-action:none;' +
+            'background-color:#0A0A0A;background-repeat:no-repeat;' +
+            'background-position:right 3px bottom 3px;background-size:11px 11px;' +
+            'background-image:linear-gradient(135deg,transparent 0 46%,#666666 46% 54%,' +
+            'transparent 54% 68%,#666666 68% 76%,transparent 76%);}' +
+        /* Mid-gesture the iframe must not swallow the pointer stream. */
+        '#chat-embed-dock.is-gesturing{user-select:none;-webkit-user-select:none;}' +
+        '#chat-embed-dock.is-gesturing .chat-embed-dock-body{pointer-events:none;}';
 
     function ensureDockStyles(doc) {
         var style;
@@ -603,9 +658,209 @@
         doc.head.appendChild(style);
     }
 
+    /* Where the user last dragged/resized the dock to. Held in memory because
+       openPlayer tears the dock down and rebuilds it on every play, and
+       mirrored to localStorage so the choice also survives a reload. */
+    var dockBox = null;
+    var dockUnbindViewport = null;
+
+    function finite(value, fallback) {
+        return typeof value === 'number' && isFinite(value) ? value : fallback;
+    }
+
+    function loadDockBox() {
+        var raw, parsed;
+        if (dockBox) return dockBox;
+        try { raw = global.localStorage.getItem(DOCK_BOX_KEY); } catch (e) { return null; }
+        if (!raw) return null;
+        try { parsed = JSON.parse(raw); } catch (e) { return null; }
+        if (!parsed || typeof parsed !== 'object') return null;
+        dockBox = {
+            left: finite(parsed.left, 0),
+            top: finite(parsed.top, 0),
+            width: finite(parsed.width, DOCK_DEFAULT_WIDTH),
+            height: finite(parsed.height, 0)
+        };
+        return dockBox;
+    }
+
+    function saveDockBox(box) {
+        dockBox = box;
+        try { global.localStorage.setItem(DOCK_BOX_KEY, JSON.stringify(box)); } catch (e) {}
+    }
+
+    /* env() is only readable back through a real property, so measure the
+       notch / home-indicator insets off a throwaway probe. Cached, because the
+       clamp below can run on every scroll frame; the viewport hooks drop the
+       cache whenever a rotation could have changed them. */
+    var dockInsets = null;
+
+    function safeInsets(doc) {
+        var probe, css;
+        if (dockInsets) return dockInsets;
+        probe = doc.createElement('div');
+        probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+            'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) ' +
+            'env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+        doc.body.appendChild(probe);
+        css = doc.defaultView.getComputedStyle(probe);
+        dockInsets = {
+            top: parseFloat(css.paddingTop) || 0,
+            right: parseFloat(css.paddingRight) || 0,
+            bottom: parseFloat(css.paddingBottom) || 0,
+            left: parseFloat(css.paddingLeft) || 0
+        };
+        probe.parentNode.removeChild(probe);
+        return dockInsets;
+    }
+
+    /* The band the user can actually see, in the layout-viewport coordinates a
+       fixed element is positioned in. This is the heart of the off-screen bug:
+       on iOS the layout viewport runs on behind the collapsing browser toolbar
+       and the on-screen keyboard, so a dock pinned to its bottom edge sits in
+       the hidden strip. visualViewport reports the visible band instead.
+       Pinch-zoom is excluded — the dock should not shrink because the user
+       zoomed in. */
+    function viewportBounds(view) {
+        var vv = view.visualViewport;
+        if (vv && vv.width && vv.height && !(vv.scale > 1.01)) {
+            return { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height };
+        }
+        return { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
+    }
+
+    /* The one place dock geometry is written. Shrinks the box to what the
+       visible band can hold, then nudges it back inside — so a player can
+       never end up clipped or parked off-screen, whatever the drag, the
+       resize, the rotation or the keyboard that got it there. */
+    function placeDock(dock, box) {
+        var doc = dock.ownerDocument;
+        var view = doc.defaultView;
+        var insets = safeInsets(doc);
+        var bounds = viewportBounds(view);
+        var minLeft = bounds.left + DOCK_MARGIN + insets.left;
+        var minTop = bounds.top + DOCK_MARGIN + insets.top;
+        var maxRight = bounds.left + bounds.width - insets.right - DOCK_MARGIN;
+        var maxBottom = bounds.top + bounds.height - insets.bottom - DOCK_MARGIN;
+        var height;
+
+        box.width = Math.min(Math.max(box.width, DOCK_MIN_WIDTH), Math.max(DOCK_MIN_WIDTH, maxRight - minLeft));
+        dock.style.width = box.width + 'px';
+        if (dock.getAttribute('data-resizable') === '1') {
+            box.height = Math.min(Math.max(box.height, DOCK_MIN_HEIGHT), Math.max(DOCK_MIN_HEIGHT, maxBottom - minTop));
+            dock.style.height = box.height + 'px';
+        }
+
+        /* Audio docks hug their controls, so measure rather than assume. */
+        height = dock.offsetHeight || finite(box.height, DOCK_MIN_HEIGHT);
+        box.left = Math.min(Math.max(box.left, minLeft), Math.max(minLeft, maxRight - box.width));
+        box.top = Math.min(Math.max(box.top, minTop), Math.max(minTop, maxBottom - height));
+        dock.style.left = box.left + 'px';
+        dock.style.top = box.top + 'px';
+        return box;
+    }
+
+    function dockRectBox(dock) {
+        var rect = dock.getBoundingClientRect();
+        return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    }
+
+    /* Drag from the title bar, resize from the rail. Pointer events so mouse
+       and touch share one path, and pointer capture so a gesture that strays
+       over the player iframe keeps reporting. */
+    function startDockGesture(dock, event, mode) {
+        var handle = event.currentTarget;
+        var start, startX, startY;
+
+        /* One gesture at a time: a second finger must not fight the first. */
+        if (event.button > 0 || dock.classList.contains('is-gesturing')) return;
+        start = dockRectBox(dock);
+        startX = event.clientX;
+        startY = event.clientY;
+        event.preventDefault();
+        dock.classList.add('is-gesturing');
+        try { handle.setPointerCapture(event.pointerId); } catch (e) {}
+
+        function onMove(moveEvent) {
+            var dx = moveEvent.clientX - startX;
+            var dy = moveEvent.clientY - startY;
+            placeDock(dock, mode === 'resize'
+                ? { left: start.left, top: start.top, width: start.width + dx, height: start.height + dy }
+                : { left: start.left + dx, top: start.top + dy, width: start.width, height: start.height });
+        }
+        function onEnd() {
+            var box = dockRectBox(dock);
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onEnd);
+            handle.removeEventListener('pointercancel', onEnd);
+            dock.classList.remove('is-gesturing');
+            /* Only deliberate gestures are remembered — a box squeezed down by
+               a small viewport should not become the user's preferred size. */
+            saveDockBox({
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: dock.getAttribute('data-resizable') === '1' ? box.height : 0
+            });
+        }
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onEnd);
+        handle.addEventListener('pointercancel', onEnd);
+    }
+
+    function bindDockGestures(dock) {
+        var bar = dock.querySelector('.chat-embed-dock-bar');
+        var grip = dock.querySelector('.chat-embed-dock-grip');
+        if (bar) bar.addEventListener('pointerdown', function (event) {
+            var target = event.target;
+            if (target && target.closest && target.closest('.chat-embed-dock-close')) return;
+            startDockGesture(dock, event, 'move');
+        });
+        if (grip) grip.addEventListener('pointerdown', function (event) {
+            startDockGesture(dock, event, 'resize');
+        });
+    }
+
+    /* Rotating the device, raising the keyboard or the mobile browser toolbar
+       sliding in can all strand the dock outside the visible band, so re-run
+       the clamp whenever the viewport moves under it. */
+    function bindDockViewport(dock) {
+        var view = dock.ownerDocument.defaultView;
+        var vv = view.visualViewport;
+        var pending = 0;
+        function reflow() {
+            if (pending) return;
+            pending = view.requestAnimationFrame(function () {
+                pending = 0;
+                if (dock.parentNode) placeDock(dock, dockRectBox(dock));
+            });
+        }
+        function remeasure() {
+            dockInsets = null;   /* a rotation can change the notch insets */
+            reflow();
+        }
+        view.addEventListener('resize', remeasure);
+        view.addEventListener('orientationchange', remeasure);
+        if (vv) {
+            vv.addEventListener('resize', remeasure);
+            vv.addEventListener('scroll', reflow);
+        }
+        dockUnbindViewport = function () {
+            if (pending) view.cancelAnimationFrame(pending);
+            view.removeEventListener('resize', remeasure);
+            view.removeEventListener('orientationchange', remeasure);
+            if (vv) {
+                vv.removeEventListener('resize', remeasure);
+                vv.removeEventListener('scroll', reflow);
+            }
+            dockUnbindViewport = null;
+        };
+    }
+
     function closePlayer() {
         var doc = global && global.document;
         var dock = doc && doc.getElementById(DOCK_ID);
+        if (dockUnbindViewport) dockUnbindViewport();
         if (dock && dock.parentNode) dock.parentNode.removeChild(dock);
     }
 
@@ -629,19 +884,49 @@
        survives both transcript re-renders and SPA page swaps. */
     function openPlayer(embed) {
         var doc = global && global.document;
-        var dock;
+        var dock, resizable, saved, bar, grip, box;
         if (!doc || !embed || !embed.url) return;
         ensureDockStyles(doc);
         closePlayer();
+        /* Audio has no picture to enlarge, so it keeps its natural height and
+           gets no grip; everything else is a free-form resizable window. */
+        resizable = embed.kind !== 'audio';
         dock = doc.createElement('div');
         dock.id = DOCK_ID;
+        dock.setAttribute('data-resizable', resizable ? '1' : '0');
         dock.innerHTML = '<div class="chat-embed-dock-bar">' +
             '<span class="chat-embed-dock-title">' + escapeHtml(embed.title || embed.url) + '</span>' +
             '<button type="button" class="chat-embed-dock-close" title="Close player">&times;</button>' +
             '</div>' +
-            '<div class="chat-embed-dock-body">' + playerBodyHtml(embed) + '</div>';
+            '<div class="chat-embed-dock-body">' + playerBodyHtml(embed) + '</div>' +
+            (resizable ? '<div class="chat-embed-dock-grip" title="Drag to resize"></div>' : '');
         dock.querySelector('.chat-embed-dock-close').addEventListener('click', closePlayer);
         doc.body.appendChild(dock);
+
+        saved = loadDockBox();
+        box = { left: 0, top: 0, width: DOCK_DEFAULT_WIDTH, height: 0 };
+        if (saved) {
+            box.left = saved.left;
+            box.top = saved.top;
+            box.width = saved.width;
+            box.height = saved.height;
+        } else {
+            /* First open: aim past the bottom-right corner and let placeDock
+               pull it back to the margin. */
+            box.left = doc.defaultView.innerWidth;
+            box.top = doc.defaultView.innerHeight;
+        }
+        if (resizable && !box.height) {
+            bar = dock.querySelector('.chat-embed-dock-bar');
+            grip = dock.querySelector('.chat-embed-dock-grip');
+            /* 16:9 body, plus the title bar, the resize rail and the dock's
+               own 1px borders. */
+            box.height = Math.round(box.width * DOCK_BODY_RATIO) +
+                (bar ? bar.offsetHeight : 28) + (grip ? grip.offsetHeight : 17) + 2;
+        }
+        placeDock(dock, box);
+        bindDockGestures(dock);
+        bindDockViewport(dock);
     }
 
     /* Delegated click handling for the poster cards under `container`. */
@@ -667,7 +952,9 @@
         hasPipeCodes: hasPipeCodes,
         stripPipeCodes: stripPipeCodes,
         parsePipeSegments: parsePipeSegments,
+        colorizePipeLabel: colorizePipeLabel,
         linkify: linkify,
+        isNsfwText: isNsfwText,
         extractUrls: extractUrls,
         trimUrl: trimUrl,
         urlHost: urlHost,

@@ -554,6 +554,7 @@
 <?xjs } ?>
         currentPage: '<? write(page); ?>',
         avatarsEnabled: true,
+        nsfwKeywords: <? var _nsfwKw = []; try { load(system.mods_dir + 'load/social_lib.js'); _nsfwKw = Social.nsfwKeywords(); } catch (_nsfwErr) { _nsfwKw = []; } write(JSON.stringify(_nsfwKw)); ?>,
         darkmodeAllow: <? write(settings.darkmode_allow ? true : false); ?>,
         darkmodeOn: <? write(settings.darkmode_on ? true : false); ?>,
         webBuildLabel: '<? write(build_info.label.replace(/'/g, "\\'")); ?>',
