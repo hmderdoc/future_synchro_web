@@ -102,14 +102,17 @@
         var isLocal = info.userNumber > 0;
         var onChatNet = opts.network !== 'local';          // MRC / DDial / IRC nick seen in chat
         var remoteBoard = !isLocal && !onChatNet && !!opts.system; // seen from another BBS (forum netmail, oneliners)
+        // A networked post carries an address whether or not the poster
+        // also has an account here: offer netmail to that address either way.
+        var netmailable = !onChatNet && !!opts.system;
         if (isLocal) html += '<button type="button" class="person-menu-item" data-act="profile">View ' + (isSelf ? 'my' : esc(info.alias) + "'s") + ' profile</button>';
         if (!isSelf) {
             // Local members: everything this board can do. Chat-network nicks:
             // a bridged private message. People from other boards: netmail.
             if (isLocal || onChatNet) html += '<button type="button" class="person-menu-item" data-act="pm">Private message</button>';
             if (isLocal && loggedIn && typeof window.sendTelegram === 'function') html += '<button type="button" class="person-menu-item" data-act="telegram">Send telegram</button>';
-            if (isLocal && loggedIn) html += '<button type="button" class="person-menu-item" data-act="email">Send email</button>';
-            if (remoteBoard && loggedIn) html += '<button type="button" class="person-menu-item" data-act="netmail">Send netmail (' + esc(opts.name + '@' + opts.system) + ')</button>';
+            if (isLocal && loggedIn) html += '<button type="button" class="person-menu-item" data-act="email">' + (netmailable ? 'Send local email (' + esc(info.alias) + ')' : 'Send email') + '</button>';
+            if (netmailable && loggedIn) html += '<button type="button" class="person-menu-item" data-act="netmail">Send netmail (' + esc(opts.name + '@' + opts.system) + ')</button>';
             if (isLocal && loggedIn) {
                 var rel = info.relation;
                 html += '<button type="button" class="person-menu-item" data-act="friend">' +
