@@ -384,6 +384,8 @@
 .pp-forum-subject { font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
 .pp-forum-subject a { color: var(--pp-link); }
 .pp-forum-snippet { font-size: 12px; color: var(--pp-text); word-break: break-word; }
+.pp-forum-ansi-toggle { cursor: pointer; font-weight: normal; margin: 0; display: inline-flex; align-items: center; gap: 4px; }
+.pp-forum-ansi-toggle input { margin: 0; }
 .pp-forum-full { margin-top: 4px; padding: 6px 8px; border: 1px solid var(--pp-border); background: rgba(127,127,127,.06); font-size: 12px; max-height: 60vh; overflow: auto; }
 .pp-forum-full .message { white-space: pre-wrap; word-break: break-word; font-family: monospace; }
 .pp-forum-full pre { margin: 0; }
@@ -665,7 +667,7 @@
 
         <div class="pp-box" id="pp-forum-box">
             <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Forum Activity <span id="pp-forum-count"></span></span>
-                <span class="pp-meta pp-forum-hint">alias + linked handles, every board you can read</span>
+                <span class="pp-meta pp-forum-hint"><label class="pp-forum-ansi-toggle"><input type="checkbox" id="pp-forum-ansi"> show [ANSI] posts <span id="pp-forum-ansi-hidden"></span></label></span>
             </div>
             <div class="pp-box-body">
                 <div class="pp-forum" id="pp-forum"><span class="pp-meta">Looking through the message bases...</span></div>
@@ -1303,6 +1305,19 @@
         if (!host || !pager) return;
         var page = 0, PER = 10, current = null;
         var gc = converter();
+        /* Ads and art drops are tagged [ANSI] in the subject: hidden by default, remembered per browser. */
+        var ansiToggle = document.getElementById('pp-forum-ansi');
+        var ansiHidden = document.getElementById('pp-forum-ansi-hidden');
+        var showAnsi = false;
+        try { showAnsi = localStorage.getItem('fl.profile.showAnsiPosts') === '1'; } catch (_ls) { showAnsi = false; }
+        if (ansiToggle) {
+            ansiToggle.checked = showAnsi;
+            ansiToggle.addEventListener('change', function () {
+                showAnsi = ansiToggle.checked;
+                try { localStorage.setItem('fl.profile.showAnsiPosts', showAnsi ? '1' : '0'); } catch (_ls2) { }
+                load(0);
+            });
+        }
         var iconCache = {};
         function forumUrl(item) {
             var url = './?page=002-forum.xjs&sub=' + encodeURIComponent(item.sub);
@@ -1384,11 +1399,12 @@
         function load(next) {
             page = Math.max(0, next);
             host.innerHTML = '<span class="pp-meta">Looking through the message bases...</span>';
-            fetch('./api/social.ssjs?call=forum&user=' + encodeURIComponent(alias) + '&page=' + page + '&per=' + PER, { credentials: 'same-origin' })
+            fetch('./api/social.ssjs?call=forum&user=' + encodeURIComponent(alias) + '&page=' + page + '&per=' + PER + (showAnsi ? '&ansi=1' : ''), { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (res) {
                     if (!res.ok) { host.innerHTML = '<span class="pp-meta">' + esc(res.error || 'Forum activity is unavailable.') + '</span>'; return; }
                     page = res.forum.page;
+                    if (ansiHidden) ansiHidden.textContent = res.forum.hiddenAnsi ? '(' + res.forum.hiddenAnsi + ' hidden)' : '';
                     render(res.forum);
                 }).catch(function () { host.innerHTML = '<span class="pp-meta">Forum activity is unavailable.</span>'; });
         }

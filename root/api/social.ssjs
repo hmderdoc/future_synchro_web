@@ -10,7 +10,8 @@
  * GET  ?call=requests                            my incoming / outgoing requests
  * GET  ?call=person&name=<nick>&network=local|mrc|ddial|irc   who a chat handle is (menu data)
  * GET  ?call=ignored                             my ignore list (shared with the terminal shell)
- * GET  ?call=forum&user=..[&page=N][&per=N]      a page of their forum posts (alias + linked handles, every
+ * GET  ?call=forum&user=..[&page=N][&per=N][&ansi=1]  a page of their forum posts (alias + linked handles, every
+ *                                                sub you may read; [ANSI]-tagged posts left out unless ansi=1)
  *                                                sub you may read) with the web thread key + forum icon
  * GET  ?call=forum-post&sub=<code>&number=N      one post rendered as forum HTML (the expand control)
  * GET  ?call=whoami                              { number, alias, csrf_token }
@@ -103,7 +104,9 @@ if (call === 'whoami') {
     else {
         var fpage = parseInt(String(request.get_param('page') || '0'), 10) || 0;
         var fper = parseInt(String(request.get_param('per') || '10'), 10) || 10;
-        var activity = Social.forumActivity(fu, me(), { page: fpage, per: fper });
+        /* &ansi=1 includes posts tagged [ANSI] (ads, art drops); left out by default. */
+        var fansi = String(request.get_param('ansi') || '0') === '1';
+        var activity = Social.forumActivity(fu, me(), { page: fpage, per: fper, hideAnsi: !fansi });
         /* The forum page keys threads the way lib/forum.js groups them
            (subject merging, thread_id, thread_back), so the deep link asks
            the same code which thread each message landed in. One scan per
