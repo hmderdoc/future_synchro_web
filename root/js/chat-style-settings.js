@@ -159,6 +159,8 @@
             }).then(function (r) { return r.json(); }).then(function (res) {
                 if (!res.ok) { setStatus(res.error || 'Could not save', false); return; }
                 setStatus('Saved. Your name now shows this way in chat, on DDial, in your MRC alias and on your profile.');
+                /* Repaint the name wherever this page shows it (navbar, sidebar cards) without a reload. */
+                try { window.dispatchEvent(new CustomEvent('fl:nickstyle-changed', { detail: { alias: alias, colors: colors.slice(), tag: state.tag } })); } catch (_ev) { }
             }).catch(function () { setStatus('Could not save', false); });
         });
 

@@ -226,5 +226,10 @@
     }
     registerEventListener('nodelist', _sb_nodelist);
     _load_nodelist_snapshot();
+    /* A member changed their handle colours in Settings: refetch so the name repaints. */
+    if (!window.__nlStyleListener) {
+        window.__nlStyleListener = true;
+        window.addEventListener('fl:nickstyle-changed', function () { _load_nodelist_snapshot(); });
+    }
     if (!window.__nlCycleTimer) window.__nlCycleTimer = setInterval(_cycleActivities, 3000);
 </script>

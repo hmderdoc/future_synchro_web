@@ -413,17 +413,13 @@
                         /* Their chat handle colours (Settings > Chat handle) on the name, letter by letter. */
                         var navStyle = null;
                         try { navStyle = load({}, system.mods_dir + 'load/chat_style_lib.js').getChatStyle().forName(user.number, user.alias); } catch (_navStyleErr) { navStyle = null; }
-                        if (navStyle && navStyle.styled) {
-                            write('<span class="nav-alias">');
-                            for (var nsi = 0; nsi < user.alias.length; nsi++) {
-                                var nsc = navStyle.colors[nsi] || '';
-                                var nsch = user.alias.charAt(nsi).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-                                write(nsc ? '<span style="color:' + nsc + '">' + nsch + '</span>' : nsch);
-                            }
-                            write('</span>');
-                        } else {
-                            write(user.alias);
+                        write('<span class="nav-alias" data-alias="' + user.alias.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">');
+                        for (var nsi = 0; nsi < user.alias.length; nsi++) {
+                            var nsc = navStyle && navStyle.styled ? (navStyle.colors[nsi] || '') : '';
+                            var nsch = user.alias.charAt(nsi).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+                            write(nsc ? '<span style="color:' + nsc + '">' + nsch + '</span>' : nsch);
                         }
+                        write('</span>');
 ?>
                         <span class="badge bg-danger" id="badge-unread-mail" style="display:none;"></span>
                         <span class="badge bg-warning text-dark" id="badge-friend-requests" style="display:none;" title="Friend requests waiting"></span>
@@ -434,6 +430,20 @@
                     (function () {
                         function draw() { if (window.Avatars && Avatars.draw) Avatars.draw(['<? write(user.number); ?>']); }
                         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', draw); else draw();
+                        /* Settings > Chat handle saved: repaint the name here at once. */
+                        window.addEventListener('fl:nickstyle-changed', function (e) {
+                            var el = document.querySelector('.auth-nav-link .nav-alias');
+                            var d = e.detail || {};
+                            if (!el || !d.alias || d.alias !== el.getAttribute('data-alias')) return;
+                            el.innerHTML = '';
+                            for (var i = 0; i < d.alias.length; i++) {
+                                var s = document.createElement('span');
+                                s.textContent = d.alias.charAt(i);
+                                var c = (d.colors || [])[i] || '';
+                                if (/^#[0-9a-f]{6}$/i.test(c)) s.style.color = c;
+                                el.appendChild(s);
+                            }
+                        });
                     })();
                     </script>
                     <ul class="dropdown-menu dropdown-menu-end">

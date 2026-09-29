@@ -236,3 +236,27 @@
     })();
 </script>
 <?xjs } ?>
+
+<script type="text/javascript">
+/* Settings > Chat handle saved: repaint that member's name in this card. */
+(function () {
+    if (window.__rvStyleListener) return;
+    window.__rvStyleListener = true;
+    window.addEventListener('fl:nickstyle-changed', function (e) {
+        var d = e.detail || {};
+        if (!d.alias) return;
+        Array.prototype.forEach.call(document.querySelectorAll('.rv-alias'), function (el) {
+            var target = el.querySelector('a') || el;
+            if (target.textContent.trim() !== d.alias) return;
+            target.innerHTML = '';
+            for (var i = 0; i < d.alias.length; i++) {
+                var s = document.createElement('span');
+                s.textContent = d.alias.charAt(i);
+                var c = (d.colors || [])[i] || '';
+                if (/^#[0-9a-f]{6}$/i.test(c)) s.style.color = c;
+                target.appendChild(s);
+            }
+        });
+    });
+})();
+</script>
