@@ -251,7 +251,8 @@
         'futureland-records': 'stereo',
         'futureland-gallery': 'art_gallery',
         newsflip: 'rssfeed',
-        music_note: 'music_note'
+        music_note: 'music_note',
+        myspace: 'myspace', account: 'account'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -381,6 +382,7 @@
                     <a class="nav-link dropdown-toggle auth-nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <? write(user.alias); ?>
                         <span class="badge bg-danger" id="badge-unread-mail" style="display:none;"></span>
+                        <span class="badge bg-warning text-dark" id="badge-friend-requests" style="display:none;" title="Friend requests waiting"></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="./?page=000-mail.xjs">
@@ -389,6 +391,7 @@
                         </a></li>
                         <li><a class="dropdown-item" href="./?page=013-profile.xjs&amp;user=<? write(encodeURIComponent(user.alias)); ?>">
                             <span class="bin-icon" data-icon="myspace"></span><? write(locale.strings.main.menu_item_profile || 'My Profile'); ?>
+                            <span class="badge bg-warning text-dark" id="badge-friend-requests-inner" style="display:none;"></span>
                         </a></li>
                         <li><a class="dropdown-item" href="./?page=010-settings.xjs">
                             <span class="bin-icon" data-icon="gear"></span><? write(locale.strings.main.menu_item_settings); ?>

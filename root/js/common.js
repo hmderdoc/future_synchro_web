@@ -297,7 +297,29 @@ document.addEventListener('DOMContentLoaded', function () {
             if (badge2) { badge2.textContent = text; }
         });
 
+        /* Friend requests waiting: a badge on the user menu (and its My
+           Profile entry, where the profile page's banner accepts them).
+           Polled, and re-checked when a telegram arrives since a request
+           announces itself with one. */
+        var friendBadgeTimer = null;
+        function refreshFriendRequestBadge() {
+            fetch('./api/social.ssjs?call=requests', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    var count = res && res.ok && res.incoming ? res.incoming.length : 0;
+                    var text = count > 0 ? String(count) : '';
+                    var b1 = document.getElementById('badge-friend-requests');
+                    var b2 = document.getElementById('badge-friend-requests-inner');
+                    if (b1) { b1.textContent = text; b1.style.display = text ? '' : 'none'; }
+                    if (b2) { b2.textContent = text ? text + ' request' + (count === 1 ? '' : 's') : ''; b2.style.display = text ? '' : 'none'; }
+                }).catch(function () { /* badge just stays as it was */ });
+        }
+        refreshFriendRequestBadge();
+        friendBadgeTimer = window.setInterval(refreshFriendRequestBadge, 60000);
+        document.addEventListener('spa:afterNavigate', refreshFriendRequestBadge);
+
         registerEventListener('telegram', function (e) {
+            refreshFriendRequestBadge();
             var tg = JSON.parse(e.data).replace(/\x01./g, '').replace(/\r?\n/g, '<br>');
             var titleEl = document.getElementById('popUpModalTitle');
             var bodyEl = document.getElementById('popUpModalBody');
