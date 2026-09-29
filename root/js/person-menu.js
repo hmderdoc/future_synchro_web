@@ -154,6 +154,10 @@
                 .then(function (info) {
                     if (!menuEl || !info.ok) { close(); return; }
                     state = info;
+                    /* Sidebar avatars are keyed by user number; every action
+                       (private thread, ignore, netmail, placeholder) wants
+                       the name, which the lookup resolved. */
+                    if (/^\d+$/.test(String(opts.name)) && info.name && !/^\d+$/.test(String(info.name))) opts.name = info.name;
                     render(opts, info);
                     place(menuEl, opts.x || 20, opts.y || 20);
                 }).catch(close);
