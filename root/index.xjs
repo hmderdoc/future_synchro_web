@@ -94,10 +94,10 @@
     var more_nav_names = [
         'futureland-records',
         'futureland-gallery',
-        'wiki',
-        'nodespy',
-        'webmonitor'
+        'wiki'
     ];
+    /* Sysop tools live in the account menu (only sysops have them in the list). */
+    var sysop_nav_names = ['nodespy', 'webmonitor'];
 
     /* Pages hidden from nav entirely (accessed via other UI) */
     pullNavPage(nav_pages, 'newsflip');
@@ -114,6 +114,12 @@
         if (idx < 0) return null;
         return list.splice(idx, 1)[0];
     }
+
+    var sysop_nav_pages = sysop_nav_names.reduce(function (items, name) {
+        var page = pullNavPage(nav_pages, name);
+        if (page && user.is_sysop) items.push(page);
+        return items;
+    }, []);
 
     var more_nav_pages = more_nav_names.reduce(function (items, name) {
         var page = pullNavPage(nav_pages, name);
@@ -414,6 +420,12 @@
                         <li><a class="dropdown-item" href="./?page=010-settings.xjs">
                             <span class="bin-icon" data-icon="gear"></span><? write(locale.strings.main.menu_item_settings); ?>
                         </a></li>
+<?xjs if (user.is_sysop && sysop_nav_pages.length) { ?>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Sysop</h6></li>
+<?xjs sysop_nav_pages.forEach(function (e) { navDropdownItem(e, ''); }); ?>
+                        <li><hr class="dropdown-divider"></li>
+<?xjs } ?>
 
                         <li><a class="dropdown-item" id="button-logout" href="#"><span class="bin-icon" data-icon="logout"></span><? write(locale.strings.main.menu_item_logout); ?></a></li>
                     </ul>

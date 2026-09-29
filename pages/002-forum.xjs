@@ -599,7 +599,7 @@
     }
 </style>
 <? if (!request.has_param('thread')) { ?>
-<div id="forum-search-bar" data-scope="<? write(_searchScope); ?>" data-group="<? write(_searchGroup); ?>" data-sub="<? write(_searchSub); ?>">
+<div id="forum-search-bar" class="stick-top" data-scope="<? write(_searchScope); ?>" data-group="<? write(_searchGroup); ?>" data-sub="<? write(_searchSub); ?>">
     <div class="input-group">
         <button id="forum-search-btn" class="btn btn-default icon" type="button" onclick="searchForum()">
             <span class="bin-icon" data-icon="search"></span>
@@ -789,7 +789,7 @@
 		</li>
 	</div>
 
-    <ol class="breadcrumb forum-breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb stick-top">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
@@ -1032,7 +1032,7 @@
     </div>
 
 
-	<ol class="breadcrumb forum-breadcrumb">
+	<ol class="breadcrumb forum-breadcrumb stick-top">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
@@ -1080,7 +1080,7 @@
         </button>
     </div>
 
-    <div id="forum-sort-controls" class="btn-group" style="margin-bottom:0.75em;">
+    <div id="forum-sort-controls" class="btn-group stick-top stick-top-fill" style="margin-bottom:0.75em;">
         <button class="btn btn-default btn-sm active" data-sort="activity" onclick="setSort('activity')" title="Sort by most recent reply"><span class="bin-icon" data-icon="fire"></span>Activity</button>
         <button class="btn btn-default btn-sm" data-sort="started" onclick="setSort('started')" title="Sort by thread creation date"><span class="bin-icon" data-icon="calendar"></span>Started</button>
         <button class="btn btn-default btn-sm" data-sort="subject" onclick="setSort('subject')" title="Sort alphabetically by subject"><span class="bin-icon" data-icon="sysinfo"></span>Subject</button>
@@ -1167,7 +1167,7 @@
 		</a>
 	</div>
 
-    <ol class="breadcrumb forum-breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb stick-top">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>
@@ -1223,7 +1223,7 @@
 				</a>
 			</div>
 
-    <ol class="breadcrumb forum-breadcrumb">
+    <ol class="breadcrumb forum-breadcrumb stick-top">
         <li>
             <a href="./?page=<? request.write_param('page'); ?>">
                 <span class="bin-icon" data-icon="forum"></span>

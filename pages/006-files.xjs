@@ -304,7 +304,7 @@
         var _canDL = _dirObj.can_download && user.compare_ars(_dirObj.download_ars);
 ?>
 
-<ol class="breadcrumb files-breadcrumb">
+<ol class="breadcrumb files-breadcrumb stick-top">
     <li>
         <a href="./?page=<? request.write_param('page'); ?>">
             <? locale.write('title'); ?>
@@ -399,7 +399,7 @@
         var _lib = file_area.lib_list[request.get_param('library')];
 ?>
 
-<ol class="breadcrumb files-breadcrumb">
+<ol class="breadcrumb files-breadcrumb stick-top">
     <li>
         <a href="./?page=<? request.write_param('page'); ?>">
             <? locale.write('title'); ?>
@@ -429,7 +429,7 @@
     } else {
 ?>
 
-<ol class="breadcrumb files-breadcrumb">
+<ol class="breadcrumb files-breadcrumb stick-top">
     <li class="active"><? locale.write('title'); ?></li>
 </ol>
 

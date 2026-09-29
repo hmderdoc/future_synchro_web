@@ -14,6 +14,42 @@
 
     /* ---------- helpers ---------- */
 
+    /* Page headers marked .stick-top pin to the top of the content column
+       (its own scroller on wide screens) and stack: each one's `top` is the
+       height of the ones above it. Recomputed after navigation, on resize and
+       whenever a pinned element changes size (stats filling in, wrapping). */
+    var stickyObserver = null;
+    function applyStickyHeads() {
+        var content = document.getElementById('content');
+        if (!content) return;
+        var els = Array.prototype.slice.call(content.querySelectorAll('.stick-top')).filter(function (el) {
+            return getComputedStyle(el).display !== 'none';
+        });
+        if (stickyObserver) stickyObserver.disconnect();
+        /* Measure where each one sits in normal flow (sticky switched off for
+           a moment, so a scrolled page reads the same as an unscrolled one),
+           then pin each at its distance below the first: margins, flex gaps
+           and wrapping all come out right and nothing jumps when it sticks. */
+        els.forEach(function (el) { el.style.position = 'static'; });
+        var tops = els.map(function (el) { return el.getBoundingClientRect().top; });
+        els.forEach(function (el, i) {
+            el.style.position = '';
+            el.style.top = Math.max(0, tops[i] - tops[0]) + 'px';
+        });
+        if ('ResizeObserver' in window && els.length) {
+            if (!stickyObserver) stickyObserver = new ResizeObserver(function () { scheduleStickyHeads(); });
+            els.forEach(function (el) { stickyObserver.observe(el); });
+        }
+    }
+    var stickyTimer = null;
+    function scheduleStickyHeads() {
+        if (stickyTimer) return;
+        stickyTimer = setTimeout(function () { stickyTimer = null; applyStickyHeads(); }, 50);
+    }
+    window.applyStickyHeads = applyStickyHeads;
+    window.addEventListener('resize', scheduleStickyHeads);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyStickyHeads); else applyStickyHeads();
+
     function getPageFromUrl(url) {
         try {
             var u = new URL(url, location.origin);
@@ -170,6 +206,7 @@
 
                 var finishNavigate = function () {
                     window.sbbsConfig.currentPage = page;
+                    applyStickyHeads();
                     dispatch('spa:afterNavigate', { page: page, title: title });
                     isNavigating = false;
                 };

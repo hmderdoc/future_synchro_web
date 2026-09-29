@@ -88,14 +88,8 @@
 
 /* ── Header / toolbar ── */
 .nf-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(0, 0, 0, 0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid #1a1a1a;
-    padding: 8px 10px;
+    background: #000;
+    padding: 8px 10px 4px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -121,7 +115,8 @@
 .nf-topic-bar {
     display: flex;
     gap: 8px;
-    padding: 10px 16px;
+    padding: 0 10px 8px;
+    background: #000;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -542,6 +537,9 @@
 .nf-empty-icon { font-size: 48px; margin-bottom: 12px; }
 .nf-empty-text { font-size: 15px; }
 
+/* The tab bar pins above the header: no gap for content to show through. */
+.news-tabs.stick-top { margin-bottom: 0; border-radius: 0; }
+
 /* ── Mobile optimizations ── */
 @media (max-width: 480px) {
     .nf-app { max-width: 100%; }
@@ -559,7 +557,7 @@
 
 </style>
 
-<nav class="news-tabs" aria-label="News views">
+<nav class="news-tabs stick-top" aria-label="News views">
     <a class="news-tab active" href="./?page=014-newsflip.xjs" aria-current="page">
         <span class="bin-icon" data-icon="newsflip"></span><span>News Flip</span>
     </a>
@@ -579,11 +577,11 @@
 
     <!-- Main reader (shown after onboarding) -->
     <div id="nf-reader" style="display:none">
-        <div class="nf-header">
+        <div class="nf-header stick-top">
             <span class="nf-header-title">Newsflip</span>
             <button class="nf-header-btn" id="nf-prefs-btn" title="Edit topics">&#9881; Topics</button>
         </div>
-        <div class="nf-topic-bar" id="nf-topic-bar"></div>
+        <div class="nf-topic-bar stick-top" id="nf-topic-bar"></div>
         <div class="nf-feed" id="nf-feed"></div>
         <div class="nf-loading" id="nf-loading" style="display:none">
             <div class="nf-spinner"></div>

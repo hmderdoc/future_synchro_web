@@ -695,7 +695,7 @@
     }
     </style>
 
-    <div class="card mb-3 userlist-shell">
+    <div class="card mb-3 userlist-shell stick-top">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><span class="bin-icon" data-icon="userlist"></span>User List</span>
             <div style="display:flex; align-items:center; gap:1rem;">

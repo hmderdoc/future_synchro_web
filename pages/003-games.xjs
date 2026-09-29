@@ -71,7 +71,7 @@ _vu = undefined;
 
 <div id="games-page">
 
-    <div id="games-controls" class="games-toolbar">
+    <div id="games-controls" class="games-toolbar stick-top stick-top-fill">
         <div class="games-toolbar-card games-toolbar-sort">
         <div class="btn-group btn-group-sm" role="group" id="games-sort">
             <button class="btn btn-outline-success active" data-sort="time">Time</button>
@@ -95,7 +95,7 @@ _vu = undefined;
         </div>
     </div>
 
-    <div class="games-stats-card">
+    <div class="games-stats-card stick-top">
         <div id="games-stats" class="small text-muted"></div>
     </div>
 

@@ -59,6 +59,18 @@
     }
 }
 
+/* Pinned page headers (spa.js applyStickyHeads sets each one's top). */
+.stick-top {
+    position: sticky;
+    z-index: 30;
+}
+/* Pinned controls with no background of their own: fill so content does not show through. */
+.stick-top-fill {
+    background: #555555;
+    padding-bottom: 6px;
+}
+[data-theme="cga"] .stick-top-fill { background: #555555; }
+
 /* Navbar must sit above the terminal overlay */
 .navbar.fixed-top {
     z-index: 1045 !important;
