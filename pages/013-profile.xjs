@@ -174,7 +174,7 @@
     var PRESETS = {
         classic:  { bg: '#ffffff', box: '#ffffff', border: '#6699cc', title: '#6699cc', titleText: '#ffffff', text: '#000000', link: '#003399', accent: '#ff6600', muted: '#666666' },
         midnight: { bg: '#0b0f1a', box: '#121a2b', border: '#33415c', title: '#1e2a44', titleText: '#ffffff', text: '#d0d6e0', link: '#7fb3ff', accent: '#ffcc00', muted: '#8892a6' },
-        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#ffffff', link: '#55ffff', accent: '#ffff55', muted: '#aaaaaa' },
+        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#ffffff', link: '#55ffff', accent: '#ffff55', muted: '#aaaaaa', emph: '#55ff55' },
         sunset:   { bg: '#2b1b17', box: '#3a231d', border: '#b5573c', title: '#c1440e', titleText: '#fff3e0', text: '#f5e6d3', link: '#ffb347', accent: '#ff6b35', muted: '#c9a48f' },
         terminal: { bg: '#000000', box: '#000000', border: '#00aa00', title: '#005500', titleText: '#55ff55', text: '#55ff55', link: '#55ffff', accent: '#ffff55', muted: '#00aa00' }
     };
@@ -185,7 +185,9 @@
         bg: hex(themeSpec.background, preset.bg), box: preset.box, border: preset.border,
         title: hex(themeSpec.accent, preset.title), titleText: preset.titleText,
         text: hex(themeSpec.text, preset.text), link: hex(themeSpec.link, preset.link),
-        accent: hex(themeSpec.accent, preset.accent), muted: preset.muted
+        accent: hex(themeSpec.accent, preset.accent), muted: preset.muted,
+        /* text drawn in the title colour (headings inside boxes); dark title bars need a readable stand-in */
+        emph: preset.emph || hex(themeSpec.accent, preset.title)
     };
     if (themeSpec.background && !themeSpec.accent) theme.box = theme.bg;
 
@@ -233,6 +235,7 @@
     --pp-link: <?xjs write(theme.link); ?>;
     --pp-accent: <?xjs write(theme.accent); ?>;
     --pp-muted: <?xjs write(theme.muted); ?>;
+    --pp-emph: <?xjs write(theme.emph); ?>;
     background: var(--pp-bg);
     color: var(--pp-text);
     font-family: Verdana, Arial, Helvetica, sans-serif;
@@ -329,7 +332,7 @@
 .pp-box-title .pp-sort-btn { border-color: rgba(255,255,255,.4); background: transparent; color: var(--pp-title-text); }
 .pp-box-title .pp-sort-btn.is-active { background: rgba(255,255,255,.25); }
 .pp-plays-head { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-.pp-plays-title { font-weight: bold; color: var(--pp-title); }
+.pp-plays-title { font-weight: bold; color: var(--pp-emph); }
 .pp-plays { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .pp-play-row { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); padding: 3px 6px 3px 3px; background: var(--pp-box); }
 .pp-play-row:hover { border-color: var(--pp-accent); color: var(--pp-text); }
@@ -364,7 +367,7 @@
 .pp-forum-icon.is-blank { background: var(--pp-title); }
 .pp-forum-main { flex: 1; min-width: 0; }
 .pp-forum-head { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 11px; color: var(--pp-muted); }
-.pp-forum-where { color: var(--pp-title); font-weight: bold; }
+.pp-forum-where { color: var(--pp-emph); font-weight: bold; }
 .pp-forum-origin { font-style: italic; }
 .pp-forum-subject { font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
 .pp-forum-subject a { color: var(--pp-link); }
