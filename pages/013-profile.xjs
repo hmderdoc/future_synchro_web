@@ -226,6 +226,7 @@
         return { label: 'Add to Friends', action: 'request', cls: 'pp-btn-primary' };
     }
 ?>
+<script type="text/javascript" src="./js/ansi-render.js?_v=<?xjs write(time()); ?>"></script>
 <style>
 .profile-page {
     --pp-bg: <?xjs write(theme.bg); ?>;
@@ -386,6 +387,10 @@
 .pp-forum-full { margin-top: 4px; padding: 6px 8px; border: 1px solid var(--pp-border); background: rgba(127,127,127,.06); font-size: 12px; max-height: 60vh; overflow: auto; }
 .pp-forum-full .message { white-space: pre-wrap; word-break: break-word; font-family: monospace; }
 .pp-forum-full pre { margin: 0; }
+/* ANSI posts: the grid fallback keeps its cells tight until the canvas image replaces it. */
+.pp-forum-full pre.ansi { white-space: pre; line-height: 1; font-size: 14px; background: #000; color: #aaa; padding: 0.5em; overflow-x: auto; }
+.pp-forum-full .ansi-render { display: inline-block; max-width: 100%; }
+.pp-forum-full .ansi-canvas-img { max-width: 100%; height: auto; image-rendering: pixelated; }
 .pp-forum-tools { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
 .pp-forum-tools button, .pp-forum-tools a.pp-forum-open { font: inherit; font-size: 11px; padding: 1px 8px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; text-decoration: none; }
 .pp-forum-tools a.pp-forum-open { color: var(--pp-link); }
@@ -1367,7 +1372,11 @@
                 .then(function (res) {
                     btn.disabled = false;
                     if (!res.ok || !res.post) { full.innerHTML = '<span class="pp-meta">That post can no longer be read.</span>'; }
-                    else if (res.post.html) full.innerHTML = '<div class="message">' + res.post.html + '</div>';
+                    else if (res.post.html) {
+                        full.innerHTML = '<div class="message">' + res.post.html + '</div>';
+                        /* ANSI posts: the same canvas rendering the forum uses. */
+                        if (window.renderAnsiCanvases) renderAnsiCanvases(full);
+                    }
                     else full.innerHTML = '<div class="message">' + esc(res.post.body || '') + '</div>';
                     full.hidden = false; snippet.hidden = true; btn.textContent = 'Collapse'; btn.classList.add('is-open');
                 }).catch(function () { btn.disabled = false; });
