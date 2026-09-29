@@ -199,18 +199,18 @@
 /* Standard card (side-by-side) */
 .nf-card-std {
     display: flex;
-    min-height: 100px;
+    min-height: 300px;
 }
 .nf-card-std .nf-card-body {
     flex: 1;
-    padding: 10px 12px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-width: 0;
 }
 .nf-card-std .nf-card-title {
-    font-size: 17px;
+    font-size: 28px;
     font-weight: 600;
     line-height: 1.3;
     color: #fff;
@@ -221,23 +221,24 @@
     overflow: hidden;
 }
 .nf-card-std .nf-card-snippet {
-    font-size: 14px;
-    color: #888;
-    margin: 0;
+    font-size: 19px;
+    line-height: 1.5;
+    color: #aaa;
+    margin: 0 0 10px;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 5;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 .nf-card-std .nf-card-thumb {
-    width: 120px;
-    min-height: 100px;
+    width: 520px;
+    min-height: 300px;
     flex-shrink: 0;
     object-fit: cover;
 }
 .nf-card-std .nf-card-thumb-placeholder {
-    width: 120px;
-    min-height: 100px;
+    width: 520px;
+    min-height: 300px;
     flex-shrink: 0;
     background: #1a1a1a;
     display: flex;
@@ -249,7 +250,7 @@
 
 /* Card meta line */
 .nf-card-meta {
-    font-size: 13px;
+    font-size: 16px;
     color: #666;
     display: flex;
     align-items: center;
@@ -547,8 +548,11 @@
     .nf-card-hero .nf-card-img { height: 180px; }
     .nf-card-hero .nf-card-title { font-size: 18px; }
     .nf-topic-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .nf-card-std { min-height: 100px; }
+    .nf-card-std .nf-card-title { font-size: 17px; }
+    .nf-card-std .nf-card-snippet { font-size: 14px; }
     .nf-card-std .nf-card-thumb,
-    .nf-card-std .nf-card-thumb-placeholder { width: 100px; }
+    .nf-card-std .nf-card-thumb-placeholder { width: 110px; min-height: 100px; }
     .nf-article-header h1 { font-size: 20px; }
     .nf-article-content { font-size: 15px; }
 }
@@ -919,6 +923,7 @@
                 card.innerHTML =
                     '<div class="nf-card-body">'
                     +   '<h3 class="nf-card-title">' + esc(art.title) + '</h3>'
+                    +   (art.snippet ? '<p class="nf-card-snippet">' + esc(art.snippet) + '</p>' : '')
                     +   '<div class="nf-card-meta">'
                     +     '<span class="nf-card-source">' + esc(art.source) + '</span>'
                     +     '<span class="nf-card-time">' + timeAgo(art.timestamp) + '</span>'
