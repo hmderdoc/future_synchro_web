@@ -1,6 +1,8 @@
 <!--Files-->
 
 <?xjs
+    try { load(system.mods_dir + 'load/social_lib.js'); } catch (_socialErr) { }
+
     var request = require({}, settings.web_lib + 'request.js', 'request');
     load(settings.web_lib + 'files.js');
     locale.section = 'page_files';
@@ -289,6 +291,7 @@
         flex-wrap: wrap;
     }
 }
+.files-nsfw-tag { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.06em; padding:0 5px; margin-left:6px; color:#fff; background:#aa0000; border:1px solid #ff5555; vertical-align:middle; }
 </style>
 
 <?xjs
@@ -346,7 +349,7 @@
          data-size="<? write(file._size); ?>"
          data-date="<? write(file.uldate); ?>">
         <div class="files-item-header">
-            <span class="files-item-name"><? write(escHtml(file.name)); ?></span>
+            <span class="files-item-name"><? write(escHtml(file.name)); ?></span><?xjs if (typeof Social !== 'undefined' && Social.isNsfw(_dir, file.name)) { ?> <span class="files-nsfw-tag" title="Not safe for work">NSFW</span><?xjs } ?>
             <div class="files-item-meta">
                 <span class="files-item-size"><? write(file.size); ?></span>
                 <span class="files-item-date"><? write(system.timestr(file.uldate)); ?></span>

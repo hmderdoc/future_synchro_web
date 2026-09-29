@@ -135,8 +135,10 @@
     }
     function caption(item) { return item.desc || item.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '); }
     var mediaAnsi = [], mediaImages = [];
-    for (var ma0 = 0; ma0 < ansiPieces.length; ma0++) mediaAnsi.push({ dir: ansiPieces[ma0].dir, name: ansiPieces[ma0].name, caption: caption(ansiPieces[ma0]), added: ansiPieces[ma0].added || 0 });
-    for (var mi0 = 0; mi0 < imagePieces.length; mi0++) mediaImages.push({ dir: imagePieces[mi0].dir, name: imagePieces[mi0].name, caption: caption(imagePieces[mi0]), added: imagePieces[mi0].added || 0,
+    var canModerate = false;
+    try { canModerate = Social.canModerate(); } catch (_modErr) { canModerate = false; }
+    for (var ma0 = 0; ma0 < ansiPieces.length; ma0++) mediaAnsi.push({ dir: ansiPieces[ma0].dir, name: ansiPieces[ma0].name, caption: caption(ansiPieces[ma0]), added: ansiPieces[ma0].added || 0, nsfw: !!ansiPieces[ma0].nsfw });
+    for (var mi0 = 0; mi0 < imagePieces.length; mi0++) mediaImages.push({ dir: imagePieces[mi0].dir, name: imagePieces[mi0].name, caption: caption(imagePieces[mi0]), added: imagePieces[mi0].added || 0, nsfw: !!imagePieces[mi0].nsfw,
         src: './api/social.ssjs?call=image&dir=' + encodeURIComponent(imagePieces[mi0].dir) + '&name=' + encodeURIComponent(imagePieces[mi0].name) });
     /* Every program ever launched is too much for a sidebar box: keep the
        union of the top 12 by time, by launches and by recency, which is all
@@ -370,6 +372,17 @@
 .pp-carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 24px; line-height: 1; padding: 12px 10px; opacity: .8; }
 .pp-carousel-nav.prev { left: 8px; } .pp-carousel-nav.next { right: 8px; }
 .pp-carousel-caption { padding: 8px 14px; font-size: 12px; text-align: center; background: #111; border-top: 1px solid #333; }
+.pp-tile-art.is-nsfw img { filter: blur(14px) brightness(.6); transform: scale(1.1); }
+.pp-tile-art.is-nsfw.is-revealed img { filter: none; transform: none; }
+.pp-tile-art.is-nsfw.is-revealed .pp-nsfw-veil { display: none; }
+.pp-nsfw-veil { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; background: rgba(0,0,0,.35); font: bold 13px Verdana, Arial, sans-serif; letter-spacing: .12em; text-shadow: 0 0 6px #000; cursor: pointer; border: none; }
+.pp-nsfw-veil small { font-weight: normal; letter-spacing: 0; font-size: 10px; opacity: .85; }
+.pp-carousel-view { position: relative; }
+.pp-carousel-view.is-nsfw img { filter: blur(24px) brightness(.5); }
+.pp-carousel-view.is-nsfw.is-revealed img { filter: none; }
+.pp-carousel-view.is-nsfw.is-revealed .pp-nsfw-veil { display: none; }
+.pp-nsfw-veil-big { font-size: 18px; }
+.pp-carousel-mod { font: inherit; color: #ffff55; background: #222; border: 1px solid #555; padding: 3px 10px; cursor: pointer; margin-right: 8px; }
 </style>
 
 <?xjs if (!summary) { ?>
@@ -854,7 +867,8 @@
         ansi: <?xjs write(jsonForScript(mediaAnsi)); ?>,
         images: <?xjs write(jsonForScript(mediaImages)); ?>,
         plays: <?xjs write(jsonForScript(allPlays)); ?>,
-        icons: <?xjs write(jsonForScript(playIcons)); ?>
+        icons: <?xjs write(jsonForScript(playIcons)); ?>,
+        canModerate: <?xjs write(canModerate ? 'true' : 'false'); ?>
     };
     var PAGE = 20, STRIP = 6;
     function converter() {
@@ -1068,7 +1082,11 @@
         drawing = true;
         var job = drawQueue.shift();
         renderAnsi(job.item, function (dataURL) {
-            if (dataURL && document.body.contains(job.el)) { job.el.innerHTML = '<img alt="">'; job.el.firstChild.src = dataURL; }
+            if (dataURL && document.body.contains(job.el)) {
+                var veil = job.el.querySelector('.pp-nsfw-veil');
+                job.el.innerHTML = '<img alt="">'; job.el.firstChild.src = dataURL;
+                if (veil) job.el.appendChild(veil);
+            }
             else if (job.el.querySelector('.pp-tile-wait')) job.el.querySelector('.pp-tile-wait').textContent = dataURL ? '' : 'n/a';
             drawing = false;
             drawNext();
@@ -1085,11 +1103,17 @@
             tile.href = '#';
             tile.className = 'pp-tile' + (kind === 'ansi' ? ' pp-tile-ansi' : ' pp-tile-image');
             tile.title = item.caption;
-            tile.innerHTML = '<span class="pp-tile-art">' + (kind === 'ansi' ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') + '</span>' +
+            tile.innerHTML = '<span class="pp-tile-art' + (item.nsfw ? ' is-nsfw' : '') + '">' + (kind === 'ansi' ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') +
+                (item.nsfw ? '<span class="pp-nsfw-veil">NSFW<small>click to reveal</small></span>' : '') + '</span>' +
                 '<span class="pp-tile-caption">' + esc(item.caption) + '</span>';
             if (kind === 'images') tile.querySelector('img').src = item.src;
             else drawQueue.push({ item: item, el: tile.querySelector('.pp-tile-art') });
-            tile.addEventListener('click', function (e) { e.preventDefault(); openCarousel(kind, i); });
+            tile.addEventListener('click', function (e) {
+                e.preventDefault();
+                var art = tile.querySelector('.pp-tile-art');
+                if (art.classList.contains('is-nsfw') && !art.classList.contains('is-revealed')) { art.classList.add('is-revealed'); return; }
+                openCarousel(kind, i);
+            });
             host.appendChild(tile);
         });
         if (items.length > STRIP) {
@@ -1119,14 +1143,24 @@
         if (!items || !items.length) return;
         var box = document.createElement('div');
         box.className = 'pp-carousel';
-        box.innerHTML = '<div class="pp-carousel-bar"><span class="pp-carousel-title"></span><span><span class="pp-carousel-count"></span> <button type="button" data-act="close">close &times;</button></span></div>' +
+        box.innerHTML = '<div class="pp-carousel-bar"><span class="pp-carousel-title"></span><span>' +
+            (MEDIA.canModerate ? '<button type="button" class="pp-carousel-mod" data-act="nsfw"></button> ' : '') +
+            '<span class="pp-carousel-count"></span> <button type="button" data-act="close">close &times;</button></span></div>' +
             '<div class="pp-carousel-stage"><button type="button" class="pp-carousel-nav prev" data-act="prev">&lsaquo;</button><div class="pp-carousel-view"></div><button type="button" class="pp-carousel-nav next" data-act="next">&rsaquo;</button></div>' +
             '<div class="pp-carousel-caption"></div>';
         document.body.appendChild(box);
         carousel = { box: box, kind: kind, items: items, index: index };
         box.addEventListener('click', function (ev) {
             var b = ev.target.closest('[data-act]');
-            if (b) { ev.preventDefault(); if (b.getAttribute('data-act') === 'close') closeCarousel(); else step(b.getAttribute('data-act') === 'next' ? 1 : -1); return; }
+            if (b) {
+                ev.preventDefault();
+                var act = b.getAttribute('data-act');
+                if (act === 'close') closeCarousel();
+                else if (act === 'nsfw') toggleNsfw();
+                else if (act === 'reveal') { var v = box.querySelector('.pp-carousel-view'); if (v) v.classList.add('is-revealed'); }
+                else step(act === 'next' ? 1 : -1);
+                return;
+            }
             if (ev.target === box.querySelector('.pp-carousel-stage')) closeCarousel();
         });
         document.addEventListener('keydown', carouselKeys);
@@ -1150,9 +1184,13 @@
         var view = c.box.querySelector('.pp-carousel-view');
         c.box.querySelector('.pp-carousel-title').textContent = (c.kind === 'ansi' ? 'ANSI Gallery' : 'Pictures') + ' - ' + alias;
         c.box.querySelector('.pp-carousel-count').textContent = (c.index + 1) + ' / ' + c.items.length;
-        c.box.querySelector('.pp-carousel-caption').textContent = item.caption + (item.added ? '  (' + fmtDate(item.added * 1000) + ')' : '');
+        c.box.querySelector('.pp-carousel-caption').textContent = item.caption + (item.added ? '  (' + fmtDate(item.added * 1000) + ')' : '') + (item.nsfw ? '  [NSFW]' : '');
+        view.className = 'pp-carousel-view' + (item.nsfw ? ' is-nsfw' : '');
+        var mod = c.box.querySelector('.pp-carousel-mod');
+        if (mod) mod.textContent = item.nsfw ? 'Clear NSFW tag' : 'Mark NSFW';
+        var veil = item.nsfw ? '<button type="button" class="pp-nsfw-veil pp-nsfw-veil-big" data-act="reveal">NSFW<small>click to reveal</small></button>' : '';
         if (c.kind === 'images') {
-            view.innerHTML = '<img class="pp-photo-full" alt="">';
+            view.innerHTML = '<img class="pp-photo-full" alt="">' + veil;
             view.firstChild.src = item.src;
             return;
         }
@@ -1160,12 +1198,23 @@
         var wanted = c.index;
         renderAnsi(item, function (dataURL) {
             if (!carousel || carousel.index !== wanted) return;
-            if (dataURL) { view.innerHTML = '<img class="pp-ansi-full" alt="">'; view.firstChild.src = dataURL; }
+            if (dataURL) { view.innerHTML = '<img class="pp-ansi-full" alt="">' + veil; view.firstChild.src = dataURL; }
             else view.innerHTML = '<div class="pp-carousel-wait">could not render this piece</div>';
         });
         /* warm the next one */
         var next = c.items[(c.index + 1) % c.items.length];
         if (next) renderAnsi(next, function () {});
+    }
+    /* Moderators: flag / clear the piece on screen; the strips follow on reload. */
+    function toggleNsfw() {
+        var c = carousel;
+        if (!c) return;
+        var item = c.items[c.index];
+        post('nsfw', { dir: item.dir, name: item.name, on: !item.nsfw }).then(function (res) {
+            if (!res.ok) { window.alert(res.error || res.reason || 'Could not change the tag'); return; }
+            item.nsfw = !!(res.info && res.info.nsfw);
+            showCurrent();
+        });
     }
     function closeCarousel() {
         if (carousel) { carousel.box.remove(); carousel = null; }
