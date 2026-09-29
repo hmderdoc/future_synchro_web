@@ -862,6 +862,7 @@
             b.disabled = false;
             var status = document.getElementById('pp-friend-status');
             if (!res.ok) { if (status) status.textContent = res.error || res.reason || 'Could not do that'; return; }
+            if (window.refreshFriendRequestBadge) window.refreshFriendRequestBadge();
             if (b.id === 'pp-friend-main') {
                 var next = relationLabel(res.relation);
                 b.textContent = next.label;

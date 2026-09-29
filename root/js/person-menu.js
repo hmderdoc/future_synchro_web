@@ -275,7 +275,10 @@
             }
             if (act === 'friend') {
                 var action = state.relation === 'friends' ? 'unfriend' : state.relation === 'incoming' ? 'accept' : state.relation === 'outgoing' ? 'cancel' : 'request';
-                post('friend', { user: state.alias, action: action }).then(refresh);
+                post('friend', { user: state.alias, action: action }).then(function () {
+                    if (window.refreshFriendRequestBadge) window.refreshFriendRequestBadge();
+                    return refresh();
+                });
                 return;
             }
             if (act === 'ignore') {

@@ -317,6 +317,9 @@ document.addEventListener('DOMContentLoaded', function () {
         refreshFriendRequestBadge();
         friendBadgeTimer = window.setInterval(refreshFriendRequestBadge, 60000);
         document.addEventListener('spa:afterNavigate', refreshFriendRequestBadge);
+        /* Pages that answer a request (profile banner, person menu) call this
+           right away so the badge clears without waiting for the poll. */
+        window.refreshFriendRequestBadge = refreshFriendRequestBadge;
 
         registerEventListener('telegram', function (e) {
             refreshFriendRequestBadge();

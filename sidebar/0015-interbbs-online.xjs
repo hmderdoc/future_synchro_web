@@ -56,9 +56,7 @@
         <table class="table table-sm" style="table-layout:fixed;">
             <colgroup><col style="width:50%;"><col style="width:50%;"></colgroup>
             <thead><tr><th>User</th><th>Origin</th></tr></thead>
-            <tbody id="ib-online-body">
-                <tr><td colspan="2" class="ib-empty">Asking the net...</td></tr>
-            </tbody>
+            <tbody id="ib-online-body"></tbody>
         </table>
     </div>
 </div>
@@ -126,10 +124,16 @@
     }
     function _ibLoad() {
         if (typeof v4_get !== 'function' || !document.getElementById('ib-online-body')) return;
-        v4_get('./api/ibbs.ssjs?call=online').then(_ibRender).catch(function (err) {
+        v4_get('./api/ibbs.ssjs?call=online').then(function (data) {
+            window.__ibOnlineLast = data;   /* survives sidebar re-renders */
+            _ibRender(data);
+        }).catch(function (err) {
             console.error('InterBBS online error:', err);
         });
     }
+    /* The card is rebuilt with every page: paint the last answer at once so
+       nothing jumps, then refresh it quietly when the net replies. */
+    if (window.__ibOnlineLast) _ibRender(window.__ibOnlineLast);
     _ibLoad();
     /* One poller per page lifetime (the sidebar script can run again on a
        re-render); the API answers from its cache between sweeps. */
