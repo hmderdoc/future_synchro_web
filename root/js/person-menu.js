@@ -47,7 +47,7 @@
         style.textContent =
             '.person-menu{position:fixed;z-index:2100;min-width:220px;max-width:300px;background:#0d1117;color:#ddd;border:1px solid #5555ff;box-shadow:0 8px 24px #000;font-size:13px;font-family:inherit}' +
             '.person-menu-head{padding:7px 10px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px}' +
-            '.person-menu-head .person-menu-avatar{width:40px;height:24px;flex-shrink:0;background:#000}.person-menu-head .person-menu-avatar img{width:40px;height:24px;image-rendering:pixelated;display:block}' +
+            '.person-menu-head .person-menu-avatar{width:40px;height:48px;flex-shrink:0;background:#000}.person-menu-head .person-menu-avatar img{width:40px;height:48px;image-rendering:pixelated;display:block}' +
             '.person-menu-name{font-weight:bold;color:#55ffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.person-menu-sub{font-size:11px;color:#888}' +
             '.person-menu-item{display:block;width:100%;text-align:left;background:none;border:none;color:#ddd;padding:7px 10px;cursor:pointer;font:inherit}' +
             '.person-menu-item:hover{background:#1a1a3a;color:#fff}.person-menu-item.is-danger{color:#ff5555}.person-menu-item.is-sysop{color:#ffff55}' +
@@ -58,7 +58,7 @@
             '.person-picker-head select{font:inherit;background:#000;color:#ddd;border:1px solid #555}' +
             '.person-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;padding:12px;overflow:auto}' +
             '.person-picker-item{background:#000;border:1px solid #333;cursor:pointer;text-align:center;padding:4px;font-size:10px;color:#aaa}' +
-            '.person-picker-item:hover{border-color:#ffff55}.person-picker-item img{width:80px;height:48px;image-rendering:pixelated;display:block;margin:0 auto 3px}' +
+            '.person-picker-item:hover{border-color:#ffff55}.person-picker-item img{width:80px;height:96px;image-rendering:pixelated;display:block;margin:0 auto 3px}' +
             '.person-picker-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer}';
         document.head.appendChild(style);
     }

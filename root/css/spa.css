@@ -74,8 +74,8 @@
 /* Your avatar in the account menu toggle (right of the alias, no chevron). */
 .auth-nav-link { display: inline-flex; align-items: center; gap: 6px; }
 .auth-nav-link.dropdown-toggle::after { display: none; }
-.auth-nav-link .nav-avatar { width: 40px; height: 24px; flex-shrink: 0; overflow: hidden; }
-.auth-nav-link .nav-avatar img, .auth-nav-link .nav-avatar canvas { width: 40px; height: 24px; image-rendering: pixelated; display: block; }
+.auth-nav-link .nav-avatar { width: 30px; height: 36px; flex-shrink: 0; overflow: hidden; }
+.auth-nav-link .nav-avatar img, .auth-nav-link .nav-avatar canvas { width: 30px; height: 36px; image-rendering: pixelated; display: block; }
 
 /* Navbar must sit above the terminal overlay */
 .navbar.fixed-top {

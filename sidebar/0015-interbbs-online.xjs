@@ -36,8 +36,9 @@
     gap: 4px;
     cursor: pointer;
 }
-.ib-panel .ib-avatar { width: 40px; height: 40px; flex-shrink: 0; background: transparent; display: flex; align-items: center; }
-.ib-panel .ib-avatar img { width: 40px; height: 24px; image-rendering: pixelated; display: block; }
+/* Same box as Who's Online's .avatar-inline: 40x40, the 80x96 art contained (33x40). */
+.ib-panel .ib-avatar { width: 40px; height: 40px; flex-shrink: 0; background: transparent; }
+.ib-panel .ib-avatar img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
 .ib-panel .ib-username { color: #FF55FF; overflow: hidden; text-overflow: ellipsis; }
 .ib-panel .ib-origin {
     font-size: 0.8em;
