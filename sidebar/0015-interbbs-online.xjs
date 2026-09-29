@@ -36,7 +36,7 @@
     gap: 4px;
     cursor: pointer;
 }
-.ib-panel .ib-avatar { width: 40px; height: 24px; flex-shrink: 0; background: #000; }
+.ib-panel .ib-avatar { width: 40px; height: 40px; flex-shrink: 0; background: transparent; display: flex; align-items: center; }
 .ib-panel .ib-avatar img { width: 40px; height: 24px; image-rendering: pixelated; display: block; }
 .ib-panel .ib-username { color: #FF55FF; overflow: hidden; text-overflow: ellipsis; }
 .ib-panel .ib-origin {

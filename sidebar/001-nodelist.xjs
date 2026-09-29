@@ -11,7 +11,24 @@
     background: #000 !important;
     border-bottom: 2px solid #00AA00 !important;
     font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
+.wo-panel .wo-count { font-size: 0.8em; font-weight: normal; color: #00AA00; }
+/* One row per person: a badge counts their nodes and the activity cell
+   cycles through what each node is doing. */
+.wo-panel .nl-nodes {
+    font-size: 0.7em;
+    line-height: 1.3;
+    padding: 0 4px;
+    border-radius: 2px;
+    background: #00AA00;
+    color: #000;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+.wo-panel .nl-where { color: #00AA00; margin-right: 3px; }
 .wo-panel .table { margin: 0; --bs-table-bg: transparent; }
 .wo-panel .table td {
     border-color: rgba(0,170,0,0.2) !important;
@@ -39,9 +56,8 @@
     max-width: 0;
 }
 </style>
-
 <div class="card wo-panel">
-    <div class="card-header">Who's Online</div>
+    <div class="card-header"><span>Who's Online</span><span class="wo-count" id="wo-online-count"></span></div>
     <div class="card-body p-0" id="sbbs-nodelist">
         <table class="table table-sm" style="table-layout:fixed;">
             <colgroup><col style="width:50%;"><col style="width:50%;"></colgroup>
@@ -52,12 +68,9 @@
         </table>
     </div>
 </div>
-
 <script type="text/javascript">
-
     var nll = <? write(system.node_list.length); ?>;
     var niu = 0;
-
     function _activityColor(str) {
         var pool = [
             '#00AA00','#55FF55','#00AAAA','#55FFFF',
@@ -71,24 +84,60 @@
         }
         return pool[Math.abs(h) % pool.length];
     }
-
+    /* Where a node entry is: 'N3' for a terminal node, 'Web' for a website session. */
+    function _nodeLabel(c) {
+        if (typeof c.node === 'number') return 'N' + c.node;
+        return c.connection === 'Web' || c.node === 'W' ? 'Web' : String(c.node || '');
+    }
+    var _nlGroups = [];
+    var _nlTick = 0;
+    /* The activity cell of everyone on more than one node: show the next node's. */
+    function _cycleActivities() {
+        _nlTick++;
+        _nlGroups.forEach(function (g) {
+            if (g.entries.length < 2 || !g.cell) return;
+            _paintActivity(g.cell, g.entries[_nlTick % g.entries.length], true);
+        });
+    }
+    function _paintActivity(td, e, showWhere) {
+        var actText = e.action || e.status || '';
+        td.innerHTML = '';
+        if (showWhere) {
+            var where = document.createElement('span');
+            where.className = 'nl-where';
+            where.textContent = _nodeLabel(e) + ':';
+            td.appendChild(where);
+        }
+        td.appendChild(document.createTextNode(actText));
+        td.title = (showWhere ? _nodeLabel(e) + ': ' : '') + actText;
+        td.style.color = _activityColor(actText);
+    }
     function _render_nodelist(data) {
         var tbody = document.getElementById('sbbs-nodelist-body');
         if (!tbody) return;
         tbody.innerHTML = '';
-
         niu = 0;
         var count = 0;
         var avatarUsers = [];
-
+        /* One row per person: the same account on several nodes (telnet +
+           web, two browsers, two terminals) is grouped, keeping every node's
+           activity for the cycling cell. */
+        var groups = [];
+        var byKey = {};
         data.forEach(function (c) {
             if (!c.user) return;
+            if (typeof c.node === 'number') niu++;
+            var key = c.useron ? 'u' + c.useron : 'n' + String(c.user).toLowerCase();
+            if (!byKey[key]) { byKey[key] = { user: c.user, useron: c.useron, entries: [], cell: null }; groups.push(byKey[key]); }
+            byKey[key].entries.push(c);
+        });
+        _nlGroups = groups;
+        groups.forEach(function (g) {
+            var c = g.entries[0];
             var tr = document.createElement('tr');
-
             var tdUser = document.createElement('td');
             var userWrap = document.createElement('div');
             userWrap.className = 'nl-user-cell';
-
             if (c.useron) {
                 var avatar = document.createElement('div');
                 avatar.setAttribute('data-avatar', String(c.useron));
@@ -100,7 +149,13 @@
             nameSpan.className = 'nl-username';
             nameSpan.textContent = c.user;
             userWrap.appendChild(nameSpan);
-
+            if (g.entries.length > 1) {
+                var badge = document.createElement('span');
+                badge.className = 'nl-nodes';
+                badge.textContent = 'x' + g.entries.length;
+                badge.title = 'On ' + g.entries.length + ' nodes: ' + g.entries.map(_nodeLabel).join(', ');
+                userWrap.appendChild(badge);
+            }
             if (c.user) {
                 /* The person menu (profile, PM, telegram, ignore...) for the
                    whole cell; the avatar itself already opens it site-wide,
@@ -115,21 +170,17 @@
                 })(c.user, c.useron));
             }
             tdUser.appendChild(userWrap);
-
             var tdActivity = document.createElement('td');
             tdActivity.className = 'nl-activity';
-            var actText = c.action || c.status || '';
-            tdActivity.textContent = actText;
-            tdActivity.title = actText;
-            tdActivity.style.color = _activityColor(actText);
-
+            g.cell = tdActivity;
+            _paintActivity(tdActivity, g.entries.length > 1 ? g.entries[_nlTick % g.entries.length] : c, g.entries.length > 1);
             tr.appendChild(tdUser);
             tr.appendChild(tdActivity);
             tbody.appendChild(tr);
-            if (typeof c.node === 'number' && c.user !== '') niu++;
             count++;
         });
-
+        var countEl = document.getElementById('wo-online-count');
+        if (countEl) countEl.textContent = count ? String(count) : '';
         if (count === 0) {
             var tr = document.createElement('tr');
             var td = document.createElement('td');
@@ -139,22 +190,18 @@
             tr.appendChild(td);
             tbody.appendChild(tr);
         }
-
         if (avatarUsers.length && typeof Avatars !== 'undefined' && Avatars.draw) {
             Avatars.draw(avatarUsers);
         }
-
         var sidebarEl = document.getElementById('sidebar');
         if (sidebarEl) {
             sidebarEl.querySelectorAll('.sb-nodes-in-use').forEach(function (el) { el.textContent = niu; });
             sidebarEl.querySelectorAll('.sb-nodes-available').forEach(function (el) { el.textContent = nll - niu; });
         }
     }
-
     function _sb_nodelist(evt) {
         _render_nodelist(JSON.parse(evt.data));
     }
-
     function _load_nodelist_snapshot() {
         if (typeof v4_get !== 'function') return;
         v4_get('./api/system.ssjs?call=node-list').then(function (data) {
@@ -164,8 +211,7 @@
             console.error("Who's Online snapshot error:", err);
         });
     }
-
     registerEventListener('nodelist', _sb_nodelist);
     _load_nodelist_snapshot();
-
+    if (!window.__nlCycleTimer) window.__nlCycleTimer = setInterval(_cycleActivities, 3000);
 </script>
