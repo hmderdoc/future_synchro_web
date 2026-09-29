@@ -689,6 +689,9 @@
 
     /* --- Local basemap: Natural Earth outlines drawn by Leaflet, CGA palette --- */
     .leaflet-container { background: #000000; }
+    .usermap-label-state { color: #7f7fff; font-size: 10px; opacity: .8; text-transform: none; letter-spacing: 0; }
+    .usermap-label-city { color: #ffaa00; font-size: 10px; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+    .usermap-label-city.is-capital { color: #ffff55; font-weight: bold; }
     .usermap-label {
         color: #55ffff; font-size: 10px; font-family: "VT323", monospace; letter-spacing: .04em;
         text-transform: uppercase; text-shadow: 0 0 3px #000, 0 0 3px #000; white-space: nowrap;
@@ -902,6 +905,76 @@
                 syncLabels();
             })
             .catch(function (err) { console.warn('[usermap] basemap', err); });
+
+        // Detail layers, also Natural Earth served from this site: states and
+        // provinces (root/lib/geo/states.geojson) from zoom 4, their names in
+        // tiers by area so countries cut into hundreds of small units (UK
+        // counties, Slovenian municipalities) do not flood the map: 20,000 km2
+        // and up from zoom 5, 3,000 km2 from zoom 6, the rest from zoom 8.
+        // Major cities (capitals + 100k and up, root/lib/geo/cities.geojson)
+        // as dots with names: capitals and 1M+ from zoom 4, 300k+ from zoom
+        // 7, the rest from zoom 8. None of it is interactive, so avatars on
+        // top keep their clicks.
+        var stateLines = L.layerGroup();
+        var stateLabels = { big: L.layerGroup(), mid: L.layerGroup(), small: L.layerGroup() };
+        var cityTiers = { big: L.layerGroup(), mid: L.layerGroup(), small: L.layerGroup() };
+        function toggleLayer(layer, on) {
+            if (on) { if (!map.hasLayer(layer)) layer.addTo(map); }
+            else if (map.hasLayer(layer)) map.removeLayer(layer);
+        }
+        function syncDetail() {
+            var z = map.getZoom();
+            toggleLayer(stateLines, z >= 4);
+            toggleLayer(stateLabels.big, z >= 5);
+            toggleLayer(stateLabels.mid, z >= 6);
+            toggleLayer(stateLabels.small, z >= 8);
+            toggleLayer(cityTiers.big, z >= 4);
+            toggleLayer(cityTiers.mid, z >= 7);
+            toggleLayer(cityTiers.small, z >= 8);
+        }
+        map.on('zoomend', syncDetail);
+        fetch('./lib/geo/states.geojson', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (states) {
+                L.geoJSON(states, {
+                    style: function () { return { color: '#3f3f9f', weight: 0.8, dashArray: '3 3', fill: false }; },
+                    interactive: false
+                }).addTo(stateLines);
+                (states.features || []).forEach(function (f) {
+                    var p = f.properties || {};
+                    if (!p.name || typeof p.lx !== 'number' || typeof p.ly !== 'number') return;
+                    var area = p.a || 0;
+                    var tier = area >= 20000 ? 'big' : (area >= 3000 ? 'mid' : 'small');
+                    stateLabels[tier].addLayer(L.marker([p.ly, p.lx], {
+                        icon: L.divIcon({ html: p.name, className: 'usermap-label usermap-label-state', iconSize: null }),
+                        interactive: false, keyboard: false
+                    }));
+                });
+                syncDetail();
+            })
+            .catch(function (err) { console.warn('[usermap] states', err); });
+        fetch('./lib/geo/cities.geojson', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (cities) {
+                (cities.features || []).forEach(function (f) {
+                    var p = f.properties || {};
+                    var c = f.geometry && f.geometry.coordinates;
+                    if (!p.name || !c) return;
+                    var tier = (p.cap || p.pop >= 1000000) ? 'big' : (p.pop >= 300000 ? 'mid' : 'small');
+                    var group = cityTiers[tier];
+                    group.addLayer(L.circleMarker([c[1], c[0]], {
+                        radius: p.cap ? 3.5 : (p.pop >= 1000000 ? 3 : 2),
+                        color: p.cap ? '#ffff55' : '#ffaa00', fillColor: p.cap ? '#ffff55' : '#ffaa00',
+                        fillOpacity: 0.9, weight: p.cap ? 1 : 0, interactive: false
+                    }));
+                    group.addLayer(L.marker([c[1], c[0]], {
+                        icon: L.divIcon({ html: p.name, className: 'usermap-label usermap-label-city' + (p.cap ? ' is-capital' : ''), iconSize: null, iconAnchor: [-5, 7] }),
+                        interactive: false, keyboard: false
+                    }));
+                });
+                syncDetail();
+            })
+            .catch(function (err) { console.warn('[usermap] cities', err); });
 
         // Fetch geo data
         fetch('./api/user-geo.ssjs', { credentials: 'same-origin' })
