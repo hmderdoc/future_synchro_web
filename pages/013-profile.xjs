@@ -174,7 +174,7 @@
     var PRESETS = {
         classic:  { bg: '#ffffff', box: '#ffffff', border: '#6699cc', title: '#6699cc', titleText: '#ffffff', text: '#000000', link: '#003399', accent: '#ff6600', muted: '#666666' },
         midnight: { bg: '#0b0f1a', box: '#121a2b', border: '#33415c', title: '#1e2a44', titleText: '#ffffff', text: '#d0d6e0', link: '#7fb3ff', accent: '#ffcc00', muted: '#8892a6' },
-        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#aaaaaa', link: '#55ffff', accent: '#ffff55', muted: '#555555' },
+        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#ffffff', link: '#55ffff', accent: '#ffff55', muted: '#aaaaaa' },
         sunset:   { bg: '#2b1b17', box: '#3a231d', border: '#b5573c', title: '#c1440e', titleText: '#fff3e0', text: '#f5e6d3', link: '#ffb347', accent: '#ff6b35', muted: '#c9a48f' },
         terminal: { bg: '#000000', box: '#000000', border: '#00aa00', title: '#005500', titleText: '#55ff55', text: '#55ff55', link: '#55ffff', accent: '#ffff55', muted: '#00aa00' }
     };
