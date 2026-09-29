@@ -26,6 +26,25 @@ var ID3_TEXT_FRAME_FIELDS = {
 };
 var _bodyParams = null;
 
+/* Bump a file's download counters without the uploader notification. */
+function countQuietDownload(dircode, filename) {
+	var fb, meta;
+	try {
+		fb = new FileBase(dircode);
+		if (!fb.open()) return;
+		try {
+			meta = fb.get(filename);
+			if (meta) {
+				meta.times_downloaded = (parseInt(meta.times_downloaded, 10) || 0) + 1;
+				meta.last_downloaded = time();
+				fb.update(filename, meta);
+			}
+		} finally { fb.close(); }
+	} catch (e) {
+		log(LOG_WARNING, 'files.ssjs: quiet download count failed for ' + filename + ': ' + e);
+	}
+}
+
 function trimText(value) {
 	return String(value || '').replace(/^\s+|\s+$/g, '');
 }
@@ -587,7 +606,14 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				f.close();
 				f = undefined;
 				reply = false;
-				user.downloaded_file(dircode, file_getname(file.path));
+				if (user.number > 0 && user.alias !== settings.guest) {
+					user.downloaded_file(dircode, file_getname(file.path));
+				} else {
+					/* A guest download (mostly crawlers): keep the file's counters
+					   honest, but no telegram or credits to the uploader - the
+					   core's downloaded_file() would tell them every time. */
+					countQuietDownload(dircode, file_getname(file.path));
+				}
 			}
 			break;
 		case 'stream-file':
