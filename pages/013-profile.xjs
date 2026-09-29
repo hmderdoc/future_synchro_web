@@ -174,7 +174,7 @@
     var PRESETS = {
         classic:  { bg: '#ffffff', box: '#ffffff', border: '#6699cc', title: '#6699cc', titleText: '#ffffff', text: '#000000', link: '#003399', accent: '#ff6600', muted: '#666666' },
         midnight: { bg: '#0b0f1a', box: '#121a2b', border: '#33415c', title: '#1e2a44', titleText: '#ffffff', text: '#d0d6e0', link: '#7fb3ff', accent: '#ffcc00', muted: '#8892a6' },
-        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#ffffff', link: '#55ffff', accent: '#ffff55', muted: '#aaaaaa', emph: '#55ff55' },
+        cga:      { bg: '#000000', box: '#000000', border: '#5555ff', title: '#0000aa', titleText: '#ffffff', text: '#ffffff', link: '#55ffff', accent: '#ffff55', muted: '#aaaaaa', emph: '#55ff55', button: '#aa00aa' },
         sunset:   { bg: '#2b1b17', box: '#3a231d', border: '#b5573c', title: '#c1440e', titleText: '#fff3e0', text: '#f5e6d3', link: '#ffb347', accent: '#ff6b35', muted: '#c9a48f' },
         terminal: { bg: '#000000', box: '#000000', border: '#00aa00', title: '#005500', titleText: '#55ff55', text: '#55ff55', link: '#55ffff', accent: '#ffff55', muted: '#00aa00' }
     };
@@ -187,7 +187,9 @@
         text: hex(themeSpec.text, preset.text), link: hex(themeSpec.link, preset.link),
         accent: hex(themeSpec.accent, preset.accent), muted: preset.muted,
         /* text drawn in the title colour (headings inside boxes); dark title bars need a readable stand-in */
-        emph: preset.emph || hex(themeSpec.accent, preset.title)
+        emph: preset.emph || hex(themeSpec.accent, preset.title),
+        /* filled buttons carry white text: a bright accent (CGA yellow) needs a darker fill */
+        button: preset.button || hex(themeSpec.accent, preset.accent)
     };
     if (themeSpec.background && !themeSpec.accent) theme.box = theme.bg;
 
@@ -236,6 +238,7 @@
     --pp-accent: <?xjs write(theme.accent); ?>;
     --pp-muted: <?xjs write(theme.muted); ?>;
     --pp-emph: <?xjs write(theme.emph); ?>;
+    --pp-button: <?xjs write(theme.button); ?>;
     background: var(--pp-bg);
     color: var(--pp-text);
     font-family: Verdana, Arial, Helvetica, sans-serif;
@@ -268,7 +271,7 @@
 .pp-details td { padding: 3px 4px; vertical-align: top; border-bottom: 1px dotted var(--pp-border); }
 .pp-details td:first-child { background: var(--pp-title); color: var(--pp-title-text); width: 38%; font-weight: bold; }
 .pp-btn { display: inline-block; padding: 4px 10px; margin: 2px 4px 2px 0; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); font: inherit; font-weight: bold; cursor: pointer; }
-.pp-btn-primary { background: var(--pp-accent); color: #ffffff; border-color: var(--pp-accent); }
+.pp-btn-primary { background: var(--pp-button); color: #ffffff; border-color: var(--pp-button); }
 .pp-btn-quiet { opacity: 0.85; }
 .pp-btn:disabled { opacity: 0.5; cursor: default; }
 .pp-link-btn { background: none; border: none; color: var(--pp-link); text-decoration: underline; cursor: pointer; font: inherit; font-size: 11px; padding: 0; margin-left: 8px; }
@@ -328,7 +331,7 @@
 .pp-title-link { color: var(--pp-title-text) !important; font-weight: normal; font-size: 11px; }
 .pp-sort { display: inline-flex; gap: 2px; }
 .pp-sort-btn { font: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border: 1px solid var(--pp-border); background: var(--pp-box); color: var(--pp-text); cursor: pointer; }
-.pp-sort-btn.is-active { background: var(--pp-accent); color: #fff; border-color: var(--pp-accent); }
+.pp-sort-btn.is-active { background: var(--pp-button); color: #fff; border-color: var(--pp-button); }
 .pp-box-title .pp-sort-btn { border-color: rgba(255,255,255,.4); background: transparent; color: var(--pp-title-text); }
 .pp-box-title .pp-sort-btn.is-active { background: rgba(255,255,255,.25); }
 .pp-plays-head { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
@@ -347,7 +350,7 @@
 .pp-track { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-bottom: 1px dotted var(--pp-border); }
 .pp-track-art { width: 40px; height: 40px; flex-shrink: 0; background: #000; border: 1px solid var(--pp-border); display: flex; align-items: center; justify-content: center; color: #555; font-size: 16px; overflow: hidden; }
 .pp-track-art img { width: 40px; height: 40px; object-fit: cover; display: block; }
-.pp-track-btn { width: 26px; height: 26px; flex-shrink: 0; border: 1px solid var(--pp-border); background: var(--pp-accent); color: #fff; cursor: pointer; font: inherit; font-size: 11px; line-height: 1; }
+.pp-track-btn { width: 26px; height: 26px; flex-shrink: 0; border: 1px solid var(--pp-border); background: var(--pp-button); color: #fff; cursor: pointer; font: inherit; font-size: 11px; line-height: 1; }
 .pp-track.is-playing { background: rgba(127,127,127,.12); }
 .pp-track.is-playing .pp-track-btn { background: var(--pp-title); }
 .pp-track-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
