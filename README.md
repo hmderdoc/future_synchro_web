@@ -30,7 +30,14 @@ Not trying to hoard these changes but also do not want to submit a hard fork to 
   (`webctrl.ini`). Owners edit headline / mood / song / featured friends /
   wall policy / theme + colours inline. Data: `root/api/social.ssjs` over
   the shared store `mods/load/social_lib.js` (the terminal shell uses the
-  same one, so friendships and posts are common).
+  same one, so friendships and posts are common). Unset themes default to
+  the CGA preset.
+- Music credit: a track is the member's when the MP3's composer tag (or the
+  records override) names them, then the featured artist ("feat. X"), the
+  uploader, the filename suffix. Being only the lead artist (the house bot
+  fronts most tracks) lists it as a collaboration with a "with <owner>" tag,
+  counted separately in the Music heading; `?call=creations` rows carry
+  `role`, `collab`, `collabWith`.
 - Forum Activity box on the profile: `?call=forum&user=..&page=N` lists their
   posts across every sub the viewer may read (alias + sysop-linked network
   handles, so posts from other boards under their handle are included),

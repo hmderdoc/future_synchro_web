@@ -131,8 +131,11 @@
     for (var mt0 = 0; mt0 < tracks.length; mt0++) {
         var tk = tracks[mt0], tmeta = trackTitle(tk.name), pc = playCounts[String(tk.name).toLowerCase()];
         mediaTracks.push({ name: tk.name, title: tmeta.title, artist: tmeta.artist, added: tk.added || 0, plays: pc ? pc.plays : 0,
+            collab: !!tk.collab, collabWith: String(tk.collabWith || ''),
             song: !!(summary && summary.profile.song && tk.name === summary.profile.song) });
     }
+    var mediaCollabs = 0;
+    for (var mc0 = 0; mc0 < mediaTracks.length; mc0++) if (mediaTracks[mc0].collab) mediaCollabs++;
     function caption(item) { return item.desc || item.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '); }
     var mediaAnsi = [], mediaImages = [];
     var canModerate = false;
@@ -175,7 +178,7 @@
         sunset:   { bg: '#2b1b17', box: '#3a231d', border: '#b5573c', title: '#c1440e', titleText: '#fff3e0', text: '#f5e6d3', link: '#ffb347', accent: '#ff6b35', muted: '#c9a48f' },
         terminal: { bg: '#000000', box: '#000000', border: '#00aa00', title: '#005500', titleText: '#55ff55', text: '#55ff55', link: '#55ffff', accent: '#ffff55', muted: '#00aa00' }
     };
-    var themeSpec = summary ? summary.profile.theme : { preset: 'classic', accent: '', background: '', text: '', link: '' };
+    var themeSpec = summary ? summary.profile.theme : { preset: 'cga', accent: '', background: '', text: '', link: '' };
     var preset = PRESETS[themeSpec.preset] || PRESETS.classic;
     function hex(v, fallback) { return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v || '')) ? String(v) : fallback; }
     var theme = {
@@ -581,7 +584,7 @@
 
 <?xjs if (mediaTracks.length) { ?>
         <div class="pp-box pp-media">
-            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Music (<?xjs write(mediaTracks.length); ?>)</span>
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Music (<?xjs write(mediaTracks.length - mediaCollabs); ?><?xjs if (mediaCollabs) write(' + ' + mediaCollabs + ' collab' + (mediaCollabs === 1 ? '' : 's')); ?>)</span>
                 <span class="pp-sort" data-sort-for="tracks">
                     <button type="button" class="pp-sort-btn is-active" data-sort="plays">top</button>
                     <button type="button" class="pp-sort-btn" data-sort="name">name</button>
@@ -1017,7 +1020,7 @@
                 '<button type="button" class="pp-track-btn pp-play" data-track="' + esc(t.name) + '" title="Play">&#9654;</button>' +
                 '<span class="pp-track-text"><span class="pp-track-title">' + esc(t.title) + '</span>' +
                 (t.artist ? '<span class="pp-track-artist">' + esc(t.artist) + '</span>' : '') + '</span>' +
-                (tag ? '<span class="pp-track-tag">' + tag + '</span>' : '') +
+                (tag ? '<span class="pp-track-tag">' + tag + '</span>' : (t.collab ? '<span class="pp-track-tag" title="Fronted this track; ' + esc(t.collabWith) + ' made it">with ' + esc(t.collabWith) + '</span>' : '')) +
                 '<span class="pp-track-plays">' + (t.plays || 0) + ' play' + ((t.plays || 0) === 1 ? '' : 's') + '</span>';
         }
         function render() {
