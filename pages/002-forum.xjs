@@ -127,7 +127,6 @@
         padding-top: 2px;
     }
     #forum-sub-toolbar .pull-right { float: right; }
-    #forum-sub-toolbar #forum-sort-controls { display: flex; margin-top: 0.4rem; }
     #forum-search-bar .input-group {
         width: 100%;
         display: flex;
