@@ -101,6 +101,10 @@
         if (info.userNumber > 0) html += '<button type="button" class="person-menu-item" data-act="profile">View ' + (isSelf ? 'my' : esc(info.alias) + "'s") + ' profile</button>';
         if (!isSelf) {
             html += '<button type="button" class="person-menu-item" data-act="pm">Private message</button>';
+            // Telegrams are a BBS thing: local accounts only (delivered at their next keypress / logon).
+            if (info.userNumber > 0 && window.sbbsConfig && window.sbbsConfig.isLoggedIn && typeof window.sendTelegram === 'function') {
+                html += '<button type="button" class="person-menu-item" data-act="telegram">Send telegram</button>';
+            }
             if (info.userNumber > 0 && window.sbbsConfig && window.sbbsConfig.isLoggedIn) {
                 var rel = info.relation;
                 html += '<button type="button" class="person-menu-item" data-act="friend">' +
@@ -154,6 +158,7 @@
             var act = b.getAttribute('data-act');
             if (act === 'profile') { close(); navigate('./?page=013-profile.xjs&user=' + encodeURIComponent(state.alias)); return; }
             if (act === 'pm') { close(); (typeof opts.onPrivate === 'function' ? opts.onPrivate : defaultPrivate)(opts); return; }
+            if (act === 'telegram') { close(); window.sendTelegram(state.alias); return; }
             if (act === 'friend') {
                 var action = state.relation === 'friends' ? 'unfriend' : state.relation === 'incoming' ? 'accept' : state.relation === 'outgoing' ? 'cancel' : 'request';
                 post('friend', { user: state.alias, action: action }).then(refresh);

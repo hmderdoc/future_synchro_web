@@ -101,12 +101,18 @@
             nameSpan.textContent = c.user;
             userWrap.appendChild(nameSpan);
 
-            if (c.user && <? write(user.alias != settings.guest); ?>) {
-                userWrap.title = '<? write(locale.strings.sidebar_node_list.label_send_telegram); ?>';
+            if (c.user) {
+                /* The person menu (profile, PM, telegram, ignore...) for the
+                   whole cell; the avatar itself already opens it site-wide,
+                   so only the name part needs a handler here. */
+                userWrap.title = c.user;
                 userWrap.style.cursor = 'pointer';
-                userWrap.addEventListener('click', (function (u) {
-                    return function () { sendTelegram(u); };
-                })(c.user));
+                userWrap.addEventListener('click', (function (u, n) {
+                    return function (ev) {
+                        if (ev.target.closest('[data-avatar]') || !window.PersonMenu) return;
+                        PersonMenu.open({ name: n ? String(n) : u, network: 'local', x: ev.clientX, y: ev.clientY });
+                    };
+                })(c.user, c.useron));
             }
             tdUser.appendChild(userWrap);
 
