@@ -313,7 +313,7 @@
         <button id="btn-terminal" type="button" title="Enter the BBS terminal" class="navbar-terminal-btn">
             <span class="crt-screen">
                 <span class="crt-scanline"></span>
-                <span class="crt-text" id="crt-label">ENTER</span>
+                <span class="crt-text crt-alternate" id="crt-label"><span class="crt-word">ENTER</span><span class="crt-word crt-word-alt">SYSTEM</span></span>
             </span>
             <span class="modem-strip">
                 <span class="mled"><span class="mled-light mled-cd"></span><span class="mled-label">CD</span></span>

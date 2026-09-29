@@ -235,15 +235,21 @@ body.terminal-open {
 .crt-text {
     font-family: 'VT323', monospace;
     font-size: 14px;
-    color: #AA5500;
+    color: #FFFF55;
     letter-spacing: 1px;
     text-transform: uppercase;
     z-index: 2;
     position: relative;
-    text-shadow: 0 0 4px rgba(170, 85, 0, 0.4);
+    text-shadow: 0 0 4px rgba(255, 255, 85, 0.45);
     animation: crt-flicker 4s ease-in-out infinite;
     transition: color 0.4s, text-shadow 0.4s;
 }
+/* Idle: the screen alternates ENTER / SYSTEM (two words stacked, one lit at a time). */
+.crt-alternate { display: inline-grid; }
+.crt-alternate .crt-word { grid-area: 1 / 1; animation: crt-word-first 4s steps(1, end) infinite; }
+.crt-alternate .crt-word-alt { animation-name: crt-word-second; }
+@keyframes crt-word-first  { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes crt-word-second { 0%, 49.9% { opacity: 0; } 50%, 100% { opacity: 1; } }
 @keyframes crt-flicker {
     0%, 100% { opacity: 0.9; }
     3%       { opacity: 0.6; }
@@ -260,8 +266,8 @@ body.terminal-open {
     border-color: #553300;
 }
 #btn-terminal:hover .crt-text {
-    color: #FF8800;
-    text-shadow: 0 0 8px rgba(255, 136, 0, 0.6);
+    color: #FFFFAA;
+    text-shadow: 0 0 8px rgba(255, 255, 85, 0.7);
 }
 
 /* Horizontal modem faceplate */

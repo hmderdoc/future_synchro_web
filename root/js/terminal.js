@@ -225,11 +225,15 @@
         //   hidden     -> "ENTER"   (amber, dimmer)
         if (crtLabel) {
             if (isConnected) {
+                crtLabel.classList.remove('crt-alternate');
                 crtLabel.textContent = 'ONLINE';
             } else if (isVisible) {
+                crtLabel.classList.remove('crt-alternate');
                 crtLabel.textContent = 'CRT ON';
             } else {
-                crtLabel.textContent = 'ENTER';
+                /* Idle: back to the alternating ENTER / SYSTEM words. */
+                crtLabel.classList.add('crt-alternate');
+                crtLabel.innerHTML = '<span class="crt-word">ENTER</span><span class="crt-word crt-word-alt">SYSTEM</span>';
             }
         }
     }
