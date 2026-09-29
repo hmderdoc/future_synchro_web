@@ -13,8 +13,8 @@
 
 /* Reset & container */
 .nf-app {
-    max-width: 640px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 0;
     font-family: 'Spleen', ui-monospace, monospace;
     color: #e0e0e0;
@@ -95,7 +95,7 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid #1a1a1a;
-    padding: 10px 16px;
+    padding: 8px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -149,7 +149,11 @@
 
 /* ── Article cards ── */
 .nf-feed {
-    padding: 0 12px 80px;
+    padding: 0 0 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 6px;
+    align-items: stretch;
 }
 
 .nf-card {
@@ -157,9 +161,9 @@
     text-decoration: none;
     color: inherit;
     background: #111;
-    border-radius: 14px;
+    border-radius: 3px;
     overflow: hidden;
-    margin-bottom: 14px;
+    margin-bottom: 0;
     border: 1px solid #1a1a1a;
     transition: border-color 0.15s;
     cursor: pointer;
@@ -167,23 +171,24 @@
 .nf-card:hover { border-color: #333; }
 .nf-card:active { transform: scale(0.995); }
 
-/* Hero card (first article) */
+/* Hero card (first article): the full row */
+.nf-card-hero { grid-column: 1 / -1; }
 .nf-card-hero .nf-card-img {
     width: 100%;
-    height: 220px;
+    height: 320px;
     object-fit: cover;
     display: block;
 }
-.nf-card-hero .nf-card-body { padding: 14px 16px 16px; }
+.nf-card-hero .nf-card-body { padding: 12px 14px 14px; }
 .nf-card-hero .nf-card-title {
-    font-size: 20px;
+    font-size: 26px;
     font-weight: 700;
     line-height: 1.25;
     color: #fff;
     margin: 0 0 8px;
 }
 .nf-card-hero .nf-card-snippet {
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.45;
     color: #aaa;
     margin: 0 0 10px;
@@ -200,14 +205,14 @@
 }
 .nf-card-std .nf-card-body {
     flex: 1;
-    padding: 12px 14px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-width: 0;
 }
 .nf-card-std .nf-card-title {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     line-height: 1.3;
     color: #fff;
@@ -218,7 +223,7 @@
     overflow: hidden;
 }
 .nf-card-std .nf-card-snippet {
-    font-size: 13px;
+    font-size: 14px;
     color: #888;
     margin: 0;
     display: -webkit-box;
@@ -246,7 +251,7 @@
 
 /* Card meta line */
 .nf-card-meta {
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
     display: flex;
     align-items: center;
@@ -353,22 +358,24 @@
 /* Article content area */
 .nf-article-hero-img {
     width: 100%;
-    max-height: 300px;
+    max-height: 420px;
     object-fit: cover;
     display: block;
 }
 .nf-article-header {
-    padding: 20px 16px 12px;
+    padding: 20px 24px 12px;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 .nf-article-header h1 {
-    font-size: 24px;
+    font-size: 32px;
     font-weight: 700;
     line-height: 1.25;
     color: #fff;
     margin: 0 0 10px;
 }
 .nf-article-meta {
-    font-size: 13px;
+    font-size: 15px;
     color: #666;
     display: flex;
     gap: 10px;
@@ -378,13 +385,15 @@
 
 /* Rich content rendering */
 .nf-article-content {
-    padding: 0 16px 40px;
-    font-size: 16px;
-    line-height: 1.7;
-    color: #ccc;
+    padding: 0 24px 48px;
+    max-width: 1200px;   /* long lines read badly; the reader fills to this, then centres */
+    margin: 0 auto;
+    font-size: 19px;
+    line-height: 1.65;
+    color: #d8d8d8;
 }
 .nf-article-content p {
-    margin: 0 0 16px;
+    margin: 0 0 18px;
 }
 .nf-article-content h2, .nf-article-content h3, .nf-article-content h4 {
     color: #fff;
@@ -399,7 +408,7 @@
 .nf-article-content img {
     max-width: 100%;
     height: auto;
-    border-radius: 8px;
+    border-radius: 3px;
     margin: 12px 0;
     display: block;
 }
@@ -409,7 +418,7 @@
     padding: 8px 16px;
     color: #aaa;
     background: #111;
-    border-radius: 0 6px 6px 0;
+    border-radius: 0;
 }
 .nf-article-content ul, .nf-article-content ol {
     padding-left: 24px;
@@ -549,8 +558,8 @@
     .nf-article-header h1 { font-size: 20px; }
     .nf-article-content { font-size: 15px; }
 }
-@media (min-width: 641px) {
-    .nf-feed { padding: 0 0 80px; }
+@media (max-width: 640px) {
+    .nf-feed { grid-template-columns: 1fr; }
 }
 </style>
 
