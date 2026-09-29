@@ -407,7 +407,15 @@
                         <? write(user.alias); ?>
                         <span class="badge bg-danger" id="badge-unread-mail" style="display:none;"></span>
                         <span class="badge bg-warning text-dark" id="badge-friend-requests" style="display:none;" title="Friend requests waiting"></span>
+                        <div class="nav-avatar" data-avatar="<? write(user.number); ?>" aria-hidden="true"></div>
                     </a>
+                    <script>
+                    /* Your avatar next to your name; redrawn by avatars.js when it changes. */
+                    (function () {
+                        function draw() { if (window.Avatars && Avatars.draw) Avatars.draw(['<? write(user.number); ?>']); }
+                        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', draw); else draw();
+                    })();
+                    </script>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="./?page=000-mail.xjs">
                             <span class="bin-icon" data-icon="mail"></span><? write(locale.strings.main.menu_item_mail); ?>

@@ -142,8 +142,9 @@ html[data-theme="cga"] body {
     color: #FF55FF !important;
 }
 
+/* The account menu shows your avatar instead of a chevron. */
 [data-theme="cga"] .navbar-nav .auth-nav-link.dropdown-toggle::after {
-    border-top-color: #55FF55;
+    display: none;
 }
 
 [data-theme="cga"] .card {

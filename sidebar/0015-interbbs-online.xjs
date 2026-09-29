@@ -17,7 +17,7 @@
     justify-content: space-between;
     align-items: center;
 }
-.ib-panel .ib-count { font-size: 0.8em; font-weight: normal; color: #AA00AA; }
+.ib-panel .ib-count { font-size: 0.8em; font-weight: normal; color: #FF55FF; }
 .ib-panel .table { margin: 0; --bs-table-bg: transparent; }
 .ib-panel .table td {
     border-color: rgba(170,0,170,0.25) !important;

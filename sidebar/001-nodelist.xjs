@@ -15,7 +15,7 @@
     justify-content: space-between;
     align-items: center;
 }
-.wo-panel .wo-count { font-size: 0.8em; font-weight: normal; color: #00AA00; }
+.wo-panel .wo-count { font-size: 0.8em; font-weight: normal; color: #55FF55; }
 /* One row per person: a badge counts their nodes and the activity cell
    cycles through what each node is doing. */
 .wo-panel .nl-nodes {
