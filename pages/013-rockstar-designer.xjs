@@ -51,7 +51,7 @@
     width: 360px;
     flex-shrink: 0;
     position: sticky;
-    top: 70px;
+    top: 0;
     border-right: 1px solid #292929;
     background: #0a0a0a;
 }

@@ -165,6 +165,7 @@
                 }
 
                 window.scrollTo(0, 0);
+                if (contentEl) contentEl.scrollTop = 0; /* the content column is its own scroller on wide screens */
                 drawAvatars(contentEl);
 
                 var finishNavigate = function () {

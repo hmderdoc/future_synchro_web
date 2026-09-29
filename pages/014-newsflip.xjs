@@ -1071,16 +1071,25 @@
     });
 
     /* ── infinite scroll ── */
+    /* On wide screens the #content column is the scroller (spa.css), on
+       narrow ones the window is; read whichever actually scrolls. */
     var scrollHandler = function () {
         if (loading || !hasMore || overlayOpen) return;
-        var scrollY = window.pageYOffset || document.documentElement.scrollTop;
-        var viewH = window.innerHeight;
-        var docH = document.documentElement.scrollHeight;
+        var column = document.getElementById('content');
+        var scrollY, viewH, docH;
+        if (column && column.scrollHeight > column.clientHeight && getComputedStyle(column).overflowY === 'auto') {
+            scrollY = column.scrollTop; viewH = column.clientHeight; docH = column.scrollHeight;
+        } else {
+            scrollY = window.pageYOffset || document.documentElement.scrollTop;
+            viewH = window.innerHeight;
+            docH = document.documentElement.scrollHeight;
+        }
         if (scrollY + viewH >= docH - 400) {
             loadMore();
         }
     };
     window.addEventListener('scroll', scrollHandler, { passive: true });
+    (function () { var column = document.getElementById('content'); if (column) column.addEventListener('scroll', scrollHandler, { passive: true }); })();
 
     /* ── prefs button ── */
     $prefsBtn.addEventListener('click', function () {

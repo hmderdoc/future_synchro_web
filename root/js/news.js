@@ -898,6 +898,8 @@
         html += '</div>';
         $content.innerHTML = html;
         window.scrollTo(0, 0);
+        var column = document.getElementById('content');
+        if (column) column.scrollTop = 0;
     }
 
     /* ── search handling ─────────────────────────────────────────────── */
