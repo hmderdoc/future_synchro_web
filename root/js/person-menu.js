@@ -390,7 +390,9 @@
         var el = e.target.closest('[data-avatar]');
         if (!el) return;
         var raw = String(el.getAttribute('data-avatar') || '').replace(/^\s+|\s+$/g, '');
-        if (!raw.length || el.closest('.person-menu, .person-picker')) return;
+        /* Your own avatar in the navbar is part of the account menu's
+           toggle, a graphic, never a person-menu trigger. */
+        if (!raw.length || el.closest('.person-menu, .person-picker, .auth-nav-link, [data-no-person-menu]')) return;
         var name = raw, system = '';
         var at = raw.indexOf('@');
         if (at > 0) { name = raw.substring(0, at); system = raw.substring(at + 1); }
