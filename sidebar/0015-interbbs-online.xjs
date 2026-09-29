@@ -1,0 +1,137 @@
+<style>
+/* InterBBS callers: the magenta card (green = Who's Online, cyan = System
+   Information, red/yellow = Recent Visitors). */
+.ib-panel {
+    --bs-card-border-color: #AA00AA;
+    --bs-card-bg: #000;
+    --bs-card-cap-bg: #000;
+    --bs-card-cap-color: #FF55FF;
+    border-color: #AA00AA !important;
+}
+.ib-panel > .card-header {
+    color: #FF55FF !important;
+    background: #000 !important;
+    border-bottom: 2px solid #AA00AA !important;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ib-panel .ib-count { font-size: 0.8em; font-weight: normal; color: #AA00AA; }
+.ib-panel .table { margin: 0; --bs-table-bg: transparent; }
+.ib-panel .table td {
+    border-color: rgba(170,0,170,0.25) !important;
+    vertical-align: middle;
+}
+.ib-panel .table thead th {
+    background: #AA00AA !important;
+    color: #000 !important;
+    border-color: #AA00AA !important;
+    font-weight: bold;
+}
+.ib-panel .ib-user-cell {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+.ib-panel .ib-avatar { width: 40px; height: 24px; flex-shrink: 0; background: #000; }
+.ib-panel .ib-avatar img { width: 40px; height: 24px; image-rendering: pixelated; display: block; }
+.ib-panel .ib-username { color: #FF55FF; overflow: hidden; text-overflow: ellipsis; }
+.ib-panel .ib-origin {
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
+    color: #FFFF55;
+}
+.ib-panel .ib-empty { color: #AA00AA; }
+</style>
+<div class="card ib-panel">
+    <div class="card-header"><span>Callers on the Net</span><span class="ib-count" id="ib-online-count"></span></div>
+    <div class="card-body p-0" id="ib-online">
+        <table class="table table-sm" style="table-layout:fixed;">
+            <colgroup><col style="width:50%;"><col style="width:50%;"></colgroup>
+            <thead><tr><th>User</th><th>Origin</th></tr></thead>
+            <tbody id="ib-online-body">
+                <tr><td colspan="2" class="ib-empty">Asking the net...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script type="text/javascript">
+(function () {
+    /* Colours per BBS name, from the same CGA pool Who's Online uses for activity. */
+    function _ibColor(str) {
+        var pool = ['#FF55FF', '#FFFF55', '#55FFFF', '#55FF55', '#FF5555', '#5555FF', '#FFFFFF', '#AAAAAA'];
+        var h = 0;
+        var s = (str || '').toLowerCase().trim();
+        for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return pool[Math.abs(h) % pool.length];
+    }
+    function _ibRender(data) {
+        var tbody = document.getElementById('ib-online-body');
+        var count = document.getElementById('ib-online-count');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        var users = data && Array.isArray(data.users) ? data.users : [];
+        users.forEach(function (u) {
+            if (!u || !u.name) return;
+            var tr = document.createElement('tr');
+            var tdUser = document.createElement('td');
+            var wrap = document.createElement('div');
+            wrap.className = 'ib-user-cell';
+            wrap.title = u.name + ' on ' + (u.bbs || u.host || 'another BBS') + (u.action ? ' - ' + u.action : '');
+            if (u.avatar && window.GraphicsConverter) {
+                var box = document.createElement('div');
+                box.className = 'ib-avatar';
+                wrap.appendChild(box);
+                try {
+                    GraphicsConverter.shared().from_bin(atob(u.avatar), 10, 6, function (url) {
+                        var img = new Image(); img.src = url; box.appendChild(img);
+                    }, true);
+                } catch (_e) { box.remove(); }
+            }
+            var name = document.createElement('span');
+            name.className = 'ib-username';
+            name.textContent = u.name;
+            wrap.appendChild(name);
+            wrap.addEventListener('click', function (ev) {
+                if (!window.PersonMenu) return;
+                PersonMenu.open({ name: u.name, network: 'ibbs', system: u.bbs || u.host, host: u.host, avatar: u.avatar || '', x: ev.clientX, y: ev.clientY });
+            });
+            tdUser.appendChild(wrap);
+            var tdOrigin = document.createElement('td');
+            tdOrigin.className = 'ib-origin';
+            tdOrigin.textContent = u.bbs || u.host || '';
+            tdOrigin.title = (u.bbs || '') + (u.host ? ' (' + u.host + ')' : '');
+            tdOrigin.style.color = _ibColor(u.bbs || u.host);
+            tr.appendChild(tdUser);
+            tr.appendChild(tdOrigin);
+            tbody.appendChild(tr);
+        });
+        if (!users.length) {
+            var tr0 = document.createElement('tr');
+            var td0 = document.createElement('td');
+            td0.setAttribute('colspan', '2');
+            td0.className = 'ib-empty';
+            td0.textContent = data && data.systems ? 'Nobody on the other boards right now' : 'No boards answered';
+            tr0.appendChild(td0);
+            tbody.appendChild(tr0);
+        }
+        if (count) count.textContent = users.length ? String(users.length) : '';
+    }
+    function _ibLoad() {
+        if (typeof v4_get !== 'function' || !document.getElementById('ib-online-body')) return;
+        v4_get('./api/ibbs.ssjs?call=online').then(_ibRender).catch(function (err) {
+            console.error('InterBBS online error:', err);
+        });
+    }
+    _ibLoad();
+    /* One poller per page lifetime (the sidebar script can run again on a
+       re-render); the API answers from its cache between sweeps. */
+    if (!window.__ibOnlineTimer) window.__ibOnlineTimer = setInterval(_ibLoad, 60000);
+})();
+</script>

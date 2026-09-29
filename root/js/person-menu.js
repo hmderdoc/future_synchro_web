@@ -9,6 +9,8 @@
  *          link to a main name / unlink, mark as not a local user / allow
  *
  * Usage: PersonMenu.open({ name, network, system, avatar, x, y, onPrivate })
+ *        network 'ibbs' (+ host) = a caller on another BBS from the InterBBS
+ *        card: no lookup, just an InterBBS telegram and a telnet link.
  * Data comes from ./api/social.ssjs?call=person; writes go through the same
  * API with the session's CSRF token. `window.PersonMenu.ignored` holds the
  * current ignore list so the chat page can hide those senders.
@@ -139,12 +141,80 @@
         drawAvatar(menuEl.querySelector('.person-menu-avatar'), opts, info);
     }
 
+    /* A caller on another BBS (the InterBBS card): no account here to look
+       up; the menu offers an InterBBS telegram to them over MSP. */
+    function openInterBbs(opts) {
+        var loggedIn = !!(window.sbbsConfig && window.sbbsConfig.isLoggedIn);
+        menuEl = document.createElement('div');
+        menuEl.className = 'person-menu';
+        menuEl.innerHTML =
+            '<div class="person-menu-head"><div class="person-menu-avatar"></div><div style="min-width:0">' +
+            '<div class="person-menu-name">' + esc(opts.name) + '</div>' +
+            '<div class="person-menu-sub">' + esc(opts.system || opts.host || 'another BBS') + (opts.host && opts.host !== opts.system ? ' &middot; ' + esc(opts.host) : '') + '</div></div></div>' +
+            (loggedIn
+                ? '<button type="button" class="person-menu-item" data-act="ibbs-telegram">Send InterBBS telegram</button>'
+                : '<div class="person-menu-note">Log in to send them an InterBBS telegram.</div>') +
+            (opts.host ? '<a class="person-menu-item" href="telnet://' + esc(opts.host) + '">Visit ' + esc(opts.system || opts.host) + ' (telnet)</a>' : '');
+        place(menuEl, opts.x || 20, opts.y || 20);
+        drawAvatar(menuEl.querySelector('.person-menu-avatar'), opts, { userNumber: 0 });
+        document.addEventListener('click', onDocClick, true);
+        document.addEventListener('keydown', onKey);
+        menuEl.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-act="ibbs-telegram"]');
+            if (!b) return;
+            close();
+            sendInterBbsTelegram(opts);
+        });
+    }
+
+    /* The site's telegram modal (common.js sendTelegram), posted to the InterBBS API instead. */
+    function sendInterBbsTelegram(opts) {
+        var modalEl = document.getElementById('popUpModal');
+        var titleEl = document.getElementById('popUpModalTitle');
+        var bodyEl = document.getElementById('popUpModalBody');
+        var actionBtn = document.getElementById('popUpModalActionButton');
+        if (!modalEl || !titleEl || !bodyEl || !window.bootstrap) return;
+        titleEl.textContent = 'InterBBS telegram to ' + opts.name + ' on ' + (opts.system || opts.host);
+        bodyEl.innerHTML =
+            '<form id="ibbs-telegram-form">' +
+            '<input type="text" class="form-control" placeholder="My message" name="message" id="ibbs-telegram-text" maxlength="400" autocomplete="off">' +
+            '<div class="small text-muted mt-1">Delivered to their BBS over the InterBBS messenger; it shows on their screen if they are still on.</div>' +
+            '<div class="small mt-1" id="ibbs-telegram-status"></div>' +
+            '<input type="submit" value="submit" class="d-none">' +
+            '</form>';
+        var sending = false;
+        var sendFn = function (evt) {
+            if (evt) evt.preventDefault();
+            if (sending) return;
+            var input = document.getElementById('ibbs-telegram-text');
+            var status = document.getElementById('ibbs-telegram-status');
+            var text = input ? input.value.trim() : '';
+            if (!text.length) { if (status) status.textContent = 'Type something first.'; return; }
+            sending = true;
+            fetch('./api/ibbs.ssjs?call=telegram', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf() },
+                body: JSON.stringify({ user: opts.name, host: opts.host, message: text })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+                sending = false;
+                if (!res.ok) { if (status) status.textContent = res.error || 'Could not send'; return; }
+                bootstrap.Modal.getInstance(modalEl).hide();
+            }).catch(function () { sending = false; if (status) status.textContent = 'Could not send'; });
+        };
+        var form = document.getElementById('ibbs-telegram-form');
+        if (form) form.addEventListener('submit', sendFn);
+        if (actionBtn) { actionBtn.hidden = false; actionBtn.onclick = sendFn; }
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        setTimeout(function () { var i = document.getElementById('ibbs-telegram-text'); if (i) i.focus(); }, 300);
+    }
+
     function open(opts) {
         injectStyle();
         close();
         opts = opts || {};
         opts.network = String(opts.network || 'local').toLowerCase() || 'local';
         if (!opts.name) return;
+        if (opts.network === 'ibbs') { openInterBbs(opts); return; }
         menuEl = document.createElement('div');
         menuEl.className = 'person-menu';
         menuEl.innerHTML = '<div class="person-menu-note">Looking up ' + esc(opts.name) + '...</div>';

@@ -32,6 +32,14 @@ Not trying to hoard these changes but also do not want to submit a hard fork to 
   the shared store `mods/load/social_lib.js` (the terminal shell uses the
   same one, so friendships and posts are common). Unset themes default to
   the CGA preset.
+- Callers on the Net (sidebar, between Who's Online and System Information):
+  who is on the other BBSes in the InterBBS messenger network
+  (`ctrl/sbbsimsg.lst`, `exec/load/sbbsimsg_lib.js`, the same list the
+  ibbs-online door sweeps), local callers left out, one row per caller with
+  their BBS as the Origin column and their avatar when the network delivered
+  one. `root/api/ibbs.ssjs?call=online` caches a 2-second sweep for 45 s;
+  clicking a caller opens the person menu with "Send InterBBS telegram"
+  (`?call=telegram`, MSP to their board) and a telnet link to it.
 - Chat handle (Settings): per-letter colours (system colour pickers, solid /
   gradient / rainbow presets) and a tag, saved through
   `root/api/chat-style.ssjs` into the record the terminal shell edits too
