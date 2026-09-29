@@ -7,7 +7,7 @@
 
 <div id="news-app">
 
-    <nav class="news-tabs" aria-label="News views">
+    <nav class="news-tabs stick-top" aria-label="News views">
         <a class="news-tab" href="./?page=014-newsflip.xjs">
             <span class="bin-icon" data-icon="newsflip"></span><span>News Flip</span>
         </a>
@@ -17,7 +17,7 @@
     </nav>
 
     <!-- Search -->
-    <div id="news-search-bar" class="mb-3">
+    <div id="news-search-bar" class="mb-3 stick-top stick-top-fill">
         <div class="input-group">
             <button class="btn btn-default icon" type="button"
                     id="news-search-btn" title="Search feeds">
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Breadcrumb -->
-    <nav id="news-breadcrumb" aria-label="breadcrumb" style="display:none">
+    <nav id="news-breadcrumb" class="stick-top stick-top-fill" aria-label="breadcrumb" style="display:none">
         <ol class="breadcrumb mb-2"></ol>
     </nav>
 

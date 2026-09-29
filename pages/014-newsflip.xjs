@@ -143,132 +143,8 @@
 .nf-pill:not(.active):hover { border-color: #555; color: #ccc; }
 
 /* ── Article cards ── */
-.nf-feed {
-    padding: 0 0 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+/* Card and article styles live in css/news.css (shared with Browse Feeds). */
 
-.nf-card {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    background: #111;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 0;
-    border: 1px solid #1a1a1a;
-    transition: border-color 0.15s;
-    cursor: pointer;
-}
-.nf-card:hover { border-color: #333; }
-.nf-card:active { transform: scale(0.995); }
-
-/* Hero card (first article) */
-.nf-card-hero .nf-card-img {
-    width: 100%;
-    height: 320px;
-    object-fit: cover;
-    display: block;
-}
-.nf-card-hero .nf-card-body { padding: 12px 14px 14px; }
-.nf-card-hero .nf-card-title {
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 1.25;
-    color: #fff;
-    margin: 0 0 8px;
-}
-.nf-card-hero .nf-card-snippet {
-    font-size: 16px;
-    line-height: 1.45;
-    color: #aaa;
-    margin: 0 0 10px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* Standard card (side-by-side) */
-.nf-card-std {
-    display: flex;
-    min-height: 300px;
-}
-.nf-card-std .nf-card-body {
-    flex: 1;
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 0;
-}
-.nf-card-std .nf-card-title {
-    font-size: 28px;
-    font-weight: 600;
-    line-height: 1.3;
-    color: #fff;
-    margin: 0 0 6px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-.nf-card-std .nf-card-snippet {
-    font-size: 19px;
-    line-height: 1.5;
-    color: #aaa;
-    margin: 0 0 10px;
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-.nf-card-std .nf-card-thumb {
-    width: 520px;
-    min-height: 300px;
-    flex-shrink: 0;
-    object-fit: cover;
-}
-.nf-card-std .nf-card-thumb-placeholder {
-    width: 520px;
-    min-height: 300px;
-    flex-shrink: 0;
-    background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #333;
-    font-size: 28px;
-}
-
-/* Card meta line */
-.nf-card-meta {
-    font-size: 16px;
-    color: #666;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.nf-card-source {
-    color: #33ff33;
-    font-weight: 600;
-}
-.nf-card-time { color: #555; }
-
-/* Content badge on cards */
-.nf-has-content-badge {
-    display: inline-block;
-    font-size: 10px;
-    color: #33ff33;
-    border: 1px solid #33ff3344;
-    border-radius: 4px;
-    padding: 1px 5px;
-    margin-left: 6px;
-    vertical-align: middle;
-    letter-spacing: 0.3px;
-}
 
 /* ── Reading Overlay ── */
 .nf-overlay {
@@ -350,80 +226,7 @@
 }
 
 /* Article content area */
-.nf-article-hero-img {
-    width: 100%;
-    max-height: 420px;
-    object-fit: cover;
-    display: block;
-}
-.nf-article-header {
-    padding: 20px 24px 12px;
-}
-.nf-article-header h1 {
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.25;
-    color: #fff;
-    margin: 0 0 10px;
-}
-.nf-article-meta {
-    font-size: 15px;
-    color: #666;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-.nf-article-meta .src { color: #33ff33; font-weight: 600; }
 
-/* Rich content rendering */
-.nf-article-content {
-    padding: 0 24px 48px;
-    font-size: 19px;
-    line-height: 1.65;
-    color: #d8d8d8;
-}
-.nf-article-content p {
-    margin: 0 0 18px;
-}
-.nf-article-content h2, .nf-article-content h3, .nf-article-content h4 {
-    color: #fff;
-    margin: 24px 0 10px;
-}
-.nf-article-content a {
-    color: #33ff33;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-.nf-article-content a:hover { opacity: 0.8; }
-.nf-article-content img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 3px;
-    margin: 12px 0;
-    display: block;
-}
-.nf-article-content blockquote {
-    border-left: 3px solid #33ff33;
-    margin: 16px 0;
-    padding: 8px 16px;
-    color: #aaa;
-    background: #111;
-    border-radius: 0;
-}
-.nf-article-content ul, .nf-article-content ol {
-    padding-left: 24px;
-    margin: 0 0 16px;
-}
-.nf-article-content li {
-    margin-bottom: 6px;
-}
-.nf-article-content pre, .nf-article-content code {
-    background: #111;
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 14px;
-    color: #e0e0e0;
-}
 .nf-article-content pre {
     padding: 12px;
     overflow-x: auto;
@@ -537,22 +340,11 @@
 .nf-empty-icon { font-size: 48px; margin-bottom: 12px; }
 .nf-empty-text { font-size: 15px; }
 
-/* The tab bar pins above the header: no gap for content to show through. */
-.news-tabs.stick-top { margin-bottom: 0; border-radius: 0; }
 
 /* ── Mobile optimizations ── */
 @media (max-width: 480px) {
     .nf-app { max-width: 100%; }
-    .nf-card-hero .nf-card-img { height: 180px; }
-    .nf-card-hero .nf-card-title { font-size: 18px; }
     .nf-topic-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .nf-card-std { min-height: 100px; }
-    .nf-card-std .nf-card-title { font-size: 17px; }
-    .nf-card-std .nf-card-snippet { font-size: 14px; }
-    .nf-card-std .nf-card-thumb,
-    .nf-card-std .nf-card-thumb-placeholder { width: 110px; min-height: 100px; }
-    .nf-article-header h1 { font-size: 20px; }
-    .nf-article-content { font-size: 15px; }
 }
 
 </style>

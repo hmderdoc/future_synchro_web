@@ -543,6 +543,7 @@
             $bcOl.appendChild(li);
         }
         $breadcrumb.style.display = crumbs.length > 1 ? '' : 'none';
+        if (window.applyStickyHeads) window.applyStickyHeads();
     }
 
     function navigateTo(crumb) {
@@ -801,54 +802,60 @@
         });
     }
 
+    /* Plain text of an article's summary for the card snippet. */
+    function snippetOf(a, max) {
+        var raw = String(a.description || a.content || '');
+        var text = raw.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+            .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/\s+/g, ' ').trim();
+        if (text.length > max) text = text.substr(0, max).replace(/\s+\S*$/, '') + '…';
+        return text;
+    }
+
+    /* The same cards News Flip shows (css/news.css .nf-card*): full-width
+       rows, big thumbnail, title, snippet, source line. */
     function renderArticles() {
         if (!state.articles) return;
         if (!state.articles.length) {
             $content.innerHTML = '<div class="news-empty">No articles found in this feed.</div>';
             return;
         }
-
-        var html = '<ul class="news-article-list">';
-        var lastDate = '';
-
+        var html = '<div class="nf-feed">';
         for (var i = 0; i < state.articles.length; i++) {
             var a = state.articles[i];
-            var dk = dateKey(a.pubDate);
-            if (dk !== lastDate) {
-                lastDate = dk;
-                html += '<li class="news-date-divider">'
-                      + esc(formatDate(a.pubDate) || 'Unknown date')
-                      + '</li>';
-            }
-
-            var thumbHtml;
-            if (a.thumbnail) {
-                thumbHtml = '<img class="news-article-thumb" src="' + esc(a.thumbnail)
-                          + '" loading="lazy" onerror="this.style.display=\'none\'">';
-            } else {
-                thumbHtml = '<div class="news-article-thumb placeholder-thumb">\uD83D\uDCF0</div>';
-            }
-
-            var byline = '';
-            if (a.author) byline += esc(a.author);
-            if (a.pubDate) {
-                var t = formatTime(a.pubDate);
-                if (t) byline += (byline ? ' \u00B7 ' : '') + t;
-            }
-
-            html += '<li class="news-article-row" data-idx="' + i + '">'
+            var thumbHtml = a.thumbnail
+                ? '<img class="nf-card-thumb" src="' + esc(a.thumbnail) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=nf-card-thumb-placeholder>📰</div>\'">'
+                : '<div class="nf-card-thumb-placeholder">📰</div>';
+            var when = '';
+            var fdate = formatDate(a.pubDate), ftime = formatTime(a.pubDate);
+            if (fdate) when = fdate + (ftime ? ' ' + ftime : '');
+            var snippet = snippetOf(a, 320);
+            var source = (state.currentFeed && state.currentFeed.label) || state.feedTitle || a.author || '';
+            html += '<div class="nf-card nf-card-std" data-idx="' + i + '" role="button" tabindex="0">'
+                  + '<div class="nf-card-body">'
+                  +   '<h3 class="nf-card-title">' + esc(a.title || 'Untitled') + '</h3>'
+                  +   (snippet ? '<p class="nf-card-snippet">' + esc(snippet) + '</p>' : '')
+                  +   '<div class="nf-card-meta">'
+                  +     (source ? '<span class="nf-card-source">' + esc(source) + '</span>' : '')
+                  +     (a.author && a.author !== source ? '<span class="nf-card-time">' + esc(a.author) + '</span>' : '')
+                  +     (when ? '<span class="nf-card-time">' + esc(when) + '</span>' : '')
+                  +   '</div>'
+                  + '</div>'
                   + thumbHtml
-                  + '<div class="news-article-meta">'
-                  + '<div class="news-article-title">' + esc(a.title || 'Untitled') + '</div>'
-                  + '<div class="news-article-byline">' + byline + '</div>'
-                  + '</div></li>';
+                  + '</div>';
         }
-        html += '</ul>';
+        html += '</div>';
         $content.innerHTML = html;
 
-        var rows = $content.querySelectorAll('.news-article-row');
+        var rows = $content.querySelectorAll('.nf-card');
         for (var j = 0; j < rows.length; j++) {
             rows[j].addEventListener('click', function () {
+                var idx = parseInt(this.getAttribute('data-idx'), 10);
+                if (state.articles[idx]) openArticle(state.articles[idx]);
+            });
+            rows[j].addEventListener('keydown', function (ev) {
+                if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                ev.preventDefault();
                 var idx = parseInt(this.getAttribute('data-idx'), 10);
                 if (state.articles[idx]) openArticle(state.articles[idx]);
             });
@@ -864,35 +871,37 @@
         render();
     }
 
+    /* The article, laid out like News Flip's reader (hero image, big
+       heading, 19px body), inline in the page. */
     function renderArticle() {
         var a = state.currentArticle;
         if (!a) return;
 
-        var byline = '';
-        if (a.author) byline += esc(a.author);
         var fdate = formatDate(a.pubDate);
         var ftime = formatTime(a.pubDate);
-        if (fdate) byline += (byline ? ' \u00B7 ' : '') + fdate;
-        if (ftime) byline += ' at ' + ftime;
+        var when = fdate ? fdate + (ftime ? ' at ' + ftime : '') : '';
 
         var bodyHtml = sanitizeHtml(a.content || a.description || '');
         if (!bodyHtml) bodyHtml = '<p class="text-muted">No content available for this article.</p>';
 
-        var html = '<div class="news-article-detail">'
-                 + '<h2>' + esc(a.title || 'Untitled') + '</h2>'
-                 + '<div class="article-byline">' + byline + '</div>';
-
+        var html = '<div class="news-article-detail nf-article">';
         if (a.thumbnail) {
-            html += '<img src="' + esc(a.thumbnail) + '" class="img-fluid rounded mb-3" '
-                  + 'onerror="this.style.display=\'none\'">';
+            html += '<img class="nf-article-hero-img" src="' + esc(a.thumbnail) + '" alt="" onerror="this.style.display=\'none\'">';
         }
-
-        html += '<div class="article-body">' + bodyHtml + '</div>';
+        html += '<div class="nf-article-header">'
+              +   '<h1>' + esc(a.title || 'Untitled') + '</h1>'
+              +   '<div class="nf-article-meta">'
+              +     ((state.currentFeed && state.currentFeed.label) || state.feedTitle ? '<span class="src">' + esc((state.currentFeed && state.currentFeed.label) || state.feedTitle) + '</span>' : '')
+              +     (a.author ? '<span>' + esc(a.author) + '</span>' : '')
+              +     (when ? '<span>' + esc(when) + '</span>' : '')
+              +   '</div>'
+              + '</div>'
+              + '<div class="nf-article-content">' + bodyHtml + '</div>';
 
         if (a.link) {
-            html += '<a class="news-article-link btn btn-sm btn-outline-primary mt-3" '
+            html += '<a class="news-article-link nf-article-link btn btn-sm btn-outline-success" '
                   + 'href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">'
-                  + '\uD83D\uDD17 Read original</a>';
+                  + '🔗 Read original</a>';
         }
 
         html += '</div>';
