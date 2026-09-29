@@ -127,6 +127,9 @@
         padding-top: 2px;
     }
     #forum-sub-toolbar .pull-right { float: right; }
+    /* sort group sits level with the post / scan icon buttons (same top, same height) */
+    #forum-sub-toolbar #forum-sort-controls { vertical-align: top; }
+    #forum-sub-toolbar #forum-sort-controls .btn { height: 38px; display: inline-flex; align-items: center; }
     #forum-search-bar .input-group {
         width: 100%;
         display: flex;
