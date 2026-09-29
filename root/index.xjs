@@ -277,7 +277,12 @@
         var nav = document.querySelector('.navbar.fixed-top');
         if (nav) document.documentElement.style.setProperty('--navbar-h', nav.getBoundingClientRect().height + 'px');
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', measure); else measure();
+    function watch() {
+        measure();
+        var nav = document.querySelector('.navbar.fixed-top');
+        if (nav && 'ResizeObserver' in window) new ResizeObserver(measure).observe(nav);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
     window.addEventListener('load', measure);
     window.addEventListener('resize', measure);
 })();
