@@ -1097,6 +1097,11 @@
         if (overrides.slideAction) {
             params.set('slide_action', overrides.slideAction);
         }
+        /* Where the current piece sits in the pool, so the server can step
+           from it without searching; it checks the hint against the file. */
+        if (state.slide_index >= 0) {
+            params.set('slide_index', String(state.slide_index));
+        }
 
         setLoading(true);
         fetch('./api/ansi-viewer.ssjs?' + params.toString(), {

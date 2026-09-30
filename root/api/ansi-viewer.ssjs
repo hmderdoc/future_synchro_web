@@ -33,6 +33,10 @@ var response = JSON.stringify(
             http_request.query.slide_action !== undefined &&
             http_request.query.slide_action.length
         ) ? http_request.query.slide_action[0] : '',
+        slide_index: (
+            http_request.query.slide_index !== undefined &&
+            http_request.query.slide_index.length
+        ) ? http_request.query.slide_index[0] : '',
         slideshow_active: (
             http_request.query.slideshow !== undefined &&
             http_request.query.slideshow.length &&
