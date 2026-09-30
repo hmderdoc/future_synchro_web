@@ -9,6 +9,7 @@ var olSettings;
 var OL_TERMINAL_COLUMNS = 80;
 var OL_TERMINAL_PADDING = 3;
 var OL_MAX_RAW_LENGTH = 512;
+var OL_MAX_STORE_READ = 500; // safety cap; the network trims the store to ~50
 
 function getVisibleOnelinerText(text) {
     var i = 0;
@@ -105,26 +106,49 @@ if (typeof http_request.query.call === 'undefined') {
             }
             try {
                 var jc = new JSONClient(olSettings.server, olSettings.port);
-                var total = jc.read('ONELINERS', 'ONELINERS.length', 1) || 0;
-                var end = Math.max(0, total - offset);
-                var start = Math.max(0, end - count);
+                var storeLen = jc.read('ONELINERS', 'ONELINERS.length', 1) || 0;
+                // The store is kept in push order, not time order: records that
+                // were trimmed to HISTORY come back around and land mid-array,
+                // weeks out of place. The network trims it to ~50 records, so
+                // read the whole thing, sort by time, and page over the sorted
+                // list rather than over store indexes.
                 var lines = [];
-                if (end > start) {
-                    lines = jc.slice('ONELINERS', 'ONELINERS', start, end, 1) || [];
+                if (storeLen > 0) {
+                    lines = jc.slice('ONELINERS', 'ONELINERS', Math.max(0, storeLen - OL_MAX_STORE_READ), storeLen, 1) || [];
                 }
                 jc.disconnect();
 
-                var result = [];
+                var all = [];
                 for (var i = 0; i < lines.length; i++) {
                     var ln = lines[i];
                     if (!ln || typeof ln.oneliner !== 'string') continue;
                     if (typeof ln.alias !== 'string' || typeof ln.qwkid !== 'string') continue;
-                    result.push({
+                    all.push({
+                        idx: i,
                         time: ln.time || 0,
                         alias: ln.alias,
                         qwkid: ln.qwkid,
                         systemName: ln.systemName || '',
                         oneliner: ln.oneliner
+                    });
+                }
+                // Store index breaks ties so same-second records keep their
+                // store order (the engine's sort is not guaranteed stable).
+                all.sort(function (a, b) {
+                    return (a.time - b.time) || (a.idx - b.idx);
+                });
+
+                var total = all.length;
+                var end = Math.max(0, total - offset);
+                var start = Math.max(0, end - count);
+                var result = [];
+                for (var r = start; r < end; r++) {
+                    result.push({
+                        time: all[r].time,
+                        alias: all[r].alias,
+                        qwkid: all[r].qwkid,
+                        systemName: all[r].systemName,
+                        oneliner: all[r].oneliner
                     });
                 }
                 reply = {
