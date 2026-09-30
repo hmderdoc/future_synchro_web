@@ -125,27 +125,25 @@
     background: #000 !important;
     border-bottom: 2px solid #AAAAAA !important;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.ahv-header-copy {
-    min-width: 0;
-    flex: 1 1 320px;
-    /* Full header height (the toolbar on the right sets it), title at the
-       top and the file line at the bottom. */
-    align-self: stretch;
-    display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 6px;
+}
+/* Two rows: title + where-to-look controls, then the file line + speed and
+   navigation. The controls take only the width they need, so the file name
+   and credit run on until they actually reach them. */
+.ahv-head-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
 }
 .ahv-title-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 .ahv-title-group {
     display: flex;
@@ -163,7 +161,7 @@
     white-space: nowrap;
 }
 /* SAUCE credit inline after the file name: "file.ans  Title by Artist / Group (1997)". */
-.ahv-file-row { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 1.3em; }
+.ahv-file-row { display: flex; align-items: baseline; gap: 0.6em; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 1.3em; }
 /* The credit gives way before the file name does. */
 .ahv-file-row .ahv-file { flex: 0 0 auto; max-width: 60%; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
 .ahv-credit { color: #FFFF55; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
@@ -183,12 +181,13 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    flex-wrap: wrap;
-    flex: 1 1 460px;
+    flex: 0 0 auto;
 }
-.ahv-toolbar-field {
-    flex: 1 1 260px;
-    min-width: min(100%, 240px);
+.ahv-look-field {
+    width: clamp(14em, 24vw, 26em);
+}
+.ahv-baud-field {
+    width: 8.5em;
 }
 .ahv-toolbar select,
 .ahv-toolbar button,
@@ -326,12 +325,16 @@
         flex-direction: column;
         gap: 4px;
     }
+    .ahv-head-row {
+        flex-wrap: wrap;
+    }
     .ahv-toolbar {
         width: 100%;
         justify-content: flex-start;
+        flex-wrap: wrap;
     }
-    .ahv-toolbar-field {
-        flex-basis: 100%;
+    .ahv-look-field {
+        width: 100%;
     }
 }
 </style>
@@ -339,7 +342,7 @@
 <div class="flg-shell">
     <div class="card mb-3 ahv-panel" id="ahv-panel">
         <div class="card-header">
-            <div class="ahv-header-copy">
+            <div class="ahv-head-row">
                 <div class="ahv-title-row">
                     <div class="ahv-title-group">
                         <div class="ahv-title">Futureland Gallery</div>
@@ -355,15 +358,18 @@
 ?>
                     </div>
                 </div>
-                <div class="ahv-file-row"><span class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></span><span class="ahv-credit" id="ahv-credit"></span></div>
-            </div>
-            <div class="ahv-toolbar">
-                <label class="ahv-toolbar-field" for="ahv-look" title="Choose a file, folder, gallery, or all galleries">
+                <div class="ahv-toolbar">
+                <label class="ahv-toolbar-field ahv-look-field" for="ahv-look" title="Choose a file, folder, gallery, or all galleries">
                     <select id="ahv-look" aria-label="Choose where to look"></select>
                 </label>
                 <button type="button" id="ahv-order-toggle" title="Toggle between random and ordered behavior"><?xjs write(_gallery_state.slide_order === 'ordered' ? 'Ordered' : 'Random'); ?></button>
                 <button type="button" id="ahv-slideshow-toggle" title="Start or stop the slideshow"><?xjs write(_gallery_slideshow ? 'Stop' : 'Play'); ?></button>
-                <label class="ahv-toolbar-field" for="ahv-baud" title="How fast the slideshow scrolls: a virtual modem speed">
+                </div>
+            </div>
+            <div class="ahv-head-row">
+                <div class="ahv-file-row"><span class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></span><span class="ahv-credit" id="ahv-credit"></span></div>
+                <div class="ahv-toolbar">
+                <label class="ahv-toolbar-field ahv-baud-field" for="ahv-baud" title="How fast the slideshow scrolls: a virtual modem speed">
                     <select id="ahv-baud" aria-label="Scroll speed">
                         <option value="300">300 baud</option>
                         <option value="1200">1200 baud</option>
@@ -382,6 +388,7 @@
                     <button type="button" id="ahv-random" title="Random ANSI">Random</button>
                     <button type="button" id="ahv-next" title="Next ANSI">&raquo;</button>
                     <button type="button" id="ahv-share" class="ahv-share" title="Share this ANSI">Share</button>
+                </div>
                 </div>
             </div>
         </div>
