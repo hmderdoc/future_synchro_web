@@ -2190,8 +2190,19 @@
         }, 1000);
     }
 
+    /* The local room the open stream is subscribed to. The chat service
+       announces every (un)subscribe to the room as the user joining or
+       leaving, so the stream only reconnects when this room changes:
+       viewing DDial/MRC (served by polling) or a page change keeps it. */
+    var _streamChannel = '';
+
+    function streamChannelFor(name) {
+        return isBridgeRoom(name) ? (_streamChannel || DEFAULT_CHANNEL) : name;
+    }
+
     function buildEventUrl() {
-        var url = './api/events.ssjs?subscribe=chat&channel=' + encodeURIComponent(_currentChannel);
+        _streamChannel = streamChannelFor(_currentChannel);
+        var url = './api/events.ssjs?subscribe=chat&channel=' + encodeURIComponent(_streamChannel);
         if (isLoggedIn()) {
             url += '&mailbox=1';
         }
@@ -2208,7 +2219,7 @@
         if (_guestMode || _reconnectTimer) return;
         _reconnectTimer = setTimeout(function () {
             _reconnectTimer = 0;
-            connectEvents(true);
+            if (!_eventSource) connectEvents(true);
         }, RECONNECT_DELAY);
     }
 
@@ -2325,7 +2336,6 @@
     // room the page parks the view on #main and offers to join it).
     function setActivePublicChannel(name, reconnect, viewOnly) {
         var next = sanitizeChannelName(name || DEFAULT_CHANNEL);
-        var changed = normalizeUpper(_currentChannel) !== normalizeUpper(next);
 
         _currentChannel = next;
         var room = ensureRoom(next);
@@ -2352,8 +2362,8 @@
         loadUsers(next, false);
         loadPresenceMap(true);
 
-        if (changed || reconnect) {
-            connectEvents(changed || reconnect);
+        if (!_eventSource || normalizeUpper(streamChannelFor(next)) !== normalizeUpper(_streamChannel)) {
+            connectEvents(true);
         }
     }
 
@@ -2599,7 +2609,7 @@
         loadPrivateThreads(false);
         loadActiveHistory(false);
         loadUsers(_currentChannel, false);
-        connectEvents(false);
+        if (!_eventSource) connectEvents(false); /* a page may have opened it already */
         startReconcileLoop();
     }
 
