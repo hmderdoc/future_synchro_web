@@ -23,6 +23,10 @@
 
     var _messages = [];
     var _users = [];
+    /* Join/leave lines per room (upper-cased name), merged into the room's
+       messages by time: history reloads replace _messages, not these. */
+    var _presenceNotices = {};
+    var MAX_PRESENCE_NOTICES = 50;
     var _rooms = [];
     var _privateThreads = [];
     var _onlinePeerKeys = {};
@@ -1889,6 +1893,41 @@
         dispatchUsers();
     }
 
+    function rosterHas(nick, systemName) {
+        return _users.some(function (entry) {
+            return normalizeUpper(entry.nick) === normalizeUpper(nick) &&
+                (!systemName || !entry.system || normalizeUpper(entry.system) === normalizeUpper(systemName));
+        });
+    }
+
+    /* "X is here." / "X has left." like the terminal chat; other BBSes named. */
+    function addPresenceNotice(room, payload, joined) {
+        var key = normalizeUpper(room);
+        var list;
+        if (!payload.sender) return;
+        list = _presenceNotices[key] || (_presenceNotices[key] = []);
+        list.push({
+            kind: 'notice',
+            sender: '',
+            text: payload.sender + (payload.remote && payload.system ? ' (' + payload.system + ')' : '') + (joined ? ' is here.' : ' has left.'),
+            timestamp: payload.timestamp || Date.now()
+        });
+        if (list.length > MAX_PRESENCE_NOTICES) list.shift();
+        if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && key === normalizeUpper(_activeView.name)) dispatchMessages();
+    }
+
+    function messagesWithNotices() {
+        var notices = normalizeUpper(_activeView.type) === 'CHANNEL' ? _presenceNotices[normalizeUpper(_activeView.name)] : null;
+        var out, i, j;
+        if (!notices || !notices.length) return _messages.slice();
+        out = [];
+        for (i = 0, j = 0; i < _messages.length || j < notices.length;) {
+            if (j >= notices.length || (i < _messages.length && (_messages[i].timestamp || 0) <= notices[j].timestamp)) out.push(_messages[i++]);
+            else out.push(notices[j++]);
+        }
+        return out;
+    }
+
     function loadUsers(channel, silent) {
         var ch = sanitizeChannelName(channel || _currentChannel);
         return fetchJSON('./api/chat.ssjs?action=who&channel=' + encodeURIComponent(ch)).then(function (response) {
@@ -2277,8 +2316,19 @@
             }
 
             if (payload.type === 'join' || payload.type === 'part') {
-                if (normalizeUpper(payload.channel || _currentChannel) === normalizeUpper(_currentChannel)) {
-                    loadUsers(_currentChannel, true);
+                var noticeRoom = payload.channel || _currentChannel;
+                var viewingRoom = normalizeUpper(noticeRoom) === normalizeUpper(_currentChannel);
+                if (payload.type === 'join') {
+                    // A second tab or device of someone already here is not an arrival.
+                    if (!(viewingRoom && rosterHas(payload.sender, payload.system))) addPresenceNotice(noticeRoom, payload, true);
+                    if (viewingRoom) loadUsers(_currentChannel, true);
+                } else if (viewingRoom) {
+                    // Still on the roster after the refresh: another session of theirs remains.
+                    loadUsers(_currentChannel, true).then(function () {
+                        if (!rosterHas(payload.sender, payload.system)) addPresenceNotice(noticeRoom, payload, false);
+                    });
+                } else {
+                    addPresenceNotice(noticeRoom, payload, false);
                 }
                 loadRoomSummaries(true).then(function () {
                     loadPresenceMap(true);
@@ -2623,7 +2673,7 @@
         loadHistory: function () { return loadActiveHistory(false); },
         getUsers: function (channel, silent) { return loadUsers(channel || _currentChannel, !!silent); },
         getUsersSnapshot: function () { return cloneUsers(); },
-        getMessages: function () { return _messages.slice(); },
+        getMessages: messagesWithNotices,
         getRooms: function () { return cloneRooms(); },
         getPrivateThreads: function () { return clonePrivateThreads(); },
         getStatus: function () { return cloneStatus(); },
