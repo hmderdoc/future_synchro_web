@@ -85,6 +85,7 @@
         files: _gallery_state.files,
         render_cells: _gallery_state.render_cells,
         render_credit: _gallery_state.render_credit,
+        source_link: _gallery_state.source_link,
         current_file: _gallery_state.current_file,
         current_file_label: _gallery_state.current_file_label,
         current_index: _gallery_state.current_index,
@@ -289,6 +290,9 @@
     padding: 32px 12px;
     text-align: center;
 }
+/* Link back to 16colo.rs for pieces from their archive: right end of the status row. */
+.ahv-status a.ahv-source-link { margin-left: auto; color: #55FF55 !important; text-decoration: none; white-space: nowrap; }
+.ahv-status a.ahv-source-link:hover { color: #AAFFAA !important; text-decoration: underline; }
 .ahv-status {
     display: flex;
     justify-content: space-between;
@@ -374,6 +378,7 @@
             <div class="ahv-status">
                 <span class="ahv-status-text" id="ahv-status"><?xjs write(_galleryEsc(_gallery_state.status_text || '')); ?></span>
                 <span class="ahv-error" id="ahv-error"><?xjs if (_gallery_state.error) write(_galleryEsc(_gallery_state.error)); ?></span>
+                <a class="ahv-source-link" id="ahv-source" target="_blank" rel="noopener" hidden></a>
             </div>
         </div>
     </div>
@@ -432,6 +437,15 @@
     var countLabel = document.getElementById('ahv-count');
     var statusLabel = document.getElementById('ahv-status');
     var errorLabel = document.getElementById('ahv-error');
+    var sourceLink = document.getElementById('ahv-source');
+    function renderSourceLink(link) {
+        if (!sourceLink) return;
+        if (!link || !link.url) { sourceLink.hidden = true; sourceLink.removeAttribute('href'); return; }
+        sourceLink.href = link.url;
+        sourceLink.textContent = link.label || 'View on 16c';
+        sourceLink.title = link.kind === 'pack' ? 'This piece in its pack on 16colo.rs' : 'Find this piece on 16colo.rs';
+        sourceLink.hidden = false;
+    }
     var prevButton = document.getElementById('ahv-prev');
     var nextButton = document.getElementById('ahv-next');
     var randomButton = document.getElementById('ahv-random');
@@ -1038,6 +1052,7 @@
         countLabel.textContent = getCountText(payload);
         statusLabel.textContent = getStatusText(payload);
         errorLabel.textContent = payload.error || '';
+        renderSourceLink(payload.source_link);
         updateControls(payload);
         syncUrl(payload);
         document.title = (payload.current_file_label || 'Futureland Gallery') + ' | Futureland Gallery';
