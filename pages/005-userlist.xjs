@@ -1190,8 +1190,8 @@
     }
 
     // Cleanup on SPA navigation
-    document.addEventListener('spa:beforeNavigate', function cleanup() {
-        document.removeEventListener('spa:beforeNavigate', cleanup);
+    window.addEventListener('spa:beforeNavigate', function cleanup() {
+        window.removeEventListener('spa:beforeNavigate', cleanup);
         document.body.classList.remove('map-fullscreen');
         if (map) { map.remove(); map = null; }
     });
