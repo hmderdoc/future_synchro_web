@@ -3046,14 +3046,6 @@ div.message .ansi-canvas-img {
     }
 }
 
-/* Icon-only bar (md..xl): spread the icons over the gap instead of packing left */
-@media (min-width: 768px) and (max-width: 1199.98px) {
-    .navbar-nav.me-auto {
-        flex: 1;
-        justify-content: space-evenly;
-    }
-}
-
 /* Level 2 (< 992px / below lg): remaining labels hide, radio compacts */
 @media (max-width: 991.98px) {
     .nav-label {
