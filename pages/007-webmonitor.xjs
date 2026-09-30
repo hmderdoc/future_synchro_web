@@ -1,4 +1,4 @@
-<!--NO_SIDEBAR:Web Monitor-->
+<!--NO_SIDEBAR|NO_ACTIVITY:Web Monitor-->
 
 <? 
     load(xjs_compile(settings.web_components + 'sysop-required.xjs')); 

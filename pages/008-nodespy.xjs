@@ -1,4 +1,4 @@
-<!--NO_SIDEBAR:Node Spy-->
+<!--NO_SIDEBAR|NO_ACTIVITY:Node Spy-->
 
 <?
     load(xjs_compile(settings.web_components + 'sysop-required.xjs'));
