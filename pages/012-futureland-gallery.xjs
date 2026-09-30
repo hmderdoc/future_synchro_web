@@ -478,6 +478,7 @@
     var shareResetTimer = 0;
     var resizeTimer = 0;
     var resizeObserver;
+    var destroyed = false;
     var observedWidth = 0;
     var layoutToken = 0;
     var slideshowAdvanceTimer = 0;
@@ -1034,6 +1035,7 @@
     }
 
     function render(payload) {
+        if (destroyed) return; /* a fetch that landed after the page left */
         slideshow.active = !!payload.slideshow_active;
         state = payload;
         lookKind = resolveLookKind(payload, lookKind);
@@ -1318,7 +1320,7 @@
         advanceSlideshow();
     });
 
-    window.addEventListener('resize', function () {
+    function onWindowResize() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function () {
             scheduleScale(function (metrics) {
@@ -1327,7 +1329,8 @@
                 }
             });
         }, 120);
-    });
+    }
+    window.addEventListener('resize', onWindowResize);
 
     if (window.ResizeObserver && root) {
         resizeObserver = new ResizeObserver(function () {
@@ -1343,6 +1346,21 @@
         observedWidth = Math.round(stageWrap.clientWidth || 0);
         resizeObserver.observe(root);
     }
+
+    /* The SPA swaps pages without unloading this script: a running slideshow
+       would keep fetching slides and stamping document.title and the URL
+       (history.replaceState) over whatever page the user moved to. */
+    function cleanup() {
+        destroyed = true;
+        slideshow.active = false;
+        resetSlideshowCycle();
+        clearTimeout(resizeTimer);
+        clearTimeout(shareResetTimer);
+        window.removeEventListener('resize', onWindowResize);
+        window.removeEventListener('spa:beforeNavigate', cleanup);
+        if (resizeObserver) resizeObserver.disconnect();
+    }
+    window.addEventListener('spa:beforeNavigate', cleanup);
 
     render(state);
 })();
