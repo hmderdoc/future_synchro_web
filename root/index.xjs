@@ -254,7 +254,7 @@
         link: 'WALLETLINK', poll: 'bar_chart', group: 'group',
         oneliners: 'quips', nodespy: 'sbbslist', webmonitor: 'bar_chart',
         wiki: 'doc_edit',
-        fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
+        fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'myspace',
         heart: 'heart_normal',
         at_symbol: 'at_symbol',
         news: 'newsitems',
@@ -263,7 +263,7 @@
         'futureland-gallery': 'art_gallery',
         newsflip: 'rssfeed',
         music_note: 'music_note',
-        myspace: 'myspace', account: 'account'
+        myspace: 'smiley', account: 'account'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
