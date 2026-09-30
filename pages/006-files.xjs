@@ -350,7 +350,7 @@
          data-size="<? write(file._size); ?>"
          data-date="<? write(file.uldate); ?>">
         <div class="files-item-header">
-            <span class="files-item-name"><? write(escHtml(file.name)); ?></span><?xjs if (typeof Social !== 'undefined' && Social.isNsfw(_dir, file.name)) { ?> <span class="files-nsfw-tag" title="Not safe for work">NSFW</span><?xjs } ?>
+            <span class="files-item-name"><? write(escHtml(file.name)); ?></span><?xjs if (typeof Social !== 'undefined' && Social.isNsfw(_dir, file.name, file.desc)) { ?> <span class="files-nsfw-tag" title="Not safe for work">NSFW</span><?xjs } ?>
             <div class="files-item-meta">
                 <span class="files-item-size"><? write(file.size); ?></span>
                 <span class="files-item-date"><? write(system.timestr(file.uldate)); ?></span>

@@ -23,7 +23,7 @@
  *   ?call=save-profile { headline?, mood?, song?, featured?, wallPolicy?, theme? }
  *   ?call=upload-ansi { name, data (base64 CP437 ANSI), desc? }  -> my ANSI dir
  *   ?call=ignore      { name, network, on }
- *   ?call=nsfw        { dir, name, on: true|false|null }   (moderators: sysop or nsfw.json moderatorArs)
+ *   ?call=nsfw        { dir, name, on: true }   (moderators: sysop or nsfw.json moderatorArs)
  *   ?call=placeholder { name, action: set|clear|link|unlink|notlocal|unnotlocal, collection?, index?, main? }  (sysop)
  *
  * Guests can read profiles of members only as far as the page allows (the
@@ -288,11 +288,11 @@ if (call === 'whoami') {
     }
 
 } else if (call === 'nsfw') {
-    /* Moderators (sysop or the configured flag) tag or clear a creation. */
+    /* Moderators (sysop or the configured flag) flag a creation; flags are permanent. */
     if (writeGate()) {
         var nb = postJson() || {};
         if (!Social.canModerate()) fail('Moderators only', '403 Forbidden');
-        else reply(Social.setNsfw(String(nb.dir || ''), String(nb.name || ''), nb.on === null ? null : nb.on !== false, user.alias));
+        else reply(Social.setNsfw(String(nb.dir || ''), String(nb.name || ''), nb.on === true, user.alias));
     }
 
 } else if (call === 'requests') {

@@ -1185,7 +1185,7 @@
         tile.href = '#';
         tile.className = 'pp-tile' + (isAnsi ? ' pp-tile-ansi' : ' pp-tile-image');
         tile.title = item.caption;
-        tile.innerHTML = '<span class="pp-tile-art' + (item.nsfw ? ' is-nsfw' : '') + '">' + (isAnsi ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') +
+        tile.innerHTML = '<span class="pp-tile-art' + (item.nsfw ? ' is-nsfw' : '') + (item.revealed ? ' is-revealed' : '') + '" data-piece="' + esc(item.dir + '/' + item.name) + '">' + (isAnsi ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') +
             (item.nsfw ? '<span class="pp-nsfw-veil">NSFW<small>click to reveal</small></span>' : '') + '</span>' +
             '<span class="pp-tile-caption">' + esc(item.caption) + '</span>';
         if (!isAnsi) tile.querySelector('img').src = item.src;
@@ -1193,10 +1193,21 @@
         tile.addEventListener('click', function (e) {
             e.preventDefault();
             var art = tile.querySelector('.pp-tile-art');
-            if (art.classList.contains('is-nsfw') && !art.classList.contains('is-revealed')) { art.classList.add('is-revealed'); return; }
+            if (art.classList.contains('is-nsfw') && !art.classList.contains('is-revealed')) { setRevealed(item, true); return; }
             onOpen();
         });
         return tile;
+    }
+    /* NSFW pieces stay flagged; each viewer blurs / unblurs them (this visit). */
+    function setRevealed(item, on) {
+        item.revealed = !!on;
+        Array.prototype.forEach.call(document.querySelectorAll('.pp-tile-art[data-piece]'), function (el) {
+            if (el.getAttribute('data-piece') === item.dir + '/' + item.name) el.classList.toggle('is-revealed', item.revealed);
+        });
+        if (carousel && carousel.items[carousel.index] === item) {
+            carousel.box.querySelector('.pp-carousel-view').classList.toggle('is-revealed', item.revealed);
+            syncCarouselButtons(item);
+        }
     }
     function buildStrip() {
         var host = document.getElementById('pp-strip-art');
@@ -1336,7 +1347,8 @@
         var box = document.createElement('div');
         box.className = 'pp-carousel';
         box.innerHTML = '<div class="pp-carousel-bar"><span class="pp-carousel-title"></span><span>' +
-            (MEDIA.canModerate ? '<button type="button" class="pp-carousel-mod" data-act="nsfw"></button> ' : '') +
+            '<button type="button" class="pp-carousel-mod pp-carousel-blur" data-act="blur"></button> ' +
+            (MEDIA.canModerate ? '<button type="button" class="pp-carousel-mod pp-carousel-flag" data-act="nsfw">Mark NSFW</button> ' : '') +
             '<span class="pp-carousel-count"></span> <button type="button" data-act="close">close &times;</button></span></div>' +
             '<div class="pp-carousel-stage"><button type="button" class="pp-carousel-nav prev" data-act="prev">&lsaquo;</button><div class="pp-carousel-view"></div><button type="button" class="pp-carousel-nav next" data-act="next">&rsaquo;</button></div>' +
             '<div class="pp-carousel-caption"></div>';
@@ -1348,8 +1360,9 @@
                 ev.preventDefault();
                 var act = b.getAttribute('data-act');
                 if (act === 'close') closeCarousel();
-                else if (act === 'nsfw') toggleNsfw();
-                else if (act === 'reveal') { var v = box.querySelector('.pp-carousel-view'); if (v) v.classList.add('is-revealed'); }
+                else if (act === 'nsfw') markNsfw();
+                else if (act === 'reveal') setRevealed(carousel.items[carousel.index], true);
+                else if (act === 'blur') { var cur = carousel.items[carousel.index]; setRevealed(cur, !cur.revealed); }
                 else step(act === 'next' ? 1 : -1);
                 return;
             }
@@ -1377,9 +1390,8 @@
         c.box.querySelector('.pp-carousel-title').textContent = 'Gallery - ' + alias;
         c.box.querySelector('.pp-carousel-count').textContent = (c.index + 1) + ' / ' + c.items.length;
         c.box.querySelector('.pp-carousel-caption').textContent = item.caption + (item.added ? '  (' + fmtDate(item.added * 1000) + ')' : '') + (item.nsfw ? '  [NSFW]' : '');
-        view.className = 'pp-carousel-view' + (item.nsfw ? ' is-nsfw' : '');
-        var mod = c.box.querySelector('.pp-carousel-mod');
-        if (mod) mod.textContent = item.nsfw ? 'Clear NSFW tag' : 'Mark NSFW';
+        view.className = 'pp-carousel-view' + (item.nsfw ? ' is-nsfw' : '') + (item.revealed ? ' is-revealed' : '');
+        syncCarouselButtons(item);
         var veil = item.nsfw ? '<button type="button" class="pp-nsfw-veil pp-nsfw-veil-big" data-act="reveal">NSFW<small>click to reveal</small></button>' : '';
         if (item.type !== 'ansi') {
             view.innerHTML = '<img class="pp-photo-full" alt="">' + veil;
@@ -1397,15 +1409,28 @@
         var next = c.items[(c.index + 1) % c.items.length];
         if (next && next.type === 'ansi') renderAnsi(next, function () {});
     }
-    /* Moderators: flag / clear the piece on screen; the strips follow on reload. */
-    function toggleNsfw() {
+    function syncCarouselButtons(item) {
+        var blur = carousel.box.querySelector('.pp-carousel-blur');
+        blur.style.display = item.nsfw ? '' : 'none';
+        blur.textContent = item.revealed ? 'Blur' : 'Unblur';
+        /* A flag is never removed here: moderators can only add one the keywords missed. */
+        var flag = carousel.box.querySelector('.pp-carousel-flag');
+        if (flag) flag.style.display = item.nsfw ? 'none' : '';
+    }
+    function markNsfw() {
         var c = carousel;
         if (!c) return;
         var item = c.items[c.index];
-        post('nsfw', { dir: item.dir, name: item.name, on: !item.nsfw }).then(function (res) {
-            if (!res.ok) { window.alert(res.error || res.reason || 'Could not change the tag'); return; }
-            item.nsfw = !!(res.info && res.info.nsfw);
-            showCurrent();
+        post('nsfw', { dir: item.dir, name: item.name, on: true }).then(function (res) {
+            if (!res.ok) { window.alert(res.error || res.reason || 'Could not flag this piece'); return; }
+            item.nsfw = true;
+            Array.prototype.forEach.call(document.querySelectorAll('.pp-tile-art[data-piece]'), function (el) {
+                if (el.getAttribute('data-piece') === item.dir + '/' + item.name && !el.classList.contains('is-nsfw')) {
+                    el.classList.add('is-nsfw');
+                    el.insertAdjacentHTML('beforeend', '<span class="pp-nsfw-veil">NSFW<small>click to reveal</small></span>');
+                }
+            });
+            if (carousel && carousel.items[carousel.index] === item) showCurrent();
         });
     }
     function closeCarousel() {
