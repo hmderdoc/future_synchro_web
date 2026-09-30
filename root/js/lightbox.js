@@ -115,6 +115,12 @@
             if (isImageUrl(href)) return { url: link.href, name: fileName(href) };
             var inner = link.querySelector('img');
             if (inner && link.href && isImageUrl(link.href)) return { url: link.href, name: fileName(link.href) };
+            /* A link wrapping its own picture (chat image cards) is a picture
+               link even with no extension to go on: a short link (tinyurl)
+               or a download endpoint that would save the file instead. */
+            if (inner && link.href && (inner.currentSrc || inner.src) === link.href) {
+                return { url: link.href, name: inner.getAttribute('alt') || fileName(link.href) };
+            }
             return null;
         }
         var img = target.closest('img');
