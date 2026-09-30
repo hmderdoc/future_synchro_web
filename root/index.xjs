@@ -252,7 +252,7 @@
         thumbs_up: 'thumbs_up', thumbs_down: 'thumbs_down',
         comment: 'chat_new', checkmark: 'checkmark', stop: 'stop_sign_icon',
         link: 'WALLETLINK', poll: 'bar_chart', group: 'group',
-        oneliners: 'oneliner', nodespy: 'sbbslist', webmonitor: 'bar_chart',
+        oneliners: 'quips', nodespy: 'sbbslist', webmonitor: 'bar_chart',
         wiki: 'doc_edit',
         fire: 'fire', sysinfo: 'sysinfo', irc: 'irc', userlist: 'smiley',
         heart: 'heart_normal',
