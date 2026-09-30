@@ -149,9 +149,12 @@
     font-size: 0.8em;
     white-space: nowrap;
 }
-/* SAUCE credit: title, artist and group next to the file name. */
-.ahv-credit { color: #FFFF55; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* SAUCE credit inline after the file name: "file.ans  Title by Artist / Group (1997)". */
+.ahv-file-row { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; white-space: nowrap; overflow: hidden; }
+.ahv-file-row .ahv-file { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ahv-credit { color: #FFFF55; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
 .ahv-credit:empty { display: none; }
+.ahv-credit::before { content: '\2014'; color: #AA00AA; margin-right: 0.6em; }
 .ahv-credit .ahv-credit-title { color: #FFFFFF; }
 .ahv-credit .ahv-credit-group { color: #55FFFF; }
 .ahv-file {
@@ -332,8 +335,7 @@
 ?>
                     </div>
                 </div>
-                <div class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></div>
-                <div class="ahv-credit" id="ahv-credit"></div>
+                <div class="ahv-file-row"><span class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></span><span class="ahv-credit" id="ahv-credit"></span></div>
             </div>
             <div class="ahv-toolbar">
                 <label class="ahv-toolbar-field" for="ahv-look" title="Choose a file, folder, gallery, or all galleries">
