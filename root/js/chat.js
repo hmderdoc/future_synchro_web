@@ -42,10 +42,73 @@
     var _lastPrivatePollAt = 0;
     var _usersRefreshTick = 0;
     var _currentChannel = DEFAULT_CHANNEL;
-    var _activeView = { type: 'channel', name: DEFAULT_CHANNEL, system: '', avatar: '' };
+    var _activeView = { type: 'channel', name: DEFAULT_CHANNEL, system: '', avatar: '', bridge: '' };
     var _status = { type: '', message: '', showRetry: false };
     var _guestMode = false;
     var _bitmapRecords = {};
+    // Bridged networks (DDial / MRC) the user is staying logged in to from any
+    // page of the site: set when they open the tab, cleared by Leave. Kept in
+    // localStorage so a reload does not log them off and back on.
+    var _bridgeHold = {};
+    // MRC room the user picked ('' = the mux default).
+    var _bridgeRoom = { mrc: '' };
+    // Who is on each bridged network, from its last who-list: nameKey -> true.
+    var _bridgeOnline = { mrc: {}, ddial: {} };
+    var _markReadTimer = 0;
+    // Local rooms whose join we have posted but not yet seen confirmed.
+    var _pendingJoin = {};
+    var HOLD_STORAGE_KEY = 'chatBridgeHold';
+    var ROOM_STORAGE_KEY = 'chatBridgeRoom';
+
+    function readStorage(key) {
+        try { return window.localStorage ? window.localStorage.getItem(key) : null; } catch (_e) { return null; }
+    }
+
+    function writeStorage(key, value) {
+        try {
+            if (!window.localStorage) return;
+            if (value === null) window.localStorage.removeItem(key);
+            else window.localStorage.setItem(key, value);
+        } catch (_e) {}
+    }
+
+    function loadBridgeState() {
+        var held = String(readStorage(HOLD_STORAGE_KEY) || '').split(',');
+        var room = String(readStorage(ROOM_STORAGE_KEY) || '');
+        _bridgeHold = {};
+        held.forEach(function (name) {
+            if (isBridgeRoom(name)) _bridgeHold[name.toLowerCase()] = true;
+        });
+        _bridgeRoom.mrc = sanitizeBridgeRoomName(room);
+    }
+
+    function heldBridgeNames() {
+        return Object.keys(_bridgeHold).filter(function (name) { return !!_bridgeHold[name]; });
+    }
+
+    function saveBridgeHold() {
+        var names = heldBridgeNames();
+        writeStorage(HOLD_STORAGE_KEY, names.length ? names.join(',') : null);
+    }
+
+    function sanitizeBridgeRoomName(raw) {
+        return String(raw || '').replace(/^#/, '').replace(/[^A-Za-z0-9_.-]/g, '').substr(0, 30);
+    }
+
+    function normalizeBridge(raw) {
+        var key = String(raw || '').toLowerCase();
+        return key === 'mrc' || key === 'ddial' ? key : '';
+    }
+
+    // Presence / room parameters every request that touches a bridged
+    // network carries: active = the chat page is showing, hold = networks to
+    // stay on regardless, room = the MRC room the user wants.
+    function bridgeQuery() {
+        var held = heldBridgeNames();
+        return '&active=' + (_chatPageActive ? '1' : '0')
+            + (held.length ? '&hold=' + encodeURIComponent(held.join(',')) : '')
+            + (_bridgeRoom.mrc ? '&room=' + encodeURIComponent(_bridgeRoom.mrc) : '');
+    }
 
     function trimText(value) {
         return String(value || '').replace(/^\s+|\s+$/g, '');
@@ -68,15 +131,26 @@
         return normalizeUpper(name).replace(/[^A-Z0-9]/g, '');
     }
 
-    function buildThreadKey(name, system) {
+    // One thread per person: per BBS for this system's chat, per NETWORK for
+    // DDial/MRC (a nick's site or line may change between messages). Mirrors
+    // buildThreadKey in api/chat.ssjs.
+    function buildThreadKey(name, system, bridge) {
+        var net = normalizeBridge(bridge);
+        if (net) {
+            return buildNameKey(name) + '|@' + net.toUpperCase();
+        }
         return buildNameKey(name) + '|' + normalizeUpper(system);
+    }
+
+    function threadKeyOf(thread) {
+        return buildThreadKey(thread.name, thread.system || '', thread.bridge || '');
     }
 
     function getCurrentPrivateKey() {
         if (_activeView.type !== 'private') {
             return '';
         }
-        return buildThreadKey(_activeView.name, _activeView.system || '');
+        return buildThreadKey(_activeView.name, _activeView.system || '', _activeView.bridge || '');
     }
 
     function isLoggedIn() {
@@ -146,9 +220,14 @@
         dispatchPrivateThreads();
     }
 
-    function isThreadOnline(name, system) {
+    function isThreadOnline(name, system, bridge) {
+        var net = normalizeBridge(bridge);
         var exactKey = buildThreadKey(name, system || '');
         var nameKey = buildNameKey(name);
+
+        if (net) {
+            return !!(_bridgeOnline[net] && _bridgeOnline[net][nameKey]);
+        }
 
         if (_onlinePeerKeys[exactKey]) {
             return true;
@@ -1251,6 +1330,9 @@
             if (msg.peerSystem) {
                 href += '&system=' + encodeURIComponent(msg.peerSystem);
             }
+            if (msg.peerBridge) {
+                href += '&bridge=' + encodeURIComponent(msg.peerBridge);
+            }
         } else if (msg.channel) {
             href += '&channel=' + encodeURIComponent(msg.channel);
         }
@@ -1272,7 +1354,7 @@
         senderDiv = document.createElement('div');
         senderDiv.className = 'chat-toast-sender';
         senderDiv.textContent = msg.type === 'private'
-            ? ('PM from ' + (msg.sender || 'Unknown'))
+            ? ('PM from ' + (msg.sender || 'Unknown') + (msg.peerBridge ? ' (' + (msg.peerBridge === 'mrc' ? 'MRC' : 'DDial') + ')' : ''))
             : (msg.sender || 'System');
         textDiv = document.createElement('div');
         textDiv.className = 'chat-toast-text';
@@ -1401,11 +1483,11 @@
 
     function upsertPrivateThread(summary) {
         summary = normalizeThreadSummary(summary);
-        var key = buildThreadKey(summary.name, summary.system || '');
+        var key = threadKeyOf(summary);
         var index;
 
         for (index = 0; index < _privateThreads.length; index += 1) {
-            if (buildThreadKey(_privateThreads[index].name, _privateThreads[index].system || '') === key) {
+            if (threadKeyOf(_privateThreads[index]) === key) {
                 _privateThreads[index].system = summary.system || _privateThreads[index].system || '';
                 if (summary.avatar) _privateThreads[index].avatar = summary.avatar;
                 _privateThreads[index].lastTimestamp = Math.max(_privateThreads[index].lastTimestamp || 0, summary.lastTimestamp || 0);
@@ -1419,6 +1501,7 @@
         _privateThreads.push({
             name: summary.name,
             system: summary.system || '',
+            bridge: normalizeBridge(summary.bridge),
             avatar: summary.avatar || undefined,
             lastTimestamp: summary.lastTimestamp || 0,
             preview: summary.preview || ''
@@ -1436,6 +1519,14 @@
                 name: room.name,
                 bridge: room.bridge || '',
                 label: room.label || '',
+                topic: room.topic || '',
+                // Bridged rooms: the network room the session is in (MRC),
+                // and whether the user is staying on the network site-wide.
+                room: room.room || '',
+                held: !!(room.bridge && _bridgeHold[normalizeBridge(room.name)]),
+                // Local rooms: in the user's sidebar (server-side membership).
+                // Bridged networks are always listed.
+                joined: !!room.bridge || !!room.joined,
                 userCount: room.userCount || 0,
                 lastTimestamp: room.lastTimestamp || 0,
                 newCount: room.newCount || 0,
@@ -1451,12 +1542,13 @@
         var list = [];
 
         _privateThreads.forEach(function (thread) {
-            var key = buildThreadKey(thread.name, thread.system || '');
+            var key = threadKeyOf(thread);
 
             if (!map[key]) {
                 map[key] = {
                     name: thread.name,
                     system: thread.system || '',
+                    bridge: thread.bridge || '',
                     avatar: thread.avatar || undefined,
                     lastTimestamp: thread.lastTimestamp || 0,
                     preview: thread.preview || ''
@@ -1480,15 +1572,16 @@
         });
 
         return list.map(function (thread) {
-            var key = buildThreadKey(thread.name, thread.system || '');
+            var key = threadKeyOf(thread);
             return {
                 name: thread.name,
                 system: thread.system || '',
+                bridge: thread.bridge || '',
                 avatar: thread.avatar || undefined,
                 lastTimestamp: thread.lastTimestamp || 0,
                 preview: thread.preview || '',
                 unreadCount: _unreadPrivate[key] || 0,
-                isOnline: isThreadOnline(thread.name, thread.system || ''),
+                isOnline: isThreadOnline(thread.name, thread.system || '', thread.bridge || ''),
                 isActive: normalizeUpper(_activeView.type) === 'PRIVATE' &&
                     key === getCurrentPrivateKey()
             };
@@ -1500,9 +1593,11 @@
             return {
                 nick: entry.nick || '',
                 system: entry.system || '',
+                bridge: entry.bridge || '',
                 userNumber: entry.userNumber || 0,
                 avatar: entry.avatar || undefined,
-                qwkid: entry.qwkid || undefined
+                qwkid: entry.qwkid || undefined,
+                nickColors: entry.nickColors || undefined
             };
         });
     }
@@ -1527,6 +1622,7 @@
             name: _activeView.name,
             system: _activeView.system || '',
             avatar: _activeView.avatar || '',
+            bridge: _activeView.bridge || '',
             currentChannel: _currentChannel
         });
     }
@@ -1545,10 +1641,15 @@
             room.userCount = summary.userCount || 0;
             room.lastTimestamp = summary.lastTimestamp || 0;
             room.newCount = summary.newCount || 0;
+            if (summary.room) room.room = String(summary.room);
+            // A join we posted counts before the server's summaries catch up.
+            if (summary.joined) delete _pendingJoin[normalizeUpper(summary.name)];
+            room.joined = !!summary.joined || !!_pendingJoin[normalizeUpper(summary.name)];
 
             if (
                 !_realtimeHealthy &&
                 (summary.newCount || 0) > 0 &&
+                (room.joined || room.bridge) &&
                 !(normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(summary.name))
             ) {
                 _unreadChannels[normalizeUpper(summary.name)] = (_unreadChannels[normalizeUpper(summary.name)] || 0) + summary.newCount;
@@ -1604,21 +1705,40 @@
         serverTime = serverTime || Date.now();
         var nextThreads = [];
         var seen = {};
+        var previous = {};
+        var nextUnread = {};
+
+        _privateThreads.forEach(function (thread) {
+            previous[threadKeyOf(thread)] = thread.lastTimestamp || 0;
+        });
 
         threads.forEach(function (summary) {
             var thread = upsertPrivateThread(summary);
-            var key = buildThreadKey(thread.name, thread.system || '');
+            var key = threadKeyOf(thread);
+            var viewing = _chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey();
+            var serverUnread = typeof summary.unreadCount === 'number' ? summary.unreadCount : (summary.newCount || 0);
 
+            // The server counts what the peer said since the thread was last
+            // read here (readAt); a live event may have bumped the local count
+            // since the last sync, so keep whichever is higher.
+            nextUnread[key] = viewing ? 0 : Math.max(serverUnread, _unreadPrivate[key] || 0);
+
+            // Bridged PMs have no push channel: a thread that grew since the
+            // last sync, while the page was elsewhere, is what a toast is for.
             if (
-                !_realtimeHealthy &&
-                (summary.newCount || 0) > 0 &&
-                !(normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey())
+                thread.bridge && !viewing && serverUnread > 0 &&
+                Object.prototype.hasOwnProperty.call(previous, key) &&
+                (summary.lastTimestamp || 0) > previous[key]
             ) {
-                _unreadPrivate[key] = (_unreadPrivate[key] || 0) + summary.newCount;
-            }
-
-            if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey()) {
-                _unreadPrivate[key] = 0;
+                showToast({
+                    type: 'private',
+                    sender: thread.name,
+                    peerName: thread.name,
+                    peerSystem: thread.system || '',
+                    peerBridge: thread.bridge,
+                    avatar: thread.avatar,
+                    previewText: thread.preview || ''
+                });
             }
 
             if (!seen[key]) {
@@ -1629,11 +1749,12 @@
 
         if (normalizeUpper(_activeView.type) === 'PRIVATE') {
             if (!nextThreads.some(function (thread) {
-                return buildThreadKey(thread.name, thread.system || '') === getCurrentPrivateKey();
+                return threadKeyOf(thread) === getCurrentPrivateKey();
             })) {
                 nextThreads.push({
                     name: _activeView.name,
                     system: _activeView.system || '',
+                    bridge: _activeView.bridge || '',
                     avatar: _activeView.avatar || undefined,
                     lastTimestamp: 0,
                     preview: ''
@@ -1642,6 +1763,7 @@
         }
 
         _privateThreads = nextThreads;
+        _unreadPrivate = nextUnread;
         _lastPrivatePollAt = serverTime;
         _serviceHealthy = true;
         if (!silent) refreshStatus();
@@ -1655,6 +1777,12 @@
             _messages = nextMessages;
         }
         if (_chatPageActive) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
+        // Bridged rooms (MRC) carry the network's own room topic, and which
+        // network room the session is actually in.
+        if (response && response.bridge) {
+            ensureRoom(_currentChannel).topic = String(response.topic || '');
+            ensureRoom(_currentChannel).room = String(response.room || '');
+        }
         _serviceHealthy = true;
         if (!silent) refreshStatus();
         if (messagesChanged) {
@@ -1665,7 +1793,7 @@
 
     function loadPublicHistory(silent) {
         return fetchJSON('./api/chat.ssjs?action=history&channel=' + encodeURIComponent(_currentChannel)
-            + '&active=' + (_chatPageActive ? '1' : '0')).then(function (response) {
+            + bridgeQuery()).then(function (response) {
             if (response && response.error) throw new Error(String(response.error));
             applyPublicHistory(response, silent);
             return true;
@@ -1680,6 +1808,13 @@
         var url = './api/chat.ssjs?action=privateHistory&target=' + encodeURIComponent(_activeView.name);
         if (_activeView.system) {
             url += '&system=' + encodeURIComponent(_activeView.system);
+        }
+        if (_activeView.bridge) {
+            url += '&bridge=' + encodeURIComponent(_activeView.bridge);
+        }
+        // The thread is on screen: the server records it as read.
+        if (_chatPageActive && !document.hidden) {
+            url += '&read=1';
         }
 
         return fetchJSON(url).then(function (response) {
@@ -1704,7 +1839,12 @@
                     trimText(_activeView.avatar || '') !== trimText(nextAvatar);
                 _activeView.system = nextSystem;
                 _activeView.avatar = nextAvatar;
-                upsertPrivateThread(response.peer);
+                upsertPrivateThread({
+                    name: response.peer.name,
+                    system: response.peer.system,
+                    bridge: _activeView.bridge || response.peer.bridge || '',
+                    avatar: response.peer.avatar
+                });
             }
             if (_chatPageActive) _unreadPrivate[getCurrentPrivateKey()] = 0;
             _serviceHealthy = true;
@@ -1732,7 +1872,18 @@
     }
 
     function applyUsers(users, silent) {
+        var net = isBridgeRoom(_currentChannel) ? normalizeBridge(_currentChannel) : '';
         _users = Array.isArray(users) ? users : [];
+        if (net) {
+            // The network's who-list is the presence source for its threads.
+            var online = {};
+            _users.forEach(function (entry) {
+                var key = buildNameKey(entry && entry.nick || '');
+                if (key.length) online[key] = true;
+            });
+            _bridgeOnline[net] = online;
+            dispatchPrivateThreads();
+        }
         _serviceHealthy = true;
         if (!silent) refreshStatus();
         dispatchUsers();
@@ -1815,6 +1966,12 @@
         if (_activeView.system) {
             body.set('system', _activeView.system);
         }
+        if (_activeView.bridge) {
+            body.set('bridge', _activeView.bridge);
+            if (_activeView.bridge === 'mrc' && _bridgeRoom.mrc) {
+                body.set('room', _bridgeRoom.mrc);
+            }
+        }
 
         return fetchJSON('./api/chat.ssjs', {
             method: 'POST',
@@ -1823,17 +1980,62 @@
         });
     }
 
-    function createRoomRequest(name) {
+    function postForm(params) {
         var body = new URLSearchParams();
-        body.set('action', 'createChannel');
-        body.set('channel', sanitizeChannelName(name));
-
+        Object.keys(params).forEach(function (key) {
+            if (params[key] !== undefined && params[key] !== null && String(params[key]).length) {
+                body.set(key, String(params[key]));
+            }
+        });
         return fetchJSON('./api/chat.ssjs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString()
         });
     }
+
+    function postThreadState(name, system, bridge, patch) {
+        var params = { action: 'threadState', target: name, system: system || '', bridge: bridge || '' };
+        Object.keys(patch).forEach(function (key) { params[key] = patch[key]; });
+        return postForm(params).catch(function () { return null; });
+    }
+
+    // A live PM arrived in the thread that is open: tell the server it was
+    // read, coalescing bursts into one request.
+    function scheduleMarkRead() {
+        if (_markReadTimer) return;
+        _markReadTimer = setTimeout(function () {
+            _markReadTimer = 0;
+            if (normalizeUpper(_activeView.type) !== 'PRIVATE' || !_chatPageActive) return;
+            postThreadState(_activeView.name, _activeView.system, _activeView.bridge, { read: '1' });
+        }, 1500);
+    }
+
+    function dismissPrivateThread(name, system, bridge) {
+        var key = buildThreadKey(name, system || '', bridge || '');
+        var wasActive = normalizeUpper(_activeView.type) === 'PRIVATE' && key === getCurrentPrivateKey();
+
+        if (!isLoggedIn() || !sanitizeAlias(name).length) {
+            return Promise.resolve(false);
+        }
+
+        _privateThreads = _privateThreads.filter(function (thread) {
+            return threadKeyOf(thread) !== key;
+        });
+        _unreadPrivate[key] = 0;
+
+        if (wasActive) {
+            // Leave the thread before dropping it, or the view would re-add it.
+            setActivePublicChannel(_currentChannel, false);
+        } else {
+            dispatchPrivateThreads();
+        }
+
+        return postThreadState(name, system, bridge, { dismiss: '1' }).then(function (response) {
+            return !!(response && response.success);
+        });
+    }
+
 
     function reconcileState(forceUsers) {
         // Skip when visualizer is active — reduce background work
@@ -1857,9 +2059,11 @@
             + '&presence=1'
             + '&history=' + (isPrivateView ? '0' : '1')
             // Bridged rooms: on MRC a poll IS the user's presence on the
-            // network, so the server only keeps that alive while the chat
-            // page itself is showing - not while they read the forum.
-            + '&active=' + (_chatPageActive ? '1' : '0')
+            // network. The server keeps it alive while the chat page shows
+            // that tab (active) or the user has chosen to stay on the
+            // network from the rest of the site (hold) - this 15s sync is
+            // what carries their private messages in meanwhile.
+            + bridgeQuery()
             + (since > 0 ? '&since=' + encodeURIComponent(String(since)) : '');
 
         return fetchJSON(url).then(function (response) {
@@ -1922,6 +2126,56 @@
     function isBridgeRoom(name) {
         var key = normalizeUpper(name);
         return key === 'DDIAL' || key === 'MRC';
+    }
+
+    // Stop being on a bridged network: log off now and stop holding it.
+    function leaveBridge(name) {
+        var net = normalizeBridge(name);
+        if (!net || !isLoggedIn()) return Promise.resolve(false);
+        delete _bridgeHold[net];
+        saveBridgeHold();
+        if (isBridgeRoom(_currentChannel) && normalizeBridge(_currentChannel) === net) {
+            setActivePublicChannel(DEFAULT_CHANNEL, true);
+        } else {
+            dispatchRooms();
+        }
+        return postForm({ action: 'leave', channel: net }).then(function (response) {
+            return !!(response && response.success);
+        }).catch(function () { return false; });
+    }
+
+    // Change MRC room. The mux moves the session on the next request that
+    // names the room; the room is remembered per browser.
+    function setBridgeRoom(net, roomName) {
+        var clean = sanitizeBridgeRoomName(roomName);
+        if (normalizeBridge(net) !== 'mrc' || !clean.length) return Promise.resolve(false);
+        _bridgeRoom.mrc = clean;
+        writeStorage(ROOM_STORAGE_KEY, clean);
+        ensureRoom('mrc').room = clean;
+        dispatchRooms();
+        if (!isBridgeRoom(_currentChannel) || normalizeBridge(_currentChannel) !== 'mrc') {
+            return Promise.resolve(true);
+        }
+        return loadPublicHistory(false).then(function (ok) {
+            loadUsers(_currentChannel, true);
+            return ok;
+        });
+    }
+
+    // MRC's room list, from the server's LIST reply. The reply trickles in
+    // over a second or so; `pending` says to ask again shortly.
+    function fetchBridgeRooms(net) {
+        if (normalizeBridge(net) !== 'mrc' || !isLoggedIn()) {
+            return Promise.resolve({ rooms: [], pending: false });
+        }
+        return fetchJSON('./api/chat.ssjs?action=rooms&channel=mrc' + bridgeQuery()).then(function (response) {
+            if (!response || response.error) throw new Error(response && response.error ? String(response.error) : 'rooms');
+            return {
+                rooms: Array.isArray(response.rooms) ? response.rooms : [],
+                pending: !!response.pending,
+                room: String(response.room || '')
+            };
+        });
     }
 
     function scheduleHistoryRefresh() {
@@ -2030,7 +2284,7 @@
                     lastTimestamp: payload.timestamp || Date.now(),
                     preview: payload.previewText || payload.text || ''
                 });
-                threadKey = buildThreadKey(thread.name, thread.system || '');
+                threadKey = threadKeyOf(thread);
 
                 if (_chatPageActive && normalizeUpper(_activeView.type) === 'PRIVATE' && threadKey === getCurrentPrivateKey()) {
                     _messages.push(normalizeMessage({
@@ -2043,7 +2297,11 @@
                     }));
                     if (_messages.length > MAX_MESSAGES) _messages.shift();
                     _unreadPrivate[threadKey] = 0;
+                    if (!payload.isSelf) scheduleMarkRead();
                     dispatchMessages();
+                } else if (payload.isSelf) {
+                    // Our own PM from another device/session: not unread here.
+                    _unreadPrivate[threadKey] = _unreadPrivate[threadKey] || 0;
                 } else {
                     _unreadPrivate[threadKey] = (_unreadPrivate[threadKey] || 0) + 1;
                     if (!_chatPageActive) showToast(payload);
@@ -2063,14 +2321,29 @@
         };
     }
 
-    function setActivePublicChannel(name, reconnect) {
+    // viewOnly: show the room without joining it (after leaving the last
+    // room the page parks the view on #main and offers to join it).
+    function setActivePublicChannel(name, reconnect, viewOnly) {
         var next = sanitizeChannelName(name || DEFAULT_CHANNEL);
         var changed = normalizeUpper(_currentChannel) !== normalizeUpper(next);
 
         _currentChannel = next;
-        ensureRoom(next);
-        _activeView = { type: 'channel', name: next, system: '', avatar: '' };
+        var room = ensureRoom(next);
+        _activeView = { type: 'channel', name: next, system: '', avatar: '', bridge: '' };
         _unreadChannels[normalizeUpper(next)] = 0;
+
+        // Opening a bridged network is joining it; from here on the user
+        // stays on it from any page of the site until they Leave.
+        if (isBridgeRoom(next) && isLoggedIn() && !_bridgeHold[normalizeBridge(next)]) {
+            _bridgeHold[normalizeBridge(next)] = true;
+            saveBridgeHold();
+        }
+        // Opening a local room (a link, a search, the picker) joins it.
+        if (!isBridgeRoom(next) && isLoggedIn() && !room.joined && !viewOnly) {
+            room.joined = true;
+            _pendingJoin[normalizeUpper(next)] = true;
+            postForm({ action: 'joinRoom', channel: next }).catch(function () {});
+        }
 
         dispatchView();
         dispatchRooms();
@@ -2084,8 +2357,9 @@
         }
     }
 
-    function openPrivateThread(name, system, avatar) {
+    function openPrivateThread(name, system, avatar, bridge) {
         var safeName = sanitizeAlias(name);
+        var net = normalizeBridge(bridge);
         var key;
 
         if (!safeName.length) return;
@@ -2097,6 +2371,7 @@
         upsertPrivateThread({
             name: safeName,
             system: trimText(system),
+            bridge: net,
             avatar: trimText(avatar),
             lastTimestamp: 0,
             preview: ''
@@ -2106,7 +2381,8 @@
             type: 'private',
             name: safeName,
             system: trimText(system),
-            avatar: trimText(avatar)
+            avatar: trimText(avatar),
+            bridge: net
         };
         key = getCurrentPrivateKey();
         _unreadPrivate[key] = 0;
@@ -2119,9 +2395,10 @@
     function setChatPageActive(active) {
         _chatPageActive = !!active;
         if (_chatPageActive) {
-            // Clear all unread counts on entering the chat page
+            // Room unread is per visit: clear it on entering the chat page.
+            // Private threads keep theirs - a PM is read when its thread is
+            // opened (the server tracks that), not when the page is.
             _unreadChannels = {};
-            _unreadPrivate = {};
             dispatchRooms();
             dispatchPrivateThreads();
             updateBadge();
@@ -2173,21 +2450,23 @@
         });
     }
 
-    function createRoom(name) {
+    // Join-or-create a local room and open it. (createRoom is the old name.)
+    function joinRoom(name) {
         var raw = trimText(name);
         var next = sanitizeChannelName(raw);
 
-        if (!raw.length || !next.length || !isLoggedIn()) {
+        if (!raw.length || !next.length || !isLoggedIn() || isBridgeRoom(next)) {
             return Promise.resolve(false);
         }
 
-        return createRoomRequest(next).then(function (response) {
+        return postForm({ action: 'joinRoom', channel: next }).then(function (response) {
             if (response && response.error) {
                 _serviceHealthy = false;
                 setStatus('error', String(response.error), true);
                 return false;
             }
-            ensureRoom(next);
+            ensureRoom(next).joined = true;
+            _pendingJoin[normalizeUpper(next)] = true;
             _serviceHealthy = true;
             refreshStatus();
             loadRoomSummaries(true);
@@ -2198,6 +2477,44 @@
             refreshStatus();
             return false;
         });
+    }
+
+    function joinedLocalRooms() {
+        return _rooms.filter(function (room) { return !room.bridge && room.joined; });
+    }
+
+    // Drop a local room from the sidebar (the room goes on without us). If
+    // it was the open one, move to the most recently active room we are
+    // still in - or, when there is none left, park on #main WITHOUT joining
+    // it, so the page can ask.
+    function leaveRoom(name) {
+        var next = sanitizeChannelName(name);
+        var room = findRoom(next);
+        var remaining;
+
+        if (!isLoggedIn() || isBridgeRoom(next)) {
+            return Promise.resolve(false);
+        }
+        if (room) room.joined = false;
+        delete _pendingJoin[normalizeUpper(next)];
+        _unreadChannels[normalizeUpper(next)] = 0;
+        if (normalizeUpper(_currentChannel) === normalizeUpper(next) && normalizeUpper(_activeView.type) === 'CHANNEL') {
+            remaining = joinedLocalRooms().sort(function (a, b) { return (b.lastTimestamp || 0) - (a.lastTimestamp || 0); });
+            if (remaining.length) {
+                setActivePublicChannel(remaining[0].name, true);
+            } else {
+                setActivePublicChannel(DEFAULT_CHANNEL, true, true);
+            }
+        } else {
+            dispatchRooms();
+        }
+        return postForm({ action: 'leaveRoom', channel: next }).then(function (response) {
+            if (response && response.error) {
+                setStatus('error', String(response.error), false);
+                return false;
+            }
+            return true;
+        }).catch(function () { return false; });
     }
 
     function retrySync() {
@@ -2228,20 +2545,28 @@
         requestedChannel = sanitizeChannelName(params.get('channel') || DEFAULT_CHANNEL);
         requestedPrivate = sanitizeAlias(params.get('private') || '');
         requestedSystem = trimText(params.get('system') || '');
+        var requestedBridge = normalizeBridge(params.get('bridge') || '');
 
+        loadBridgeState();
         _currentChannel = requestedChannel;
         ensureRoom(requestedChannel);
+        if (isBridgeRoom(requestedChannel) && isLoggedIn()) {
+            _bridgeHold[normalizeBridge(requestedChannel)] = true;
+            saveBridgeHold();
+        }
 
         if (requestedPrivate.length && isLoggedIn()) {
             _activeView = {
                 type: 'private',
                 name: requestedPrivate,
                 system: requestedSystem,
-                avatar: ''
+                avatar: '',
+                bridge: requestedBridge
             };
             upsertPrivateThread({
                 name: requestedPrivate,
                 system: requestedSystem,
+                bridge: requestedBridge,
                 avatar: '',
                 lastTimestamp: 0,
                 preview: ''
@@ -2251,7 +2576,8 @@
                 type: 'channel',
                 name: requestedChannel,
                 system: '',
-                avatar: ''
+                avatar: '',
+                bridge: ''
             };
         }
 
@@ -2279,7 +2605,10 @@
 
     window.ChatService = {
         send: send,
-        createRoom: createRoom,
+        createRoom: joinRoom,
+        joinRoom: joinRoom,
+        leaveRoom: leaveRoom,
+        hasJoinedRooms: function () { return joinedLocalRooms().length > 0; },
         retrySync: retrySync,
         loadHistory: function () { return loadActiveHistory(false); },
         getUsers: function (channel, silent) { return loadUsers(channel || _currentChannel, !!silent); },
@@ -2294,11 +2623,18 @@
                 name: _activeView.name,
                 system: _activeView.system || '',
                 avatar: _activeView.avatar || '',
+                bridge: _activeView.bridge || '',
                 currentChannel: _currentChannel
             };
         },
         setActiveChannel: function (name) { setActivePublicChannel(name, true); },
         openPrivateThread: openPrivateThread,
+        dismissPrivateThread: dismissPrivateThread,
+        leaveBridge: leaveBridge,
+        isBridgeHeld: function (name) { return !!_bridgeHold[normalizeBridge(name)]; },
+        setBridgeRoom: setBridgeRoom,
+        getBridgeRoom: function (name) { return normalizeBridge(name) === 'mrc' ? _bridgeRoom.mrc : ''; },
+        fetchBridgeRooms: fetchBridgeRooms,
         isGuestMode: function () { return _guestMode; },
         setChatPageActive: setChatPageActive,
         _renderEmbeddedAvatars: renderEmbeddedAvatars,
