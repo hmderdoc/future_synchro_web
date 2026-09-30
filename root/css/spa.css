@@ -77,16 +77,34 @@
 .auth-nav-link .nav-avatar { width: 30px; height: 36px; flex-shrink: 0; overflow: hidden; }
 .auth-nav-link .nav-avatar img, .auth-nav-link .nav-avatar canvas { width: 30px; height: 36px; image-rendering: pixelated; display: block; }
 
-/* With every label showing (xl and up) the page links sit centred between
-   the player on the left and the account menu on the right, equal room
-   either side, instead of hugging the player. */
+/* With every label showing (xl and up) ENTER SYSTEM and the player are each
+   their own group: equal room between the brand and ENTER SYSTEM, ENTER
+   SYSTEM and the player, the player and the page links, and the page links
+   and the account menu. The collapse wrapper steps out of the layout so
+   everything is a flex sibling, and one auto margin per gap splits the free
+   space four ways. The brand and ENTER SYSTEM drop their fixed side margins
+   so those gaps match the others exactly. */
 @media (min-width: 1200px) {
+    .navbar-expand-md #navbarMain {
+        display: contents !important;
+    }
+    .navbar .navbar-brand {
+        margin-right: 0;
+    }
+    .navbar #btn-terminal {
+        margin-left: auto;
+        margin-right: 0;
+    }
+    .navbar #radio-container {
+        margin-left: auto;
+        margin-right: auto;
+    }
     #navbarMain .navbar-nav.me-auto {
-        margin-left: auto !important;
+        margin-left: 0 !important;
         margin-right: auto !important;
     }
     /* The account group keeps its place at the right edge without its own
-       auto margin, so the two auto margins above split the space evenly. */
+       auto margin, so it doesn't add a fifth share to the last gap. */
     #navbarMain .navbar-nav.ms-auto {
         margin-left: 0 !important;
     }

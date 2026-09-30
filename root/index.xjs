@@ -96,7 +96,7 @@
         userlist: 'Users',
         oneliners: 'Quips',
         'futureland-records': 'Music',
-        'futureland-gallery': 'Gallery'
+        'futureland-gallery': 'Art'
     };
     function navLabel(e) {
         return nav_short_titles[e.name] || e.title;
