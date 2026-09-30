@@ -137,12 +137,15 @@
     var mediaCollabs = 0;
     for (var mc0 = 0; mc0 < mediaTracks.length; mc0++) if (mediaTracks[mc0].collab) mediaCollabs++;
     function caption(item) { return item.desc || item.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '); }
-    var mediaAnsi = [], mediaImages = [];
+    /* One gallery: ANSI and pictures together, newest first (type says how to draw each). */
+    var mediaArt = [];
     var canModerate = false;
     try { canModerate = Social.canModerate(); } catch (_modErr) { canModerate = false; }
-    for (var ma0 = 0; ma0 < ansiPieces.length; ma0++) mediaAnsi.push({ dir: ansiPieces[ma0].dir, name: ansiPieces[ma0].name, caption: caption(ansiPieces[ma0]), added: ansiPieces[ma0].added || 0, nsfw: !!ansiPieces[ma0].nsfw });
-    for (var mi0 = 0; mi0 < imagePieces.length; mi0++) mediaImages.push({ dir: imagePieces[mi0].dir, name: imagePieces[mi0].name, caption: caption(imagePieces[mi0]), added: imagePieces[mi0].added || 0, nsfw: !!imagePieces[mi0].nsfw,
+    for (var ma0 = 0; ma0 < ansiPieces.length; ma0++) mediaArt.push({ type: 'ansi', dir: ansiPieces[ma0].dir, name: ansiPieces[ma0].name, caption: caption(ansiPieces[ma0]), added: ansiPieces[ma0].added || 0, nsfw: !!ansiPieces[ma0].nsfw });
+    for (var mi0 = 0; mi0 < imagePieces.length; mi0++) mediaArt.push({ type: 'image', dir: imagePieces[mi0].dir, name: imagePieces[mi0].name, caption: caption(imagePieces[mi0]), added: imagePieces[mi0].added || 0, nsfw: !!imagePieces[mi0].nsfw,
         src: './api/social.ssjs?call=image&dir=' + encodeURIComponent(imagePieces[mi0].dir) + '&name=' + encodeURIComponent(imagePieces[mi0].name) });
+    for (var mo0 = 0; mo0 < mediaArt.length; mo0++) mediaArt[mo0].order = mo0;
+    mediaArt.sort(function (x, y) { return (y.added - x.added) || (x.order - y.order); });
     /* Every program ever launched is too much for a sidebar box: keep the
        union of the top 12 by time, by launches and by recency, which is all
        the client's three sort views can ever show. */
@@ -650,21 +653,12 @@
             </div>
         </div>
 <?xjs } ?>
-<?xjs if (mediaAnsi.length) { ?>
+<?xjs if (mediaArt.length) { ?>
         <div class="pp-box pp-media">
-            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s ANSI Gallery (<?xjs write(mediaAnsi.length); ?>)</span>
-                <a href="#" class="pp-title-link pp-open-carousel" data-gallery="ansi">view all &raquo;</a></div>
+            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Gallery (<?xjs write(mediaArt.length); ?>)</span>
+                <a href="#" class="pp-title-link pp-open-carousel">view all &raquo;</a></div>
             <div class="pp-box-body">
-                <div class="pp-strip" id="pp-strip-ansi"></div>
-            </div>
-        </div>
-<?xjs } ?>
-<?xjs if (mediaImages.length) { ?>
-        <div class="pp-box pp-media">
-            <div class="pp-box-title pp-box-title-row"><span><?xjs write(esc(summary.alias)); ?>'s Pictures (<?xjs write(mediaImages.length); ?>)</span>
-                <a href="#" class="pp-title-link pp-open-carousel" data-gallery="images">view all &raquo;</a></div>
-            <div class="pp-box-body">
-                <div class="pp-strip" id="pp-strip-images"></div>
+                <div class="pp-strip" id="pp-strip-art"></div>
             </div>
         </div>
 <?xjs } ?>
@@ -954,8 +948,7 @@
     /* ---- media data (rendered here, 20 per page, so the page stays light) ---- */
     var MEDIA = {
         tracks: <?xjs write(jsonForScript(mediaTracks)); ?>,
-        ansi: <?xjs write(jsonForScript(mediaAnsi)); ?>,
-        images: <?xjs write(jsonForScript(mediaImages)); ?>,
+        art: <?xjs write(jsonForScript(mediaArt)); ?>,
         plays: <?xjs write(jsonForScript(allPlays)); ?>,
         icons: <?xjs write(jsonForScript(playIcons)); ?>,
         canModerate: <?xjs write(canModerate ? 'true' : 'false'); ?>
@@ -1186,15 +1179,16 @@
     }
 
     /* ---- gallery strips: the first few; "view all" opens the thumbnail grid ---- */
-    function makeTile(kind, item, onOpen) {
+    function makeTile(item, onOpen) {
+        var isAnsi = item.type === 'ansi';
         var tile = document.createElement('a');
         tile.href = '#';
-        tile.className = 'pp-tile' + (kind === 'ansi' ? ' pp-tile-ansi' : ' pp-tile-image');
+        tile.className = 'pp-tile' + (isAnsi ? ' pp-tile-ansi' : ' pp-tile-image');
         tile.title = item.caption;
-        tile.innerHTML = '<span class="pp-tile-art' + (item.nsfw ? ' is-nsfw' : '') + '">' + (kind === 'ansi' ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') +
+        tile.innerHTML = '<span class="pp-tile-art' + (item.nsfw ? ' is-nsfw' : '') + '">' + (isAnsi ? '<span class="pp-tile-wait">ANSI</span>' : '<img loading="lazy" alt="">') +
             (item.nsfw ? '<span class="pp-nsfw-veil">NSFW<small>click to reveal</small></span>' : '') + '</span>' +
             '<span class="pp-tile-caption">' + esc(item.caption) + '</span>';
-        if (kind === 'images') tile.querySelector('img').src = item.src;
+        if (!isAnsi) tile.querySelector('img').src = item.src;
         else drawQueue.push({ item: item, el: tile.querySelector('.pp-tile-art') });
         tile.addEventListener('click', function (e) {
             e.preventDefault();
@@ -1204,39 +1198,38 @@
         });
         return tile;
     }
-    function buildStrip(kind) {
-        var host = document.getElementById('pp-strip-' + kind);
-        var items = MEDIA[kind];
+    function buildStrip() {
+        var host = document.getElementById('pp-strip-art');
+        var items = MEDIA.art;
         if (!host || !items.length) return;
         items.slice(0, STRIP).forEach(function (item, i) {
-            host.appendChild(makeTile(kind, item, function () { openCarousel(kind, i); }));
+            host.appendChild(makeTile(item, function () { openCarousel(i); }));
         });
         if (items.length > STRIP) {
             var more = document.createElement('a');
             more.href = '#';
             more.className = 'pp-tile pp-tile-more';
             more.innerHTML = '<span class="pp-tile-art">+' + (items.length - STRIP) + ' more</span><span class="pp-tile-caption">view all</span>';
-            more.addEventListener('click', function (e) { e.preventDefault(); openGrid(kind); });
+            more.addEventListener('click', function (e) { e.preventDefault(); openGrid(); });
             host.appendChild(more);
         }
         drawNext();
     }
-    buildStrip('ansi');
-    buildStrip('images');
+    buildStrip();
     root.addEventListener('click', function (e) {
         var t = e.target.closest('.pp-open-carousel');
         if (!t) return;
         e.preventDefault();
-        openGrid(t.getAttribute('data-gallery'));
+        openGrid();
     });
 
     /* ---- thumbnail grid: pages of thumbnails; a thumbnail opens the carousel on top ---- */
     var grid = null;
     var THUMBS_PER_PAGE = 20; /* keep the .pp-thumbs-body column counts dividing this */
     var THEME_VARS = ['--pp-bg', '--pp-box', '--pp-border', '--pp-title', '--pp-title-text', '--pp-text', '--pp-link', '--pp-accent', '--pp-muted'];
-    function openGrid(kind, page) {
+    function openGrid(page) {
         closeGrid();
-        var items = MEDIA[kind];
+        var items = MEDIA.art;
         if (!items || !items.length) return;
         var box = document.createElement('div');
         box.className = 'pp-thumbs';
@@ -1248,7 +1241,7 @@
             '<div class="pp-thumbs-body"><div class="pp-strip"></div></div>' +
             '<div class="pp-pager pp-thumbs-pager"><button type="button" data-act="prev">&lsaquo; prev</button>' +
             '<span class="pp-thumbs-count"></span><button type="button" data-act="next">next &rsaquo;</button></div></div>';
-        box.querySelector('.pp-thumbs-title').textContent = (kind === 'ansi' ? 'ANSI Gallery' : 'Pictures') + ' - ' + alias + ' (' + items.length + ')';
+        box.querySelector('.pp-thumbs-title').textContent = 'Gallery - ' + alias + ' (' + items.length + ')';
         box.addEventListener('click', function (ev) {
             var b = ev.target.closest('[data-act]');
             if (b) {
@@ -1261,7 +1254,7 @@
             if (ev.target === box) closeGrid();
         });
         document.body.appendChild(box);
-        grid = { box: box, kind: kind, items: items, page: 0, pages: Math.ceil(items.length / THUMBS_PER_PAGE) };
+        grid = { box: box, items: items, page: 0, pages: Math.ceil(items.length / THUMBS_PER_PAGE) };
         document.addEventListener('keydown', gridKeys);
         window.addEventListener('resize', fitGrid);
         showGridPage(page || 0);
@@ -1274,7 +1267,7 @@
         host.innerHTML = '';
         var first = g.page * THUMBS_PER_PAGE;
         g.items.slice(first, first + THUMBS_PER_PAGE).forEach(function (item, i) {
-            host.appendChild(makeTile(g.kind, item, function () { openCarousel(g.kind, first + i); }));
+            host.appendChild(makeTile(item, function () { openCarousel(first + i); }));
         });
         var pager = g.box.querySelector('.pp-thumbs-pager');
         pager.style.display = g.pages > 1 ? '' : 'none';
@@ -1336,9 +1329,9 @@
 
     /* ---- carousel: one piece at a time, arrows / keys, loads as you go ---- */
     var carousel = null;
-    function openCarousel(kind, index) {
+    function openCarousel(index) {
         closeCarousel();
-        var items = MEDIA[kind];
+        var items = MEDIA.art;
         if (!items || !items.length) return;
         var box = document.createElement('div');
         box.className = 'pp-carousel';
@@ -1348,7 +1341,7 @@
             '<div class="pp-carousel-stage"><button type="button" class="pp-carousel-nav prev" data-act="prev">&lsaquo;</button><div class="pp-carousel-view"></div><button type="button" class="pp-carousel-nav next" data-act="next">&rsaquo;</button></div>' +
             '<div class="pp-carousel-caption"></div>';
         document.body.appendChild(box);
-        carousel = { box: box, kind: kind, items: items, index: index };
+        carousel = { box: box, items: items, index: index };
         box.addEventListener('click', function (ev) {
             var b = ev.target.closest('[data-act]');
             if (b) {
@@ -1381,14 +1374,14 @@
         if (!c) return;
         var item = c.items[c.index];
         var view = c.box.querySelector('.pp-carousel-view');
-        c.box.querySelector('.pp-carousel-title').textContent = (c.kind === 'ansi' ? 'ANSI Gallery' : 'Pictures') + ' - ' + alias;
+        c.box.querySelector('.pp-carousel-title').textContent = 'Gallery - ' + alias;
         c.box.querySelector('.pp-carousel-count').textContent = (c.index + 1) + ' / ' + c.items.length;
         c.box.querySelector('.pp-carousel-caption').textContent = item.caption + (item.added ? '  (' + fmtDate(item.added * 1000) + ')' : '') + (item.nsfw ? '  [NSFW]' : '');
         view.className = 'pp-carousel-view' + (item.nsfw ? ' is-nsfw' : '');
         var mod = c.box.querySelector('.pp-carousel-mod');
         if (mod) mod.textContent = item.nsfw ? 'Clear NSFW tag' : 'Mark NSFW';
         var veil = item.nsfw ? '<button type="button" class="pp-nsfw-veil pp-nsfw-veil-big" data-act="reveal">NSFW<small>click to reveal</small></button>' : '';
-        if (c.kind === 'images') {
+        if (item.type !== 'ansi') {
             view.innerHTML = '<img class="pp-photo-full" alt="">' + veil;
             view.firstChild.src = item.src;
             return;
@@ -1402,7 +1395,7 @@
         });
         /* warm the next one */
         var next = c.items[(c.index + 1) % c.items.length];
-        if (next) renderAnsi(next, function () {});
+        if (next && next.type === 'ansi') renderAnsi(next, function () {});
     }
     /* Moderators: flag / clear the piece on screen; the strips follow on reload. */
     function toggleNsfw() {
