@@ -133,6 +133,12 @@
 .ahv-header-copy {
     min-width: 0;
     flex: 1 1 320px;
+    /* Full header height (the toolbar on the right sets it), title at the
+       top and the file line at the bottom. */
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 .ahv-title-row {
     display: flex;
@@ -140,6 +146,12 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 4px;
+}
+.ahv-title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2em;
+    min-width: 0;
 }
 .ahv-title {
     color: #FFFF55;
@@ -151,9 +163,10 @@
     white-space: nowrap;
 }
 /* SAUCE credit inline after the file name: "file.ans  Title by Artist / Group (1997)". */
-.ahv-file-row { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; white-space: nowrap; overflow: hidden; }
-.ahv-file-row .ahv-file { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ahv-credit { color: #FFFF55; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
+.ahv-file-row { display: flex; align-items: baseline; gap: 0.6em; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 1.3em; }
+/* The credit gives way before the file name does. */
+.ahv-file-row .ahv-file { flex: 0 0 auto; max-width: 60%; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 1em; }
+.ahv-credit { color: #FFFF55; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
 .ahv-credit:empty { display: none; }
 .ahv-credit::before { content: '\2014'; color: #AA00AA; margin-right: 0.6em; }
 .ahv-credit .ahv-credit-title { color: #FFFFFF; }
@@ -290,9 +303,9 @@
     padding: 32px 12px;
     text-align: center;
 }
-/* Link back to 16colo.rs for pieces from their archive: right end of the status row. */
-.ahv-status a.ahv-source-link { margin-left: auto; color: #55FF55 !important; text-decoration: none; white-space: nowrap; }
-.ahv-status a.ahv-source-link:hover { color: #AAFFAA !important; text-decoration: underline; }
+/* Link back to 16colo.rs for pieces from their archive: beside the title. */
+.ahv-title-row a.ahv-source-link { color: #55FF55 !important; font-size: 0.8em; font-weight: normal; text-decoration: none; white-space: nowrap; }
+.ahv-title-row a.ahv-source-link:hover { color: #AAFFAA !important; text-decoration: underline; }
 .ahv-status {
     display: flex;
     justify-content: space-between;
@@ -328,7 +341,10 @@
         <div class="card-header">
             <div class="ahv-header-copy">
                 <div class="ahv-title-row">
-                    <div class="ahv-title">Futureland Gallery</div>
+                    <div class="ahv-title-group">
+                        <div class="ahv-title">Futureland Gallery</div>
+                        <a class="ahv-source-link" id="ahv-source" target="_blank" rel="noopener" hidden></a>
+                    </div>
                     <div class="ahv-count" id="ahv-count">
 <?xjs
     if (_gallery_state.current_count > 0) {
@@ -378,7 +394,6 @@
             <div class="ahv-status">
                 <span class="ahv-status-text" id="ahv-status"><?xjs write(_galleryEsc(_gallery_state.status_text || '')); ?></span>
                 <span class="ahv-error" id="ahv-error"><?xjs if (_gallery_state.error) write(_galleryEsc(_gallery_state.error)); ?></span>
-                <a class="ahv-source-link" id="ahv-source" target="_blank" rel="noopener" hidden></a>
             </div>
         </div>
     </div>
