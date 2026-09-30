@@ -32,6 +32,17 @@ Not trying to hoard these changes but also do not want to submit a hard fork to 
   the shared store `mods/load/social_lib.js` (the terminal shell uses the
   same one, so friendships and posts are common). Unset themes default to
   the CGA preset.
+- ANSI rendering, one path everywhere: `lib/ansi-viewer.js`
+  `render_file_cells(path)` strips the SAUCE trailer (and comment block),
+  parses with graphic.js and returns the cell grid plus the SAUCE facts (iCE
+  colours, 8/9-pixel spacing, pixel aspect, font, title/author/group/year);
+  `render_file_wrapper()` wraps that as `<div class="ansi-render" data-ansi-*>`
+  around the `<pre>` fallback, which `js/ansi-render.js` draws with the VGA
+  font through GraphicsConverter (`from_bin(..., { ice, spacing9 })`, 9-pixel
+  cells repeat column 8 for 0xC0-0xDF, aspect 1.35 applied as height). Used by
+  the gallery (with the SAUCE credit next to the file name and a virtual
+  modem speed for the slideshow scroll), the files page preview, wiki ANSI
+  embeds, profile thumbnails and expanded forum posts.
 - Callers on the Net (sidebar, between Who's Online and System Information):
   who is on the other BBSes in the InterBBS messenger network
   (`ctrl/sbbsimsg.lst`, `exec/load/sbbsimsg_lib.js`, the same list the

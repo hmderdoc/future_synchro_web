@@ -173,22 +173,14 @@ if (call === 'whoami') {
     var bpath = Social.creationPath(request.get_param('dir'), request.get_param('name'));
     if (!bpath || !/\.(ans|asc|bin)$/i.test(bpath)) fail('No such file', '404 Not Found');
     else {
-        load('graphic.js');
-        var Sauce = load({}, 'sauce_lib.js');
-        var sauce = Sauce.read(bpath);
-        var graphic;
-        var MAX_ROWS = 400;
-        try {
-            if (sauce && sauce.cols && sauce.rows) graphic = new Graphic(sauce.cols, Math.min(sauce.rows, MAX_ROWS));
-            else { graphic = new Graphic(80, 25); graphic.auto_extend = true; }
-            if (/\.bin$/i.test(bpath) && !(sauce && sauce.cols && sauce.rows)) throw new Error('BIN without SAUCE');
-            if (!graphic.load(bpath)) throw new Error('load failed');
-            var rows = Math.min(graphic.height, MAX_ROWS);
-            var bin = graphic.BIN.substr(0, graphic.width * rows * 2);
+        /* The same renderer the gallery uses: SAUCE trailer stripped, iCE /
+           9-pixel / aspect facts and the credit alongside the cells. */
+        var bviewer = load({}, settings.web_lib + 'ansi-viewer.js');
+        var bcells = bviewer.render_file_cells(bpath, 400);
+        if (!bcells.ok) fail('Could not render: ' + bcells.message, '500 Internal Server Error');
+        else {
             http_reply.header['Cache-Control'] = 'public, max-age=3600';
-            reply({ ok: true, cols: graphic.width, rows: rows, bin: base64_encode(bin) });
-        } catch (bErr) {
-            fail('Could not render: ' + bErr, '500 Internal Server Error');
+            reply(bcells);
         }
     }
 

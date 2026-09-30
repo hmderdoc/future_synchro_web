@@ -83,6 +83,8 @@
         current_dir: _gallery_state.current_dir,
         current_dir_label: _gallery_state.current_dir_label,
         files: _gallery_state.files,
+        render_cells: _gallery_state.render_cells,
+        render_credit: _gallery_state.render_credit,
         current_file: _gallery_state.current_file,
         current_file_label: _gallery_state.current_file_label,
         current_index: _gallery_state.current_index,
@@ -147,6 +149,11 @@
     font-size: 0.8em;
     white-space: nowrap;
 }
+/* SAUCE credit: title, artist and group next to the file name. */
+.ahv-credit { color: #FFFF55; font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ahv-credit:empty { display: none; }
+.ahv-credit .ahv-credit-title { color: #FFFFFF; }
+.ahv-credit .ahv-credit-group { color: #55FFFF; }
 .ahv-file {
     color: #FF55FF;
     font-size: 0.8em;
@@ -264,6 +271,13 @@
     display: inline-block;
     white-space: pre;
 }
+/* The VGA-font canvas rendering (exact 8x16 / 9x16 glyphs, SAUCE aspect applied through height). */
+.ahv-stage img.ahv-ansi-img {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+.ahv-toolbar select#ahv-baud { min-width: 7.5em; }
 .ahv-slide-note {
     color: #AAAAAA;
 }
@@ -319,6 +333,7 @@
                     </div>
                 </div>
                 <div class="ahv-file" id="ahv-file"><?xjs write(_galleryEsc(_gallery_state.current_file_label || 'No ANSI selected')); ?></div>
+                <div class="ahv-credit" id="ahv-credit"></div>
             </div>
             <div class="ahv-toolbar">
                 <label class="ahv-toolbar-field" for="ahv-look" title="Choose a file, folder, gallery, or all galleries">
@@ -326,6 +341,20 @@
                 </label>
                 <button type="button" id="ahv-order-toggle" title="Toggle between random and ordered behavior"><?xjs write(_gallery_state.slide_order === 'ordered' ? 'Ordered' : 'Random'); ?></button>
                 <button type="button" id="ahv-slideshow-toggle" title="Start or stop the slideshow"><?xjs write(_gallery_slideshow ? 'Stop' : 'Play'); ?></button>
+                <label class="ahv-toolbar-field" for="ahv-baud" title="How fast the slideshow scrolls: a virtual modem speed">
+                    <select id="ahv-baud" aria-label="Scroll speed">
+                        <option value="300">300 baud</option>
+                        <option value="1200">1200 baud</option>
+                        <option value="2400">2400 baud</option>
+                        <option value="9600">9600 baud</option>
+                        <option value="14400">14.4k</option>
+                        <option value="19200">19.2k</option>
+                        <option value="28800">28.8k</option>
+                        <option value="57600">57.6k</option>
+                        <option value="115200">115.2k</option>
+                        <option value="0">Instant</option>
+                    </select>
+                </label>
                 <div class="ahv-nav">
                     <button type="button" id="ahv-prev" title="Previous ANSI">&laquo;</button>
                     <button type="button" id="ahv-random" title="Random ANSI">Random</button>
@@ -364,8 +393,40 @@
     var stageWrap = document.getElementById('ahv-stage-wrap');
     var lookSelect = document.getElementById('ahv-look');
     var orderToggle = document.getElementById('ahv-order-toggle');
+    /* Virtual modem speed for the slideshow scroll: rows per second =
+       baud / 10 bits / ~110 bytes per ANSI row (text plus colour codes).
+       Remembered per browser. */
+    var baudSelect = document.getElementById('ahv-baud');
+    var BAUD_DEFAULT = 14400;
+    var BYTES_PER_ROW = 110;
+    function currentBaud() {
+        var v = baudSelect ? parseInt(baudSelect.value, 10) : BAUD_DEFAULT;
+        return isNaN(v) ? BAUD_DEFAULT : v;
+    }
+    if (baudSelect) {
+        var savedBaud = null;
+        try { savedBaud = localStorage.getItem('fl.gallery.baud'); } catch (_lsb) { savedBaud = null; }
+        baudSelect.value = savedBaud !== null && baudSelect.querySelector('option[value="' + savedBaud + '"]') ? savedBaud : String(BAUD_DEFAULT);
+        baudSelect.addEventListener('change', function () {
+            try { localStorage.setItem('fl.gallery.baud', baudSelect.value); } catch (_lsb2) { }
+            if (slideshow.active && state) scheduleScale(function (metrics) { startSlideshowCycle(metrics); });
+        });
+    }
     var slideshowToggle = document.getElementById('ahv-slideshow-toggle');
     var fileLabel = document.getElementById('ahv-file');
+    var creditLabel = document.getElementById('ahv-credit');
+    function escHtml(s) { return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function renderCredit(credit) {
+        if (!creditLabel) return;
+        if (!credit || (!credit.title && !credit.author && !credit.group)) { creditLabel.innerHTML = ''; creditLabel.title = ''; return; }
+        var parts = [];
+        if (credit.title) parts.push('<span class="ahv-credit-title">' + escHtml(credit.title) + '</span>');
+        if (credit.author) parts.push('by ' + escHtml(credit.author));
+        if (credit.group) parts.push('<span class="ahv-credit-group">' + escHtml(credit.group) + '</span>');
+        if (credit.year) parts.push('(' + escHtml(credit.year) + ')');
+        creditLabel.innerHTML = parts.join(' ');
+        creditLabel.title = [credit.title, credit.author, credit.group, credit.year].filter(Boolean).join(' / ');
+    }
     var countLabel = document.getElementById('ahv-count');
     var statusLabel = document.getElementById('ahv-status');
     var errorLabel = document.getElementById('ahv-error');
@@ -684,14 +745,14 @@
         stageInner.style.transform = 'none';
         stageWrap.style.height = 'auto';
 
-        pre = stageInner.querySelector('pre.ahv-ansi-pre');
+        pre = stageInner.querySelector('pre.ahv-ansi-pre, img.ahv-ansi-img');
         if (!pre) {
             return { hasAnsi: false, scrollDistance: 0, scaledHeight: 0, viewportHeight: 0, rowCount: 1 };
         }
 
         wrapW = Math.max(0, stageWrap.clientWidth);
-        preW = Math.max(1, pre.scrollWidth);
-        preH = Math.max(1, pre.scrollHeight);
+        preW = Math.max(1, pre.tagName === 'IMG' ? (parseInt(pre.getAttribute('width'), 10) || pre.naturalWidth || pre.scrollWidth) : pre.scrollWidth);
+        preH = Math.max(1, pre.tagName === 'IMG' ? (parseInt(pre.getAttribute('height'), 10) || pre.naturalHeight || pre.scrollHeight) : pre.scrollHeight);
         scale = wrapW && preW ? (wrapW / preW) : 1;
 
         if (!isFinite(scale) || scale <= 0) scale = 1;
@@ -707,8 +768,12 @@
         stage.style.height = scaledH + 'px';
         stageWrap.style.height = (viewportH + 2) + 'px';
 
-        rawText = String(pre.textContent || '').replace(/\s+$/, '');
-        rowCount = rawText.length ? rawText.split('\n').length : 1;
+        if (pre.tagName === 'IMG') {
+            rowCount = parseInt(pre.getAttribute('data-rows'), 10) || 1;
+        } else {
+            rawText = String(pre.textContent || '').replace(/\s+$/, '');
+            rowCount = rawText.length ? rawText.split('\n').length : 1;
+        }
 
         return {
             hasAnsi: true,
@@ -889,14 +954,21 @@
         }
 
         rowHeight = metrics.scaledHeight / Math.max(1, metrics.rowCount);
-        scrollSpeed = Math.max(28, rowHeight * 12);
-        travelDuration = Math.max(1400, Math.round((metrics.scrollDistance / scrollSpeed) * 1000));
+        var baud = currentBaud();
+        if (baud > 0) {
+            /* rows per second at this modem speed, as pixels per second on screen */
+            scrollSpeed = Math.max(4, rowHeight * (baud / 10 / BYTES_PER_ROW));
+            travelDuration = Math.max(400, Math.round((metrics.scrollDistance / scrollSpeed) * 1000));
+        } else {
+            travelDuration = 0;
+        }
+        var rewindDuration = Math.min(travelDuration, 1500);
         stageWrap.scrollTop = 0;
 
         queueSlideshowDelay(600, function () {
             animateScrollTo(metrics.scrollDistance, travelDuration, function () {
                 queueSlideshowDelay(750, function () {
-                    animateScrollTo(0, travelDuration, function () {
+                    animateScrollTo(0, rewindDuration, function () {
                         queueSlideshowDelay(550, function () {
                             animateScrollTo(metrics.scrollDistance, travelDuration, function () {
                                 queueSlideshowDelay(1000, function () {
@@ -929,13 +1001,38 @@
         lookKind = resolveLookKind(payload, lookKind);
         lookDir = resolveLookDirectory(payload, lookKind);
 
-        if (payload.render_html) {
+        if (payload.render_cells && payload.render_cells.bin && window.GraphicsConverter) {
+            /* Exact rendering: the VGA font on a canvas, honouring SAUCE
+               (iCE colours, 9-pixel spacing, 1.35 pixel aspect when the
+               art asks for it). The HTML is only the fallback. */
+            var cells = payload.render_cells;
+            var cellW = cells.spacing === 9 ? 9 : 8;
+            var aspect = cells.ratio === 'rect' ? 1.35 : 1;
+            var w = cells.cols * cellW;
+            var h = Math.round(cells.rows * 16 * aspect);
+            var img = document.createElement('img');
+            img.className = 'ahv-ansi-img';
+            img.alt = payload.current_file_label || 'ANSI';
+            img.setAttribute('width', String(w));
+            img.setAttribute('height', String(h));
+            img.setAttribute('data-rows', String(cells.rows));
+            img.title = (cells.font ? cells.font + ', ' : '') + cellW + 'x16' + (cells.ice ? ', iCE colours' : '') + (aspect !== 1 ? ', 1.35 aspect' : '');
+            stageInner.innerHTML = '';
+            stageInner.appendChild(img);
+            try {
+                GraphicsConverter.shared().from_bin(atob(cells.bin), cells.cols, cells.rows, function (dataURL) { img.src = dataURL; },
+                    true, { ice: cells.ice, spacing9: cells.spacing === 9 });
+            } catch (drawErr) {
+                stageInner.innerHTML = payload.render_html || '';
+            }
+        } else if (payload.render_html) {
             stageInner.innerHTML = payload.render_html;
         } else if (!stageInner.innerHTML.length) {
             stageInner.innerHTML = '<div class="ahv-empty">No ANSI available.</div>';
         }
 
         fileLabel.textContent = payload.current_file_label || 'No ANSI selected';
+        renderCredit(payload.render_credit);
         countLabel.textContent = getCountText(payload);
         statusLabel.textContent = getStatusText(payload);
         errorLabel.textContent = payload.error || '';

@@ -80,13 +80,13 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         return palette;
     })();
 
-    function get_workspace(cols, rows, callback) {
+    function get_workspace(cols, rows, callback, cell_width) {
 
         const container = document.createElement('div');
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.canvas.width = cols * font_width;
+        ctx.canvas.width = cols * (cell_width || font_width);
         ctx.canvas.height = rows * font_height;
         ctx.fillStyle = COLORS[0];
         ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -173,21 +173,40 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
         return XTERM_COLORS[clamp_color_256(value)] || XTERM_COLORS[0];
     }
 
-    this.from_bin = function (bin, cols, rows, callback, dataOnly) {
+    /* opts (all optional, from the file's SAUCE record):
+         ice       true = bright backgrounds instead of blink (bg 0-15)
+         spacing9  true = VGA 9-pixel text mode: each cell 9 wide, the ninth
+                   column repeating the eighth for the box-drawing range
+                   0xC0-0xDF (so lines join) and blank otherwise */
+    this.from_bin = function (bin, cols, rows, callback, dataOnly, opts) {
+        opts = opts || {};
+        const cell_width = opts.spacing9 ? font_width + 1 : font_width;
         get_workspace(cols, rows, workspace => {
             let x = 0;
             let y = 0;
             for (let n = 0; n < cols * rows * 2; n = n + 2) {
                 const char = bin.substr(n, 1).charCodeAt(0);
                 const attr = bin.substr(n + 1, 1).charCodeAt(0);
+                const px = x * cell_width;
+                const py = y * font_height;
+                const bg = COLORS[opts.ice ? (attr >> 4) & 15 : (attr >> 4) & 7];
                 put_character(
                     workspace,
-                    get_character(workspace, char),
-                    x * font_width,
-                    y * font_height,
+                    get_cached_character(workspace, char),
+                    px,
+                    py,
                     COLORS[attr&15],
-                    COLORS[(attr>>4)&7]
+                    bg
                 );
+                if (opts.spacing9) {
+                    workspace.ctx.globalCompositeOperation = 'source-over';
+                    if (char >= 0xC0 && char <= 0xDF) {
+                        workspace.ctx.putImageData(workspace.ctx.getImageData(px + font_width - 1, py, 1, font_height), px + font_width, py);
+                    } else {
+                        workspace.ctx.fillStyle = bg;
+                        workspace.ctx.fillRect(px + font_width, py, 1, font_height);
+                    }
+                }
                 x++;
                 if (x >= cols) {
                     x = 0;
@@ -202,7 +221,7 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
                     callback(img);
                 });
             }
-        });
+        }, cell_width);
     }
 
     this.from_bitmap_cells = function (cells, cols, rows, callback, dataOnly) {

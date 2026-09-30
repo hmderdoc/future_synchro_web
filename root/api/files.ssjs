@@ -674,26 +674,17 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
                                 }
                                 var vext = (vfile.ext || '').toLowerCase();
                                 if (vext === 'ans') {
-                                        /* Render ANSI to HTML server-side using graphic.js */
-                                        load('graphic.js');
-                                        var vSauce = load({}, 'sauce_lib.js');
-                                        var vGraphic;
+                                        /* The same rendering as the gallery: an upgradeable grid
+                                           (js/ansi-render.js draws it with the VGA font, honouring
+                                           SAUCE) around the HTML fallback, trailer stripped. */
                                         try {
-                                                var sauce = vSauce.read(vfile.path);
-                                                if (sauce && sauce.cols && sauce.rows) {
-                                                        vGraphic = new Graphic(sauce.cols, sauce.rows);
-                                                } else {
-                                                        vGraphic = new Graphic();
-                                                }
-                                                if (!vGraphic.load(vfile.path)) {
-                                                        reply.error = 'Could not load ANSI file';
+                                                var vViewer = load({}, settings.web_lib + 'ansi-viewer.js');
+                                                var vRendered = vViewer.render_file_wrapper(vfile.path);
+                                                if (!vRendered.ok) {
+                                                        reply.error = vRendered.message || 'Could not load ANSI file';
                                                         break;
                                                 }
-                                                var vhtml = vGraphic.HTML;
-                                                vhtml = vhtml.replace(/background-color: black;/g, '');
-                                                vhtml = vhtml.replace(/"color: #a8a8a8;/g, '"');
-                                                vhtml = vhtml.replace(/ style=" "/g, '');
-                                                vhtml = vhtml.replace(/<span>([^<]*)<\/span>/g, '$1');
+                                                var vhtml = vRendered.html;
                                                 http_reply.header['Content-Type'] = 'text/html; charset=utf-8';
                                                 http_reply.header['Content-Length'] = vhtml.length;
                                                 write(vhtml);

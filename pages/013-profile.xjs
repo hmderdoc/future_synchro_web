@@ -1149,7 +1149,8 @@
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (!res.ok) { done(null); return; }
-                gc.from_bin(atob(res.bin), res.cols, res.rows, function (dataURL) { ansiCache[key] = dataURL; done(dataURL); }, true);
+                gc.from_bin(atob(res.bin), res.cols, res.rows, function (dataURL) { ansiCache[key] = dataURL; done(dataURL); }, true,
+                    { ice: !!res.ice, spacing9: res.spacing === 9 });
             }).catch(function () { done(null); });
     }
     var drawQueue = [], drawing = false;

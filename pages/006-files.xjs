@@ -1,4 +1,5 @@
 <!--Files-->
+<script type="text/javascript" src="./js/ansi-render.js?_v=<?xjs write(time()); ?>"></script>
 
 <?xjs
     try { load(system.mods_dir + 'load/social_lib.js'); } catch (_socialErr) { }
@@ -514,8 +515,10 @@
             fetch(url).then(function (r) { return r.text(); }).then(function (html) {
                 var wrap = document.createElement('div');
                 wrap.className = 'ansi-wrap';
-                wrap.innerHTML = '<pre class="ansi">' + html + '</pre>';
+                /* The API returns the upgradeable grid (with its <pre> fallback inside). */
+                wrap.innerHTML = /ansi-render/.test(html) ? html : '<pre class="ansi">' + html + '</pre>';
                 panel.querySelector('.files-preview-loading').replaceWith(wrap);
+                if (window.renderAnsiCanvases) renderAnsiCanvases(wrap);
             }).catch(function () {
                 panel.querySelector('.files-preview-loading').textContent = 'Failed to load ANSI.';
             });
