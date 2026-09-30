@@ -995,6 +995,7 @@ textarea.chat-web-input {
     width: 100%;
 }
 .chat-web-page .chat-bitmap-frame {
+    position: relative;
     width: 100%;
     border: 1px solid #333;
     border-radius: 0;
@@ -1018,6 +1019,12 @@ textarea.chat-web-input {
     font-size: 0.78rem;
     text-align: center;
 }
+.chat-web-page .chat-bitmap-frame.is-nsfw .chat-bitmap-stage { filter: blur(16px) brightness(.55); }
+.chat-web-page .chat-bitmap-frame.is-nsfw .chat-bitmap-download { display: none; }
+.chat-web-page .chat-bitmap-frame.is-nsfw .chat-rich-nsfw-veil { z-index: 1; }
+.chat-web-page .chat-bitmap-frame.is-nsfw.is-revealed .chat-bitmap-stage { filter: none; }
+.chat-web-page .chat-bitmap-frame.is-nsfw.is-revealed .chat-bitmap-download { display: flex; }
+.chat-web-page .chat-bitmap-frame.is-nsfw.is-revealed .chat-rich-nsfw-veil { display: none; }
 .chat-web-page .chat-bitmap-stage.is-error .chat-bitmap-placeholder {
     color: #FF5555;
 }
@@ -2843,7 +2850,32 @@ textarea.chat-web-input {
             ' data-private-avatar="' + escapeAttr(message.avatar || '') + '"';
     }
 
-    function renderBitmapBubble(message) {
+    /* A bitmap post carries no name or caption: the art bots put the file
+       name ("...Porn_Like...ans has been uploaded") in the line right after
+       it. Veil a bitmap when a following line from the same sender, before
+       its next bitmap and within 10 minutes, trips the keyword rule. */
+    var BITMAP_CAPTION_WINDOW = 600000;
+    var revealedBitmaps = {};
+
+    function nsfwBitmapKeys(msgs) {
+        var flagged = {};
+        var i, j, bitmap, next;
+        if (!window.ChatEmbeds || !ChatEmbeds.isNsfwText) return flagged;
+        for (i = 0; i < msgs.length; i++) {
+            bitmap = msgs[i];
+            if (bitmap.kind !== 'bitmap' || !bitmap.bitmapKey) continue;
+            for (j = i + 1; j < msgs.length; j++) {
+                next = msgs[j];
+                if ((next.timestamp || 0) - (bitmap.timestamp || 0) > BITMAP_CAPTION_WINDOW) break;
+                if (normalizeUpper(next.sender || '') !== normalizeUpper(bitmap.sender || '')) continue;
+                if (next.kind === 'bitmap') break;
+                if (ChatEmbeds.isNsfwText(next.text || '')) { flagged[bitmap.bitmapKey] = true; break; }
+            }
+        }
+        return flagged;
+    }
+
+    function renderBitmapBubble(message, nsfw) {
         var cols = Math.max(1, message.bitmapWidth || 80);
         var rows = Math.max(1, message.bitmapHeight || 25);
         var pixelWidth = cols * 8;
@@ -2851,7 +2883,8 @@ textarea.chat-web-input {
         var label = 'image ' + cols + 'x' + rows;
 
         return '<div class="chat-bitmap-shell" style="' + escapeAttr('max-width:' + pixelWidth + 'px;') + '">' +
-            '<div class="chat-bitmap-frame">' +
+            '<div class="chat-bitmap-frame' + (nsfw ? ' is-nsfw' : '') + '">' +
+            (nsfw ? '<span class="chat-rich-nsfw-veil" data-chat-nsfw-reveal data-chat-bitmap-reveal="' + escapeAttr(message.bitmapKey || '') + '">NSFW<small>click to reveal</small></span>' : '') +
             '<div class="chat-bitmap-stage" data-chat-bitmap-key="' + escapeAttr(message.bitmapKey || '') + '" data-chat-bitmap-alt="' + escapeAttr(label) + '" data-chat-bitmap-ts="' + escapeAttr(String(message.timestamp || 0)) + '" style="' + escapeAttr('aspect-ratio:' + pixelWidth + ' / ' + pixelHeight + ';') + '">' +
             '<div class="chat-bitmap-placeholder">Rendering ' + escapeHtml(label) + '...</div>' +
             '</div>' +
@@ -3137,6 +3170,7 @@ textarea.chat-web-input {
         html += renderNoRoomsBanner();
 
         var hiddenBySender = 0;
+        var nsfwBitmaps = nsfwBitmapKeys(msgs);
         msgs.forEach(function (message) {
             // The ignore list is shared with the terminal shell (person menu > Ignore).
             if (!message.isSelf && message.sender && window.PersonMenu && PersonMenu.isIgnored(message.sender, message.bridge || 'local')) { hiddenBySender++; return; }
@@ -3219,7 +3253,7 @@ textarea.chat-web-input {
             }
 
             if (message.kind === 'bitmap' && message.bitmapKey) {
-                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble">' + renderBitmapBubble(message) + '</div>';
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble">' + renderBitmapBubble(message, !!nsfwBitmaps[message.bitmapKey] && !revealedBitmaps[message.bitmapKey]) + '</div>';
             } else {
                 html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + renderRichMessageHtml(message.text || '', message.textColors) + '</div>';
             }
@@ -3559,8 +3593,10 @@ textarea.chat-web-input {
             var veil = event.target.closest('[data-chat-nsfw-reveal]');
             if (veil) {
                 event.preventDefault();
-                var card = veil.closest('.chat-rich-image-card');
+                var card = veil.closest('.chat-rich-image-card, .chat-bitmap-frame');
                 if (card) card.classList.add('is-revealed');
+                // Transcript re-renders rebuild every bubble: remember the reveal.
+                if (veil.getAttribute('data-chat-bitmap-reveal')) revealedBitmaps[veil.getAttribute('data-chat-bitmap-reveal')] = true;
                 return;
             }
             var audioButton = event.target.closest('[data-chat-audio-play]');
