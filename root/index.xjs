@@ -107,6 +107,18 @@
     /* Pages hidden from nav entirely (accessed via other UI) */
     pullNavPage(nav_pages, 'newsflip');
 
+    /* Top bar order; pages not named here keep their file order after these. */
+    var nav_order = ['userlist', 'chat', 'forum', 'games', 'futureland-records',
+        'futureland-gallery', 'news', 'wiki', 'oneliners'];
+    nav_pages = nav_pages.map(function (item, i) {
+        var rank = nav_order.indexOf(item.name);
+        return { item: item, rank: rank < 0 ? nav_order.length + i : rank };
+    }).sort(function (a, b) {
+        return a.rank - b.rank;
+    }).map(function (e) {
+        return e.item;
+    });
+
     /* News lands on the NewsFlip view; Browse Feeds is a tab from there */
     nav_pages.forEach(function (item) {
         if (item.name === 'news') item.page = '014-newsflip.xjs';
