@@ -77,6 +77,21 @@
 .auth-nav-link .nav-avatar { width: 30px; height: 36px; flex-shrink: 0; overflow: hidden; }
 .auth-nav-link .nav-avatar img, .auth-nav-link .nav-avatar canvas { width: 30px; height: 36px; image-rendering: pixelated; display: block; }
 
+/* With every label showing (xl and up) the page links sit centred between
+   the player on the left and the account menu on the right, equal room
+   either side, instead of hugging the player. */
+@media (min-width: 1200px) {
+    #navbarMain .navbar-nav.me-auto {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    /* The account group keeps its place at the right edge without its own
+       auto margin, so the two auto margins above split the space evenly. */
+    #navbarMain .navbar-nav.ms-auto {
+        margin-left: 0 !important;
+    }
+}
+
 /* Navbar must sit above the terminal overlay */
 .navbar.fixed-top {
     z-index: 1045 !important;
