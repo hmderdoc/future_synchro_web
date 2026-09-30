@@ -67,12 +67,27 @@ function getAvatarCollectionFile(collectionId) {
 	return false;
 }
 
-function readAvatarCollectionChunk(filePath, index, avatar_lib) {
+/* Avatars in a collection, as exec/avatar_chooser.js counts them: SAUCE rows
+   / avatar height. The file length alone overcounts, because the SAUCE
+   comment block (per-avatar descriptions) and record follow the avatars and
+   read back as garbage cells. */
+function getAvatarCollectionCount(filePath, avatar_lib, sauce) {
 	var file = new File(filePath);
 	var count;
-	var bin;
-	if (!file.open('rb')) return false;
+	if (!file.open('rb')) return 0;
 	count = Math.floor(file.length / avatar_lib.size);
+	file.close();
+	if (sauce === undefined) sauce = getSauceLib().read(filePath);
+	if (sauce && sauce.rows > 0) count = Math.min(count, Math.floor(sauce.rows / avatar_lib.defs.height));
+	return count;
+}
+
+function readAvatarCollectionChunk(filePath, index, avatar_lib, count) {
+	var file;
+	var bin;
+	if (count === undefined) count = getAvatarCollectionCount(filePath, avatar_lib);
+	file = new File(filePath);
+	if (!file.open('rb')) return false;
 	if (index < 0 || index >= count) {
 		file.close();
 		return false;
@@ -88,22 +103,19 @@ function readAvatarCollectionChunk(filePath, index, avatar_lib) {
 }
 
 function summarizeAvatarCollection(filePath, avatar_lib, sauce) {
-	var file = new File(filePath);
 	var count;
 	var previewIndex = 0;
 	var previewChunk = null;
 	var comments;
-	if (!file.open('rb')) return false;
-	count = Math.floor(file.length / avatar_lib.size);
-	file.close();
-	if (count < 1) return false;
 	if (!sauce) sauce = getSauceLib().read(filePath);
 	if (!sauce) return false;
+	count = getAvatarCollectionCount(filePath, avatar_lib, sauce);
+	if (count < 1) return false;
 	if (sauce.tinfo4) {
 		var candidate = parseInt(sauce.tinfo4, 10) - 1;
 		if (!isNaN(candidate) && candidate >= 0 && candidate < count) previewIndex = candidate;
 	}
-	previewChunk = readAvatarCollectionChunk(filePath, previewIndex, avatar_lib);
+	previewChunk = readAvatarCollectionChunk(filePath, previewIndex, avatar_lib, count);
 	if (!previewChunk) return false;
 	comments = Array.isArray(sauce.comment) ? sauce.comment : [];
 	return {
@@ -148,7 +160,7 @@ function getAvatarCollection(collectionId) {
 	if (!summary) return false;
 	comments = Array.isArray(sauce.comment) ? sauce.comment : [];
 	for (i = 0; i < summary.count; i++) {
-		chunk = readAvatarCollectionChunk(filePath, i, avatar_lib);
+		chunk = readAvatarCollectionChunk(filePath, i, avatar_lib, summary.count);
 		if (!chunk) continue;
 		avatars.push({
 			index: i,
