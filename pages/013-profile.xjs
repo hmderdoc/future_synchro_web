@@ -431,7 +431,7 @@
 .pp-carousel-view.is-nsfw.is-revealed .pp-nsfw-veil { display: none; }
 .pp-nsfw-veil-big { font-size: 18px; }
 .pp-thumbs { position: fixed; inset: 0; z-index: 1990; background: rgba(0,0,0,.9); display: flex; flex-direction: column; font-family: Verdana, Arial, sans-serif; }
-.pp-thumbs-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 1100px; margin: 0 auto; background: var(--pp-bg); color: var(--pp-text); border-left: 1px solid var(--pp-border); border-right: 1px solid var(--pp-border); }
+.pp-thumbs-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; background: var(--pp-bg); color: var(--pp-text); }
 .pp-thumbs-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; font-size: 12px; font-weight: bold; background: var(--pp-title); color: var(--pp-title-text); }
 .pp-thumbs-bar button { font: inherit; font-weight: normal; color: var(--pp-text); background: var(--pp-box); border: 1px solid var(--pp-border); padding: 3px 10px; cursor: pointer; }
 .pp-thumbs-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
@@ -441,6 +441,9 @@
 .pp-thumbs-pager button { font-size: 12px; padding: 3px 12px; }
 @media (max-width: 700px) { .pp-thumbs-body .pp-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 440px) { .pp-thumbs-body .pp-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Fitted by fitGrid(): the page's rows exactly fill the body; the art stretches (object-fit: cover crops). */
+.pp-thumbs-body.is-fit { overflow: hidden; }
+.pp-thumbs-body.is-fit .pp-tile-art { flex: 1; min-height: 0; aspect-ratio: auto; }
 .pp-carousel-mod { font: inherit; color: #ffff55; background: #222; border: 1px solid #555; padding: 3px 10px; cursor: pointer; margin-right: 8px; }
 </style>
 
@@ -1260,6 +1263,7 @@
         document.body.appendChild(box);
         grid = { box: box, kind: kind, items: items, page: 0, pages: Math.ceil(items.length / THUMBS_PER_PAGE) };
         document.addEventListener('keydown', gridKeys);
+        window.addEventListener('resize', fitGrid);
         showGridPage(page || 0);
     }
     function showGridPage(page) {
@@ -1278,7 +1282,42 @@
         g.box.querySelector('[data-act="prev"]').disabled = g.page === 0;
         g.box.querySelector('[data-act="next"]').disabled = g.page >= g.pages - 1;
         g.box.querySelector('.pp-thumbs-body').scrollTop = 0;
+        fitGrid();
         drawNext(); /* tiles of the page just left are detached and get skipped */
+    }
+    /* Size the page to the window: of the column counts that divide the page
+       size, take the one whose stretched tiles come closest to the 4:3 art;
+       rows then fill the body height exactly. When no count gives a sane
+       shape (a tall narrow phone), fall back to the CSS columns and scroll. */
+    var FIT_COLUMNS = [2, 4, 5, 10];
+    var FIT_GAP = 8;
+    function fitGrid() {
+        var g = grid;
+        if (!g) return;
+        var body = g.box.querySelector('.pp-thumbs-body');
+        var strip = body.querySelector('.pp-strip');
+        body.classList.remove('is-fit');
+        strip.style.gridTemplateColumns = '';
+        strip.style.gridAutoRows = '';
+        var caption = strip.querySelector('.pp-tile-caption');
+        var captionH = (caption ? caption.offsetHeight : 16) + 2; /* + tile border */
+        var bs = window.getComputedStyle(body);
+        var w = body.clientWidth - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight);
+        var h = body.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
+        var best = null;
+        FIT_COLUMNS.forEach(function (cols) {
+            var rows = Math.ceil(THUMBS_PER_PAGE / cols);
+            var tileW = (w - FIT_GAP * (cols - 1)) / cols;
+            var rowH = Math.floor((h - FIT_GAP * (rows - 1)) / rows);
+            var artH = rowH - captionH;
+            if (tileW < 90 || artH < 50) return;
+            var off = Math.abs(Math.log((tileW / artH) / (4 / 3)));
+            if (!best || off < best.off) best = { cols: cols, rowH: rowH, off: off };
+        });
+        if (!best || best.off > Math.log(1.8)) return; /* nothing within ~1.8x of 4:3: scroll instead */
+        body.classList.add('is-fit');
+        strip.style.gridTemplateColumns = 'repeat(' + best.cols + ', minmax(0, 1fr))';
+        strip.style.gridAutoRows = best.rowH + 'px';
     }
     function gridStep(delta) {
         if (grid) showGridPage(grid.page + delta);
@@ -1292,6 +1331,7 @@
     function closeGrid() {
         if (grid) { grid.box.remove(); grid = null; }
         document.removeEventListener('keydown', gridKeys);
+        window.removeEventListener('resize', fitGrid);
     }
 
     /* ---- carousel: one piece at a time, arrows / keys, loads as you go ---- */
