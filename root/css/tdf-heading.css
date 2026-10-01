@@ -1,0 +1,49 @@
+/* TDF headings (lib/tdf-heading.js): the text stays in the DOM for search
+   engines and screen readers; the art is decoration scaled to the container.
+   Width fills the container and height is capped, so a 3-row font and a
+   12-row font take up about the same space. */
+.tdf-heading {
+    margin: 0 0 10px;
+    line-height: 1;
+}
+.tdf-heading .tdf-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+.tdf-art {
+    display: flex;
+    justify-content: var(--tdf-justify, flex-start);
+    width: 100%;
+    aspect-ratio: var(--tdf-ar);
+    max-height: var(--tdf-max-h, 7rem);
+}
+.tdf-art-inner {
+    position: relative;
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: var(--tdf-ar);
+    container-type: size;
+}
+.tdf-art-cells,
+.tdf-art-cells img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+.tdf-fallback {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    font: 700 85cqh/0.75 system-ui, -apple-system, "Segoe UI", sans-serif;
+}

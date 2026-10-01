@@ -286,6 +286,8 @@
     <? } ?>
     <link href="./css/theme-cga.css" rel="stylesheet">
     <link href="./css/spa.css?_v=<? write(time()); ?>" rel="stylesheet">
+    <link href="./css/tdf-heading.css?_v=<? write(time()); ?>" rel="stylesheet">
+    <noscript><style>.tdf-heading .tdf-text{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}.tdf-art{display:none}</style></noscript>
     <link href="./css/avatar-fx.css?_v=<? write(time()); ?>" rel="stylesheet">
 
 <!-- BIN icon data (server-side encoded) -->
@@ -350,6 +352,7 @@
 <!-- Early scripts: needed before inline scripts in sidebar/content -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 <script src="./js/graphics-converter.js?_v=<? write(time()); ?>"></script>
+<script src="./js/tdf-heading.js?_v=<? write(time()); ?>"></script>
 <script src="./js/avatars.js?_v=<? write(time()); ?>"></script>
 <script src="./js/person-menu.js?_v=<? write(time()); ?>"></script>
 <script src="./js/avatar-fx.js?_v=<? write(time()); ?>"></script>

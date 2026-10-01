@@ -3,6 +3,8 @@
 <?xjs
     require('sbbsdefs.js', 'SYS_CLOSED');
 
+    var _tdf = load({}, settings.web_lib + 'tdf-heading.js');
+
     var _bltn_subcode = 'LOCAL-NOTICES';
     var _bltn_max = 10;
     var _bltn_body_maxlen = 600;
@@ -174,14 +176,6 @@
 }
 .bl-panel ~ .hm-intro { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .hm-intro .card-body { padding: 16px 18px; }
-.hm-intro-title {
-    color: #FF55FF;
-    font-family: 'Press Start 2P', monospace;
-    font-size: clamp(1.1rem, 3vw, 1.6rem);
-    line-height: 1.3;
-    margin: 0 0 10px;
-    word-break: break-word;
-}
 .hm-intro-sub {
     color: #55FFFF;
     font-size: 1rem;
@@ -204,7 +198,7 @@
 
 <section class="card mb-3 hm-intro" aria-labelledby="hm-intro-title">
     <div class="card-body">
-        <h1 class="hm-intro-title" id="hm-intro-title"><?xjs write(_homeEsc(system.name)); ?></h1>
+        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random' })); ?>
         <p class="hm-intro-lede">
             We like to think this might be the most customized Synchronet BBS out there. Alongside the
             classic doors, we write our own, and the board is under constant development<?xjs
