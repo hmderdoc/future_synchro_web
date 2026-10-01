@@ -250,6 +250,7 @@
     <? } ?>
     <link href="./css/theme-cga.css" rel="stylesheet">
     <link href="./css/spa.css?_v=<? write(time()); ?>" rel="stylesheet">
+    <link href="./css/avatar-fx.css?_v=<? write(time()); ?>" rel="stylesheet">
 
 <!-- BIN icon data (server-side encoded) -->
 <?xjs
@@ -315,6 +316,7 @@
 <script src="./js/graphics-converter.js?_v=<? write(time()); ?>"></script>
 <script src="./js/avatars.js?_v=<? write(time()); ?>"></script>
 <script src="./js/person-menu.js?_v=<? write(time()); ?>"></script>
+<script src="./js/avatar-fx.js?_v=<? write(time()); ?>"></script>
 <script src="./js/lightbox.js?_v=<? write(time()); ?>"></script>
 <script src="./js/common.js?_v=<? write(time()); ?>"></script>
 <script src="./js/chat.js?_v=<? write(time()); ?>"></script>
