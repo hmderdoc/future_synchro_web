@@ -89,7 +89,7 @@
             classic doors, we write our own, and the board is under constant development<?xjs
     if (_doors_wiki) { ?> (<a href="./?page=010-wiki.xjs#wiki/original-doors">see our original doors</a>)<?xjs } ?>.
             We carry DoveNet, fsxNet and tqwNet, and we're the home and info center of
-            <a href="./cheesenet/">CheeseNet</a>. Live chat runs across four networks, so there's
+            <a href="https://futureland.today/cheesenet/" data-no-spa>CheeseNet</a>. Live chat runs across four networks, so there's
             usually someone around to talk to. And we enjoy pushing what a terminal can do: multimedia,
             demoscene tricks, and experimental music and video broadcasts.
         </p>
