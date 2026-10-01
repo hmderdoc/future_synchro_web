@@ -93,7 +93,7 @@
         var preview = host.querySelector('.wiki-preview');
         if (preview) { convertPreview(preview); return; }
         previewFonts = {};   /* left the editor: next edit session rolls new fonts */
-        if (host.querySelector(':scope > .wiki-meta')) convertPage(host);
+        if (host.querySelector(':scope > .wiki-body')) convertPage(host);
     }
 
     function attach() {

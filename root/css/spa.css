@@ -4429,5 +4429,7 @@ body.avatar-settings-modal-open {
 /* Wiki: the article card sits right under the toolbar and fills the content
    column (the wiki project's own css caps it at 60em). Site layout, so it
    lives here rather than in xtrn/wiki. */
-#wiki-app #wiki-toolbar { margin-bottom: 0 !important; }
-#wiki-app #wiki-content { max-width: none; }
+#wiki-app #wiki-toolbar { margin-bottom: 0 !important; padding-bottom: 0; }
+#wiki-app #wiki-content { max-width: none; border-top-left-radius: 0; border-top-right-radius: 0; }
+/* Centered read-view title: center the TDF art too. */
+#wiki-app #wiki-content > h1.tdf-heading .tdf-art { justify-content: center; }
