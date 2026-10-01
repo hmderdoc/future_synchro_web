@@ -64,7 +64,6 @@
             _conn_ssh = _conn_ini.iniGetValue('BBS', 'SSHPort', 22);
         } finally { _conn_ini.close(); }
     }
-    var _is_guest = (user.alias === settings.guest || user.number < 1);
 ?>
 
 <!-- Intro: the one block of plain text crawlers and link previews read -->
@@ -89,26 +88,12 @@
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     gap: 4px 14px;
-    margin: 0 0 14px;
+    margin: 0;
     font-family: monospace;
 }
 .hm-intro-connect dt { color: #55FFFF; font-weight: normal; }
 .hm-intro-connect dd { color: #FFFF55; margin: 0; word-break: break-all; }
 .hm-intro-connect dd .hm-intro-note { color: #AAAAAA; word-break: normal; }
-.hm-intro-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.hm-intro-actions .hm-intro-btn {
-    background: transparent;
-    border: 1px solid #AA00AA;
-    color: #FF55FF;
-    font-family: monospace;
-    padding: 4px 14px;
-    border-radius: 2px;
-    text-decoration: none;
-    cursor: pointer;
-}
-.hm-intro-actions .hm-intro-btn:hover { background: #AA00AA; color: #000; }
-.hm-intro-links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; }
-.hm-intro-links a { color: #55FF55; }
 </style>
 
 <section class="card mb-3 hm-intro" aria-labelledby="hm-intro-title">
@@ -127,34 +112,9 @@
             <dt>Client</dt>
             <dd><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a> <span class="hm-intro-note">recommended, or any ANSI terminal</span></dd>
         </dl>
-        <div class="hm-intro-actions">
-            <button type="button" class="hm-intro-btn" id="hm-intro-terminal" aria-controls="terminal-panel">Open web terminal</button>
-<?xjs if (_is_guest && settings.user_registration) { ?>
-            <a class="hm-intro-btn" href="./?page=000-register.xjs">Create an account</a>
-<?xjs } ?>
-        </div>
-        <ul class="hm-intro-links">
-            <li><a href="./?page=003-games.xjs">Games</a></li>
-            <li><a href="./?page=002-forum.xjs">Forums</a></li>
-            <li><a href="./?page=001-chat.xjs">Chat</a></li>
-            <li><a href="./?page=012-futureland-gallery.xjs">Art gallery</a></li>
-            <li><a href="./?page=011-futureland-records.xjs">Music</a></li>
-            <li><a href="./?page=010-wiki.xjs">Wiki</a></li>
-            <li><a href="./?page=006-files.xjs">Files</a></li>
-        </ul>
     </div>
 </section>
 
-<script>
-(function () {
-    var btn = document.getElementById('hm-intro-terminal');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-        var term = document.getElementById('btn-terminal');
-        if (term) term.click();
-    });
-})();
-</script>
 
 <!-- Bulletins Carousel -->
 <style>
