@@ -35,6 +35,8 @@
     /* Connection details for the intro card, read from the live config so
        the page never drifts from what the terminal server actually listens on. */
     var _conn_host = system.inet_addr || system.name;
+    /* The original-doors link appears once that wiki page exists. */
+    var _doors_wiki = file_exists(system.data_dir + 'wiki/pages/original-doors.jsonl');
     var _conn_telnet = 23;
     var _conn_ssh = 22;
     var _conn_ini = new File(system.ctrl_dir + 'sbbs.ini');
@@ -186,6 +188,7 @@
     font-weight: bold;
     margin: 0 0 8px;
 }
+.hm-intro-lede a { color: #55FF55; }
 .hm-intro-lede { color: #FFFFFF; margin: 0 0 14px; line-height: 1.5; max-width: 70ch; }
 .hm-intro-connect {
     display: grid;
@@ -203,9 +206,13 @@
     <div class="card-body">
         <h1 class="hm-intro-title" id="hm-intro-title"><?xjs write(_homeEsc(system.name)); ?></h1>
         <p class="hm-intro-lede">
-            <?xjs write(_homeEsc(system.name)); ?> is a Synchronet bulletin board system with door games,
-            message networks, live chat, an ANSI art gallery and original music. Dial in with a terminal
-            over telnet or SSH, or use the BBS right here in your browser.
+            We like to think this might be the most customized Synchronet BBS out there. Alongside the
+            classic doors, we write our own, and the board is under constant development<?xjs
+    if (_doors_wiki) { ?> (<a href="./?page=010-wiki.xjs#wiki/original-doors">see our original doors</a>)<?xjs } ?>.
+            We carry DoveNet, fsxNet and tqwNet, and we're the home and info center of
+            <a href="./cheesenet/">CheeseNet</a>. Live chat runs across four networks, so there's
+            usually someone around to talk to. And we enjoy pushing what a terminal can do: multimedia,
+            demoscene tricks, and experimental music and video broadcasts.
         </p>
         <h2 class="hm-intro-sub">Connection info</h2>
         <dl class="hm-intro-connect">

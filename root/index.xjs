@@ -236,7 +236,7 @@
        to the site-wide one. */
     var _seo_base = 'https://' + (system.inet_addr || system.name) + '/';
     var _seo_is_home = (page === '000-home.xjs');
-    var _seo_site_desc = system.name + ' is a Synchronet BBS with door games, message networks, live chat, ANSI art and original music. Connect by telnet, SSH or right in your browser.';
+    var _seo_site_desc = 'Possibly the most customized Synchronet BBS around: original doors, live chat across four networks, DoveNet, fsxNet, tqwNet and home of CheeseNet.';
     var _seo_desc_by_page = {
         '001-chat.xjs': 'Live chat on ' + system.name + ', bridged to the BBS and other networks.',
         '002-forum.xjs': 'Message areas and networked forums on ' + system.name + '.',
