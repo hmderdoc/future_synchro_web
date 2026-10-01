@@ -50,11 +50,64 @@
     }
 ?>
 
+<!-- About + connection info: the plain text crawlers and link previews read -->
+<style>
+.hm-intro {
+    --bs-card-border-color: #AA00AA;
+    --bs-card-bg: #000;
+    border-color: #AA00AA !important;
+    background: #000 !important;
+}
+.hm-intro { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.hm-intro ~ .bl-panel { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.hm-intro .card-body { padding: 16px 18px; }
+.hm-intro-sub {
+    color: #55FFFF;
+    font-size: 1rem;
+    font-weight: bold;
+    margin: 0 0 8px;
+}
+.hm-intro-lede a { color: #55FF55; }
+.hm-intro-lede { color: #FFFFFF; margin: 0 0 14px; line-height: 1.5; max-width: 70ch; }
+.hm-intro-connect {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 14px;
+    margin: 0;
+    font-family: monospace;
+}
+.hm-intro-connect dt { color: #55FFFF; font-weight: normal; }
+.hm-intro-connect dd { color: #FFFF55; margin: 0; word-break: break-all; }
+.hm-intro-connect dd .hm-intro-note { color: #AAAAAA; word-break: normal; }
+</style>
+
+<section class="card mb-0 hm-intro" aria-labelledby="hm-intro-title">
+    <div class="card-body">
+        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random' })); ?>
+        <p class="hm-intro-lede">
+            We like to think this might be the most customized Synchronet BBS out there. Alongside the
+            classic doors, we write our own, and the board is under constant development<?xjs
+    if (_doors_wiki) { ?> (<a href="./?page=010-wiki.xjs#wiki/original-doors">see our original doors</a>)<?xjs } ?>.
+            We carry DoveNet, fsxNet and tqwNet, and we're the home and info center of
+            <a href="./cheesenet/">CheeseNet</a>. Live chat runs across four networks, so there's
+            usually someone around to talk to. And we enjoy pushing what a terminal can do: multimedia,
+            demoscene tricks, and experimental music and video broadcasts.
+        </p>
+        <h2 class="hm-intro-sub">Connection info</h2>
+        <dl class="hm-intro-connect">
+            <dt>Telnet</dt>
+            <dd><?xjs write(_homeEsc(_conn_host)); if (_conn_telnet != 23) write(':' + _conn_telnet); ?></dd>
+            <dt>SSH</dt>
+            <dd><?xjs write(_homeEsc(_conn_host) + ':' + _conn_ssh); ?></dd>
+            <dt>Client</dt>
+            <dd><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a> <span class="hm-intro-note">recommended, or any ANSI terminal</span></dd>
+        </dl>
+    </div>
+</section>
+
 <!-- Bulletins Carousel -->
 <style>
 .bl-panel {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
     --bs-card-border-color: #AA5500;
     --bs-card-bg: #000;
     --bs-card-cap-bg: #000;
@@ -109,7 +162,7 @@
 .bl-empty { color: #AA5500; padding: 12px 14px; }
 </style>
 
-<div class="card mb-0 bl-panel">
+<div class="card mb-3 bl-panel">
     <div class="card-header">
         <div class="bl-header-left">
             <div class="bl-header-subject" id="bl-title"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].subject : 'Bulletins'); ?></div>
@@ -165,57 +218,3 @@
 })();
 </script>
 <?xjs } ?>
-
-<!-- About + connection info: the plain text crawlers and link previews read -->
-<style>
-.hm-intro {
-    --bs-card-border-color: #AA00AA;
-    --bs-card-bg: #000;
-    border-color: #AA00AA !important;
-    background: #000 !important;
-}
-.bl-panel ~ .hm-intro { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
-.hm-intro .card-body { padding: 16px 18px; }
-.hm-intro-sub {
-    color: #55FFFF;
-    font-size: 1rem;
-    font-weight: bold;
-    margin: 0 0 8px;
-}
-.hm-intro-lede a { color: #55FF55; }
-.hm-intro-lede { color: #FFFFFF; margin: 0 0 14px; line-height: 1.5; max-width: 70ch; }
-.hm-intro-connect {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 4px 14px;
-    margin: 0;
-    font-family: monospace;
-}
-.hm-intro-connect dt { color: #55FFFF; font-weight: normal; }
-.hm-intro-connect dd { color: #FFFF55; margin: 0; word-break: break-all; }
-.hm-intro-connect dd .hm-intro-note { color: #AAAAAA; word-break: normal; }
-</style>
-
-<section class="card mb-3 hm-intro" aria-labelledby="hm-intro-title">
-    <div class="card-body">
-        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random' })); ?>
-        <p class="hm-intro-lede">
-            We like to think this might be the most customized Synchronet BBS out there. Alongside the
-            classic doors, we write our own, and the board is under constant development<?xjs
-    if (_doors_wiki) { ?> (<a href="./?page=010-wiki.xjs#wiki/original-doors">see our original doors</a>)<?xjs } ?>.
-            We carry DoveNet, fsxNet and tqwNet, and we're the home and info center of
-            <a href="./cheesenet/">CheeseNet</a>. Live chat runs across four networks, so there's
-            usually someone around to talk to. And we enjoy pushing what a terminal can do: multimedia,
-            demoscene tricks, and experimental music and video broadcasts.
-        </p>
-        <h2 class="hm-intro-sub">Connection info</h2>
-        <dl class="hm-intro-connect">
-            <dt>Telnet</dt>
-            <dd><?xjs write(_homeEsc(_conn_host)); if (_conn_telnet != 23) write(':' + _conn_telnet); ?></dd>
-            <dt>SSH</dt>
-            <dd><?xjs write(_homeEsc(_conn_host) + ':' + _conn_ssh); ?></dd>
-            <dt>Client</dt>
-            <dd><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a> <span class="hm-intro-note">recommended, or any ANSI terminal</span></dd>
-        </dl>
-    </div>
-</section>
