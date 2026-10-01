@@ -4425,3 +4425,9 @@ body.avatar-settings-modal-open {
     color: #FFFF55;
     margin-left: 4px;
 }
+
+/* Wiki: the article card sits right under the toolbar and fills the content
+   column (the wiki project's own css caps it at 60em). Site layout, so it
+   lives here rather than in xtrn/wiki. */
+#wiki-app #wiki-toolbar { margin-bottom: 0 !important; }
+#wiki-app #wiki-content { max-width: none; }
