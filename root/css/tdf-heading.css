@@ -20,7 +20,7 @@
 .tdf-art {
     display: flex;
     justify-content: var(--tdf-justify, flex-start);
-    width: 100%;
+    width: var(--tdf-max-w, 100%);
     aspect-ratio: var(--tdf-ar);
     max-height: var(--tdf-max-h, 7rem);
 }
@@ -47,3 +47,13 @@
     justify-content: center;
     font: 700 85cqh/0.75 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Heading levels: each level gets a lower height cap and a narrower width
+   cap, so an h2 stays smaller than the h1 above it on wide screens (height
+   binds) and on phones (width binds). A max_h option overrides the height. */
+h1.tdf-heading { --tdf-max-h: 7rem;   --tdf-max-w: 100%; }
+h2.tdf-heading { --tdf-max-h: 3.5rem; --tdf-max-w: 75%; }
+h3.tdf-heading { --tdf-max-h: 2.5rem; --tdf-max-w: 60%; }
+h4.tdf-heading,
+h5.tdf-heading,
+h6.tdf-heading { --tdf-max-h: 1.75rem; --tdf-max-w: 50%; }
