@@ -89,8 +89,8 @@
         try {
             var u = new URL(url, location.origin);
             var page = u.searchParams.get('page') || '000-home.xjs';
-            if (page === '000-home.xjs' && u.searchParams.size <= 1) return './';
-            return './' + u.search;
+            if (page === '000-home.xjs' && u.searchParams.size <= 1) return './' + u.hash;
+            return './' + u.search + u.hash;
         } catch (e) {
             return './';
         }
@@ -198,6 +198,13 @@
             }
 
             return res.text().then(function (html) {
+                /* Update the address bar before the page's scripts run: pages
+                   that route on location.hash (the wiki's #wiki/<slug>) read
+                   it while they initialize. */
+                if (pushState !== false) {
+                    history.pushState({ href: href, page: page }, title, buildDisplayUrl(href));
+                }
+
                 contentEl.innerHTML = html;
                 executeScripts(contentEl);
 
@@ -206,11 +213,6 @@
                 if (sidebarEl) {
                     sidebarEl.style.display = noSidebar ? 'none' : '';
                     contentEl.className = noSidebar ? 'col-md-12' : 'col-md-9';
-                }
-
-                if (pushState !== false) {
-                    var displayUrl = buildDisplayUrl(href);
-                    history.pushState({ href: href, page: page }, title, displayUrl);
                 }
 
                 window.scrollTo(0, 0);
