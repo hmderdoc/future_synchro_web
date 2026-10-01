@@ -19,7 +19,7 @@
 (function () {
     'use strict';
 
-    var HOSTS = '[data-avatar], [data-avatar-bin], [data-message-avatar], .chat-web-avatar, .chat-web-user-avatar, .chat-web-thread-avatar, .chat-avatar, .avatar-inline, .ol-avatar';
+    var HOSTS = '[data-avatar], [data-avatar-bin], [data-message-avatar], .chat-web-avatar, .chat-web-user-avatar, .chat-web-thread-avatar, .chat-avatar, .avatar-inline, .ol-avatar, .ib-avatar';
     var SKIP = '.person-picker, .bin-avatar-upload, [data-no-avatar-fx]';
     var AMBIENT_MS = [8000, 15000];
     var TWITCH_MS = 320;
@@ -607,8 +607,18 @@
         return m;
     }
 
+    /* The drawn art's box: an object-fit:contain img (Who's Online, Callers
+       on the Net) letterboxes 80x96 art inside a square element. */
+    function artRect(media) {
+        var r = media.getBoundingClientRect();
+        var nw = media.naturalWidth || media.width, nh = media.naturalHeight || media.height;
+        if (media.tagName !== 'IMG' || !nw || !nh || getComputedStyle(media).objectFit !== 'contain') return r;
+        var k = Math.min(r.width / nw, r.height / nh), w = nw * k, h = nh * k;
+        return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h };
+    }
+
     function place(el, st, pad, srcW) {
-        var hr = st.host.getBoundingClientRect(), mr = st.media.getBoundingClientRect();
+        var hr = st.host.getBoundingClientRect(), mr = artRect(st.media);
         var ppx = pad ? mr.width / srcW : 0;
         el.style.left = (mr.left - hr.left - st.host.clientLeft - pad * ppx) + 'px';
         el.style.top = (mr.top - hr.top - st.host.clientTop - pad * ppx) + 'px';
@@ -656,7 +666,7 @@
 
     function track(st, ev) {
         if (!st || st.dead) return;
-        var r = st.media.getBoundingClientRect();
+        var r = artRect(st.media);
         if (!r.width || !r.height) return;
         var px = clamp((ev.clientX - r.left) / r.width, 0, 1), py = clamp((ev.clientY - r.top) / r.height, 0, 1);
         st.host.style.setProperty('--afx-px', px.toFixed(3));
