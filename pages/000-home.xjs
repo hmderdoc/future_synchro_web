@@ -269,6 +269,13 @@
 
 <!-- Bulletins Carousel -->
 <?xjs
+    /* Section headings each get their own random font, never the same one. */
+    var _news_font = _tdf.tdf_pick_font(['Latest News']);
+    var _tracks_font = '';
+    for (var _tf = 0; _tf < 6 && (!_tracks_font || _tracks_font === _news_font); _tf++) {
+        _tracks_font = _tdf.tdf_pick_font(['Trending Tracks']);
+    }
+
     /* One random font for every bulletin subject this load (coverage judged
        on all of them), so flipping through keeps a consistent look. */
     var _bl_font = _bltn_msgs.length
@@ -332,7 +339,7 @@
 <div class="card mb-3 bl-panel">
     <div class="bl-head">
         <button type="button" class="bl-arrow" id="bl-prev" title="Previous bulletin" aria-label="Previous bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&laquo;</button>
-        <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: 'random', align: 'center' })); ?>
+        <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: _news_font || 'random', align: 'center' })); ?>
         <button type="button" class="bl-arrow" id="bl-next" title="Next bulletin" aria-label="Next bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&raquo;</button>
     </div>
 <?xjs if (_bltn_msgs.length) { ?>
@@ -416,3 +423,219 @@
 })();
 </script>
 <?xjs } ?>
+
+<!-- Trending Tracks: top played Vektrax Records songs as a horizontal
+     thumbnail chart, 10 per page. Click plays + opens the visualizer. -->
+<style>
+.tt-panel {
+    --bs-card-border-color: #FF5555;
+    --bs-card-bg: #000;
+    border-color: #FF5555 !important;
+    background: #000 !important;
+}
+.tt-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+}
+.tt-head #hm-tracks-title { grid-column: 2; margin: 14px 0 10px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
+.tt-head #hm-tracks-title .tdf-art { margin: 0 auto; }
+.tt-arrow {
+    background: transparent;
+    border: 1px solid #FFFFFF;
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.tt-arrow:hover { background: #FFFFFF; color: #000; }
+.tt-arrow:disabled { visibility: hidden; }
+.tt-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(76px, 112px);
+    justify-content: safe center;   /* centered when it fits, never cut off when it scrolls */
+    gap: 10px;
+    padding: 4px 14px 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 14px;
+    scrollbar-width: thin;
+}
+.tt-empty { padding: 4px 14px 16px; color: #AAAAAA; text-align: center; }
+.tt-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #FFFFFF;
+    text-align: center;
+    font: inherit;
+    cursor: pointer;
+    scroll-snap-align: start;
+}
+.tt-thumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 1 / 1;
+    background: #111;
+    border: 1px solid #333;
+    overflow: hidden;
+}
+.tt-item:hover .tt-thumb, .tt-item:focus-visible .tt-thumb { border-color: #FF5555; box-shadow: 0 0 12px rgba(255, 85, 85, 0.5); }
+.tt-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.6s ease;
+}
+.tt-thumb .tt-ava { object-fit: contain; image-rendering: pixelated; background: #000; opacity: 0; }
+.tt-item.tt-show-ava .tt-ava { opacity: 1; }
+.tt-item.tt-show-ava .tt-art { opacity: 0; }
+.tt-noart { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 2em; }
+.tt-rank, .tt-plays {
+    position: absolute;
+    z-index: 1;
+    padding: 1px 5px;
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 0.75em;
+    line-height: 1.3;
+}
+.tt-rank { top: 0; left: 0; color: #FFFF55; font-weight: bold; }
+.tt-plays { right: 0; bottom: 0; color: #55FFFF; }
+.tt-title, .tt-artist { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-title { font-size: 0.85em; color: #FFFFFF; }
+.tt-artist { font-size: 0.72em; color: #AAAAAA; }
+.tt-item.tt-playing .tt-thumb { border-color: #55FF55; }
+.tt-item.tt-playing .tt-plays { color: #55FF55; }
+</style>
+
+<div class="card mb-3 tt-panel" id="tt-panel">
+    <div class="tt-head">
+        <button type="button" class="tt-arrow" id="tt-prev" title="Higher on the chart" aria-label="Higher on the chart" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Trending Tracks', { tag: 'h2', id: 'hm-tracks-title', font: _tracks_font || 'random', align: 'center' })); ?>
+        <button type="button" class="tt-arrow" id="tt-next" title="Further down the chart" aria-label="Further down the chart" disabled>&raquo;</button>
+    </div>
+    <div class="tt-strip" id="tt-strip" role="list" aria-label="Most played tracks">
+        <div class="tt-empty">Loading the chart&hellip;</div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var panel = document.getElementById('tt-panel');
+    if (!panel || panel.__tt) return;
+    panel.__tt = true;
+    var DIR = 'originalcontent_mp3s', PAGE = 10, LIMIT = 50, SWAP_MS = 3500;
+    var strip = document.getElementById('tt-strip');
+    var prev = document.getElementById('tt-prev'), next = document.getElementById('tt-next');
+    var tracks = [], page = 0, avatars = {}, swapTimer = null, visible = true;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function artUrl(name) {
+        return './api/files.ssjs?call=track-art&dir=' + DIR + '&file=' + encodeURIComponent(name);
+    }
+
+    function render() {
+        var pages = Math.ceil(tracks.length / PAGE);
+        prev.disabled = page <= 0;
+        next.disabled = page >= pages - 1;
+        if (!tracks.length) { strip.innerHTML = '<div class="tt-empty">No plays counted yet.</div>'; return; }
+        var html = '';
+        tracks.slice(page * PAGE, page * PAGE + PAGE).forEach(function (t, k) {
+            var rank = page * PAGE + k + 1;
+            var ava = avatars[t.from];
+            html += '<button type="button" class="tt-item" role="listitem" data-name="' + esc(t.name) + '"' +
+                ' aria-label="#' + rank + ' ' + esc(t.title) + (t.artist ? ' by ' + esc(t.artist) : '') + ', ' + t.plays + ' plays. Play">' +
+                '<span class="tt-thumb">' +
+                    (t.has_art ? '<img class="tt-art" alt="" loading="lazy" draggable="false" src="' + artUrl(t.name) + '">' : '<span class="tt-noart">&#9835;</span>') +
+                    (ava ? '<img class="tt-ava" alt="" draggable="false" src="' + ava + '">' : '') +
+                    '<span class="tt-rank">#' + rank + '</span>' +
+                    '<span class="tt-plays">' + t.plays + (t.plays === 1 ? ' play' : ' plays') + '</span>' +
+                '</span>' +
+                '<span class="tt-title" title="' + esc(t.title) + '">' + esc(t.title) + '</span>' +
+                '<span class="tt-artist" title="' + esc(t.artist) + '">' + esc(t.artist || t.from) + '</span>' +
+            '</button>';
+        });
+        strip.innerHTML = html;
+        strip.scrollLeft = 0;
+        markPlaying();
+    }
+
+    /* Thumbnails with an uploader avatar alternate between it and the art,
+       staggered so the strip shimmers rather than blinking in unison. */
+    function swap() {
+        clearTimeout(swapTimer);
+        swapTimer = setTimeout(swap, SWAP_MS);
+        if (!visible || document.hidden || !panel.isConnected) return;
+        Array.prototype.forEach.call(strip.querySelectorAll('.tt-item'), function (el, i) {
+            if (!el.querySelector('.tt-ava')) return;
+            setTimeout(function () { el.classList.toggle('tt-show-ava'); }, i * 120);
+        });
+    }
+
+    function loadAvatars() {
+        var users = [];
+        tracks.forEach(function (t) { if (t.from && users.indexOf(t.from) === -1) users.push(t.from); });
+        if (!users.length || typeof GraphicsConverter === 'undefined') return;
+        fetch('./api/system.ssjs?call=get-avatar&user=' + users.map(encodeURIComponent).join('&user='), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                var gc = GraphicsConverter.shared(), pending = 0;
+                (list || []).forEach(function (a) {
+                    if (!a || !a.data || a.identicon) return;   /* only real, user-set avatars */
+                    pending++;
+                    gc.from_bin(atob(a.data), 10, 6, function (url) {
+                        if (url) avatars[a.user] = url;
+                        if (--pending === 0) render();
+                    }, true);
+                });
+            })
+            .catch(function () { /* art only */ });
+    }
+
+    var nowPlaying = '';
+    function markPlaying() {
+        Array.prototype.forEach.call(strip.querySelectorAll('.tt-item'), function (el) {
+            el.classList.toggle('tt-playing', el.getAttribute('data-name') === nowPlaying);
+        });
+    }
+
+    strip.addEventListener('click', function (ev) {
+        var item = ev.target.closest('.tt-item');
+        if (!item) return;
+        nowPlaying = item.getAttribute('data-name');
+        document.dispatchEvent(new CustomEvent('viz:picktrack', { detail: { name: nowPlaying } }));
+        document.dispatchEvent(new CustomEvent('viz:open'));
+        markPlaying();
+    });
+    prev.addEventListener('click', function () { if (page > 0) { page--; render(); } });
+    next.addEventListener('click', function () { if ((page + 1) * PAGE < tracks.length) { page++; render(); } });
+
+    if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (e) { visible = e[e.length - 1].isIntersecting; }).observe(panel);
+    }
+
+    fetch('./api/files.ssjs?call=top-tracks&meta=1&dir=' + DIR + '&limit=' + LIMIT, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (list) {
+            tracks = Array.isArray(list) ? list.filter(function (t) { return t.plays > 0; }) : [];
+            render();
+            loadAvatars();
+            swap();
+        })
+        .catch(function () { strip.innerHTML = '<div class="tt-empty">The chart is unavailable right now.</div>'; });
+})();
+</script>

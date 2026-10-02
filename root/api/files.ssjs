@@ -922,6 +922,66 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 					last_played: entry.last_played
 				};
 			});
+			/* &meta=1: uploader plus display title/artist (overrides, then ID3,
+			   then the file name) for charts such as the home page's. */
+			if (request.get_param('meta') === '1' && reply.length) {
+				var metaId3 = load({}, settings.web_lib + 'id3-lite.js').Id3Lite;
+				var metaOverrides = loadTrackOverrides();
+				var metaBase = new FileBase(tdir);
+				var metaOpen = metaBase.open();
+				reply.forEach(function (entry) {
+					var ov = metaOverrides[trackOverrideSection(entry.name)] || {};
+					var tags = null;
+					try { tags = metaId3.read(file_area.dir[tdir].path + entry.name); } catch (id3Err) { tags = null; }
+					var rec = null;
+					if (metaOpen) { try { rec = metaBase.get(entry.name); } catch (getErr) { rec = null; } }
+					entry.title = ov.title || (tags && tags.title) || entry.name.replace(/\.mp3$/i, '').replace(/_/g, ' ');
+					entry.artist = ov.artist || (tags && tags.artist) || '';
+					entry.from = rec && rec.from ? String(rec.from) : '';
+					entry.has_art = !!(tags && tags.art);
+				});
+				if (metaOpen) metaBase.close();
+			}
+			break;
+		case 'track-art':
+			/* The embedded cover picture of one MP3, cached by the browser. */
+			var adir = request.get_param('dir');
+			var afn = request.has_param('file') ? String(request.get_param('file')) : '';
+			if (adir === undefined
+				|| file_area.dir[adir] === undefined
+				|| !file_area.dir[adir].can_download
+				|| !user.compare_ars(file_area.dir[adir].download_ars)
+				|| !/^[^\/\\]+\.mp3$/i.test(afn)
+			) {
+				reply.error = 'Invalid directory or access denied';
+				break;
+			}
+			var artPath = file_area.dir[adir].path + afn;
+			if (!file_exists(artPath)) { reply.error = 'File not found'; break; }
+			var artTags = null;
+			try { artTags = load({}, settings.web_lib + 'id3-lite.js').Id3Lite.read(artPath); } catch (artErr) { artTags = null; }
+			if (!artTags || !artTags.art) {
+				http_reply.status = '404 Not Found';
+				reply.error = 'No cover art';
+				break;
+			}
+			var artTag = '"' + md5_calc(afn + ':' + file_date(artPath) + ':' + artTags.art.length, true).substr(0, 16) + '"';
+			http_reply.header['Cache-Control'] = 'public, max-age=86400';
+			http_reply.header['ETag'] = artTag;
+			if (http_request.header && http_request.header['if-none-match'] === artTag) {
+				http_reply.status = '304 Not Modified';
+				reply = false;
+				break;
+			}
+			http_reply.header['Content-Type'] = artTags.art.mime;
+			http_reply.header['Content-Length'] = artTags.art.length;
+			var artFile = new File(artPath);
+			if (artFile.open('rb')) {
+				artFile.position = artTags.art.offset;
+				write(artFile.read(artTags.art.length));
+				artFile.close();
+			}
+			reply = false;
 			break;
 		case 'delete-track':
 			var ddir = request.get_param('dir');
