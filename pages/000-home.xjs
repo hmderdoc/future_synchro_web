@@ -277,11 +277,11 @@
 ?>
 <style>
 .bl-panel {
-    --bs-card-border-color: #AA5500;
+    --bs-card-border-color: #FFFF55;
     --bs-card-bg: #000;
     --bs-card-cap-bg: #000;
     --bs-card-cap-color: #FFFF55;
-    border-color: #AA5500 !important;
+    border-color: #FFFF55 !important;
 }
 /* Head: arrows at the card's edges, level with the "Latest News" title;
    the current bulletin's date and subject centered beneath. */
@@ -295,7 +295,7 @@
 .bl-head #hm-news-title { grid-column: 2; }
 .bl-arrow {
     background: transparent;
-    border: 1px solid #AA5500;
+    border: 1px solid #55FF55;
     color: #FFFF55;
     font-family: inherit;
     font-size: 18px;
@@ -304,7 +304,7 @@
     cursor: pointer;
     border-radius: 2px;
 }
-.bl-arrow:hover { background: #AA5500; color: #000; }
+.bl-arrow:hover { background: #55FF55; color: #000; }
 .bl-arrow[hidden] { display: block; visibility: hidden; }
 .bl-date {
     color: #55FF55;
@@ -312,7 +312,7 @@
     text-align: center;
     margin: 0 0 6px;
 }
-.bl-subject { padding: 0 14px 10px; border-bottom: 2px solid #AA5500; }
+.bl-subject { padding: 0 14px 10px; border-bottom: 2px solid #FFFF55; }
 #bl-subject-title {
     margin: 0;
     color: #FFFF55;
