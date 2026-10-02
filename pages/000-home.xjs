@@ -67,6 +67,10 @@
     font-weight: bold;
     margin: 0 0 8px;
 }
+#hm-intro-title { margin: 12px 0 24px; container-type: inline-size; cursor: pointer; }
+/* The font changes every few seconds; a fixed box (the widest allowed
+   shape, 10:1) keeps the text below from jumping. */
+#hm-intro-title .tdf-art { aspect-ratio: auto; height: min(7rem, 10cqi); align-items: center; }
 .hm-intro-lede a { color: #55FF55; }
 .hm-intro-lede { color: #FFFFFF; margin: 0 0 14px; line-height: 1.5; max-width: 70ch; }
 .hm-intro-connect {
@@ -83,7 +87,7 @@
 
 <section class="card mb-0 hm-intro" aria-labelledby="hm-intro-title">
     <div class="card-body">
-        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random', fx: 'random', fx_play: 'loop' })); ?>
+        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random', align: 'center' })); ?>
         <p class="hm-intro-lede">
             We like to think this might be the most customized Synchronet BBS out there. Alongside the
             classic doors, we write our own, and the board is under constant development<?xjs
@@ -104,6 +108,90 @@
         </dl>
     </div>
 </section>
+
+<script>
+/* Landing title: every 3-5 s a new random font and a new avatar effect;
+   a click skips ahead. Fonts come from api/tdf-heading.ssjs in batches of
+   10 (one request per ~40 s). Lives here, not in js/, so the service
+   worker's asset revision is left alone. Pauses offscreen / hidden tab. */
+(function () {
+    var head = document.getElementById('hm-intro-title');
+    if (!head || head.__hmCycle) return;
+    head.__hmCycle = true;
+    var MIN_MS = 3000, MAX_MS = 5000, BATCH = 10;
+    var variants = [], fetching = false, timer = null, visible = true, effect = null;
+
+    function host() { return head.querySelector('.tdf-art-cells'); }
+    function names() { return window.AvatarFx ? AvatarFx.list().map(function (n) { return n.split(':')[1]; }) : []; }
+    function nextEffect() {
+        var pool = names().filter(function (n) { return n !== effect; });
+        effect = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    }
+    function play() {
+        var h = host();
+        if (window.AvatarFx && h && effect && h.querySelector('img')) AvatarFx.play(h, effect);
+    }
+
+    function fetchMore() {
+        if (fetching) return;
+        fetching = true;
+        var req = [{ tag: 'h1', text: head.querySelector('.tdf-text').textContent, align: 'center' }];
+        fetch('./api/tdf-heading.ssjs?variants=' + BATCH + '&h=' + encodeURIComponent(JSON.stringify(req)), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { variants = variants.concat(d.html || []); })
+            .catch(function () { /* keep the current font */ })
+            .then(function () { fetching = false; });
+    }
+
+    /* Swap in the next font, then start a new effect once it has drawn. */
+    function step() {
+        nextEffect();
+        var next = null;
+        while (variants.length && !next) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = variants.shift();
+            var h = tmp.firstElementChild;
+            if (h && h.getAttribute('data-tdf-font') !== head.getAttribute('data-tdf-font')) next = h;
+        }
+        if (variants.length < 3) fetchMore();
+        var art = next && next.querySelector('.tdf-art'), old = head.querySelector('.tdf-art');
+        if (!art || !old || !window.renderTdfHeadings) { play(); return; }
+        if (window.AvatarFx && host()) AvatarFx.stop(host());
+        head.setAttribute('data-tdf-font', next.getAttribute('data-tdf-font'));
+        old.replaceWith(art);
+        renderTdfHeadings(head);
+        var waited = 0;
+        (function whenDrawn() {
+            if (host() && host().querySelector('img') && host().querySelector('img').complete) { play(); return; }
+            if ((waited += 50) < 3000) setTimeout(whenDrawn, 50);
+        })();
+    }
+
+    function schedule() {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            if (!head.isConnected) return;
+            if (visible && !document.hidden) step();
+            schedule();
+        }, MIN_MS + Math.random() * (MAX_MS - MIN_MS));
+    }
+
+    head.addEventListener('click', function () { step(); schedule(); });
+    if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+            visible = entries[entries.length - 1].isIntersecting;
+            if (!visible && window.AvatarFx && host()) AvatarFx.stop(host());
+        }).observe(head);
+    }
+    fetchMore();
+    var waited = 0;
+    (function firstPlay() {
+        if (host() && host().querySelector('img')) { nextEffect(); play(); return; }
+        if ((waited += 100) < 5000) setTimeout(firstPlay, 100);
+    })();
+    schedule();
+})();
+</script>
 
 <!-- Bulletins Carousel -->
 <style>

@@ -4,6 +4,7 @@
 //       optional: avatar effects, see lib/tdf-heading.js)
 //     &font=random|name|name:index        (default random)
 //     &fonts={"h1":"name",...}            (optional per-level pins)
+//     &variants=N                         (first heading in N random fonts)
 // -> { fonts: { h1: "name:index", h2: ... }, html: ["<h1 ...>", ...] }
 // Used by pages that build their headings in the browser (the wiki), so
 // headings of the same level on one document match.
@@ -33,7 +34,8 @@ list = list.slice(0, MAX_HEADINGS).map(function (h) {
         color: /^#[0-9a-f]{6}$/i.test(String(h && h.color || '')) ? String(h.color) : '',
         fx: /^[a-z0-9-]{1,24}$/.test(String(h && h.fx || '')) ? String(h.fx) : '',
         fx_play: h && h.fx_play === 'loop' ? 'loop' : 'hover',
-        fx_click: !(h && h.fx_click === false)
+        fx_click: !(h && h.fx_click === false),
+        align: h && (h.align === 'center' || h.align === 'right') ? h.align : 'left'
     };
 });
 
@@ -56,12 +58,27 @@ list.forEach(function (h) {
     }).map(function (o) { return o.text; }));
 });
 
+/* &variants=N: the first heading rendered in N different random fonts, for
+   pages that cycle a heading's font client-side (one request per batch). */
+var variants = Math.min(12, Math.max(0, parseInt(http_request.query.variants ? http_request.query.variants[0] : '0', 10) || 0));
+if (variants && list.length && list[0].text) {
+    var first = list[0], seen = {}, out = [];
+    for (var v = 0; v < variants * 2 && out.length < variants; v++) {
+        var f = tdf.tdf_pick_font([first.text]);
+        if (!f || seen[f]) continue;
+        seen[f] = true;
+        out.push(tdf.tdf_heading(first.text, { tag: first.tag, font: f, align: first.align }));
+    }
+    write(JSON.stringify({ html: out }));
+    exit();
+}
+
 write(JSON.stringify({
     fonts: fonts,
     html: list.map(function (h) {
         return h.text ? tdf.tdf_heading(h.text, {
             tag: h.tag, font: fonts[h.tag] || 'random', color: h.color,
-            fx: h.fx || undefined, fx_play: h.fx_play, fx_click: h.fx_click
+            fx: h.fx || undefined, fx_play: h.fx_play, fx_click: h.fx_click, align: h.align
         }) : '';
     })
 }));
