@@ -336,7 +336,7 @@
 .bl-empty { color: #AA5500; padding: 12px 14px; text-align: center; }
 </style>
 
-<div class="card mb-3 bl-panel">
+<div class="card mb-0 bl-panel">
     <div class="bl-head">
         <button type="button" class="bl-arrow" id="bl-prev" title="Previous bulletin" aria-label="Previous bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&laquo;</button>
         <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: _news_font || 'random', align: 'center' })); ?>
@@ -433,6 +433,9 @@
     border-color: #FF5555 !important;
     background: #000 !important;
 }
+/* Flush against the news card: one shared edge, square corners. */
+.bl-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#tt-panel { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .tt-head {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -445,7 +448,7 @@
 .tt-arrow {
     background: transparent;
     border: 1px solid #FFFFFF;
-    color: #FFFFFF;
+    color: #AA00AA;
     font-family: inherit;
     font-size: 18px;
     line-height: 1;
@@ -453,7 +456,7 @@
     cursor: pointer;
     border-radius: 2px;
 }
-.tt-arrow:hover { background: #FFFFFF; color: #000; }
+.tt-arrow:hover { background: #FFFFFF; color: #AA00AA; }
 .tt-arrow:disabled { visibility: hidden; }
 .tt-strip {
     display: grid;
@@ -520,7 +523,7 @@
 .tt-item.tt-playing .tt-plays { color: #55FF55; }
 </style>
 
-<div class="card mb-3 tt-panel" id="tt-panel">
+<div class="card mb-0 tt-panel" id="tt-panel">
     <div class="tt-head">
         <button type="button" class="tt-arrow" id="tt-prev" title="Higher on the chart" aria-label="Higher on the chart" disabled>&laquo;</button>
         <?xjs write(_tdf.tdf_heading('Trending Tracks', { tag: 'h2', id: 'hm-tracks-title', font: _tracks_font || 'random', align: 'center' })); ?>
@@ -556,7 +559,7 @@
         var html = '';
         tracks.slice(page * PAGE, page * PAGE + PAGE).forEach(function (t, k) {
             var rank = page * PAGE + k + 1;
-            var ava = avatars[t.from];
+            var ava = t.from_user ? avatars[String(t.from_user)] : null;
             html += '<button type="button" class="tt-item" role="listitem" data-name="' + esc(t.name) + '"' +
                 ' aria-label="#' + rank + ' ' + esc(t.title) + (t.artist ? ' by ' + esc(t.artist) : '') + ', ' + t.plays + ' plays. Play">' +
                 '<span class="tt-thumb">' +
@@ -587,8 +590,10 @@
     }
 
     function loadAvatars() {
+        /* Uploaders arrive resolved to account numbers (from_user): alt
+           handles and case variants all land on the same person. */
         var users = [];
-        tracks.forEach(function (t) { if (t.from && users.indexOf(t.from) === -1) users.push(t.from); });
+        tracks.forEach(function (t) { if (t.from_user && users.indexOf(String(t.from_user)) === -1) users.push(String(t.from_user)); });
         if (!users.length || typeof GraphicsConverter === 'undefined') return;
         fetch('./api/system.ssjs?call=get-avatar&user=' + users.map(encodeURIComponent).join('&user='), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })

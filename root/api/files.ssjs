@@ -929,6 +929,11 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 				var metaOverrides = loadTrackOverrides();
 				var metaBase = new FileBase(tdir);
 				var metaOpen = metaBase.open();
+				/* Uploader names vary (case, punctuation, alt handles); resolve
+				   them to an account the same way profile pages credit songs. */
+				var metaSocial = null;
+				try { metaSocial = load({}, system.mods_dir + 'load/social_lib.js').Social; } catch (socErr) { metaSocial = null; }
+				var metaResolved = {};
 				reply.forEach(function (entry) {
 					var ov = metaOverrides[trackOverrideSection(entry.name)] || {};
 					var tags = null;
@@ -939,6 +944,33 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 					entry.artist = ov.artist || (tags && tags.artist) || '';
 					entry.from = rec && rec.from ? String(rec.from) : '';
 					entry.has_art = !!(tags && tags.art);
+					entry.from_user = 0;
+					entry.from_alias = '';
+					if (metaSocial) {
+						var resolveName = function (name) {
+							if (!name) return 0;
+							if (metaResolved[name] === undefined) {
+								var num = 0;
+								try { num = metaSocial.resolveLocalUser(name, '') || 0; } catch (resErr) { num = 0; }
+								metaResolved[name] = num;
+							}
+							return metaResolved[name];
+						};
+						entry.from_user = resolveName(entry.from);
+						/* No (resolvable) uploader: the file name's trailing handle,
+						   the same convention profile pages credit by
+						   (..._hm_derdoc.mp3, ..._hmderdoc.mp3). Longest first; a
+						   single word must be 4+ letters, like the profile rule. */
+						if (!entry.from_user) {
+							var stemParts = entry.name.replace(/\.mp3$/i, '').split('_');
+							for (var tw = Math.min(3, stemParts.length - 1); tw >= 1 && !entry.from_user; tw--) {
+								var tail = stemParts.slice(-tw).join(' ');
+								if (tw === 1 && tail.length < 4) continue;
+								entry.from_user = resolveName(tail);
+							}
+						}
+						if (entry.from_user) entry.from_alias = String(new User(entry.from_user).alias);
+					}
 				});
 				if (metaOpen) metaBase.close();
 			}
