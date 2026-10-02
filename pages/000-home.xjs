@@ -127,7 +127,18 @@
 .hm-connect .hm-connect-label th { color: #55FFFF; font-weight: normal; }
 .hm-connect td { color: #FFFF55; overflow-wrap: normal; }
 .hm-connect td a { color: #55FF55; }
-.hm-connect td a.hm-connect-more { color: #AAAAAA; font-size: 0.85em; }
+/* Terminal options flow inline (wrapping only on narrow screens). */
+.hm-connect-terms > * { display: inline-block; margin: 0 6px; }
+.hm-connect-web {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #55FF55;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hm-connect-web:hover { color: #FFFFFF; }
 #hm-news-title { margin: 14px 0 6px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
 #hm-news-title .tdf-art { margin: 0 auto; }
 </style>
@@ -152,13 +163,26 @@
                 <tr>
                     <td><?xjs write(_hmBreakable(_conn_host + ':' + _conn_telnet)); ?></td>
                     <td><?xjs write(_hmBreakable(_conn_host + ':' + _conn_ssh)); ?></td>
-                    <td><a href="https://syncterm.bbsdev.net" rel="noopener" data-no-spa>SyncTERM</a><br><a href="./?page=010-wiki.xjs#wiki/other-terminals" class="hm-connect-more">Other Terminals</a></td>
+                    <td class="hm-connect-terms"><a href="https://syncterm.bbsdev.net" rel="noopener" data-no-spa>SyncTERM</a> <a href="./?page=010-wiki.xjs#wiki/other-terminals">More</a> <button type="button" class="hm-connect-web" id="hm-connect-web" aria-controls="terminal-panel" title="Open the built-in web terminal">Web</button></td>
                 </tr>
             </tbody>
         </table>
     </div>
 </section>
 
+<script>
+/* "Web" in the connection table opens the built-in terminal: the same
+   toggle (and connect) as the navbar's terminal button. */
+(function () {
+    var web = document.getElementById('hm-connect-web');
+    if (!web || web.__bound) return;
+    web.__bound = true;
+    web.addEventListener('click', function () {
+        var btn = document.getElementById('btn-terminal');
+        if (btn) btn.click();
+    });
+})();
+</script>
 <script>
 /* Landing title: every 3-5 s a new random font and a new avatar effect;
    a click skips ahead. Fonts come from api/tdf-heading.ssjs in batches of
