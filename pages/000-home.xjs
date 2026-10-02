@@ -8,6 +8,11 @@
     var _bltn_subcode = 'LOCAL-NOTICES';
     var _bltn_max = 10;
     var _bltn_body_maxlen = 600;
+    /* Narrow columns may wrap a host name only before a '.' or ':'. */
+    function _hmBreakable(value) {
+        return _homeEsc(value).replace(/([.:])/g, '<wbr>$1');
+    }
+
     function _homeEsc(value) {
         return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
@@ -61,28 +66,29 @@
 .hm-intro { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .hm-intro ~ .bl-panel { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .hm-intro .card-body { padding: 16px 18px; }
-.hm-intro-sub {
-    color: #55FFFF;
-    font-size: 1rem;
-    font-weight: bold;
-    margin: 0 0 8px;
-}
 #hm-intro-title { margin: 12px 0 24px; container-type: inline-size; cursor: pointer; }
 /* The font changes every few seconds; a fixed box (the widest allowed
    shape, 10:1) keeps the text below from jumping. */
 #hm-intro-title .tdf-art { aspect-ratio: auto; height: min(7rem, 10cqi); align-items: center; }
 .hm-intro-lede a { color: #55FF55; }
-.hm-intro-lede { color: #FFFFFF; margin: 0 0 14px; line-height: 1.5; max-width: 70ch; }
-.hm-intro-connect {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    gap: 4px 14px;
-    margin: 0;
+.hm-intro .hm-intro-lede { color: #FFFFFF; margin: 0 auto 18px; line-height: 1.5; max-width: 70ch; text-align: center; }
+.hm-connect {
+    width: 100%;
+    max-width: 52rem;
+    margin: 0 auto;
+    table-layout: fixed;
+    border-collapse: collapse;
+    text-align: center;
     font-family: monospace;
 }
-.hm-intro-connect dt { color: #55FFFF; font-weight: normal; }
-.hm-intro-connect dd { color: #FFFF55; margin: 0; word-break: break-all; }
-.hm-intro-connect dd .hm-intro-note { color: #AAAAAA; word-break: normal; }
+.hm-connect th, .hm-connect td { padding: 4px 8px; vertical-align: top; }
+.hm-connect .hm-connect-title { padding-bottom: 8px; }
+.hm-connect h2 { margin: 0; color: #FFFFFF; font-size: 1rem; font-weight: bold; }
+.hm-connect .hm-connect-label th { color: #55FFFF; font-weight: normal; }
+.hm-connect td { color: #FFFF55; overflow-wrap: normal; }
+.hm-connect td a { color: #55FF55; }
+#hm-news-title { margin: 14px 0 6px; container-type: inline-size; --tdf-max-h: min(3.5rem, 6cqi); }
+#hm-news-title .tdf-art { margin: 0 auto; }
 </style>
 
 <section class="card mb-0 hm-intro" aria-labelledby="hm-intro-title">
@@ -97,15 +103,19 @@
             usually someone around to talk to. And we enjoy pushing what a terminal can do: multimedia,
             demoscene tricks, and experimental music and video broadcasts.
         </p>
-        <h2 class="hm-intro-sub">Connection info</h2>
-        <dl class="hm-intro-connect">
-            <dt>Telnet</dt>
-            <dd><?xjs write(_homeEsc(_conn_host)); if (_conn_telnet != 23) write(':' + _conn_telnet); ?></dd>
-            <dt>SSH</dt>
-            <dd><?xjs write(_homeEsc(_conn_host) + ':' + _conn_ssh); ?></dd>
-            <dt>Client</dt>
-            <dd><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a> <span class="hm-intro-note">recommended, or any ANSI terminal</span></dd>
-        </dl>
+        <table class="hm-connect">
+            <thead>
+                <tr><th colspan="3" class="hm-connect-title"><h2>Connection Info</h2></th></tr>
+                <tr class="hm-connect-label"><th scope="col">Telnet</th><th scope="col">SSH</th><th scope="col">Terminal</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><?xjs write(_hmBreakable(_conn_host + (_conn_telnet != 23 ? ':' + _conn_telnet : ''))); ?></td>
+                    <td><?xjs write(_hmBreakable(_conn_host + ':' + _conn_ssh)); ?></td>
+                    <td><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </section>
 
@@ -251,6 +261,7 @@
 </style>
 
 <div class="card mb-3 bl-panel">
+    <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: 'random', align: 'center' })); ?>
     <div class="card-header">
         <div class="bl-header-left">
             <div class="bl-header-subject" id="bl-title"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].subject : 'Bulletins'); ?></div>
