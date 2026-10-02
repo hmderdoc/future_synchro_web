@@ -17,6 +17,49 @@
         return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    /* Bulletin body -> HTML that keeps its Ctrl-A colors (signatures are
+       colored). Hand-rolled because html_encode() hard-wraps at 80 columns.
+       Letters krgybmcw set the foreground, digits 0-7 the background, H high
+       intensity, N resets; uncolored text inherits the card's white. The
+       preview cut counts visible characters only, so it never splits a code. */
+    var _CA_LETTERS = 'krgybmcw';
+    var _CA_NORMAL = ['#000000', '#AA0000', '#00AA00', '#AA5500', '#0000AA', '#AA00AA', '#00AAAA', '#AAAAAA'];
+    var _CA_BRIGHT = ['#555555', '#FF5555', '#55FF55', '#FFFF55', '#5555FF', '#FF55FF', '#55FFFF', '#FFFFFF'];
+
+    function _blBodyHtml(raw) {
+        var out = '', run = '', seen = 0, fg = -1, bg = -1, hi = false, open = false, i = 0;
+        function style() {
+            var css = '';
+            if (fg >= 0) css += 'color:' + (hi ? _CA_BRIGHT : _CA_NORMAL)[fg] + ';';
+            else if (hi) css += 'color:#FFFFFF;';
+            if (bg > 0) css += 'background-color:' + _CA_NORMAL[bg] + ';';
+            return css;
+        }
+        function flush() {
+            if (!run) return;
+            var css = style();
+            out += css ? '<span style="' + css + '">' + _homeEsc(run) + '</span>' : _homeEsc(run);
+            run = '';
+        }
+        for (; i < raw.length && seen < _bltn_body_maxlen; i++) {
+            var ch = raw.charAt(i);
+            if (ch === '\x01' && i + 1 < raw.length) {
+                var code = raw.charAt(++i), lower = code.toLowerCase(), k = _CA_LETTERS.indexOf(lower);
+                flush();
+                if (k >= 0) fg = k;
+                else if (code >= '0' && code <= '7') bg = +code;
+                else if (lower === 'h') hi = true;
+                else if (lower === 'n') { fg = -1; bg = -1; hi = false; }
+                continue;
+            }
+            run += ch;
+            seen++;
+        }
+        flush();
+        if (i < raw.length) out += '...';
+        return out.replace(/^\s+/, '');
+    }
+
     var _bltn_msgs = [];
     var _bltn_mb = new MsgBase(_bltn_subcode);
     if (_bltn_mb.open()) {
@@ -26,13 +69,12 @@
             if (_bh === null || (_bh.attr & MSG_DELETE))
                 continue;
             var _bb = _bltn_mb.get_msg_body(_bm) || '';
-            _bb = _bb.replace(/\x01./g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-            if (_bb.length > _bltn_body_maxlen)
-                _bb = _bb.substring(0, _bltn_body_maxlen) + '...';
+            _bb = _bb.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+$/, '');
             _bltn_msgs.push({
                 subject: _bh.subject.replace(/</g, '&lt;'),
+                subject_raw: _bh.subject,
                 date: system.timestr(_bh.when_written_time),
-                body: _bb.replace(/</g, '&lt;')
+                body: _blBodyHtml(_bb)
             });
             _bltn_count++;
         }
@@ -79,15 +121,14 @@
     table-layout: fixed;
     border-collapse: collapse;
     text-align: center;
-    font-family: monospace;
+    font-family: inherit;   /* the site's Spleen CP437 face */
 }
 .hm-connect th, .hm-connect td { padding: 4px 8px; vertical-align: top; }
-.hm-connect .hm-connect-title { padding-bottom: 8px; }
-.hm-connect h2 { margin: 0; color: #FFFFFF; font-size: 1rem; font-weight: bold; }
 .hm-connect .hm-connect-label th { color: #55FFFF; font-weight: normal; }
 .hm-connect td { color: #FFFF55; overflow-wrap: normal; }
 .hm-connect td a { color: #55FF55; }
-#hm-news-title { margin: 14px 0 6px; container-type: inline-size; --tdf-max-h: min(3.5rem, 6cqi); }
+.hm-connect td a.hm-connect-more { color: #AAAAAA; font-size: 0.85em; }
+#hm-news-title { margin: 14px 0 6px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
 #hm-news-title .tdf-art { margin: 0 auto; }
 </style>
 
@@ -105,14 +146,13 @@
         </p>
         <table class="hm-connect">
             <thead>
-                <tr><th colspan="3" class="hm-connect-title"><h2>Connection Info</h2></th></tr>
                 <tr class="hm-connect-label"><th scope="col">Telnet</th><th scope="col">SSH</th><th scope="col">Terminal</th></tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><?xjs write(_hmBreakable(_conn_host + (_conn_telnet != 23 ? ':' + _conn_telnet : ''))); ?></td>
+                    <td><?xjs write(_hmBreakable(_conn_host + ':' + _conn_telnet)); ?></td>
                     <td><?xjs write(_hmBreakable(_conn_host + ':' + _conn_ssh)); ?></td>
-                    <td><a href="https://syncterm.bbsdev.net/" rel="noopener">SyncTERM</a></td>
+                    <td><a href="https://syncterm.bbsdev.net" rel="noopener" data-no-spa>SyncTERM</a><br><a href="./?page=010-wiki.xjs#wiki/other-terminals" class="hm-connect-more">Other Terminals</a></td>
                 </tr>
             </tbody>
         </table>
@@ -204,6 +244,13 @@
 </script>
 
 <!-- Bulletins Carousel -->
+<?xjs
+    /* One random font for every bulletin subject this load (coverage judged
+       on all of them), so flipping through keeps a consistent look. */
+    var _bl_font = _bltn_msgs.length
+        ? _tdf.tdf_pick_font(_bltn_msgs.map(function (m) { return m.subject_raw; }))
+        : '';
+?>
 <style>
 .bl-panel {
     --bs-card-border-color: #AA5500;
@@ -212,69 +259,64 @@
     --bs-card-cap-color: #FFFF55;
     border-color: #AA5500 !important;
 }
-.bl-panel > .card-header {
-    color: #FFFF55 !important;
-    background: #000 !important;
-    border-bottom: 2px solid #AA5500 !important;
-    font-weight: bold;
-    display: flex;
-    justify-content: space-between;
+/* Head: arrows at the card's edges, level with the "Latest News" title;
+   the current bulletin's date and subject centered beneath. */
+.bl-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
+    padding: 0 14px;
 }
-.bl-header-left {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-}
-.bl-header-subject {
-    color: #FFFF55;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: bold;
-}
-.bl-header-date {
-    color: #55FF55;
-    font-size: 0.75em;
-    font-weight: normal;
-    white-space: nowrap;
-}
-.bl-nav { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.bl-nav button {
+.bl-head #hm-news-title { grid-column: 2; }
+.bl-arrow {
     background: transparent;
     border: 1px solid #AA5500;
     color: #FFFF55;
-    font-family: monospace;
-    font-size: 14px;
+    font-family: inherit;
+    font-size: 18px;
     line-height: 1;
-    padding: 2px 8px;
+    padding: 6px 12px;
     cursor: pointer;
     border-radius: 2px;
 }
-.bl-nav button:hover { background: #AA5500; color: #000; }
-.bl-counter { color: #AAAAAA; font-size: 0.75em; font-weight: normal; }
+.bl-arrow:hover { background: #AA5500; color: #000; }
+.bl-arrow[hidden] { display: block; visibility: hidden; }
+.bl-date {
+    color: #55FF55;
+    font-size: 1.125em;
+    text-align: center;
+    margin: 0 0 6px;
+}
+.bl-subject { padding: 0 14px 10px; border-bottom: 2px solid #AA5500; }
+#bl-subject-title {
+    margin: 0;
+    color: #FFFF55;
+    text-align: center;
+    font-size: 1.25rem;
+    container-type: inline-size;
+    --tdf-max-h: min(2.75rem, 6.5cqi);
+    --tdf-max-w: 100%;
+}
+#bl-subject-title .tdf-art { margin: 0 auto; }
 .bl-slide { display: none; padding: 12px 14px; }
 .bl-slide.active { display: block; }
-.bl-body { color: #FFFFFF; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; line-height: 1.45; }
-.bl-empty { color: #AA5500; padding: 12px 14px; }
+.bl-body { color: #FFFFFF; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; line-height: 1.45; text-align: center; }
+.bl-empty { color: #AA5500; padding: 12px 14px; text-align: center; }
 </style>
 
 <div class="card mb-3 bl-panel">
-    <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: 'random', align: 'center' })); ?>
-    <div class="card-header">
-        <div class="bl-header-left">
-            <div class="bl-header-subject" id="bl-title"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].subject : 'Bulletins'); ?></div>
-            <div class="bl-header-date" id="bl-date"><?xjs write(_bltn_msgs.length ? _bltn_msgs[0].date : ''); ?></div>
-        </div>
-<?xjs if (_bltn_msgs.length > 1) { ?>
-        <div class="bl-nav">
-            <button id="bl-prev" title="Previous">&laquo;</button>
-            <span class="bl-counter" id="bl-counter">1 / <?xjs write(_bltn_msgs.length); ?></span>
-            <button id="bl-next" title="Next">&raquo;</button>
-        </div>
-<?xjs } ?>
+    <div class="bl-head">
+        <button type="button" class="bl-arrow" id="bl-prev" title="Previous bulletin" aria-label="Previous bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: 'random', align: 'center' })); ?>
+        <button type="button" class="bl-arrow" id="bl-next" title="Next bulletin" aria-label="Next bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&raquo;</button>
     </div>
+<?xjs if (_bltn_msgs.length) { ?>
+    <div class="bl-date" id="bl-date"><?xjs write(_homeEsc(_bltn_msgs[0].date)); ?></div>
+    <div class="bl-subject" id="bl-subject" data-tdf-font="<?xjs write(_homeEsc(_bl_font)); ?>">
+        <?xjs write(_tdf.tdf_heading(_bltn_msgs[0].subject_raw, { tag: 'h3', id: 'bl-subject-title', font: _bl_font || 'random', align: 'center' })); ?>
+    </div>
+<?xjs } ?>
     <div class="card-body p-0" id="bl-carousel">
 <?xjs
     if (_bltn_msgs.length === 0) {
@@ -284,7 +326,7 @@
     }
     _bltn_msgs.forEach(function (msg, idx) {
 ?>
-        <div class="bl-slide<?xjs if (idx === 0) write(' active'); ?>" data-bl-idx="<?xjs write(idx); ?>" data-bl-subject="<?xjs write(msg.subject); ?>" data-bl-date="<?xjs write(msg.date); ?>">
+        <div class="bl-slide<?xjs if (idx === 0) write(' active'); ?>" data-bl-idx="<?xjs write(idx); ?>" data-bl-subject="<?xjs write(_homeEsc(msg.subject_raw)); ?>" data-bl-date="<?xjs write(_homeEsc(msg.date)); ?>">
             <div class="bl-body"><?xjs write(msg.body); ?></div>
         </div>
 <?xjs
@@ -295,25 +337,58 @@
 
 <?xjs if (_bltn_msgs.length > 1) { ?>
 <script>
+/* Bulletin carousel: arrows flip slides; the date and the TDF subject
+   follow. Subjects for the other slides are rendered in the same font in
+   one batch request after load, then swapped in instantly. */
 (function () {
-    var total = <?xjs write(_bltn_msgs.length); ?>;
-    var cur = 0;
     var slides = document.querySelectorAll('.bl-slide');
-    var counter = document.getElementById('bl-counter');
-    var titleEl = document.getElementById('bl-title');
+    var total = slides.length, cur = 0;
     var dateEl = document.getElementById('bl-date');
+    var subjectBox = document.getElementById('bl-subject');
+    var font = subjectBox ? subjectBox.getAttribute('data-tdf-font') : '';
+    var rendered = {};   /* slide index -> heading html */
 
-    function show(idx) {
-        cur = ((idx % total) + total) % total;
-        slides.forEach(function (s) { s.classList.remove('active'); });
+    function subjectOf(i) { return slides[i].getAttribute('data-bl-subject'); }
+
+    function prefetch() {
+        var idx = [], req = [];
+        for (var i = 1; i < total; i++) { idx.push(i); req.push({ tag: 'h3', text: subjectOf(i), align: 'center' }); }
+        var url = './api/tdf-heading.ssjs?h=' + encodeURIComponent(JSON.stringify(req)) +
+            (font ? '&fonts=' + encodeURIComponent(JSON.stringify({ h3: font })) : '');
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { idx.forEach(function (n, k) { if (d.html && d.html[k]) rendered[n] = d.html[k]; }); })
+            .catch(function () { /* plain subjects as a fallback */ });
+    }
+
+    function showSubject(i) {
+        var old = document.getElementById('bl-subject-title');
+        if (!old) return;
+        var el;
+        if (rendered[i]) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = rendered[i];
+            el = tmp.firstElementChild;
+        } else {
+            el = document.createElement('h3');
+            el.textContent = subjectOf(i);
+        }
+        el.id = 'bl-subject-title';
+        old.replaceWith(el);
+        if (window.renderTdfHeadings) renderTdfHeadings(subjectBox);
+    }
+
+    function show(i) {
+        cur = ((i % total) + total) % total;
+        Array.prototype.forEach.call(slides, function (s) { s.classList.remove('active'); });
         slides[cur].classList.add('active');
-        if (counter) counter.textContent = (cur + 1) + ' / ' + total;
-        if (titleEl) titleEl.textContent = slides[cur].getAttribute('data-bl-subject');
         if (dateEl) dateEl.textContent = slides[cur].getAttribute('data-bl-date');
+        showSubject(cur);
     }
 
     document.getElementById('bl-prev').addEventListener('click', function () { show(cur - 1); });
     document.getElementById('bl-next').addEventListener('click', function () { show(cur + 1); });
+    prefetch();
 })();
 </script>
 <?xjs } ?>
