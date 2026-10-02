@@ -13,7 +13,7 @@
     'use strict';
     var IMAGE_URL = /\.(png|jpe?g|gif|webp|bmp|svg|avif)(?:[?#].*)?$/i;
     var IMAGE_PARAM = /[?&]file=([^&#]+)/i;
-    var SKIP = '[data-avatar], .avatar-inline, .bin-icon, .bin-icon-img, .forum-icon-img, .brand-icon, .nav-avatar, .person-menu, .person-picker, .ib-avatar, .avatar-marker, .lightbox, .chat-web-avatar, .pp-avatar, .rv-row .avatar-inline, .chat-rich-link-media, .chat-rich-media-thumb, .files-preview-panel, .leaflet-container';
+    var SKIP = '[data-avatar], .avatar-inline, .tdf-heading, .bin-icon, .bin-icon-img, .forum-icon-img, .brand-icon, .nav-avatar, .person-menu, .person-picker, .ib-avatar, .avatar-marker, .lightbox, .chat-web-avatar, .pp-avatar, .rv-row .avatar-inline, .chat-rich-link-media, .chat-rich-media-thumb, .files-preview-panel, .leaflet-container';
     var overlay = null;
     var lastFocus = null;
 

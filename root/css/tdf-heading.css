@@ -38,6 +38,10 @@
     height: 100%;
     image-rendering: pixelated;
 }
+/* The art is lettering, not a picture: no image drag, save-as or lightbox;
+   pointer events land on the heading. */
+.tdf-art { user-select: none; -webkit-user-select: none; }
+.tdf-art-cells img { pointer-events: none; -webkit-user-drag: none; }
 .tdf-fallback {
     position: absolute;
     top: 0;

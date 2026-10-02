@@ -1,6 +1,7 @@
 // tdf-heading.ssjs - render a batch of TDF headings, one font per level.
 // GET ?h=[{"tag":"h1","text":"...","color":"#rrggbb"},...]  (JSON, URL-encoded;
-//       color optional: recolors the art toward it)
+//       color optional: recolors the art toward it; fx/fx_play/fx_click
+//       optional: avatar effects, see lib/tdf-heading.js)
 //     &font=random|name|name:index        (default random)
 //     &fonts={"h1":"name",...}            (optional per-level pins)
 // -> { fonts: { h1: "name:index", h2: ... }, html: ["<h1 ...>", ...] }
@@ -29,7 +30,10 @@ list = list.slice(0, MAX_HEADINGS).map(function (h) {
     return {
         tag: /^h[1-6]$/.test(tag) ? tag : 'h2',
         text: String(h && h.text || '').replace(/\s+/g, ' ').trim().substr(0, MAX_TEXT),
-        color: /^#[0-9a-f]{6}$/i.test(String(h && h.color || '')) ? String(h.color) : ''
+        color: /^#[0-9a-f]{6}$/i.test(String(h && h.color || '')) ? String(h.color) : '',
+        fx: /^[a-z0-9-]{1,24}$/.test(String(h && h.fx || '')) ? String(h.fx) : '',
+        fx_play: h && h.fx_play === 'loop' ? 'loop' : 'hover',
+        fx_click: !(h && h.fx_click === false)
     };
 });
 
@@ -55,6 +59,9 @@ list.forEach(function (h) {
 write(JSON.stringify({
     fonts: fonts,
     html: list.map(function (h) {
-        return h.text ? tdf.tdf_heading(h.text, { tag: h.tag, font: fonts[h.tag] || 'random', color: h.color }) : '';
+        return h.text ? tdf.tdf_heading(h.text, {
+            tag: h.tag, font: fonts[h.tag] || 'random', color: h.color,
+            fx: h.fx || undefined, fx_play: h.fx_play, fx_click: h.fx_click
+        }) : '';
     })
 }));

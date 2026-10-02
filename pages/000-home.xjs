@@ -83,7 +83,7 @@
 
 <section class="card mb-0 hm-intro" aria-labelledby="hm-intro-title">
     <div class="card-body">
-        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random' })); ?>
+        <?xjs write(_tdf.tdf_heading(system.name, { tag: 'h1', id: 'hm-intro-title', font: 'random', fx: 'random', fx_play: 'loop' })); ?>
         <p class="hm-intro-lede">
             We like to think this might be the most customized Synchronet BBS out there. Alongside the
             classic doors, we write our own, and the board is under constant development<?xjs
