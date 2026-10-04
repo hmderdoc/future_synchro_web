@@ -47,6 +47,72 @@
 ?>
 
 <script type="text/javascript" src="./js/forum.js?_v=<? write(time()); ?>"></script>
+<script type="text/javascript" src="./js/mail-attach.js?_v=<? write(file_date(settings.web_root + 'js/mail-attach.js')); ?>"></script>
+
+<style>
+/* ── Composer attachments (js/mail-attach.js) ── */
+.mail-attach { margin: 0 0 10px; }
+.mail-attach-drop {
+    border: 1px dashed #555555;
+    padding: 8px 10px;
+    color: #AAAAAA;
+    font-size: 0.9em;
+}
+.mail-attach-label { color: #55FFFF; }
+.mail-attach-browse {
+    border: 1px solid #555555;
+    background: transparent;
+    color: #FFFFFF;
+    font: inherit;
+    padding: 0 6px;
+    cursor: pointer;
+}
+.mail-attach-browse:hover { border-color: #55FFFF; color: #55FFFF; }
+.mail-attach-hint { color: #555555; margin-left: 10px; }
+.mail-attach-dragover .mail-attach-drop {
+    border-color: #55FFFF;
+    border-style: solid;
+    background: rgba(85, 255, 255, 0.08);
+    color: #FFFFFF;
+}
+.mail-attach-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.mail-attach-item {
+    border: 1px solid #333333;
+    border-left: 3px solid #55FFFF;
+    background: #050505;
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    font-size: 0.85em;
+}
+.mail-attach-item[data-state="done"] { border-left-color: #55FF55; }
+.mail-attach-item[data-state="error"] { border-left-color: #FF5555; }
+.mail-attach-head { display: flex; align-items: center; gap: 8px; }
+.mail-attach-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #AAAAAA;
+}
+.mail-attach-size { color: #555555; white-space: nowrap; }
+.mail-attach-remove {
+    border: 1px solid #333333;
+    background: transparent;
+    color: #AAAAAA;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    padding: 1px 6px;
+}
+.mail-attach-remove:hover { color: #FFFFFF; border-color: #AAAAAA; }
+.mail-attach-bar { height: 3px; background: #1a1a1a; margin-top: 4px; }
+.mail-attach-fill { height: 100%; width: 0; background: #55FFFF; transition: width 0.2s linear; }
+.mail-attach-item[data-state="done"] .mail-attach-fill { background: #55FF55; }
+.mail-attach-item[data-state="error"] .mail-attach-fill { background: #FF5555; }
+.mail-attach-msg:empty { display: none; }
+.mail-attach-msg, .mail-attach-error { color: #FF5555; margin-top: 4px; }
+</style>
 
 <script type="text/javascript">
 

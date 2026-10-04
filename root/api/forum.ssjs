@@ -54,7 +54,8 @@ if (request.has_param('call') && (http_request.method === 'GET' || http_request.
             case 'post-reply':
                 if (request.has_params(['sub', 'body', 'pid'])) {
                     var _ansi = request.has_param('ansi') && http_request.query.ansi[0] === '1';
-                    reply.success = postReply(http_request.query.sub[0], http_request.query.body[0], Number(http_request.query.pid[0]), _ansi);
+                    reply.success = postReply(http_request.query.sub[0], http_request.query.body[0], Number(http_request.query.pid[0]), _ansi, http_request.query.attach || []);
+                    if (!reply.success && postMailError) reply.error = postMailError;
                 } else {
                     reply.success = false;
                 }
@@ -68,8 +69,10 @@ if (request.has_param('call') && (http_request.method === 'GET' || http_request.
                         http_request.query.to[0],
                         http_request.query.subject[0],
                         http_request.query.body[0],
-                        _ansi
+                        _ansi,
+                        http_request.query.attach || []
                     );
+                    if (!reply.success && postMailError) reply.error = postMailError;
                 } else {
                     reply.success = false;
                 }

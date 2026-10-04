@@ -31,9 +31,44 @@ function quotify(id) {
         replyEl.value;
 }
 
+// Mail composers' attachment strips (root/js/mail-attach.js), keyed 'new' or by
+// the message number being replied to
+var _mailAttach = {};
+
+function mountMailAttach(key, box) {
+    if (!box || typeof MailAttach === 'undefined') return;
+    _mailAttach[key] = MailAttach.mount(box);
+}
+
+/* Attachment ids to send with composer 'key', or null (after saying why) if
+   it can't be sent yet. */
+function mailAttachIds(key) {
+    var ctl = _mailAttach[key];
+    if (!ctl) return [];
+    if (ctl.busy()) {
+        ctl.showError('Wait for the attachments to finish uploading.');
+        return null;
+    }
+    if (ctl.failed()) {
+        ctl.showError('Remove the attachments that failed (or attach them again) before sending.');
+        return null;
+    }
+    ctl.showError('');
+    return ctl.ids();
+}
+
+function mailAttachSendError(key, data) {
+    var ctl = _mailAttach[key];
+    var msg = (data && data.error) || 'Your message could not be sent.';
+    if (ctl) ctl.showError(msg);
+    else alert(msg);
+}
+
 // (Try to) post a new message to 'sub' via the web API
 async function postNew(sub) {
     var btn = document.getElementById('newmessage-button');
+    var attach = sub === 'mail' ? mailAttachIds('new') : [];
+    if (attach === null) return;
     btn.disabled = true;
     var to = document.getElementById('newmessage-to').value;
     var subject = document.getElementById('newmessage-subject').value;
@@ -43,9 +78,11 @@ async function postNew(sub) {
         sub,
         to,
         subject,
-        body
+        body,
+        attach
     });
-    if (data.success) {
+    if (data && data.success) {
+        delete _mailAttach['new'];
         var el = document.getElementById('newmessage');
         if (el) el.remove();
         var notice = document.createElement('div');
@@ -59,6 +96,8 @@ async function postNew(sub) {
             notice.style.opacity = '0';
             setTimeout(function () { notice.remove(); }, 1000);
         }, 3000);
+    } else if (sub === 'mail') {
+        mailAttachSendError('new', data);
     }
     btn.disabled = false;
 }
@@ -66,15 +105,19 @@ async function postNew(sub) {
 // (Try to) post a reply to message number 'id' of 'sub' via the web API
 async function postReply(sub, id) {
     var btn = document.getElementById('reply-button-' + id);
+    var attach = sub === 'mail' ? mailAttachIds(id) : [];
+    if (attach === null) return;
     btn.disabled = true;
     var body = document.getElementById('replytext-' + id).value;
     const data = await v4_post('./api/forum.ssjs', {
         call: 'post-reply',
         sub,
         body,
-        pid: id
+        pid: id,
+        attach
     });
-    if (data.success) {
+    if (data && data.success) {
+        delete _mailAttach[id];
         var quoteBtn = document.getElementById('quote-' + id);
         if (quoteBtn) quoteBtn.disabled = false;
         var replyBox = document.getElementById('replybox-' + id);
@@ -91,6 +134,7 @@ async function postReply(sub, id) {
             setTimeout(function () { notice.remove(); }, 1000);
         }, 3000);
     } else {
+        if (sub === 'mail') mailAttachSendError(id, data);
         btn.disabled = false;
     }
 }
@@ -124,6 +168,7 @@ function addNew(sub) {
     document.getElementById('newmessage-body').addEventListener('keydown', function (evt) {
         evt.stopImmediatePropagation();
     });
+    if (sub === 'mail') mountMailAttach('new', document.getElementById('newmessage'));
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(document.getElementById('newmessage'));
 }
 
@@ -301,6 +346,7 @@ function addReply(sub, id) {
     document.getElementById('replytext-' + id).addEventListener('keydown', function (evt) {
         evt.stopImmediatePropagation();
     });
+    if (sub === 'mail') mountMailAttach(id, document.getElementById('replybox-' + id));
     if (typeof renderAllBinIcons === 'function') renderAllBinIcons(document.getElementById('replybox-' + id));
 }
 

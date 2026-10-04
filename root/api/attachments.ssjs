@@ -36,7 +36,7 @@ if (!msgBase.open()) barfOut('Unable to open MsgBase ' + sub);
 
 var header = msgBase.get_msg_header(false, id);
 if (header === null) barfOut('No such message.');
-if (msgBase.cfg === undefined && header.to_ext != user.number) {
+if (msgBase.cfg === undefined && header.to_ext != user.number && header.from_ext != user.number) {
 	barfOut('Not your message.');
 }
 
@@ -55,6 +55,15 @@ if (cid !== undefined) {
 if (att !== undefined) {
 	if (att.content_type !== undefined) http_reply.header['Content-Type'] = att.content_type;
 	http_reply.header['Content-Length'] = att.body.length;
+	http_reply.header['X-Content-Type-Options'] = 'nosniff';
+	/* Name the download after the attachment, not this script. Raster images
+	   stay inline (the mail reader previews them in <img>); anything else is a
+	   download, so e.g. an HTML attachment never renders on this origin. */
+	var _name = String(filename !== undefined ? filename : cid).replace(/^.*[\\\/]/, '').replace(/[\x00-\x1f"]/g, '_');
+	var _inline = /^image\/(png|jpe?g|gif|webp|bmp)\b/i.test(att.content_type || '');
+	http_reply.header['Content-Disposition'] = (_inline ? 'inline' : 'attachment') +
+		'; filename="' + _name.replace(/[^\x20-\x7e]/g, '_') + '"' +
+		"; filename*=UTF-8''" + encodeURIComponent(_name);
 	write(att.body);
 }
 
