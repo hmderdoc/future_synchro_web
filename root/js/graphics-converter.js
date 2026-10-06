@@ -178,6 +178,19 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
          spacing9  true = VGA 9-pixel text mode: each cell 9 wide, the ninth
                    column repeating the eighth for the box-drawing range
                    0xC0-0xDF (so lines join) and blank otherwise */
+    /* An icon cell that shows nothing, so the page shows through it: the
+       terminal shell's rule (fshell_ts shell/icon_renderer.ts
+       isTransparentIconCell). NUL, a blank on black, black on black, or a
+       black full block. */
+    function transparent_icon_cell(char, attr) {
+        const fg = attr & 0x0f;
+        const bg = (attr >> 4) & 0x07;
+        if (char === 0) return true;
+        if (char === 32 && bg === 0) return true;
+        if (fg === 0 && bg === 0) return true;
+        return char === 219 && fg === 0;
+    }
+
     this.from_bin = function (bin, cols, rows, callback, dataOnly, opts) {
         opts = opts || {};
         const cell_width = opts.spacing9 ? font_width + 1 : font_width;
@@ -190,6 +203,12 @@ function GraphicsConverter(spritesheet_src, font_width, font_height, spritesheet
                 const px = x * cell_width;
                 const py = y * font_height;
                 const bg = COLORS[opts.ice ? (attr >> 4) & 15 : (attr >> 4) & 7];
+                if (opts.transparentBlack && transparent_icon_cell(char, attr)) {
+                    workspace.ctx.clearRect(px, py, opts.spacing9 ? cell_width : font_width, font_height);
+                    x++;
+                    if (x >= cols) { x = 0; y++; }
+                    continue;
+                }
                 put_character(
                     workspace,
                     get_cached_character(workspace, char),

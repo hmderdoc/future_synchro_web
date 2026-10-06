@@ -16,6 +16,7 @@
     var SKIP = '[data-avatar], .avatar-inline, .tdf-heading, .bin-icon, .bin-icon-img, .forum-icon-img, .brand-icon, .nav-avatar, .person-menu, .person-picker, .ib-avatar, .avatar-marker, .lightbox, .chat-web-avatar, .pp-avatar, .rv-row .avatar-inline, .chat-rich-link-media, .chat-rich-media-thumb, .files-preview-panel, .leaflet-container';
     var overlay = null;
     var lastFocus = null;
+    var parts = null;   /* the open overlay's pieces, for in-place swaps */
 
     function isImageUrl(url) {
         if (!url) return false;
@@ -45,7 +46,12 @@
             '.lightbox-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#55ffff}' +
             '.lightbox-bar a,.lightbox-bar button{background:none;border:1px solid #555;color:#ddd;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;text-decoration:none;border-radius:2px}' +
             '.lightbox-bar a:hover,.lightbox-bar button:hover{border-color:#55ffff;color:#fff}' +
-            '.lightbox-loading{color:#888;font-size:13px}';
+            '.lightbox-loading{color:#888;font-size:13px}' +
+            '.lightbox-nav{position:fixed;top:50%;transform:translateY(-50%);z-index:1;background:rgba(0,0,0,.7);border:1px solid #55ff55;color:#fff;font-family:inherit;font-size:28px;line-height:1;padding:14px 12px;cursor:pointer;border-radius:2px}' +
+            '.lightbox-nav:hover{background:#55ff55;color:#000}' +
+            '.lightbox-nav[hidden]{display:none}' +
+            '.lightbox-prev{left:10px}.lightbox-next{right:10px}' +
+            '.lightbox.is-busy .lightbox-img{opacity:.4;transition:opacity .2s}';
         document.head.appendChild(style);
     }
 
@@ -53,14 +59,56 @@
         if (!overlay) return;
         overlay.remove();
         overlay = null;
+        parts = null;
         document.removeEventListener('keydown', onKey);
         if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) { /* gone */ } }
         lastFocus = null;
     }
-    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
+    function step(dir) {
+        var fn = parts && (dir < 0 ? parts.onPrev : parts.onNext);
+        if (!fn) return;
+        overlay.classList.add('is-busy');
+        fn();
+    }
+    function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); close(); }
+        else if (e.key === 'ArrowLeft' && parts && parts.onPrev) { e.preventDefault(); step(-1); }
+        else if (e.key === 'ArrowRight' && parts && parts.onNext) { e.preventDefault(); step(1); }
+    }
 
+    /* Put a picture into the open overlay: name, size, link, arrows. */
+    function fill(url, opts) {
+        var p = parts;
+        p.onPrev = typeof opts.onPrev === 'function' ? opts.onPrev : null;
+        p.onNext = typeof opts.onNext === 'function' ? opts.onNext : null;
+        p.prev.hidden = !p.onPrev;
+        p.next.hidden = !p.onNext;
+        overlay.classList.remove('is-busy');
+        p.name.textContent = opts.name || fileName(url);
+        p.size.textContent = '';
+        p.openLink.href = url;
+        p.loading.textContent = 'Loading...';
+        if (!p.loading.parentNode) overlay.insertBefore(p.loading, p.img);
+        var img = p.img;
+        img.className = 'lightbox-img' + (opts.pixel ? ' is-pixel' : '');
+        img.alt = p.name.textContent;
+        img.onload = function () {
+            p.loading.remove();
+            p.size.textContent = img.naturalWidth + ' x ' + img.naturalHeight;
+            if (img.naturalWidth <= 320 && img.naturalHeight <= 200) img.classList.add('is-pixel');
+        };
+        img.onerror = function () { p.loading.textContent = 'Could not load that picture.'; };
+        img.src = url;
+        overlay.scrollTop = 0;
+    }
+
+    /* opts: name, pixel; onPrev / onNext (functions) add arrows and the
+       Left/Right keys. They are expected to call open() again with
+       replace: true, which swaps the picture without closing the overlay
+       (full-size mode and focus stay as they are). */
     function open(url, opts) {
         opts = opts || {};
+        if (overlay && opts.replace) { fill(url, opts); return; }
         injectStyle();
         close();
         lastFocus = document.activeElement;
@@ -72,29 +120,32 @@
         bar.className = 'lightbox-bar';
         var name = document.createElement('span');
         name.className = 'lightbox-name';
-        name.textContent = opts.name || fileName(url);
         var size = document.createElement('span');
         var openLink = document.createElement('a');
-        openLink.href = url; openLink.target = '_blank'; openLink.rel = 'noopener'; openLink.textContent = 'Open original';
+        openLink.target = '_blank'; openLink.rel = 'noopener'; openLink.textContent = 'Open original';
         var closeBtn = document.createElement('button');
         closeBtn.type = 'button'; closeBtn.textContent = 'Close'; closeBtn.setAttribute('aria-label', 'Close');
         bar.appendChild(name); bar.appendChild(size); bar.appendChild(openLink); bar.appendChild(closeBtn);
         var loading = document.createElement('div');
         loading.className = 'lightbox-loading';
-        loading.textContent = 'Loading...';
         var img = new Image();
-        img.className = 'lightbox-img' + (opts.pixel ? ' is-pixel' : '');
-        img.alt = name.textContent;
-        img.onload = function () {
-            loading.remove();
-            size.textContent = img.naturalWidth + ' x ' + img.naturalHeight;
-            if (img.naturalWidth <= 320 && img.naturalHeight <= 200) img.classList.add('is-pixel');
-        };
-        img.onerror = function () { loading.textContent = 'Could not load that picture.'; };
-        img.src = url;
+        function navButton(dir, label, glyph) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'lightbox-nav lightbox-' + (dir < 0 ? 'prev' : 'next');
+            b.setAttribute('aria-label', label); b.title = label;
+            b.innerHTML = glyph;
+            b.addEventListener('click', function (e) { e.stopPropagation(); step(dir); });
+            return b;
+        }
+        var prev = navButton(-1, 'Previous', '&laquo;'), next = navButton(1, 'Next', '&raquo;');
         overlay.appendChild(bar);
         overlay.appendChild(loading);
         overlay.appendChild(img);
+        overlay.appendChild(prev);
+        overlay.appendChild(next);
+        parts = { name: name, size: size, openLink: openLink, loading: loading, img: img, prev: prev, next: next };
+        fill(url, opts);
         overlay.addEventListener('click', function (e) {
             if (e.target === img) { overlay.classList.toggle('is-full'); return; }
             if (e.target.closest('.lightbox-bar') && !e.target.closest('button')) return;

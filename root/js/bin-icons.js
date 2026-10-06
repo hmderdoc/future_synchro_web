@@ -45,7 +45,7 @@
             getGc().from_bin(atob(b64), cols, rows, function (dataUrl) {
                 cache[name] = dataUrl;
                 _insertImg(el, dataUrl);
-            }, true);  // dataOnly=true -> callback receives dataURL string
+            }, true, { transparentBlack: true });  // dataURL; black cells see-through like the terminal
         } catch (ex) {
             // Silently skip broken icons
         }

@@ -2109,9 +2109,7 @@
 <script>
 (function() {
     var COMPOSER = <?xjs write(JSON.stringify(user.alias).replace(/<\//g, '<\\/')); ?>;
-    var API_URL  = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s';
-    var STREAM_URL = './radio-stream/';
-    var RANGE_BYTES = 262144;
+    var API_URL  = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s&id3=1';
 
     var searchInput = document.getElementById('tm-search');
     var dropdown    = document.getElementById('tm-dropdown');
@@ -2137,14 +2135,6 @@
         return d.innerHTML;
     }
 
-    /* ── Merge helpers (mirrors the radio player) ── */
-    function mergeTrackTags(base, over) {
-        var m = {}, k;
-        base = base || {}; over = over || {};
-        for (k in base)  if (base.hasOwnProperty(k))  m[k] = base[k];
-        for (k in over)  if (over.hasOwnProperty(k) && over[k] !== undefined && over[k] !== null && over[k] !== '') m[k] = over[k];
-        return m;
-    }
 
     function tagVal(track, key) {
         return (track.tags && track.tags[key]) ? track.tags[key] : '';
@@ -2153,50 +2143,16 @@
         return tagVal(track, 'title') || track.name.replace(/\.mp3$/i, '').replace(/_/g, ' ');
     }
 
-    /* Bounded-concurrency map (order preserved). Every track needs a range
-       fetch for its tags; firing all ~150 at once exceeds the web server's
-       MaxClients and 503s the rest of the page. */
-    var PARSE_CONCURRENCY = 4;
-    function mapWithLimit(items, limit, fn) {
-        var results = new Array(items.length);
-        var next = 0;
-        function worker() {
-            if (next >= items.length) return Promise.resolve();
-            var idx = next++;
-            return Promise.resolve().then(function() { return fn(items[idx]); })
-                .then(function(value) { results[idx] = value; })
-                .then(worker);
-        }
-        var workers = [];
-        for (var w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
-        return Promise.all(workers).then(function() { return results; });
+    /* The list arrives with tags already merged (ID3 under the overrides)
+       and has_art; cover art is a cached URL the browser fetches only when
+       an <img> shows it. No per-track MP3 downloads. */
+    function artUrl(name) {
+        return './api/files.ssjs?call=track-art&dir=originalcontent_mp3s&file=' + encodeURIComponent(name);
     }
-
-    /* ── Parse track list exactly like the radio player ── */
     function parseTrackList(list) {
-        return mapWithLimit(list, PARSE_CONCURRENCY, function(item) {
-            var url = STREAM_URL + encodeURIComponent(item.name);
-            return fetch(url, {
-                headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
-            })
-            .then(function(r) { return r.arrayBuffer(); })
-            .then(function(buf) {
-                var tags = {};
-                var artURL = '';
-                var overrideTags = item && item.tags ? item.tags : {};
-                if (typeof window.parseID3v2 === 'function') {
-                    try { tags = window.parseID3v2(buf) || {}; } catch(_) { tags = {}; }
-                }
-                if (tags.picture && tags.picture.blob) {
-                    artURL = URL.createObjectURL(tags.picture.blob);
-                }
-                tags = mergeTrackTags(tags, overrideTags);
-                return { name: item.name, desc: item.desc || '', tags: tags, artURL: artURL };
-            })
-            .catch(function() {
-                return { name: item.name, desc: item.desc || '',
-                         tags: mergeTrackTags({}, item && item.tags ? item.tags : {}), artURL: '' };
-            });
+        return list.map(function(item) {
+            return { name: item.name, desc: item.desc || '', tags: item.tags || {},
+                     artURL: item.has_art ? artUrl(item.name) : '' };
         });
     }
 
@@ -2278,7 +2234,7 @@
         } else {
             dropdown.innerHTML = matches.map(function(tr, i) {
                 var artHtml = tr.artURL
-                    ? '<img class="tm-dropdown-art" src="' + esc(tr.artURL) + '" alt="" />'
+                    ? '<img class="tm-dropdown-art" loading="lazy" src="' + esc(tr.artURL) + '" alt="" />'
                     : '<div class="tm-dropdown-art-placeholder">\u266b</div>';
                 return '<div class="tm-dropdown-item" data-idx="' + i + '" data-name="' + esc(tr.name) + '">'
                      + artHtml
@@ -2591,9 +2547,7 @@
     'use strict';
 
     var PAGE_FILE = '011-futureland-records.xjs';
-    var API_URL = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s';
-    var STREAM_URL = './radio-stream/';
-    var RANGE_BYTES = 262144;
+    var API_URL = './api/files.ssjs?call=list-files&dir=originalcontent_mp3s&id3=1';
     var REQUESTED_TRACK = <?xjs write(_records_track_json); ?>;
     var PERSONA_LIST = [];
     try { PERSONA_LIST = <?xjs write(typeof _cowriters_json === 'string' ? _cowriters_json : '[]'); ?>; } catch(_e) {}
@@ -2663,26 +2617,6 @@
         return String((track.tags && track.tags.genre) || '');
     }
 
-    function mergeTrackTags(base, override) {
-        var merged = {};
-        var key;
-
-        base = base || {};
-        override = override || {};
-
-        for (key in base) {
-            if (!Object.prototype.hasOwnProperty.call(base, key)) continue;
-            merged[key] = base[key];
-        }
-        for (key in override) {
-            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
-            if (override[key] === undefined || override[key] === null || override[key] === '') continue;
-            merged[key] = override[key];
-        }
-
-        return merged;
-    }
-
     function optionLabel(track) {
         var artist = trackArtist(track);
         return artist.length ? (trackTitle(track) + ' - ' + artist) : trackTitle(track);
@@ -2720,72 +2654,21 @@
         });
     }
 
-    /* Bounded-concurrency map (order preserved): the range fetch per track
-       must not fan out to all ~150 tracks at once, or the web server hits
-       MaxClients and 503s the sidebar and the next navigation. */
-    var PARSE_CONCURRENCY = 4;
-    function mapWithLimit(items, limit, fn) {
-        var results = new Array(items.length);
-        var next = 0;
-        function worker() {
-            if (next >= items.length) return Promise.resolve();
-            var idx = next++;
-            return Promise.resolve().then(function () { return fn(items[idx]); })
-                .then(function (value) { results[idx] = value; })
-                .then(worker);
-        }
-        var workers = [];
-        for (var w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
-        return Promise.all(workers).then(function () { return results; });
-    }
-
+    /* Tags arrive merged (ID3 under the overrides) with has_art from the
+       list call; cover art is a cached URL loaded only when shown. */
     function parseTrackList(list) {
-        return mapWithLimit(list, PARSE_CONCURRENCY, function (item) {
-            var url = STREAM_URL + encodeURIComponent(item.name);
-            return fetch(url, {
-                headers: { Range: 'bytes=0-' + (RANGE_BYTES - 1) }
-            })
-                .then(function (response) { return response.arrayBuffer(); })
-                .then(function (buf) {
-                    var tags = {};
-                    var artURL = '';
-                    var overrideTags = item && item.tags ? item.tags : {};
-
-                    if (typeof window.parseID3v2 === 'function') {
-                        try {
-                            tags = window.parseID3v2(buf) || {};
-                        } catch (_) {
-                            tags = {};
-                        }
-                    }
-
-                    if (tags.picture && tags.picture.blob) {
-                        artURL = URL.createObjectURL(tags.picture.blob);
-                    }
-
-                    tags = mergeTrackTags(tags, overrideTags);
-
-                    return {
-                        name: item.name,
-                        desc: item.desc || '',
-                        added: item.added || 0,
-                        plays: Number(item.plays) || 0,
-                        lastPlayed: Number(item.last_played) || 0,
-                        tags: tags,
-                        artURL: artURL
-                    };
-                })
-                .catch(function () {
-                    return {
-                        name: item.name,
-                        desc: item.desc || '',
-                        added: item.added || 0,
-                        plays: Number(item.plays) || 0,
-                        lastPlayed: Number(item.last_played) || 0,
-                        tags: mergeTrackTags({}, item && item.tags ? item.tags : {}),
-                        artURL: ''
-                    };
-                });
+        return list.map(function (item) {
+            return {
+                name: item.name,
+                desc: item.desc || '',
+                added: item.added || 0,
+                plays: Number(item.plays) || 0,
+                lastPlayed: Number(item.last_played) || 0,
+                tags: item.tags || {},
+                artURL: item.has_art
+                    ? './api/files.ssjs?call=track-art&dir=originalcontent_mp3s&file=' + encodeURIComponent(item.name)
+                    : ''
+            };
         });
     }
 
@@ -2984,7 +2867,7 @@
             button.title = isCurrent ? 'Now playing' : 'Play ' + trackTitle(track);
             button.innerHTML =
                 '<span class="flrd-top-rank">' + (rank + 1) + '</span>'
-                + '<span class="flrd-top-art">' + (track.artURL ? '<img src="' + esc(track.artURL) + '" alt="">' : '♫') + '</span>'
+                + '<span class="flrd-top-art">' + (track.artURL ? '<img loading="lazy" src="' + esc(track.artURL) + '" alt="">' : '♫') + '</span>'
                 + '<span class="flrd-top-meta">'
                 +   '<span class="flrd-top-track">' + esc(trackTitle(track)) + '</span>'
                 +   '<span class="flrd-top-artist">' + esc(trackArtist(track) || '') + '</span>'

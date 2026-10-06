@@ -496,6 +496,58 @@ function readTrackId3Tags(trackPath) {
 	return cleanTrackOverrideTags(result);
 }
 
+/* Text tags plus whether there's a cover picture, for whole-list views.
+   Walks frame headers and reads only the text frames, seeking past the
+   picture, so a 150-track list costs a few KB of reads instead of the
+   256 KB per track readTrackId3Tags takes. */
+var _id3Lite = null;
+function scanTrackMeta(trackPath) {
+	var out = { tags: {}, has_art: false };
+	/* id3-lite's decoder: UTF-8 like the rest of the JSON (decodeId3TextFrame
+	   yields CP437 via utf8_decode, which isn't valid in a reply). */
+	if (!_id3Lite) _id3Lite = load({}, settings.web_lib + 'id3-lite.js').Id3Lite;
+	var file = new File(trackPath);
+	if (!file.open('rb')) {
+		return out;
+	}
+	try {
+		var head = file.read(10);
+		if (!head || head.length < 10 || head.substr(0, 3) !== 'ID3' || binaryByteAt(head, 3) < 3) {
+			return out;
+		}
+		var majorVer = binaryByteAt(head, 3);
+		var sizeOf = majorVer >= 4 ? readSynchsafe : readBigEndian32;
+		var tagEnd = 10 + readSynchsafe(head, 6);
+		var pos = 10;
+		if (binaryByteAt(head, 5) & 0x40) {
+			var ext = file.read(4);
+			pos += majorVer >= 4 ? readSynchsafe(ext, 0) : readBigEndian32(ext, 0) + 4;
+		}
+		while (pos + 10 <= tagEnd) {
+			file.position = pos;
+			var frameHead = file.read(10);
+			if (!frameHead || frameHead.length < 10 || !/^[A-Z0-9]{4}$/.test(frameHead.substr(0, 4))) {
+				break;
+			}
+			var frameId = frameHead.substr(0, 4);
+			var frameSize = sizeOf(frameHead, 4);
+			if (frameSize <= 0 || pos + 10 + frameSize > tagEnd) {
+				break;
+			}
+			if (frameId === 'APIC') {
+				out.has_art = true;
+			} else if (ID3_TEXT_FRAME_FIELDS[frameId] && !out.tags[ID3_TEXT_FRAME_FIELDS[frameId]]) {
+				out.tags[ID3_TEXT_FRAME_FIELDS[frameId]] = _id3Lite.text(file.read(frameSize));
+			}
+			pos += 10 + frameSize;
+		}
+	} finally {
+		file.close();
+	}
+	out.tags = cleanTrackOverrideTags(out.tags);
+	return out;
+}
+
 function normalizeContributorName(value) {
 	return trimText(value).replace(/\s+/g, ' ').toLowerCase();
 }
@@ -730,10 +782,14 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 					var flist = fb.get_list('*.mp3', FileBase.DETAIL.NORM, 0, true, FileBase.SORT.DATE_D);
 					var overrides = loadTrackOverrides();
 					var listCounts = playCounts ? playCounts.counts() : {};
+					/* &id3=1: tags come back merged (ID3 under the overrides)
+					   with has_art, so a page needn't fetch every MP3 itself. */
+					var listId3 = request.get_param('id3') === '1';
 					fb.close();
 					reply = [];
 					for (var fi = 0; fi < flist.length; fi++) {
 						var listCount = listCounts[String(flist[fi].name).toLowerCase()];
+						var listMeta = listId3 ? scanTrackMeta(file_area.dir[ldir].path + flist[fi].name) : null;
 						reply.push({
 							name: flist[fi].name,
 							desc: flist[fi].desc || '',
@@ -742,6 +798,14 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && request
 							last_played: listCount ? listCount.last_played : 0,
 							tags: (function(t, e) { var c = loadCharOverride(file_area.dir[ldir].path + e.name); if (c) t.character = c; return t; })(copyTags(overrides[trackOverrideSection(flist[fi].name)] || {}), flist[fi])
 						});
+						if (listMeta) {
+							var merged = listMeta.tags, ov = reply[fi].tags;
+							for (var mk in ov) {
+								if (ov.hasOwnProperty(mk) && ov[mk] !== undefined && ov[mk] !== null && ov[mk] !== '') merged[mk] = ov[mk];
+							}
+							reply[fi].tags = merged;
+							reply[fi].has_art = listMeta.has_art;
+						}
 					}
 				} else {
 					reply.error = 'Could not open file directory';
