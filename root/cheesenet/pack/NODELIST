@@ -1,8 +1,8 @@
 ;A FidoNet style nodelist for CheeseNet (Zone 3323)
 ;
-;Day number 263 : Sun, Sep 20, 2026
+;Day number 274 : Thu, Oct 01, 2026
 ;Compiled by  : Hm Derdoc, ZC of CheeseNet
-;Released     : 2026-09-20
+;Released     : 2026-10-01
 ;
 ;
 ;Format reference: FTS-0005
@@ -24,6 +24,7 @@ Host,1,CheeseNet_Hub,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:fut
 ,5,Altair_IV_BBS,Internet,ogg,-Unpublished-,300,CM,XX,IBN,INA:altairiv.ddns.net
 ,6,L33Test_Gaming,Internet,Skrawl,-Unpublished-,300,CM,XX,IBN,INA:binkterm.l33test.com
 ,7,Pwecks_Retreat_BBS,Internet,pweck,-Unpublished-,300,CM,XX,IBN,INA:bbs.pwecksretreat.com
-Pvt,8,forum_sysops_finest,Prittriching,Michael_Selhof,-Unpublished-,300
+,8,forum_sysops_finest,Prittriching,Michael_Selhof,-Unpublished-,300,CM,XX,IBN,INA:fido.sysops-finest.org
+,9,End_Of_The_Line_BBS,Internet,Nigel_Reed,-Unpublished-,300,CM,XX,IBN,INA:bbs.endofthelinebbs.com
 ,31,Postbus_7,Internet,Floris_van_Unen,-Unpublished-,300,CM,XX,IBN,INA:fido.unen.net
 ,100,futureland,Turtle_Island,Hm_Derdoc,-Unpublished-,300,CM,XX,IBN,INA:futureland.today
