@@ -6,6 +6,8 @@
 //     &fonts={"h1":"name",...}            (optional per-level pins)
 //     &variants=N                         (first heading in N random fonts)
 // -> { fonts: { h1: "name:index", h2: ... }, html: ["<h1 ...>", ...] }
+// POST with a JSON body {h:[...], fonts:{...}} takes the same arguments;
+// long pages must use it, since sbbs drops request lines over ~1KB.
 // Used by pages that build their headings in the browser (the wiki), so
 // headings of the same level on one document match.
 
@@ -19,9 +21,14 @@ var MAX_TEXT = 80;
 http_reply.header['Content-Type'] = 'application/json';
 http_reply.header['Cache-Control'] = 'no-store';
 
+var body = {};
+if (http_request.method === 'POST') {
+    try { body = JSON.parse(http_request.post_data || '{}') || {}; } catch (e) { body = {}; }
+}
+
 var list = [];
 try {
-    list = JSON.parse(http_request.query.h ? http_request.query.h[0] : '[]');
+    list = body.h !== undefined ? body.h : JSON.parse(http_request.query.h ? http_request.query.h[0] : '[]');
 } catch (e) {
     list = [];
 }
@@ -46,7 +53,7 @@ var fixed = http_request.query.font ? String(http_request.query.font[0]) : 'rand
    (the wiki editor keeps its preview fonts steady while you type). */
 var fonts = {};
 try {
-    var given = JSON.parse(http_request.query.fonts ? http_request.query.fonts[0] : '{}');
+    var given = body.fonts !== undefined ? body.fonts : JSON.parse(http_request.query.fonts ? http_request.query.fonts[0] : '{}');
     for (var gt in given) {
         if (/^h[1-6]$/.test(gt) && typeof given[gt] === 'string' && given[gt]) fonts[gt] = given[gt];
     }

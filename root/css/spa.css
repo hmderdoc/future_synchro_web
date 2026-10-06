@@ -76,6 +76,28 @@
 .auth-nav-link.dropdown-toggle::after { display: none; }
 .auth-nav-link .nav-avatar { width: 30px; height: 36px; flex-shrink: 0; overflow: hidden; }
 .auth-nav-link .nav-avatar img, .auth-nav-link .nav-avatar canvas { width: 30px; height: 36px; image-rendering: pixelated; display: block; }
+/* Unread notifications: black on light cyan. On the bar it's a small
+   circle on the avatar's bottom-right corner, mostly hanging outside it,
+   so it covers little of the art and takes no room in the bar. */
+.badge-notify { background: #55ffff; color: #000; font-weight: bold; border-radius: 999px; }
+/* Unread mail: the same circle in white on red, on the bottom-LEFT corner
+   so the two never collide. */
+.badge-mail { background: rgb(var(--bs-danger-rgb)); color: #fff; font-weight: bold; border-radius: 999px; }
+.nav-avatar-badge.is-left { right: auto; left: -9px; }
+.nav-avatar-wrap { position: relative; display: inline-block; flex-shrink: 0; line-height: 0; }
+.nav-avatar-badge {
+    position: absolute;
+    right: -9px;
+    bottom: -7px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 17px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #000;
+    pointer-events: none;
+}
 
 /* With every label showing (xl and up) ENTER SYSTEM and the player are each
    their own group: equal room between the brand and ENTER SYSTEM, ENTER
@@ -198,6 +220,12 @@ body.terminal-open {
 #content.spa-loading {
     opacity: 0.5;
 }
+
+/* The content column is black to the bottom of the window, so a short page
+   ends in the cards' own black rather than the theme's grey. */
+#content { background: #000; }
+/* Site rule: cards stack flush, no vertical gaps between them. */
+#content .card { margin-top: 0 !important; margin-bottom: 0 !important; }
 
 /* BS5 navbar tweaks */
 .navbar .badge-unread {
@@ -4432,4 +4460,53 @@ body.avatar-settings-modal-open {
 #wiki-app #wiki-toolbar { margin-bottom: 0 !important; padding-bottom: 0; }
 #wiki-app #wiki-content { max-width: none; border-top-left-radius: 0; border-top-right-radius: 0; }
 /* Centered read-view title: center the TDF art too. */
-#wiki-app #wiki-content > h1.tdf-heading .tdf-art { justify-content: center; }
+/* Set on the art itself: the heading's inline --tdf-left/--tdf-shift would
+   win over variables set here. */
+#wiki-app #wiki-content > h1.tdf-heading .tdf-art-inner { left: 50%; transform: translateX(-50%); }
+
+/* ---------- Notifications (pages/015-notifications.xjs) ---------- */
+.nf-title { font-weight: bold; }
+.nf-title .bin-icon { margin-right: 0.4rem; }
+.nf-feed { display: flex; flex-direction: column; }
+.nf-row {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 0.75rem 1rem;
+    background: #000;
+    border: 1px solid #5555ff;
+    margin-bottom: -1px;
+    color: #aaaaaa;
+    text-decoration: none;
+}
+a.nf-row:hover, a.nf-row:focus { border-color: #55ffff; color: #aaaaaa; z-index: 1; }
+.nf-row.nf-unread { border-left: 4px solid #55ffff; background: #000033; }
+.nf-row.nf-gone { opacity: 0.55; }
+.nf-avatar { width: 40px; height: 48px; flex-shrink: 0; overflow: hidden; }
+.nf-avatar img, .nf-avatar canvas { width: 40px; height: 48px; image-rendering: pixelated; display: block; }
+.nf-avatar-net { display: flex; align-items: center; justify-content: center; border: 1px dashed #555555; }
+/* Notification thumbnails: network icon, board icon, avatar (or mailbox and
+   sender) stacked and crossfading (js/notifications.js cycleThumbs). */
+.nf-thumb { position: relative; }
+.nf-thumb img { position: absolute; inset: 0; object-fit: contain; opacity: 0; transition: opacity 0.6s ease; }
+.nf-thumb img.is-on { opacity: 1; }
+.nf-body { flex: 1; min-width: 0; }
+.nf-line { color: #ffffff; overflow-wrap: anywhere; }
+.nf-actor { color: #ffff55; font-weight: bold; }
+.nf-subject { color: #55ffff; }
+.nf-snippet {
+    margin-top: 0.2rem;
+    color: #aaaaaa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.nf-meta { margin-top: 0.2rem; color: #5555ff; font-size: 0.85rem; }
+.nf-dot { width: 10px; height: 10px; flex-shrink: 0; margin-top: 0.4rem; background: #55ffff; }
+.nf-status { padding: 1rem; color: #aaaaaa; text-align: center; border: 1px solid #5555ff; }
+.nf-more-wrap { text-align: center; padding: 0.75rem 0; }
+@media (max-width: 575px) {
+    .nf-row { padding: 0.6rem 0.7rem; gap: 0.6rem; }
+    .nf-avatar, .nf-avatar img, .nf-avatar canvas { width: 30px; height: 36px; }
+}

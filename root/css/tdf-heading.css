@@ -17,15 +17,22 @@
     white-space: nowrap;
     border: 0;
 }
+/* The inner art is absolutely positioned at the box's full height: Safari
+   won't resolve an in-flow height:100% against a box sized only by
+   aspect-ratio + max-height, and drew the art at full width instead,
+   spilling over what follows. Its width comes from the font's shape. */
 .tdf-art {
-    display: flex;
-    justify-content: var(--tdf-justify, flex-start);
+    display: block;
+    position: relative;
     width: var(--tdf-max-w, 100%);
     aspect-ratio: var(--tdf-ar);
     max-height: var(--tdf-max-h, 7rem);
 }
 .tdf-art-inner {
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: var(--tdf-left, 0);
+    transform: translateX(var(--tdf-shift, 0));
     height: 100%;
     max-width: 100%;
     aspect-ratio: var(--tdf-ar);

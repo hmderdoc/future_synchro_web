@@ -60,6 +60,28 @@
         return out.replace(/^\s+/, '');
     }
 
+    /* Message editors hard-wrap at ~79 columns; on the web those breaks
+       fight the card's own wrapping. A line that ran near that width was
+       wrapped by the editor, so it rejoins the next one. Short lines
+       (signatures, deliberate breaks), blank lines and lines that start
+       indented or as a list item keep their break. */
+    var _BL_SOFT_WRAP = 60;
+    function _blUnwrap(text) {
+        var lines = text.split('\n'), out = [];
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var prev = out.length ? out[out.length - 1] : null;
+            if (prev !== null && line.replace(/\x01./g, '').trim() !== '' && !/^\s|^(?:\x01.)*\s*(?:[-*+>]|\d+[.)])\s/.test(line)
+                && prev.lastLen >= _BL_SOFT_WRAP) {
+                prev.text = prev.text.replace(/\s+$/, '') + ' ' + line;
+                prev.lastLen = line.replace(/\x01./g, '').length;
+                continue;
+            }
+            out.push({ text: line, lastLen: line.replace(/\x01./g, '').length });
+        }
+        return out.map(function (o) { return o.text; }).join('\n');
+    }
+
     var _bltn_msgs = [];
     var _bltn_mb = new MsgBase(_bltn_subcode);
     if (_bltn_mb.open()) {
@@ -74,7 +96,7 @@
                 subject: _bh.subject.replace(/</g, '&lt;'),
                 subject_raw: _bh.subject,
                 date: system.timestr(_bh.when_written_time),
-                body: _blBodyHtml(_bb)
+                body: _blBodyHtml(_blUnwrap(_bb))
             });
             _bltn_count++;
         }
@@ -105,15 +127,30 @@
     border-color: #AA00AA !important;
     background: #000 !important;
 }
-.hm-intro { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.hm-intro ~ .bl-panel { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
-.hm-intro .card-body { padding: 16px 18px; }
+.hm-intro { border-bottom-width: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* Stacked cards share one edge: the upper card drops its bottom border and
+   the lower card draws the seam, blending from the upper card's color
+   (--seam-from) into its own (--seam-to). */
+.hm-seam { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.hm-seam::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -1px;
+    right: -1px;
+    height: 1px;
+    background: linear-gradient(to right, var(--seam-from), var(--seam-to));
+    pointer-events: none;
+    z-index: 1;
+}
+.bl-panel { --seam-from: #AA00AA; --seam-to: #FFFF55; }
+.hm-intro .card-body { padding: 16px 18px 10px; }
 #hm-intro-title { margin: 12px 0 24px; container-type: inline-size; cursor: pointer; }
 /* The font changes every few seconds; a fixed box (the widest allowed
    shape, 10:1) keeps the text below from jumping. */
 #hm-intro-title .tdf-art { aspect-ratio: auto; height: min(7rem, 10cqi); align-items: center; }
 .hm-intro-lede a { color: #55FF55; }
-.hm-intro .hm-intro-lede { color: #FFFFFF; margin: 0 auto 18px; line-height: 1.5; max-width: 70ch; text-align: center; }
+.hm-intro .hm-intro-lede { color: #FFFFFF; margin: 0 auto 10px; line-height: 1.5; max-width: 70ch; text-align: center; }
 .hm-connect {
     width: 100%;
     max-width: 52rem;
@@ -123,7 +160,7 @@
     text-align: center;
     font-family: inherit;   /* the site's Spleen CP437 face */
 }
-.hm-connect th, .hm-connect td { padding: 4px 8px; vertical-align: top; }
+.hm-connect th, .hm-connect td { padding: 0 8px; line-height: 1.25; vertical-align: top; }
 .hm-connect .hm-connect-label th { color: #55FFFF; font-weight: normal; }
 .hm-connect td { color: #FFFF55; overflow-wrap: normal; }
 .hm-connect td a { color: #55FF55; }
@@ -267,20 +304,147 @@
 })();
 </script>
 
+<!-- Header effects: small CGA animations in the gaps between a section's
+     arrows and its title (Notices waves, Hot Tracks fire, Art Drops drips,
+     Rico coins, Suave lava). -->
+<style>
+.hm-gap-fx {
+    position: absolute;
+    bottom: 0;
+    width: 0;
+    height: 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+.bl-head, .tt-head, .la-head { position: relative; }
+</style>
+<script>
+/* hmGapFx(head, opts) runs an effect in the head's two .hm-gap-fx canvases,
+   fitted between opts.prev / opts.next and the title art. One cell is 4 CSS
+   pixels. opts.create(geo) is called whenever a canvas is (re)sized, with
+   geo = { w, h, side (0 left, 1 right), ox, oy (title center in cells,
+   relative to that canvas) }, and returns { cells, step() }: step() advances
+   one frame and fills cells (a CGA color index per cell). opts.warm frames
+   run up front so it opens mid-flow. Pauses offscreen and in hidden tabs;
+   a still frame for reduced motion. */
+window.hmGapFx = window.hmGapFx || function (head, opts) {
+    if (!head || head.__gapFx) return;
+    head.__gapFx = true;
+    var CELL = 4, GAP = 10, FPS = opts.fps || 24;
+    var CGA = [[0, 0, 0], [0, 0, 170], [0, 170, 0], [0, 170, 170], [170, 0, 0], [170, 0, 170], [170, 85, 0], [170, 170, 170],
+        [85, 85, 85], [85, 85, 255], [85, 255, 85], [85, 255, 255], [255, 85, 85], [255, 85, 255], [255, 255, 85], [255, 255, 255]];
+    var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var slots = Array.prototype.map.call(head.querySelectorAll('.hm-gap-fx'), function (c) {
+        return { canvas: c, key: '', fx: null, ctx: null, img: null };
+    });
+    var visible = true, timer = null;
+
+    function place() {
+        var a = head.querySelector('.tdf-art-inner') || head.querySelector('.tdf-heading');
+        if (!a || !opts.prev || !opts.next) return;
+        var hr = head.getBoundingClientRect(), ar = a.getBoundingClientRect();
+        var spans = [
+            [opts.prev.getBoundingClientRect().right - hr.left + GAP, ar.left - hr.left - GAP],
+            [ar.right - hr.left + GAP, opts.next.getBoundingClientRect().left - hr.left - GAP]
+        ];
+        slots.forEach(function (s, i) {
+            var left = spans[i][0];
+            var w = Math.floor((spans[i][1] - left) / CELL), h = Math.ceil(hr.height / CELL);
+            if (w < 4) { s.canvas.style.width = '0'; s.fx = null; s.key = ''; return; }
+            s.canvas.style.left = left + 'px';
+            s.canvas.style.width = (w * CELL) + 'px';
+            var geo = { w: w, h: h, side: i,
+                ox: (ar.left + ar.width / 2 - hr.left - left) / CELL,
+                oy: (ar.top + ar.height / 2 - hr.top) / CELL };
+            var key = w + ',' + h + ',' + Math.round(geo.ox);
+            if (key === s.key) return;
+            s.key = key;
+            s.canvas.width = w; s.canvas.height = h;
+            s.ctx = s.canvas.getContext('2d');
+            s.img = s.ctx.createImageData(w, h);
+            s.fx = opts.create(geo);
+            for (var t = 0; t < (opts.warm || 1); t++) s.fx.step();
+        });
+        draw();
+    }
+
+    function draw() {
+        slots.forEach(function (s) {
+            if (!s.fx) return;
+            var c = s.fx.cells, d = s.img.data;
+            for (var i = 0; i < c.length; i++) {
+                var rgb = CGA[c[i] & 15], o = i * 4;
+                d[o] = rgb[0]; d[o + 1] = rgb[1]; d[o + 2] = rgb[2]; d[o + 3] = 255;
+            }
+            s.ctx.putImageData(s.img, 0, 0);
+        });
+    }
+
+    function tick() {
+        timer = null;
+        if (!head.isConnected || !visible || document.hidden) return;
+        slots.forEach(function (s) { if (s.fx) s.fx.step(); });
+        draw();
+        timer = setTimeout(tick, 1000 / FPS);
+    }
+    function run() { if (!still && !timer) tick(); }
+
+    if ('ResizeObserver' in window) new ResizeObserver(place).observe(head);
+    window.addEventListener('resize', place);
+    /* The title art arrives as an image after the page renders. */
+    var mo = new MutationObserver(function () {
+        if (head.querySelector('.tdf-art-cells img')) { mo.disconnect(); place(); }
+    });
+    mo.observe(head, { childList: true, subtree: true });
+    place();
+    if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+            visible = entries[entries.length - 1].isIntersecting;
+            if (visible) run();
+        }).observe(head);
+    }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) run(); });
+    run();
+};
+</script>
+
 <!-- Bulletins Carousel -->
 <?xjs
     /* Section headings each get their own random font, never the same one. */
-    var _news_font = _tdf.tdf_pick_font(['Latest News']);
+    var _news_font = _tdf.tdf_pick_font(['Notices']);
     var _tracks_font = '';
     for (var _tf = 0; _tf < 6 && (!_tracks_font || _tracks_font === _news_font); _tf++) {
-        _tracks_font = _tdf.tdf_pick_font(['Trending Tracks']);
+        _tracks_font = _tdf.tdf_pick_font(['Hot Tracks']);
     }
+    var _art_font = '';
+    for (var _af = 0; _af < 6 && (!_art_font || _art_font === _news_font || _art_font === _tracks_font); _af++) {
+        _art_font = _tdf.tdf_pick_font(['Art Drops']);
+    }
+    var _forums_font = '', _posters_font = '', _rico_font = '', _suave_font = '';
+    for (var _ff = 0; _ff < 6 && (!_forums_font || [_news_font, _tracks_font, _art_font].indexOf(_forums_font) !== -1); _ff++) {
+        _forums_font = _tdf.tdf_pick_font(['Forums']);
+    }
+    for (var _pf = 0; _pf < 6 && (!_posters_font || [_news_font, _tracks_font, _art_font, _forums_font].indexOf(_posters_font) !== -1); _pf++) {
+        _posters_font = _tdf.tdf_pick_font(['Posters']);
+    }
+    for (var _rf = 0; _rf < 6 && (!_rico_font || [_news_font, _tracks_font, _art_font, _forums_font, _posters_font].indexOf(_rico_font) !== -1); _rf++) {
+        _rico_font = _tdf.tdf_pick_font(['Rico']);
+    }
+    for (var _sf = 0; _sf < 6 && (!_suave_font || [_news_font, _tracks_font, _art_font, _forums_font, _posters_font, _rico_font].indexOf(_suave_font) !== -1); _sf++) {
+        _suave_font = _tdf.tdf_pick_font(['Suave']);
+    }
+    /* Art uploaded before this date isn't shown (the earlier batch was weak). */
+    var _art_since = Math.floor(new Date(2026, 8, 23).getTime() / 1000);
 
-    /* One random font for every bulletin subject this load (coverage judged
-       on all of them), so flipping through keeps a consistent look. */
-    var _bl_font = _bltn_msgs.length
-        ? _tdf.tdf_pick_font(_bltn_msgs.map(function (m) { return m.subject_raw; }))
-        : '';
+    /* Each bulletin's subject gets its own random font (no repeats this
+       load), rendered here so flipping back shows the same one. */
+    var _bl_used = {};
+    _bltn_msgs.forEach(function (m) {
+        var f = '';
+        for (var t = 0; t < 6 && (!f || _bl_used[f]); t++) f = _tdf.tdf_pick_font([m.subject_raw]);
+        _bl_used[f] = true;
+        m.heading = _tdf.tdf_heading(m.subject_raw, { tag: 'h3', cls: 'bl-subject-title', font: f || 'random', align: 'center' });
+    });
 ?>
 <style>
 .bl-panel {
@@ -290,7 +454,7 @@
     --bs-card-cap-color: #FFFF55;
     border-color: #FFFF55 !important;
 }
-/* Head: arrows at the card's edges, level with the "Latest News" title;
+/* Head: arrows at the card's edges, level with the "Notices" title;
    the current bulletin's date and subject centered beneath. */
 .bl-head {
     display: grid;
@@ -298,6 +462,7 @@
     align-items: center;
     gap: 8px;
     padding: 0 14px;
+    border-bottom: 2px solid #FFFF55;
 }
 .bl-head #hm-news-title { grid-column: 2; }
 .bl-arrow {
@@ -314,39 +479,40 @@
 .bl-arrow:hover { background: #55FF55; color: #000; }
 .bl-arrow[hidden] { display: block; visibility: hidden; }
 .bl-date {
-    color: #55FF55;
-    font-size: 1.125em;
+    color: #AAAAAA;
+    font-size: 0.85em;
     text-align: center;
-    margin: 0 0 6px;
+    padding: 0 14px;
 }
-.bl-subject { padding: 0 14px 10px; border-bottom: 2px solid #FFFF55; }
-#bl-subject-title {
+.bl-subject { padding: 12px 14px 4px; }
+.bl-subject-title {
     margin: 0;
     color: #FFFF55;
     text-align: center;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     container-type: inline-size;
-    --tdf-max-h: min(2.75rem, 6.5cqi);
+    --tdf-max-h: min(3.25rem, 7.75cqi);
     --tdf-max-w: 100%;
 }
-#bl-subject-title .tdf-art { margin: 0 auto; }
+.bl-subject-title .tdf-art { margin: 0 auto; }
 .bl-slide { display: none; padding: 12px 14px; }
 .bl-slide.active { display: block; }
-.bl-body { color: #FFFFFF; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; line-height: 1.45; text-align: center; }
+/* Same measure as the intro paragraph under the title. */
+.bl-body { color: #FFFFFF; white-space: pre-wrap; word-wrap: break-word; line-height: 1.5; text-align: center; max-width: 70ch; margin: 0 auto; }
 .bl-empty { color: #AA5500; padding: 12px 14px; text-align: center; }
 </style>
 
-<div class="card mb-0 bl-panel">
-    <div class="bl-head">
+<div class="card mb-0 bl-panel hm-seam">
+    <div class="bl-head" id="bl-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
         <button type="button" class="bl-arrow" id="bl-prev" title="Previous bulletin" aria-label="Previous bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&laquo;</button>
-        <?xjs write(_tdf.tdf_heading('Latest News', { tag: 'h2', id: 'hm-news-title', font: _news_font || 'random', align: 'center' })); ?>
+        <?xjs write(_tdf.tdf_heading('Notices', { tag: 'h2', palette: [[14, 15], [5, 13], [6, 14], [2, 10], [14, 15], [3, 11]], id: 'hm-news-title', font: _news_font || 'random', align: 'center' })); ?>
         <button type="button" class="bl-arrow" id="bl-next" title="Next bulletin" aria-label="Next bulletin"<?xjs if (_bltn_msgs.length < 2) write(' hidden'); ?>>&raquo;</button>
     </div>
 <?xjs if (_bltn_msgs.length) { ?>
+    <div class="bl-subject" id="bl-subject"><?xjs write(_bltn_msgs[0].heading); ?></div>
     <div class="bl-date" id="bl-date"><?xjs write(_homeEsc(_bltn_msgs[0].date)); ?></div>
-    <div class="bl-subject" id="bl-subject" data-tdf-font="<?xjs write(_homeEsc(_bl_font)); ?>">
-        <?xjs write(_tdf.tdf_heading(_bltn_msgs[0].subject_raw, { tag: 'h3', id: 'bl-subject-title', font: _bl_font || 'random', align: 'center' })); ?>
-    </div>
 <?xjs } ?>
     <div class="card-body p-0" id="bl-carousel">
 <?xjs
@@ -358,6 +524,7 @@
     _bltn_msgs.forEach(function (msg, idx) {
 ?>
         <div class="bl-slide<?xjs if (idx === 0) write(' active'); ?>" data-bl-idx="<?xjs write(idx); ?>" data-bl-subject="<?xjs write(_homeEsc(msg.subject_raw)); ?>" data-bl-date="<?xjs write(_homeEsc(msg.date)); ?>">
+            <template class="bl-subject-tpl"><?xjs write(msg.heading); ?></template>
             <div class="bl-body"><?xjs write(msg.body); ?></div>
         </div>
 <?xjs
@@ -366,46 +533,58 @@
     </div>
 </div>
 
+<script>
+/* Notices waves: rings pulse outward from the title like a transmitter on
+   the air, mostly yellow with magenta, green and cyan, dimming to their
+   dark shades and dithering away toward the arrows. */
+hmGapFx(document.getElementById('bl-head'), {
+    prev: document.getElementById('bl-prev'),
+    next: document.getElementById('bl-next'),
+    fps: 24,
+    create: function (g) {
+        var RINGS = [14, 13, 14, 10, 14, 11], DIM = { 14: 6, 13: 5, 10: 2, 11: 3 };
+        var BAYER = [0, 0.5, 0.75, 0.25], PERIOD = 7, THICK = 2, SPEED = 0.3, SQUASH = 1.6;
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h), t = 0;
+        /* Distance from the title center to this canvas's near edge. */
+        var r0 = g.side === 0 ? g.ox - w : -g.ox;
+        return { cells: cells, step: function () {
+            t++;
+            for (var y = 0; y < h; y++) {
+                var dy = (y - g.oy) * SQUASH;
+                for (var x = 0; x < w; x++) {
+                    var dx = x + 0.5 - g.ox, d = Math.sqrt(dx * dx + dy * dy);
+                    var phase = d - t * SPEED, ring = Math.floor(phase / PERIOD);
+                    var c = 0;
+                    if (phase - ring * PERIOD < THICK) {
+                        var f = (d - r0) / w;   /* 0 by the title, 1 at the arrow */
+                        if (f < 0.85 || BAYER[(y & 1) * 2 + (x & 1)] > (f - 0.85) / 0.15) {
+                            c = RINGS[((ring % RINGS.length) + RINGS.length) % RINGS.length];
+                            if (f > 0.5) c = DIM[c];
+                        }
+                    }
+                    cells[y * w + x] = c;
+                }
+            }
+        } };
+    }
+});
+</script>
+
 <?xjs if (_bltn_msgs.length > 1) { ?>
 <script>
-/* Bulletin carousel: arrows flip slides; the date and the TDF subject
-   follow. Subjects for the other slides are rendered in the same font in
-   one batch request after load, then swapped in instantly. */
+/* Bulletin carousel: arrows flip slides; the date and the subject follow.
+   Each slide carries its subject pre-rendered in its own font. */
 (function () {
     var slides = document.querySelectorAll('.bl-slide');
     var total = slides.length, cur = 0;
     var dateEl = document.getElementById('bl-date');
     var subjectBox = document.getElementById('bl-subject');
-    var font = subjectBox ? subjectBox.getAttribute('data-tdf-font') : '';
-    var rendered = {};   /* slide index -> heading html */
-
-    function subjectOf(i) { return slides[i].getAttribute('data-bl-subject'); }
-
-    function prefetch() {
-        var idx = [], req = [];
-        for (var i = 1; i < total; i++) { idx.push(i); req.push({ tag: 'h3', text: subjectOf(i), align: 'center' }); }
-        var url = './api/tdf-heading.ssjs?h=' + encodeURIComponent(JSON.stringify(req)) +
-            (font ? '&fonts=' + encodeURIComponent(JSON.stringify({ h3: font })) : '');
-        fetch(url, { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (d) { idx.forEach(function (n, k) { if (d.html && d.html[k]) rendered[n] = d.html[k]; }); })
-            .catch(function () { /* plain subjects as a fallback */ });
-    }
 
     function showSubject(i) {
-        var old = document.getElementById('bl-subject-title');
-        if (!old) return;
-        var el;
-        if (rendered[i]) {
-            var tmp = document.createElement('div');
-            tmp.innerHTML = rendered[i];
-            el = tmp.firstElementChild;
-        } else {
-            el = document.createElement('h3');
-            el.textContent = subjectOf(i);
-        }
-        el.id = 'bl-subject-title';
-        old.replaceWith(el);
+        var tpl = slides[i].querySelector('.bl-subject-tpl');
+        if (!subjectBox || !tpl) return;
+        subjectBox.innerHTML = '';
+        subjectBox.appendChild(tpl.content.cloneNode(true));
         if (window.renderTdfHeadings) renderTdfHeadings(subjectBox);
     }
 
@@ -419,12 +598,11 @@
 
     document.getElementById('bl-prev').addEventListener('click', function () { show(cur - 1); });
     document.getElementById('bl-next').addEventListener('click', function () { show(cur + 1); });
-    prefetch();
 })();
 </script>
 <?xjs } ?>
 
-<!-- Trending Tracks: top played Vektrax Records songs as a horizontal
+<!-- Hot Tracks: top played Vektrax Records songs as a horizontal
      thumbnail chart, 10 per page. Click plays + opens the visualizer. -->
 <style>
 .tt-panel {
@@ -434,14 +612,15 @@
     background: #000 !important;
 }
 /* Flush against the news card: one shared edge, square corners. */
-.bl-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-#tt-panel { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.bl-panel { border-bottom-width: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#tt-panel { --seam-from: #FFFF55; --seam-to: #FF5555; }
 .tt-head {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     padding: 0 14px;
+    border-bottom: 2px solid #FF5555;
 }
 .tt-head #hm-tracks-title { grid-column: 2; margin: 14px 0 10px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
 .tt-head #hm-tracks-title .tdf-art { margin: 0 auto; }
@@ -464,7 +643,7 @@
     grid-auto-columns: minmax(76px, 112px);
     justify-content: safe center;   /* centered when it fits, never cut off when it scrolls */
     gap: 10px;
-    padding: 4px 14px 14px;
+    padding: 12px 14px 14px;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-padding-inline: 14px;
@@ -523,16 +702,56 @@
 .tt-item.tt-playing .tt-plays { color: #55FF55; }
 </style>
 
-<div class="card mb-0 tt-panel" id="tt-panel">
-    <div class="tt-head">
+<div class="card mb-0 tt-panel hm-seam" id="tt-panel">
+    <div class="tt-head" id="tt-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
         <button type="button" class="tt-arrow" id="tt-prev" title="Higher on the chart" aria-label="Higher on the chart" disabled>&laquo;</button>
-        <?xjs write(_tdf.tdf_heading('Trending Tracks', { tag: 'h2', id: 'hm-tracks-title', font: _tracks_font || 'random', align: 'center' })); ?>
+        <?xjs write(_tdf.tdf_heading('Hot Tracks', { tag: 'h2', palette: [[4, 12], [6, 14], [12, 14]], id: 'hm-tracks-title', font: _tracks_font || 'random', align: 'center' })); ?>
         <button type="button" class="tt-arrow" id="tt-next" title="Further down the chart" aria-label="Further down the chart" disabled>&raquo;</button>
     </div>
     <div class="tt-strip" id="tt-strip" role="list" aria-label="Most played tracks">
         <div class="tt-empty">Loading the chart&hellip;</div>
     </div>
 </div>
+
+<script>
+/* Hot Tracks fire: the classic demoscene fire (each cell takes the heat of
+   the one below, minus a random decay, drifting sideways) in the CGA fire
+   colors with a 2x2 ordered dither. */
+hmGapFx(document.getElementById('tt-head'), {
+    prev: document.getElementById('tt-prev'),
+    next: document.getElementById('tt-next'),
+    fps: 24,
+    create: function (g) {
+        var MAX = 36, RAMP = [0, 4, 12, 14, 15], BAYER = [0, 2, 3, 1];
+        var w = g.w, h = g.h, heat = new Uint8Array(w * h), cells = new Uint8Array(w * h);
+        /* Flames burn out about two-thirds of the way up whatever the
+           height; the base cools toward the sides so the edges taper. */
+        var range = 2 * MAX / (h * 0.65) + 1, steps = (RAMP.length - 1) * 4;
+        return { cells: cells, step: function () {
+            for (var x = 0; x < w; x++) {
+                var edge = Math.min(1, Math.min(x + 1, w - x) / 4);
+                heat[(h - 1) * w + x] = Math.round((Math.random() < 0.8 ? MAX : MAX - 14) * edge);
+            }
+            for (var y = 0; y < h - 1; y++) {
+                for (var x2 = 0; x2 < w; x2++) {
+                    var src = heat[(y + 1) * w + x2];
+                    var decay = (Math.random() * range) | 0;
+                    var dx = Math.min(w - 1, Math.max(0, x2 + ((Math.random() * 3) | 0) - 1));
+                    heat[y * w + dx] = src > decay ? src - decay : 0;
+                }
+            }
+            for (var i = 0; i < w * h; i++) {
+                var level = heat[i] * steps / MAX, base = Math.floor(level / 4);
+                var px = i % w, py = (i / w) | 0;
+                cells[i] = RAMP[Math.min(RAMP.length - 1, base + (level - base * 4 > BAYER[(py & 1) * 2 + (px & 1)] ? 1 : 0))];
+            }
+        } };
+    },
+    warm: 40
+});
+</script>
 
 <script>
 (function () {
@@ -643,4 +862,941 @@
         })
         .catch(function () { strip.innerHTML = '<div class="tt-empty">The chart is unavailable right now.</div>'; });
 })();
+</script>
+
+<!-- Art Drops: newest ANSI uploads as a horizontal thumbnail strip, 10 per
+     page, fetched a page at a time. Click opens the whole piece. -->
+<style>
+.la-panel {
+    --bs-card-border-color: #55FF55;
+    --bs-card-bg: #000;
+    border-color: #55FF55 !important;
+    background: #000 !important;
+}
+/* Flush against Hot Tracks: one shared edge, square corners. */
+#tt-panel { border-bottom-width: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#la-panel { --seam-from: #FF5555; --seam-to: #55FF55; }
+.la-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-bottom: 2px solid #55FF55;
+}
+.la-head #hm-art-title { grid-column: 2; margin: 14px 0 10px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
+.la-head #hm-art-title .tdf-art { margin: 0 auto; }
+.la-arrow {
+    background: transparent;
+    border: 1px solid #55FF55;
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.la-arrow:hover { background: #55FF55; color: #000; }
+.la-arrow:disabled { visibility: hidden; }
+.la-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(120px, 160px);
+    justify-content: safe center;
+    gap: 10px;
+    padding: 12px 14px 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 14px;
+    scrollbar-width: thin;
+}
+.la-empty { padding: 4px 14px 16px; color: #AAAAAA; text-align: center; }
+.la-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #FFFFFF;
+    text-align: center;
+    font: inherit;
+    cursor: pointer;
+    scroll-snap-align: start;
+}
+.la-thumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 3;
+    background: #000;
+    border: 1px solid #333;
+    overflow: hidden;
+}
+.la-item:hover .la-thumb, .la-item:focus-visible .la-thumb { border-color: #55FF55; box-shadow: 0 0 12px rgba(85, 255, 85, 0.5); }
+.la-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    /* Smooth, not pixelated: the piece is drawn at full size and shrunk
+       about 5x, and nearest-pixel shrinking drops shade-block dithers
+       (a blue made of magenta and cyan comes out solid magenta). */
+    image-rendering: auto;
+}
+.la-title, .la-by { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.la-title { font-size: 0.85em; color: #FFFFFF; }
+.la-by { font-size: 0.72em; color: #AAAAAA; }
+</style>
+
+<div class="card mb-0 la-panel hm-seam" id="la-panel" data-since="<?xjs write(_art_since); ?>">
+    <div class="la-head" id="la-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <button type="button" class="la-arrow" id="la-prev" title="Newer art" aria-label="Newer art" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Art Drops', { tag: 'h2', palette: [[2, 10], [6, 14], [5, 13]], id: 'hm-art-title', font: _art_font || 'random', align: 'center' })); ?>
+        <button type="button" class="la-arrow" id="la-next" title="Older art" aria-label="Older art" disabled>&raquo;</button>
+    </div>
+    <div class="la-strip" id="la-strip" role="list" aria-label="Latest ANSI art">
+        <div class="la-empty">Loading the art&hellip;</div>
+    </div>
+</div>
+
+<script>
+/* Art Drops drips: paint runs down from a painted top edge in green,
+   yellow and magenta, each drip bright with a darker shaded side and a
+   drop at its head, and pools along the divider before drying up. */
+hmGapFx(document.getElementById('la-head'), {
+    prev: document.getElementById('la-prev'),
+    next: document.getElementById('la-next'),
+    fps: 20,
+    create: function (g) {
+        var PAINT = [[10, 2], [14, 6], [13, 5]];   /* [bright, shade] */
+        var BAYER = [0, 0.5, 0.75, 0.25];
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h);
+        var lip = new Uint8Array(w), lipH = new Uint8Array(w);
+        var pool = new Float32Array(w), poolC = new Uint8Array(w);
+        var drips = [], maxDrips = Math.max(2, Math.round(w / 3.5));
+        for (var x = 0, c = (Math.random() * 3) | 0; x < w; ) {
+            var run = 4 + ((Math.random() * 8) | 0);
+            for (var k = 0; k < run && x < w; k++, x++) { lip[x] = c; lipH[x] = Math.random() < 0.55 ? 2 : (Math.random() < 0.3 ? 3 : 1); poolC[x] = c; }
+            c = (c + 1 + ((Math.random() * 2) | 0)) % 3;
+        }
+        function put(x, y, col) { if (x >= 0 && x < w && y >= 0 && y < h) cells[y * w + x] = col; }
+        return { cells: cells, step: function () {
+            if (drips.length < maxDrips && Math.random() < 0.14) {
+                var dx = 1 + ((Math.random() * Math.max(1, w - 3)) | 0);
+                drips.push({ x: dx, wide: Math.random() < 0.6 ? 2 : 1, c: lip[dx], top: 0,
+                    head: lipH[dx], speed: 0.08 + Math.random() * 0.1, drain: false });
+            }
+            drips = drips.filter(function (d) {
+                if (!d.drain) {
+                    d.head += d.speed;
+                    d.speed = Math.min(0.5, d.speed * 1.025);
+                    if (d.head >= h - 1 - pool[d.x]) { d.head = h - 1 - pool[d.x]; d.drain = true; }
+                } else {
+                    d.top += 0.35;
+                    for (var k = 0; k < d.wide; k++) {
+                        if (d.x + k < w) { pool[d.x + k] = Math.min(3, pool[d.x + k] + 0.12); poolC[d.x + k] = d.c; }
+                    }
+                }
+                return d.top < d.head;
+            });
+            /* The pool spreads and dries. */
+            var next = new Float32Array(w);
+            for (var x = 0; x < w; x++) {
+                var l = pool[x > 0 ? x - 1 : x], r = pool[x < w - 1 ? x + 1 : x];
+                next[x] = Math.max(0, pool[x] + 0.12 * (l + r - 2 * pool[x]) - 0.0012);
+                if (pool[x] < 0.3 && (l > 0.6 || r > 0.6)) poolC[x] = poolC[l > r ? (x > 0 ? x - 1 : x) : (x < w - 1 ? x + 1 : x)];
+            }
+            pool = next;
+
+            cells.fill(0);
+            for (var x2 = 0; x2 < w; x2++) {
+                for (var ly = 0; ly < lipH[x2]; ly++) put(x2, ly, PAINT[lip[x2]][ly === lipH[x2] - 1 && ly ? 1 : 0]);
+                var lvl = pool[x2], full = Math.floor(lvl), p = PAINT[poolC[x2]];
+                for (var py = 0; py < full; py++) put(x2, h - 1 - py, py === full - 1 && lvl - full < 0.5 ? p[0] : p[1]);
+                if (lvl - full > BAYER[((h - 1 - full) & 1) * 2 + (x2 & 1)]) put(x2, h - 1 - full, p[0]);
+            }
+            drips.forEach(function (d) {
+                var p = PAINT[d.c], y0 = Math.max(Math.floor(d.top), 0), y1 = Math.floor(d.head);
+                for (var y = y0; y <= y1; y++) {
+                    put(d.x, y, p[0]);
+                    if (d.wide === 2) put(d.x + 1, y, p[1]);
+                }
+                if (!d.drain) {   /* the drop at its head */
+                    put(d.x - 1, y1, p[1]);
+                    put(d.x + d.wide, y1, p[1]);
+                    put(d.x, y1 + 1, p[1]);
+                    if (d.wide === 2) put(d.x + 1, y1 + 1, p[1]);
+                }
+            });
+        } };
+    },
+    warm: 400
+});
+</script>
+
+<script>
+(function () {
+    var panel = document.getElementById('la-panel');
+    if (!panel || panel.__la) return;
+    panel.__la = true;
+    var PAGE = 10, API = './api/latest-art.ssjs';
+    var since = panel.getAttribute('data-since') || '0';
+    var strip = document.getElementById('la-strip');
+    var prev = document.getElementById('la-prev'), next = document.getElementById('la-next');
+    var pages = {}, page = 0, total = 0, loading = false;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function draw(cells, cb) {
+        if (!cells || !cells.bin || typeof GraphicsConverter === 'undefined') { cb(null); return; }
+        try {
+            GraphicsConverter.shared().from_bin(atob(cells.bin), cells.cols, cells.rows, cb, true,
+                { ice: cells.ice, spacing9: cells.spacing === 9 });
+        } catch (e) { cb(null); }
+    }
+
+    function render() {
+        var items = pages[page] || [];
+        prev.disabled = page <= 0;
+        next.disabled = (page + 1) * PAGE >= total;
+        if (!items.length) { strip.innerHTML = '<div class="la-empty">No new art yet.</div>'; return; }
+        strip.innerHTML = items.map(function (a, k) {
+            return '<button type="button" class="la-item" role="listitem" data-k="' + k + '"' +
+                ' aria-label="' + esc(a.title) + (a.by ? ' by ' + esc(a.by) : '') + '. View">' +
+                '<span class="la-thumb"></span>' +
+                '<span class="la-title" title="' + esc(a.title) + '">' + esc(a.title) + '</span>' +
+                '<span class="la-by">' + esc(a.by) + '</span>' +
+            '</button>';
+        }).join('');
+        strip.scrollLeft = 0;
+        var shown = page;
+        items.forEach(function (a, k) {
+            draw(a.thumb, function (url) {
+                if (!url || shown !== page) return;
+                var box = strip.querySelector('.la-item[data-k="' + k + '"] .la-thumb');
+                if (box) box.innerHTML = '<img alt="" draggable="false" data-no-lightbox src="' + url + '">';
+            });
+        });
+    }
+
+    /* Fetch page p if needed; resolves to its items. Shown in the strip
+       unless quiet. */
+    var inflight = {};
+    function fetchPage(p) {
+        if (pages[p]) return Promise.resolve(pages[p]);
+        if (!inflight[p]) {
+            inflight[p] = fetch(API + '?call=list&since=' + encodeURIComponent(since) + '&offset=' + (p * PAGE) + '&limit=' + PAGE, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { total = d.total || 0; pages[p] = d.items || []; return pages[p]; })
+                .then(function (v) { delete inflight[p]; return v; }, function (e) { delete inflight[p]; throw e; });
+        }
+        return inflight[p];
+    }
+    function load(p) {
+        return fetchPage(p).then(function (items) { page = p; render(); return items; });
+    }
+
+    /* The whole piece, drawn the same way, shown in the site's lightbox
+       (a blob: URL so its "Open original" link works in a new tab). Its
+       arrows walk the whole list, fetching further pages as needed; the
+       strip follows along so closing lands on the right page. */
+    var lastBlob = null, viewing = -1;
+    function view(i, dir) {
+        if (!window.Lightbox || i < 0 || (total && i >= total)) return;
+        viewing = i;
+        var p = Math.floor(i / PAGE);
+        fetchPage(p)
+            .then(function (items) {
+                var a = items[i % PAGE];
+                if (!a) throw new Error('gone');
+                if (p !== page) { page = p; render(); }
+                return fetch(API + '?call=full&dir=' + encodeURIComponent(a.dir) + '&file=' + encodeURIComponent(a.name), { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (!d.ok) throw new Error(d.error || 'not found');
+                        return new Promise(function (ok) { draw(d.cells, ok); });
+                    })
+                    .then(function (url) { return url ? fetch(url).then(function (r) { return r.blob(); }) : null; })
+                    .then(function (blob) {
+                        if (!blob || viewing !== i) return;      /* a later click won */
+                        if (lastBlob) URL.revokeObjectURL(lastBlob);
+                        lastBlob = URL.createObjectURL(blob);
+                        Lightbox.open(lastBlob, {
+                            name: a.title + (a.by ? ' by ' + a.by : '') + '  (' + (i + 1) + '/' + total + ')',
+                            pixel: true,
+                            replace: true,
+                            onPrev: i > 0 ? function () { view(i - 1, -1); } : null,
+                            onNext: i + 1 < total ? function () { view(i + 1, 1); } : null
+                        });
+                    });
+            })
+            .catch(function () {
+                /* Can't show this one: skip past it in the same direction. */
+                if (dir && viewing === i) view(i + dir, dir);
+            });
+    }
+
+    strip.addEventListener('click', function (ev) {
+        var item = ev.target.closest('.la-item');
+        if (item) view(page * PAGE + (+item.getAttribute('data-k')));
+    });
+    function flip(p) { load(p).catch(function () { /* stay on this page */ }); }
+    prev.addEventListener('click', function () { if (page > 0) flip(page - 1); });
+    next.addEventListener('click', function () { if ((page + 1) * PAGE < total) flip(page + 1); });
+
+    load(0).catch(function () { strip.innerHTML = '<div class="la-empty">The art is unavailable right now.</div>'; });
+})();
+</script>
+
+<!-- Top Forums: the busiest message areas over the last 30 days as a
+     horizontal strip, 10 per page. Each tile flips between its network's
+     icon and its own; ad and data boards are left out (api/leaderboards). -->
+<style>
+.tf-panel {
+    --bs-card-border-color: #FFFF55;
+    --bs-card-bg: #000;
+    border-color: #FFFF55 !important;
+    background: #000 !important;
+}
+#tf-panel { --seam-from: #55FF55; --seam-to: #FFFF55; }
+.tf-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-bottom: 2px solid #FFFF55;
+    position: relative;
+}
+.tf-head #hm-forums-title { grid-column: 2; margin: 14px 0 10px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
+.tf-head #hm-forums-title .tdf-art { margin: 0 auto; }
+.tf-arrow {
+    background: transparent;
+    border: 1px solid #FFFF55;
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.tf-arrow:hover { background: #FFFF55; color: #000; }
+.tf-arrow:disabled { visibility: hidden; }
+.tf-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(96px, 128px);
+    justify-content: safe center;
+    gap: 10px;
+    padding: 12px 14px 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 14px;
+    scrollbar-width: thin;
+}
+.tf-empty { padding: 4px 14px 16px; color: #AAAAAA; text-align: center; }
+.tf-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: #FFFFFF;
+    text-align: center;
+    text-decoration: none;
+    scroll-snap-align: start;
+}
+.tf-thumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 1 / 1;   /* a 12x6 icon's shape */
+    background: #000;
+    border: 1px solid #333;
+    overflow: hidden;
+}
+.tf-item:hover .tf-thumb, .tf-item:focus-visible .tf-thumb { border-color: #FFFF55; box-shadow: 0 0 12px rgba(255, 255, 85, 0.5); }
+.tf-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    transition: opacity 0.6s ease;
+}
+.tf-thumb .tf-sub { opacity: 0; }
+.tf-item.tf-show-sub .tf-sub { opacity: 1; }
+.tf-item.tf-show-sub .tf-net { opacity: 0; }
+.tf-noicon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 1.6em; }
+.tf-rank, .tf-count {
+    position: absolute;
+    z-index: 1;
+    padding: 1px 5px;
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 0.75em;
+    line-height: 1.3;
+}
+.tf-rank { top: 0; left: 0; color: #FFFF55; font-weight: bold; }
+.tf-count { right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; color: #55FFFF; }
+.tf-icon { width: 1em; height: 1em; flex: none; shape-rendering: crispEdges; }
+.tf-name, .tf-net-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-name { font-size: 0.85em; color: #FFFFFF; }
+.tf-net-name { font-size: 0.72em; color: #AAAAAA; }
+.tf-item:hover .tf-name { color: #FFFF55; }
+</style>
+
+<div class="card mb-0 tf-panel hm-seam" id="tf-panel">
+    <div class="tf-head" id="tf-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <button type="button" class="tf-arrow" id="tf-prev" title="Busier forums" aria-label="Busier forums" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Forums', { tag: 'h2', palette: [[6, 14], [14, 15], [6, 14], [2, 10]], id: 'hm-forums-title', font: _forums_font || 'random', align: 'center' })); ?>
+        <button type="button" class="tf-arrow" id="tf-next" title="Quieter forums" aria-label="Quieter forums" disabled>&raquo;</button>
+    </div>
+    <div class="tf-strip" id="tf-strip" role="list" aria-label="Busiest forums in the last 30 days">
+        <div class="tf-empty">Reading the boards&hellip;</div>
+    </div>
+</div>
+
+<script>
+/* Top Forums packets: echomail on the wire. Packets run along dim network
+   lines, hop between lines at node junctions, and flash the node they
+   reach, in the yellows and browns of the card. */
+hmGapFx(document.getElementById('tf-head'), {
+    prev: document.getElementById('tf-prev'),
+    next: document.getElementById('tf-next'),
+    fps: 20,
+    create: function (g) {
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h);
+        var lanes = [], nodes = [], packets = [], flashes = [];
+        for (var y = 1; y < h - 1; y += 3) lanes.push(y);
+        if (!lanes.length) lanes.push(h >> 1);
+        for (var x = 2; x < w - 1; x += 6 + ((Math.random() * 4) | 0)) nodes.push(x);
+        function put(x, y, c) { if (x >= 0 && x < w && y >= 0 && y < h) cells[y * w + x] = c; }
+        function isNode(x) { return nodes.indexOf(x) !== -1; }
+        var most = Math.max(2, Math.round(w * lanes.length / 18));
+        return { cells: cells, step: function () {
+            if (packets.length < most && Math.random() < 0.3) {
+                var dir = Math.random() < 0.5 ? 1 : -1;
+                packets.push({ x: dir > 0 ? 0 : w - 1, lane: (Math.random() * lanes.length) | 0, dir: dir, len: 2 + ((Math.random() * 3) | 0) });
+            }
+            packets = packets.filter(function (p) {
+                p.x += p.dir;
+                if (isNode(p.x)) {
+                    flashes.push({ x: p.x, y: lanes[p.lane], life: 4 });
+                    /* Now and then the packet is routed onto the next line. */
+                    if (lanes.length > 1 && Math.random() < 0.25) {
+                        p.lane = Math.max(0, Math.min(lanes.length - 1, p.lane + (Math.random() < 0.5 ? -1 : 1)));
+                    }
+                }
+                return p.x >= -p.len && p.x < w + p.len;
+            });
+            flashes = flashes.filter(function (f) { return --f.life > 0; });
+
+            cells.fill(0);
+            lanes.forEach(function (ly) {
+                for (var x2 = 0; x2 < w; x2++) put(x2, ly, (x2 & 1) ? 0 : 8);
+                nodes.forEach(function (nx) { put(nx, ly, 6); });
+            });
+            packets.forEach(function (p) {
+                var ly = lanes[p.lane];
+                for (var k = p.len; k >= 0; k--) put(p.x - k * p.dir, ly, k === 0 ? 15 : k === 1 ? 14 : 6);
+            });
+            flashes.forEach(function (f) {
+                put(f.x, f.y, f.life > 2 ? 15 : 14);
+                put(f.x, f.y - 1, 14); put(f.x, f.y + 1, 14);
+                if (f.life > 2) { put(f.x - 1, f.y, 14); put(f.x + 1, f.y, 14); }
+            });
+        } };
+    },
+    warm: 60
+});
+
+/* Leaderboard fetch for the home cards: gives up after 10s and tries once
+   more, so a card shows its "unavailable" line instead of a loader forever. */
+window.hmBoardFetch = window.hmBoardFetch || function (url, panel, ok, down) {
+    function attempt(n) {
+        var ctl = 'AbortController' in window ? new AbortController() : null;
+        var timer = ctl ? setTimeout(function () { ctl.abort(); }, 10000) : 0;
+        fetch(url, { credentials: 'same-origin', signal: ctl ? ctl.signal : undefined })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (data) { clearTimeout(timer); ok(data); })
+            .catch(function () {
+                clearTimeout(timer);
+                if (!panel.isConnected) return;
+                if (n < 1) setTimeout(function () { attempt(n + 1); }, 1500);
+                else down();
+            });
+    }
+    attempt(0);
+};
+
+(function () {
+    var panel = document.getElementById('tf-panel');
+    if (!panel || panel.__tf) return;
+    panel.__tf = true;
+    var PAGE = 10, SWAP_MS = 3500;
+    var strip = document.getElementById('tf-strip');
+    var prev = document.getElementById('tf-prev'), next = document.getElementById('tf-next');
+    var rows = [], page = 0, icons = {}, swapTimer = null, visible = true;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* A pixel envelope beside the post count, drawn like the Rico/Suave icons. */
+    var ENVELOPE = (function () {
+        var art = ['byyyyyyb', 'ybyyyyby', 'yybyybyy', 'yyybbyyy', 'yyyyyyyy', 'yyyyyyyy'];
+        var colors = { y: '#FFFF55', b: '#AA5500' }, rects = '';
+        art.forEach(function (line, y) {
+            for (var x = 0; x < line.length; x++) rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + colors[line[x]] + '"/>';
+        });
+        return '<svg class="tf-icon" viewBox="0 0 8 6" aria-hidden="true">' + rects + '</svg>';
+    })();
+
+    /* 12x6 .bin icons drawn once each, shared by every tile that uses them. */
+    function iconUrl(b64) {
+        if (!b64 || typeof GraphicsConverter === 'undefined') return null;
+        if (b64 in icons) return icons[b64];
+        icons[b64] = null;
+        try {
+            GraphicsConverter.shared().from_bin(atob(b64), 12, 6, function (url) {
+                icons[b64] = url || null;
+                if (url && panel.isConnected) render();
+            }, true);
+        } catch (e) { /* no icon */ }
+        return null;
+    }
+
+    function render() {
+        var pages = Math.ceil(rows.length / PAGE);
+        prev.disabled = page <= 0;
+        next.disabled = page >= pages - 1;
+        if (!rows.length) { strip.innerHTML = '<div class="tf-empty">No forum posts in the last 30 days.</div>'; return; }
+        var html = '';
+        rows.slice(page * PAGE, page * PAGE + PAGE).forEach(function (f, k) {
+            var rank = page * PAGE + k + 1;
+            var net = iconUrl(f.group_icon), sub = iconUrl(f.icon);
+            /* Network first; tiles with only one icon just show that one. */
+            var first = net || sub, second = net && sub && net !== sub ? sub : null;
+            var was = strip.querySelector('.tf-item[data-code="' + f.code + '"]');
+            var flipped = was && was.classList.contains('tf-show-sub');
+            html += '<a class="tf-item' + (second && flipped ? ' tf-show-sub' : '') + '" role="listitem" data-code="' + esc(f.code) + '"' +
+                ' href="./?page=002-forum.xjs&amp;sub=' + encodeURIComponent(f.code) + '"' +
+                ' aria-label="#' + rank + ' ' + esc(f.name) + ' on ' + esc(f.group) + ', ' + f.posts + ' posts in the last 30 days">' +
+                '<span class="tf-thumb">' +
+                    (first ? '<img class="tf-net" alt="" draggable="false" src="' + first + '">' : '<span class="tf-noicon">&#9993;</span>') +
+                    (second ? '<img class="tf-sub" alt="" draggable="false" src="' + second + '">' : '') +
+                    '<span class="tf-rank">#' + rank + '</span>' +
+                    '<span class="tf-count" title="' + f.posts + ' posts in the last 30 days">' + ENVELOPE + f.posts.toLocaleString('en-US') + '</span>' +
+                '</span>' +
+                '<span class="tf-name" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
+                '<span class="tf-net-name" title="' + esc(f.group) + '">' + esc(f.group) + '</span>' +
+            '</a>';
+        });
+        var keep = strip.scrollLeft;
+        strip.innerHTML = html;
+        strip.scrollLeft = keep;
+    }
+
+    /* Network and forum icons alternate, staggered across the strip. */
+    function swap() {
+        clearTimeout(swapTimer);
+        swapTimer = setTimeout(swap, SWAP_MS);
+        if (!visible || document.hidden || !panel.isConnected) return;
+        Array.prototype.forEach.call(strip.querySelectorAll('.tf-item'), function (el, i) {
+            if (!el.querySelector('.tf-sub')) return;
+            setTimeout(function () { el.classList.toggle('tf-show-sub'); }, i * 120);
+        });
+    }
+
+    prev.addEventListener('click', function () { if (page > 0) { page--; strip.scrollLeft = 0; render(); } });
+    next.addEventListener('click', function () { if ((page + 1) * PAGE < rows.length) { page++; strip.scrollLeft = 0; render(); } });
+
+    if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (e) { visible = e[e.length - 1].isIntersecting; }).observe(panel);
+    }
+
+    hmBoardFetch('./api/leaderboards.ssjs?call=forums', panel,
+        function (list) { rows = Array.isArray(list) ? list : []; render(); swap(); },
+        function () { strip.innerHTML = '<div class="tf-empty">The forum count is unavailable right now.</div>'; });
+})();
+</script>
+
+<!-- Rico and Suave: users ranked by BBScoin and by friends, as horizontal
+     avatar strips, 10 per page. Each avatar links to the profile. -->
+<style>
+.rk-panel {
+    --bs-card-bg: #000;
+    border-color: var(--rk-color) !important;
+    background: #000 !important;
+}
+#tp-panel { --rk-color: #FF55FF; --rk-text: #55FFFF; --seam-from: #FFFF55; --seam-to: #FF55FF; }
+#rico-panel { --rk-color: #5555FF; --rk-text: #FFFF55; --seam-from: #FF55FF; --seam-to: #5555FF; }
+#suave-panel { --rk-color: #55FFFF; --rk-text: #FF55FF; --seam-from: #5555FF; --seam-to: #55FFFF; }
+/* Flush against the card above: one shared edge, square corners. */
+#la-panel, #tf-panel, #tp-panel, #rico-panel { border-bottom-width: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.rk-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-bottom: 2px solid var(--rk-color);
+    position: relative;
+}
+.rk-head .tdf-heading { grid-column: 2; margin: 14px 0 10px; container-type: inline-size; --tdf-max-h: min(3.5rem, 9cqi); --tdf-max-w: 100%; }
+.rk-head .tdf-art { margin: 0 auto; }
+.rk-arrow {
+    background: transparent;
+    border: 1px solid var(--rk-color);
+    color: var(--rk-text);
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.rk-arrow:hover { background: var(--rk-color); color: #000; }
+.rk-arrow:disabled { visibility: hidden; }
+.rk-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(76px, 112px);
+    justify-content: safe center;   /* centered when it fits, never cut off when it scrolls */
+    gap: 10px;
+    padding: 12px 14px 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 14px;
+    scrollbar-width: thin;
+}
+.rk-empty { padding: 4px 14px 16px; color: #AAAAAA; text-align: center; }
+.rk-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: #FFFFFF;
+    text-align: center;
+    text-decoration: none;
+    scroll-snap-align: start;
+}
+.rk-thumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 5 / 6;   /* a 10x6 avatar's shape */
+    background: #000;
+    border: 1px solid #333;
+    overflow: hidden;
+}
+.rk-item:hover .rk-thumb, .rk-item:focus-within .rk-thumb { border-color: var(--rk-color); box-shadow: 0 0 12px color-mix(in srgb, var(--rk-color) 55%, transparent); }
+.rk-ava { position: absolute; inset: 0; display: block; }
+.rk-ava img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.rk-rank, .rk-count {
+    position: absolute;
+    z-index: 1;
+    padding: 1px 5px;
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 0.75em;
+    line-height: 1.3;
+    pointer-events: none;   /* hover and clicks reach the avatar beneath */
+}
+.rk-rank { top: 0; left: 0; color: #FFFF55; font-weight: bold; }
+.rk-count { right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; color: var(--rk-text); }
+.rk-icon { width: 1em; height: 1em; flex: none; shape-rendering: crispEdges; }
+.rk-name { display: block; font-size: 0.85em; color: #FFFFFF; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-name:hover, .rk-name:focus-visible { color: var(--rk-color); }
+</style>
+
+<div class="card mb-0 rk-panel hm-seam" id="tp-panel">
+    <div class="rk-head" id="tp-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <button type="button" class="rk-arrow" id="tp-prev" title="More posts" aria-label="More posts" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Posters', { tag: 'h2', palette: [[5, 13], [3, 11], [13, 15]], id: 'hm-posters-title', font: _posters_font || 'random', align: 'center' })); ?>
+        <button type="button" class="rk-arrow" id="tp-next" title="Further down the list" aria-label="Further down the list" disabled>&raquo;</button>
+    </div>
+    <div class="rk-strip" id="tp-strip" role="list" aria-label="Members with the most forum posts">
+        <div class="rk-empty">Counting posts&hellip;</div>
+    </div>
+</div>
+
+<div class="card mb-0 rk-panel hm-seam" id="rico-panel">
+    <div class="rk-head" id="rico-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <button type="button" class="rk-arrow" id="rico-prev" title="Richer" aria-label="Richer" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Rico', { tag: 'h2', palette: [[1, 9], [6, 14], [1, 9], [14, 15]], id: 'hm-rico-title', font: _rico_font || 'random', align: 'center' })); ?>
+        <button type="button" class="rk-arrow" id="rico-next" title="Further down the list" aria-label="Further down the list" disabled>&raquo;</button>
+    </div>
+    <div class="rk-strip" id="rico-strip" role="list" aria-label="Users with the most BBScoin">
+        <div class="rk-empty">Counting coins&hellip;</div>
+    </div>
+</div>
+
+<div class="card mb-0 rk-panel hm-seam" id="suave-panel">
+    <div class="rk-head" id="suave-head">
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <canvas class="hm-gap-fx" aria-hidden="true"></canvas>
+        <button type="button" class="rk-arrow" id="suave-prev" title="More friends" aria-label="More friends" disabled>&laquo;</button>
+        <?xjs write(_tdf.tdf_heading('Suave', { tag: 'h2', palette: [[3, 11], [5, 13], [3, 11], [1, 9]], id: 'hm-suave-title', font: _suave_font || 'random', align: 'center' })); ?>
+        <button type="button" class="rk-arrow" id="suave-next" title="Further down the list" aria-label="Further down the list" disabled>&raquo;</button>
+    </div>
+    <div class="rk-strip" id="suave-strip" role="list" aria-label="Users with the most friends">
+        <div class="rk-empty">Counting friends&hellip;</div>
+    </div>
+</div>
+
+<script>
+/* Ranked avatar strips (Rico, Suave): one page of 10 at a time from
+   api/leaderboards.ssjs, each avatar (or its identicon) with the rank on
+   top and the count beside a little pixel icon, linking to the profile. */
+window.hmRankStrip = window.hmRankStrip || function (o) {
+    var panel = document.getElementById(o.id + '-panel');
+    if (!panel || panel.__rk) return;
+    panel.__rk = true;
+    var PAGE = 10;
+    var strip = document.getElementById(o.id + '-strip');
+    var prev = document.getElementById(o.id + '-prev'), next = document.getElementById(o.id + '-next');
+    var rows = [], page = 0, avatars = {};
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    /* A pixel icon from rows of palette letters ('.' is clear). */
+    function pixelSvg(art, colors) {
+        var rects = '';
+        art.forEach(function (line, y) {
+            for (var x = 0; x < line.length; x++) {
+                if (colors[line[x]]) rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + colors[line[x]] + '"/>';
+            }
+        });
+        return '<svg class="rk-icon" viewBox="0 0 ' + art[0].length + ' ' + art.length + '" aria-hidden="true">' + rects + '</svg>';
+    }
+    var icon = pixelSvg(o.icon, o.iconColors);
+
+    function render() {
+        var pages = Math.ceil(rows.length / PAGE);
+        prev.disabled = page <= 0;
+        next.disabled = page >= pages - 1;
+        if (!rows.length) { strip.innerHTML = '<div class="rk-empty">' + esc(o.empty) + '</div>'; return; }
+        var html = '';
+        rows.slice(page * PAGE, page * PAGE + PAGE).forEach(function (r, k) {
+            var rank = page * PAGE + k + 1, n = r[o.key], ava = avatars[String(r.number)];
+            /* The avatar slot is a [data-avatar] like everywhere else on the
+               site: avatar-fx plays on hover, person-menu opens on click. */
+            html += '<div class="rk-item" role="listitem">' +
+                '<span class="rk-thumb">' +
+                    '<span class="rk-ava" data-avatar="' + esc(r.alias) + '" title="' + esc(r.alias) + '">' +
+                        (ava ? '<img alt="' + esc(r.alias) + '" draggable="false" src="' + ava + '">' : '') +
+                    '</span>' +
+                    '<span class="rk-rank">#' + rank + '</span>' +
+                    '<span class="rk-count" aria-label="' + n.toLocaleString('en-US') + ' ' + (n === 1 ? o.unit : o.units) + '">' + icon + n.toLocaleString('en-US') + '</span>' +
+                '</span>' +
+                '<a class="rk-name" href="./?page=013-profile.xjs&amp;user=' + encodeURIComponent(r.alias) + '" title="' + esc(r.alias) + '">' + esc(r.alias) + '</a>' +
+            '</div>';
+        });
+        strip.innerHTML = html;
+        strip.scrollLeft = 0;
+        loadAvatars();
+    }
+
+    /* Avatars for the page on show, fetched once each. */
+    function loadAvatars() {
+        if (typeof GraphicsConverter === 'undefined') return;
+        var want = rows.slice(page * PAGE, page * PAGE + PAGE)
+            .map(function (r) { return String(r.number); })
+            .filter(function (n) { return !(n in avatars); });
+        if (!want.length) return;
+        want.forEach(function (n) { avatars[n] = null; });
+        fetch('./api/system.ssjs?call=get-avatar&user=' + want.join('&user='), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                var gc = GraphicsConverter.shared(), pending = 0;
+                (list || []).forEach(function (a) {
+                    if (!a || !a.data) return;
+                    pending++;
+                    gc.from_bin(atob(a.data), 10, 6, function (url) {
+                        if (url) avatars[a.user] = url;
+                        if (--pending === 0 && panel.isConnected) render();
+                    }, true);
+                });
+            })
+            .catch(function () { /* names and counts only */ });
+    }
+
+    prev.addEventListener('click', function () { if (page > 0) { page--; render(); } });
+    next.addEventListener('click', function () { if ((page + 1) * PAGE < rows.length) { page++; render(); } });
+
+    hmBoardFetch('./api/leaderboards.ssjs?call=' + o.call, panel,
+        function (list) { rows = Array.isArray(list) ? list : []; render(); },
+        function () { strip.innerHTML = '<div class="rk-empty">' + esc(o.down) + '</div>'; });
+};
+
+/* Top Posters: forum posts by the same rules as a profile's Forum
+   Activity (alias and linked handles on any BBS), so the counts match. */
+hmRankStrip({
+    id: 'tp', call: 'posters', key: 'posts', unit: 'post', units: 'posts',
+    empty: 'No posts counted yet.', down: 'The post count is unavailable right now.',
+    icon: ['.cccccc.', 'cccccccc', 'cckckckc', 'cccccccc', '.cccccc.', '..cc....', '.c......'],
+    iconColors: { c: '#55FFFF', k: '#000000' }
+});
+hmRankStrip({
+    id: 'rico', call: 'rico', key: 'coins', unit: 'BBScoin', units: 'BBScoin',
+    empty: 'Nobody has any BBScoin yet.', down: 'The coin count is unavailable right now.',
+    icon: ['..oooo..', '.oyyyyo.', 'oywyyoyo', 'oyyyyoyo', 'oyyyyoyo', 'oyyyyoyo', '.oyyyyo.', '..oooo..'],
+    iconColors: { o: '#AA5500', y: '#FFFF55', w: '#FFFFFF' }
+});
+hmRankStrip({
+    id: 'suave', call: 'suave', key: 'friends', unit: 'friend', units: 'friends',
+    empty: 'No friendships yet.', down: 'The friend count is unavailable right now.',
+    icon: ['.mm.mm.', 'mwmmmmm', 'mmmmmmm', 'mmmmmmm', '.mmmmm.', '..mmm..', '...m...'],
+    iconColors: { m: '#FF55FF', w: '#FFFFFF' }
+});
+
+/* Top Posters chatter: speech bubbles pop up, type their dots, drift
+   upward and fade out, in magenta, cyan and white. */
+hmGapFx(document.getElementById('tp-head'), {
+    prev: document.getElementById('tp-prev'),
+    next: document.getElementById('tp-next'),
+    fps: 12,
+    create: function (g) {
+        var COLORS = [[13, 5], [11, 3], [15, 7]];   /* bright, faded */
+        var BW = 6, BH = 4, LIFE = 40;
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h), bubbles = [], t = 0;
+        var most = Math.max(2, Math.round(w / 9));
+        function put(x, y, c) { if (x >= 0 && x < w && y >= 0 && y < h) cells[y * w + x] = c; }
+        return { cells: cells, step: function () {
+            t++;
+            if (bubbles.length < most && Math.random() < 0.18) {
+                bubbles.push({ x: Math.floor(Math.random() * Math.max(1, w - BW)), y: h - BH - 1 - Math.random() * 2,
+                    life: LIFE, col: COLORS[(Math.random() * COLORS.length) | 0], left: Math.random() < 0.5 });
+            }
+            bubbles = bubbles.filter(function (b) { b.y -= 0.12; return --b.life > 0 && b.y > -BH; });
+            cells.fill(0);
+            bubbles.forEach(function (b) {
+                var c = b.life < 10 ? b.col[1] : b.col[0], x0 = b.x, y0 = Math.round(b.y);
+                for (var y = 0; y < BH; y++) {
+                    for (var x = 0; x < BW; x++) {
+                        if ((y === 0 || y === BH - 1) && (x === 0 || x === BW - 1)) continue;   /* round corners */
+                        put(x0 + x, y0 + y, c);
+                    }
+                }
+                put(b.left ? x0 + 1 : x0 + BW - 2, y0 + BH, c);   /* tail */
+                /* The dots type in one by one, then hold. */
+                var dots = Math.min(3, Math.floor((LIFE - b.life) / 3));
+                for (var d = 0; d < dots; d++) put(x0 + 1 + d + (d > 0 ? d : 0) - (d > 1 ? 1 : 0), y0 + 1 + (BH > 3 ? 1 : 0), 0);
+            });
+        } };
+    },
+    warm: 30
+});
+
+/* Rico coins: gold coins tumble down, spinning (the disc narrows to its
+   edge and back), and land in a burst of sparkles. */
+hmGapFx(document.getElementById('rico-head'), {
+    prev: document.getElementById('rico-prev'),
+    next: document.getElementById('rico-next'),
+    fps: 20,
+    create: function (g) {
+        var SPIN = [6, 6, 5, 4, 2, 1, 2, 4, 5];   /* disc width per spin frame */
+        var TALL = 5;
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h);
+        var coins = [], sparks = [], maxCoins = Math.max(3, Math.round(w / 3));
+        function put(x, y, c) { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < w && y >= 0 && y < h) cells[y * w + x] = c; }
+        function coin(c) {
+            var fw = SPIN[Math.floor(c.spin) % SPIN.length], cx = c.x, top = Math.floor(c.y);
+            for (var r = 0; r < TALL; r++) {
+                var cap = r === 0 || r === TALL - 1;
+                var rw = cap ? Math.max(1, fw - 2) : fw, x0 = Math.round(cx - rw / 2);
+                for (var k = 0; k < rw; k++) {
+                    var edge = fw > 1 && (k === 0 || k === rw - 1 || cap);
+                    put(x0 + k, top + r, fw === 1 ? 14 : edge ? 6 : (r === 1 && k === 1 && fw >= 4 ? 15 : 14));
+                }
+            }
+        }
+        return { cells: cells, step: function () {
+            if (coins.length < maxCoins && Math.random() < 0.2) {
+                coins.push({ x: 3 + Math.random() * (w - 6), y: -TALL, vy: 0.15 + Math.random() * 0.2,
+                    spin: Math.random() * SPIN.length, vs: 0.25 + Math.random() * 0.25, sway: Math.random() * 6.28 });
+            }
+            coins = coins.filter(function (c) {
+                c.y += c.vy;
+                c.vy = Math.min(0.7, c.vy + 0.01);
+                c.spin += c.vs;
+                c.sway += 0.08;
+                c.x += Math.sin(c.sway) * 0.08;
+                if (c.y + TALL >= h) {
+                    for (var k = 0; k < 5; k++) {
+                        sparks.push({ x: c.x, y: h - 1, vx: (Math.random() - 0.5) * 0.9, vy: -0.3 - Math.random() * 0.5, life: 6 + ((Math.random() * 6) | 0) });
+                    }
+                    return false;
+                }
+                return true;
+            });
+            /* Stray glints between coins. */
+            if (Math.random() < 0.15) sparks.push({ x: Math.random() * w, y: Math.random() * h, vx: 0, vy: 0, life: 3 });
+            sparks = sparks.filter(function (s) { s.x += s.vx; s.y += s.vy; s.vy += 0.06; return --s.life > 0; });
+
+            cells.fill(0);
+            coins.forEach(coin);
+            sparks.forEach(function (s) { put(s.x, s.y, s.life > 3 ? 15 : 14); });
+        } };
+    },
+    warm: 120
+});
+
+/* Suave lava: slow blobs drift and merge like a lava lamp, cyan and
+   magenta over a dark blue glow, dithered so the edges stay smooth. */
+hmGapFx(document.getElementById('suave-head'), {
+    prev: document.getElementById('suave-prev'),
+    next: document.getElementById('suave-next'),
+    fps: 20,
+    create: function (g) {
+        var RAMPS = [[0, 1, 3, 11, 15], [0, 1, 5, 13, 15]];   /* cyan, magenta */
+        var BAYER = [0, 0.5, 0.75, 0.25];
+        var w = g.w, h = g.h, cells = new Uint8Array(w * h), t = Math.random() * 1000;
+        var blobs = [], n = Math.max(2, Math.round(w / 12));
+        for (var i = 0; i < n; i++) {
+            blobs.push({ bx: (i + 0.5) * w / n, ax: w / n * 0.8, r: 3.2 + Math.random() * 2.4,
+                sx: 0.008 + Math.random() * 0.012, sy: 0.012 + Math.random() * 0.016,
+                px: Math.random() * 6.28, py: Math.random() * 6.28, ramp: i % 2 });
+        }
+        return { cells: cells, step: function () {
+            t++;
+            blobs.forEach(function (b) {
+                b.x = b.bx + Math.sin(t * b.sx + b.px) * b.ax;
+                b.y = h / 2 + Math.sin(t * b.sy + b.py) * (h / 2 - 2);
+            });
+            for (var y = 0; y < h; y++) {
+                for (var x = 0; x < w; x++) {
+                    var field = 0, best = 0, top = null;
+                    for (var k = 0; k < blobs.length; k++) {
+                        var b = blobs[k], dx = x - b.x, dy = (y - b.y) * 1.3;
+                        var f = b.r * b.r / (dx * dx + dy * dy + 0.5);
+                        field += f;
+                        if (f > best) { best = f; top = b; }
+                    }
+                    var level = (field - 0.5) * 2.6, c = 0;
+                    if (level > 0) {
+                        var base = Math.floor(level), ramp = RAMPS[top.ramp];
+                        var idx = Math.min(ramp.length - 1, base + (level - base > BAYER[(y & 1) * 2 + (x & 1)] ? 1 : 0));
+                        c = ramp[idx];
+                    }
+                    cells[y * w + x] = c;
+                }
+            }
+        } };
+    },
+    warm: 1
+});
 </script>

@@ -12,6 +12,13 @@
  * Overlays never take pointer events, so clicks still reach the person
  * menu. Every so often a random visible avatar twitches on its own.
  *
+ * Effects that follow the pointer (flagged `pointer`, plus anything riding
+ * the tilt motion) get a ghost cursor when no mouse drives them: a random
+ * effect started by script (the landing title, TDF headings) or a touch tap.
+ * It springs between random spots with the odd pause, so a spotlight sweeps
+ * and a lens glides instead of sitting dead center. A real mouse moving over
+ * the art takes over; the ghost resumes a moment after it goes still.
+ *
  * Console: AvatarFx.list() names every effect; AvatarFx.only('fire') pins
  * one for testing, AvatarFx.only() goes back to random; AvatarFx.play(el,
  * 'fire') / AvatarFx.stop(el) drive one avatar directly.
@@ -458,7 +465,7 @@
                 put(e, (y * e.OW + x) * 4, p.c);
             });
         } },
-        { name: 'ripple', frame: function (e) {
+        { name: 'ripple', pointer: true, frame: function (e) {
             var amp0 = 2.6 * Math.min(1, e.t * 3), d = e.d, src = e.src;
             for (var y = 0; y < e.H; y++) for (var x = 0; x < e.W; x++) {
                 var dx = x - e.px, dy = y - e.py, dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
@@ -467,7 +474,7 @@
                 d[o] = src[so] * k; d[o + 1] = src[so + 1] * k; d[o + 2] = src[so + 2] * k; d[o + 3] = 255;
             }
         } },
-        { name: 'lens', frame: function (e) {
+        { name: 'lens', pointer: true, frame: function (e) {
             var R = Math.max(10, Math.min(e.W, e.H) * 0.27), d = e.d;
             e.d.set(e.src);
             for (var y = Math.floor(e.py - R); y <= e.py + R; y++) for (var x = Math.floor(e.px - R); x <= e.px + R; x++) {
@@ -511,7 +518,7 @@
             var MASKS = [1, 2, 4, 8, 3, 5, 6, 9, 12, 7, 14, 15], mask = MASKS[Math.floor(e.t / 0.28) % MASKS.length];
             for (var i = 0; i < e.N; i++) { if (e.bg[i]) copy(e, i * 4, i * 4); else put(e, i * 4, VGA[e.idx[i] & mask]); }
         } },
-        { name: 'thermal', frame: function (e) {
+        { name: 'thermal', pointer: true, frame: function (e) {
             var heat = 0.55 * Math.min(1, e.t * 2);
             for (var y = 0; y < e.H; y++) for (var x = 0; x < e.W; x++) {
                 var i = y * e.W + x, dx = x - e.px, dy = y - e.py, dist = Math.sqrt(dx * dx + dy * dy);
@@ -571,14 +578,14 @@
         { name: 'crt-power-on', media: ['afx-crt'] },
         { name: 'jelly', media: ['afx-jelly'] },
         { name: 'coin-flip', media: ['afx-coin'] },
-        { name: 'tilt', media: ['afx-tilt'], layers: ['afx-l-shine afx-tilt'] },
-        { name: 'holo-foil', media: ['afx-holo', 'afx-tilt'], layers: ['afx-l-holo afx-tilt'] },
+        { name: 'tilt', pointer: true, media: ['afx-tilt'], layers: ['afx-l-shine afx-tilt'] },
+        { name: 'holo-foil', pointer: true, media: ['afx-holo', 'afx-tilt'], layers: ['afx-l-holo afx-tilt'] },
         { name: 'scanlines', media: ['afx-scan'], layers: ['afx-l-scan'] },
         { name: 'vhs', media: ['afx-vhs'], layers: ['afx-l-vhs'] },
         { name: 'strobe', media: ['afx-strobe'] },
         { name: 'retro-shadow', media: ['afx-retro'] },
         { name: 'glitch-clip', media: ['afx-clip'] },
-        { name: 'spotlight', media: ['afx-spot'], layers: ['afx-l-spot'] },
+        { name: 'spotlight', pointer: true, media: ['afx-spot'], layers: ['afx-l-spot'] },
         { name: 'punch', media: ['afx-punch'] }
     ];
     /* CSS motions a canvas effect can ride on. */
@@ -590,7 +597,8 @@
     var BY_NAME = {};
     ALL.forEach(function (f) { BY_NAME[f.name] = f; });
 
-    var bag = [], forced = null, hover = null;
+    var bag = [], forced = null, hover = null, ghosts = [];
+    var GHOST_IDLE_MS = 1200;   /* a real pointer keeps the ghost off this long */
     function nextFx() {
         if (forced && BY_NAME[forced]) return BY_NAME[forced];
         if (!bag.length) bag = shuffle(ALL.slice());
@@ -655,6 +663,8 @@
         if (!st || st.dead) return;
         st.dead = true;
         if (st.raf) cancelAnimationFrame(st.raf);
+        if (st.ghostRaf) cancelAnimationFrame(st.ghostRaf);
+        if (st.ghost) ghosts.splice(ghosts.indexOf(st), 1);
         if (st.timer) clearTimeout(st.timer);
         st.nodes.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
         st.mediaClasses.forEach(function (c) { st.media.classList.remove(c); });
@@ -664,14 +674,51 @@
         if (hover === st) hover = null;
     }
 
+    /* Pointer position as fractions of the art box (0..1). */
+    function setPointer(st, px, py) {
+        st.host.style.setProperty('--afx-px', px.toFixed(3));
+        st.host.style.setProperty('--afx-py', py.toFixed(3));
+        if (st.env) { st.env.px = px * st.env.W; st.env.py = py * st.env.H; }
+        if (st.ghost) { st.ghost.x = px; st.ghost.y = py; }
+    }
+
     function track(st, ev) {
         if (!st || st.dead) return;
         var r = artRect(st.media);
         if (!r.width || !r.height) return;
-        var px = clamp((ev.clientX - r.left) / r.width, 0, 1), py = clamp((ev.clientY - r.top) / r.height, 0, 1);
-        st.host.style.setProperty('--afx-px', px.toFixed(3));
-        st.host.style.setProperty('--afx-py', py.toFixed(3));
-        if (st.env) { st.env.px = px * st.env.W; st.env.py = py * st.env.H; }
+        setPointer(st, clamp((ev.clientX - r.left) / r.width, 0, 1), clamp((ev.clientY - r.top) / r.height, 0, 1));
+        if (st.ghost) { st.ghost.vx = st.ghost.vy = 0; st.ghost.realUntil = performance.now() + GHOST_IDLE_MS; }
+    }
+
+    function usesPointer(st) {
+        return !!(st.fx.pointer || (st.env && st.env.cv.classList.contains('afx-tilt')));
+    }
+
+    /* The ghost cursor: a damped spring toward a waypoint that moves every
+       half second or so, sometimes holding still for a beat. Waypoints stay
+       off the very edges so the effect keeps something to light up. */
+    function ghost(st) {
+        var g = st.ghost = { x: 0.5, y: 0.5, vx: 0, vy: 0, tx: 0.5, ty: 0.5, next: 0, realUntil: 0, last: performance.now() };
+        var cur = st.host.style.getPropertyValue('--afx-px');
+        if (cur) { g.x = parseFloat(cur); g.y = parseFloat(st.host.style.getPropertyValue('--afx-py')); }
+        ghosts.push(st);
+        function step(now) {
+            if (st.dead) return;
+            var dt = clamp((now - g.last) / 1000, 0, 0.05);
+            g.last = now;
+            if (now >= g.realUntil) {
+                if (now >= g.next) {
+                    if (Math.random() < 0.2) { g.tx = g.x; g.ty = g.y; }
+                    else { g.tx = 0.1 + Math.random() * 0.8; g.ty = 0.15 + Math.random() * 0.7; }
+                    g.next = now + rnd(450, 1300);
+                }
+                g.vx += ((g.tx - g.x) * 32 - g.vx * 8) * dt;
+                g.vy += ((g.ty - g.y) * 32 - g.vy * 8) * dt;
+                setPointer(st, clamp(g.x + g.vx * dt, 0, 1), clamp(g.y + g.vy * dt, 0, 1));
+            }
+            st.ghostRaf = requestAnimationFrame(step);
+        }
+        st.ghostRaf = requestAnimationFrame(step);
     }
 
     function play(host, fx, ev, ms) {
@@ -698,6 +745,7 @@
                 st.nodes.push(l);
             });
         }
+        if (!reduceMotion && (!ev || ev.pointerType !== 'mouse') && usesPointer(st)) ghost(st);
         if (ms) st.timer = setTimeout(function () { stop(st); }, ms);
         return st;
     }
@@ -747,7 +795,16 @@
         if (!hover.host.contains(ev.target)) return;
         stop(hover);
     });
-    document.addEventListener('pointermove', function (ev) { if (hover) track(hover, ev); }, { passive: true });
+    document.addEventListener('pointermove', function (ev) {
+        if (hover) track(hover, ev);
+        /* A mouse over ghost-driven art takes the wheel. */
+        if (ev.pointerType !== 'mouse') return;
+        ghosts.forEach(function (st) {
+            if (st === hover) return;
+            var r = artRect(st.media);
+            if (ev.clientX >= r.left && ev.clientX <= r.left + r.width && ev.clientY >= r.top && ev.clientY <= r.top + r.height) track(st, ev);
+        });
+    }, { passive: true });
 
     /* The tease: now and then one visible avatar glitches for a blink. */
     function ambient() {
