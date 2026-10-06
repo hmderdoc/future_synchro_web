@@ -55,7 +55,7 @@
     // localStorage so a reload does not log them off and back on.
     var _bridgeHold = {};
     // MRC room the user picked ('' = the mux default).
-    var _bridgeRoom = { mrc: '' };
+    var _bridgeRoom = { mrc: '', irc: '' };
     // Who is on each bridged network, from its last who-list: nameKey -> true.
     var _bridgeOnline = { mrc: {}, ddial: {} };
     var _markReadTimer = 0;
@@ -63,6 +63,63 @@
     var _pendingJoin = {};
     var HOLD_STORAGE_KEY = 'chatBridgeHold';
     var ROOM_STORAGE_KEY = 'chatBridgeRoom';
+    var IRC_ROOM_STORAGE_KEY = 'chatIrcRoom';
+    // Newest network sequence number shown to the user, per bridged network:
+    // the server counts a network's unread room messages from here (only
+    // while the user is on that network, like a joined local room).
+    var SEEN_STORAGE_KEY = 'chatBridgeSeen';
+    var _bridgeSeen = {};
+    // Networks whose count this page load has already shown once: the first
+    // count after a (re)load is old news, not something to toast.
+    var _bridgeCountShown = {};
+    // Chat messages already announced on this device: every open tab runs
+    // its own stream and sync, and the network counts can repeat their
+    // latest message, so a desktop notification is claimed here first
+    // (shared by all tabs) and a toast once per tab.
+    var ANNOUNCED_STORAGE_KEY = 'chatAnnounced';
+    var ANNOUNCED_TTL_MS = 30 * 60 * 1000;
+    var _toasted = {};
+
+    function loadBridgeSeen() {
+        _bridgeSeen = {};
+        String(readStorage(SEEN_STORAGE_KEY) || '').split(',').forEach(function (pair) {
+            var parts = pair.split(':');
+            var net = normalizeBridge(parts[0]);
+            var seq = parseInt(parts[1], 10);
+            if (net && seq > 0) _bridgeSeen[net] = seq;
+        });
+    }
+
+    function setBridgeSeen(net, seq) {
+        net = normalizeBridge(net);
+        if (!net || !(seq > 0) || _bridgeSeen[net] === seq) return;
+        _bridgeSeen[net] = seq;
+        writeStorage(SEEN_STORAGE_KEY, Object.keys(_bridgeSeen).map(function (k) { return k + ':' + _bridgeSeen[k]; }).join(','));
+    }
+
+    /* Which kind of chat notification a message is (mods/load/notify_lib.js
+       CHAT_KINDS): a message in a room here that says your name is a mention. */
+    function chatKind(msg) {
+        if (msg.type === 'private') return 'chat_private';
+        if (msg.bridge === 'mrc') return 'chat_mrc';
+        if (msg.bridge === 'ddial') return 'chat_ddial';
+        if (msg.bridge === 'irc') return 'chat_irc';
+        var me = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
+        var said = String(getMessageText(msg) || msg.previewText || '');
+        if (me && new RegExp('(^|[^a-z0-9])@?' + me.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)', 'i').test(said)) {
+            return 'chat_mention';
+        }
+        return 'chat_local';
+    }
+
+    /* How the user wants that kind announced: 'off', 'web' (toast),
+       'native' (desktop notification) or 'both' (Settings > Notifications). */
+    function chatMode(kind) {
+        var prefs = window.sbbsConfig && window.sbbsConfig.notifyPrefs;
+        var mode = prefs && prefs.chat && prefs.chat[kind];
+        if (mode) return mode;
+        return kind === 'chat_private' || kind === 'chat_mention' ? 'both' : 'web';
+    }
 
     function readStorage(key) {
         try { return window.localStorage ? window.localStorage.getItem(key) : null; } catch (_e) { return null; }
@@ -84,6 +141,8 @@
             if (isBridgeRoom(name)) _bridgeHold[name.toLowerCase()] = true;
         });
         _bridgeRoom.mrc = sanitizeBridgeRoomName(room);
+        _bridgeRoom.irc = sanitizeBridgeRoomName(readStorage(IRC_ROOM_STORAGE_KEY) || '');
+        loadBridgeSeen();
     }
 
     function heldBridgeNames() {
@@ -101,7 +160,11 @@
 
     function normalizeBridge(raw) {
         var key = String(raw || '').toLowerCase();
-        return key === 'mrc' || key === 'ddial' ? key : '';
+        return key === 'mrc' || key === 'ddial' || key === 'irc' ? key : '';
+    }
+
+    function bridgeTitle(net) {
+        return net === 'mrc' ? 'MRC' : net === 'irc' ? 'IRC' : 'DDial';
     }
 
     // Presence / room parameters every request that touches a bridged
@@ -111,7 +174,11 @@
         var held = heldBridgeNames();
         return '&active=' + (_chatPageActive ? '1' : '0')
             + (held.length ? '&hold=' + encodeURIComponent(held.join(',')) : '')
-            + (_bridgeRoom.mrc ? '&room=' + encodeURIComponent(_bridgeRoom.mrc) : '');
+            + (_bridgeRoom.mrc ? '&room=' + encodeURIComponent(_bridgeRoom.mrc) : '')
+            + (_bridgeRoom.irc ? '&ircroom=' + encodeURIComponent(_bridgeRoom.irc) : '')
+            + (Object.keys(_bridgeSeen).length
+                ? '&seen=' + encodeURIComponent(Object.keys(_bridgeSeen).map(function (k) { return k + ':' + _bridgeSeen[k]; }).join(','))
+                : '');
     }
 
     function trimText(value) {
@@ -1310,7 +1377,166 @@
         }, 400);
     }
 
-    function showToast(msg) {
+    /* Where a chat notification leads: the thread, room or network. */
+    function chatHref(msg) {
+        var href = './?page=001-chat.xjs';
+        if (msg.type === 'private' && msg.peerName) {
+            href += '&private=' + encodeURIComponent(msg.peerName);
+            if (msg.peerSystem) href += '&system=' + encodeURIComponent(msg.peerSystem);
+            if (msg.peerBridge) href += '&bridge=' + encodeURIComponent(msg.peerBridge);
+        } else if (msg.channel) {
+            href += '&channel=' + encodeURIComponent(msg.channel);
+        }
+        return href;
+    }
+
+    function nativeAllowed() {
+        return 'Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator;
+    }
+
+    /* The sender's avatar as a notification icon: the 80x96 drawing scaled
+       up 3x with hard pixels so the OS doesn't blur it. From the avatar the
+       message carries, else the site's avatar cache / lookup by user number.
+       Prefers the server's PNG of it (api/push.ssjs ?call=icon, the same file
+       a push uses): some notification centres drop data: URL icons. Falls
+       back to drawing it here. cb(null) when there is none or it isn't ready
+       within 4s. */
+    var _notifyIcons = {};
+    function avatarIcon(msg, cb) {
+        var done = false;
+        function finish(url) { if (!done) { done = true; cb(url); } }
+        setTimeout(function () { finish(null); }, 4000);
+        var key = msg.avatar ? 'bin:' + msg.avatar : msg.userNumber > 0 ? 'user:' + msg.userNumber : '';
+        if (!key || typeof GraphicsConverter === 'undefined') { finish(null); return; }
+        if (_notifyIcons[key]) { finish(_notifyIcons[key]); return; }
+        function scale(dataURL) {
+            if (!dataURL) { finish(null); return; }
+            var img = new Image();
+            img.onload = function () {
+                var c = document.createElement('canvas');
+                c.width = img.width * 3;
+                c.height = img.height * 3;
+                var ctx = c.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(img, 0, 0, c.width, c.height);
+                _notifyIcons[key] = c.toDataURL('image/png');
+                finish(_notifyIcons[key]);
+            };
+            img.onerror = function () { finish(null); };
+            img.src = dataURL;
+        }
+        function drawHere(b64) {
+            try { GraphicsConverter.shared().from_bin(atob(b64), 10, 6, scale, true); } catch (e) { finish(null); }
+        }
+        function fromBin(b64) {
+            fetch('./api/push.ssjs?call=icon&avatar=' + encodeURIComponent(b64), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    if (!res || !res.ok || !res.url) throw new Error('no icon');
+                    _notifyIcons[key] = new URL(res.url, location.href).href;
+                    finish(_notifyIcons[key]);
+                })
+                .catch(function () { drawHere(b64); });
+        }
+        if (msg.avatar) { fromBin(msg.avatar); return; }
+        var store = window.sbbs && window.sbbs.avatars;
+        function fromCache() {
+            Promise.resolve(store ? store.get(msg.userNumber) : null).then(function (cached) {
+                if (cached && cached.dataURL) scale(cached.dataURL); else finish(null);
+            }).catch(function () { finish(null); });
+        }
+        fetch('./api/system.ssjs?call=get-avatar&user=' + encodeURIComponent(msg.userNumber), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                var a = list && list[0];
+                if (a && a.data) fromBin(a.data); else fromCache();
+            }).catch(fromCache);
+    }
+
+    /* A desktop notification, with the sender's avatar as its picture. A
+       private message uses the server push's tag, so the two replace each
+       other instead of doubling up. */
+    function nativeNotify(msg, href, kind) {
+        var who = msg.sender || 'Someone';
+        var where = msg.bridge ? bridgeTitle(msg.bridge) : '#' + (msg.channel || _currentChannel);
+        var title = kind === 'chat_private' ? who + ' sent you a private message'
+            : kind === 'chat_mention' ? who + ' mentioned you in ' + where
+            : who + ' in ' + where;
+        var body = (msg.previewText || buildMessagePreview(getMessageText(msg)) || '').substring(0, 200);
+        var tag = msg.type === 'private'
+            ? 'pm:' + String(msg.peerName || who).toLowerCase()
+            : 'chat:' + String(msg.channel || _currentChannel).toLowerCase();
+        avatarIcon(msg, function (icon) {
+            navigator.serviceWorker.ready.then(function (reg) {
+                return reg.showNotification(title, {
+                    body: body, tag: tag, renotify: true,
+                    icon: icon || './images/icon-192.png', badge: './images/icon-maskable-192.png',
+                    data: { url: href }
+                });
+            }).catch(function () { /* the in-site badge still counts it */ });
+        });
+    }
+
+    /* Announce a chat message, unless the user is looking right at it (the
+       room or thread on screen in a visible tab): a toast, a desktop
+       notification or both, per their choice for its kind. Desktop without
+       the browser's permission falls back to a toast so nothing is lost. */
+    function notifyChat(msg, viewing) {
+        if (!msg || msg.isSelf) return;
+        if (viewing && !document.hidden) return;
+        var kind = chatKind(msg);
+        var mode = chatMode(kind);
+        if (mode === 'off') return;
+        var href = chatHref(msg);
+        var key = announceKey(msg);
+        var native = (mode === 'native' || mode === 'both') && nativeAllowed();
+        if (native) {
+            claimAnnouncement(key, function (fresh) {
+                if (fresh) nativeNotify(msg, href, kind);
+            });
+        }
+        if ((mode === 'web' || mode === 'both' || (mode === 'native' && !native)) && !_toasted[key]) {
+            if (Object.keys(_toasted).length > 200) _toasted = {};
+            _toasted[key] = Date.now();
+            renderToast(msg, href);
+        }
+    }
+
+    /* One chat message, however it reached this tab (stream, sync, network
+       count): where it was said, who said it, when and what. */
+    function announceKey(msg) {
+        var where = msg.type === 'private'
+            ? 'pm:' + (msg.peerBridge || '') + ':' + (msg.peerName || msg.sender || '')
+            : (msg.bridge || '') + '#' + (msg.channel || _currentChannel);
+        var text = String(msg.previewText || getMessageText(msg) || '').substring(0, 80);
+        return (where + '|' + (msg.sender || '') + '|' + (msg.timestamp || 0) + '|' + text).toLowerCase();
+    }
+
+    /* cb(true) the first time any tab on this device claims key (within
+       ANNOUNCED_TTL_MS), cb(false) after. Web Locks keep two tabs that got
+       the same stream event at once from both winning. */
+    function claimAnnouncement(key, cb) {
+        function claim() {
+            var now = Date.now();
+            var seen = {};
+            try { seen = JSON.parse(readStorage(ANNOUNCED_STORAGE_KEY) || '{}') || {}; } catch (_e) { seen = {}; }
+            Object.keys(seen).forEach(function (k) {
+                if (!(now - seen[k] < ANNOUNCED_TTL_MS)) delete seen[k];
+            });
+            if (seen[key]) return false;
+            seen[key] = now;
+            writeStorage(ANNOUNCED_STORAGE_KEY, JSON.stringify(seen));
+            return true;
+        }
+        if (navigator.locks && navigator.locks.request) {
+            navigator.locks.request('chatAnnounce', claim).then(cb, function () { cb(true); });
+        } else {
+            cb(claim());
+        }
+    }
+
+    /* The in-site toast itself; notifyChat decides whether to show it. */
+    function renderToast(msg, href) {
         var container;
         var toast;
         var avatarDiv;
@@ -1318,27 +1544,12 @@
         var senderDiv;
         var textDiv;
         var closeBtn;
-        var href = './?page=004-chat.xjs';
-
-        if (_chatPageActive) return;
 
         container = document.getElementById('chat-toasts');
         if (!container) return;
 
         while (container.children.length >= MAX_TOASTS) {
             container.removeChild(container.lastChild);
-        }
-
-        if (msg.type === 'private' && msg.peerName) {
-            href += '&private=' + encodeURIComponent(msg.peerName);
-            if (msg.peerSystem) {
-                href += '&system=' + encodeURIComponent(msg.peerSystem);
-            }
-            if (msg.peerBridge) {
-                href += '&bridge=' + encodeURIComponent(msg.peerBridge);
-            }
-        } else if (msg.channel) {
-            href += '&channel=' + encodeURIComponent(msg.channel);
         }
 
         toast = document.createElement('div');
@@ -1358,7 +1569,7 @@
         senderDiv = document.createElement('div');
         senderDiv.className = 'chat-toast-sender';
         senderDiv.textContent = msg.type === 'private'
-            ? ('PM from ' + (msg.sender || 'Unknown') + (msg.peerBridge ? ' (' + (msg.peerBridge === 'mrc' ? 'MRC' : 'DDial') + ')' : ''))
+            ? ('PM from ' + (msg.sender || 'Unknown') + (msg.peerBridge ? ' (' + bridgeTitle(msg.peerBridge) + ')' : ''))
             : (msg.sender || 'System');
         textDiv = document.createElement('div');
         textDiv.className = 'chat-toast-text';
@@ -1663,6 +1874,8 @@
                 _unreadChannels[normalizeUpper(summary.name)] = 0;
             }
 
+            if (room.bridge && summary.counted) applyBridgeUnread(room, summary);
+
             nextRooms.push(room);
         });
 
@@ -1672,6 +1885,35 @@
         _serviceHealthy = true;
         if (!silent) refreshStatus();
         dispatchRooms();
+    }
+
+    /* A network the user is on: its unread room messages since what this
+       browser last showed (the server counts them from _bridgeSeen). The
+       open network is read as it arrives; a network seen for the first time
+       starts from now, not from its whole backlog. */
+    function applyBridgeUnread(room, summary) {
+        var net = normalizeBridge(room.name);
+        var key = normalizeUpper(room.name);
+        var viewing = _chatPageActive && !document.hidden && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === key;
+        var before = _unreadChannels[key] || 0;
+        if (viewing || !_bridgeSeen[net] || !_bridgeHold[net]) {
+            _unreadChannels[key] = 0;
+            setBridgeSeen(net, summary.seq || 0);
+            return;
+        }
+        _unreadChannels[key] = summary.newCount || 0;
+        var firstCount = !_bridgeCountShown[net];
+        _bridgeCountShown[net] = true;
+        if (!firstCount && summary.newCount > before && summary.latest) {
+            room.lastTimestamp = Math.max(room.lastTimestamp || 0, summary.latest.timestamp || 0);
+            notifyChat({
+                type: 'message', channel: room.name, bridge: net,
+                sender: summary.latest.sender + ' (' + bridgeTitle(net) + ')',
+                text: summary.latest.text, previewText: summary.latest.text,
+                userNumber: summary.latest.userNumber || 0,
+                avatar: summary.latest.avatar || undefined
+            });
+        }
     }
 
     function loadRoomSummaries(silent) {
@@ -1734,7 +1976,7 @@
                 Object.prototype.hasOwnProperty.call(previous, key) &&
                 (summary.lastTimestamp || 0) > previous[key]
             ) {
-                showToast({
+                notifyChat({
                     type: 'private',
                     sender: thread.name,
                     peerName: thread.name,
@@ -1780,12 +2022,14 @@
         if (messagesChanged) {
             _messages = nextMessages;
         }
-        if (_chatPageActive) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
+        if (_chatPageActive && !document.hidden) _unreadChannels[normalizeUpper(_currentChannel)] = 0;
         // Bridged rooms (MRC) carry the network's own room topic, and which
         // network room the session is actually in.
         if (response && response.bridge) {
             ensureRoom(_currentChannel).topic = String(response.topic || '');
             ensureRoom(_currentChannel).room = String(response.room || '');
+            // On screen now (and looked at): nothing up to here is unread.
+            if (_chatPageActive && !document.hidden && response.seq) setBridgeSeen(response.bridge, response.seq);
         }
         _serviceHealthy = true;
         if (!silent) refreshStatus();
@@ -2010,6 +2254,9 @@
             if (_activeView.bridge === 'mrc' && _bridgeRoom.mrc) {
                 body.set('room', _bridgeRoom.mrc);
             }
+            if (_activeView.bridge === 'irc' && _bridgeRoom.irc) {
+                body.set('ircroom', _bridgeRoom.irc);
+            }
         }
 
         return fetchJSON('./api/chat.ssjs', {
@@ -2096,7 +2343,12 @@
             + '&channel=' + encodeURIComponent(_currentChannel)
             + '&who=' + (wantUsers ? '1' : '0')
             + '&presence=1'
-            + '&history=' + (isPrivateView ? '0' : '1')
+            /* A network room's history counts as read, so ask for it only
+               while the user is actually looking at it; otherwise the server
+               counts that network's unread messages, which is what toasts
+               and the badge need (else DDial as the last-open room never
+               notified from another page or a hidden tab). */
+            + '&history=' + (isPrivateView || (isBridgeRoom(_currentChannel) && !(_chatPageActive && !document.hidden)) ? '0' : '1')
             // Bridged rooms: on MRC a poll IS the user's presence on the
             // network. The server keeps it alive while the chat page shows
             // that tab (active) or the user has chosen to stay on the
@@ -2164,7 +2416,7 @@
 
     function isBridgeRoom(name) {
         var key = normalizeUpper(name);
-        return key === 'DDIAL' || key === 'MRC';
+        return key === 'DDIAL' || key === 'MRC' || key === 'IRC';
     }
 
     // Stop being on a bridged network: log off now and stop holding it.
@@ -2183,16 +2435,18 @@
         }).catch(function () { return false; });
     }
 
-    // Change MRC room. The mux moves the session on the next request that
-    // names the room; the room is remembered per browser.
+    // Change MRC room / IRC channel. The mux moves the session on the next
+    // request that names the room; the room is remembered per browser.
     function setBridgeRoom(net, roomName) {
         var clean = sanitizeBridgeRoomName(roomName);
-        if (normalizeBridge(net) !== 'mrc' || !clean.length) return Promise.resolve(false);
-        _bridgeRoom.mrc = clean;
-        writeStorage(ROOM_STORAGE_KEY, clean);
-        ensureRoom('mrc').room = clean;
+        net = normalizeBridge(net);
+        if ((net !== 'mrc' && net !== 'irc') || !clean.length) return Promise.resolve(false);
+        if (net === 'irc') clean = clean.replace(/\./g, '');
+        _bridgeRoom[net] = clean;
+        writeStorage(net === 'irc' ? IRC_ROOM_STORAGE_KEY : ROOM_STORAGE_KEY, clean);
+        ensureRoom(net).room = clean;
         dispatchRooms();
-        if (!isBridgeRoom(_currentChannel) || normalizeBridge(_currentChannel) !== 'mrc') {
+        if (!isBridgeRoom(_currentChannel) || normalizeBridge(_currentChannel) !== net) {
             return Promise.resolve(true);
         }
         return loadPublicHistory(false).then(function (ok) {
@@ -2201,13 +2455,14 @@
         });
     }
 
-    // MRC's room list, from the server's LIST reply. The reply trickles in
-    // over a second or so; `pending` says to ask again shortly.
+    // MRC's room list / IRC's channel list, from the server's LIST reply. The
+    // reply trickles in; `pending` says to ask again shortly.
     function fetchBridgeRooms(net) {
-        if (normalizeBridge(net) !== 'mrc' || !isLoggedIn()) {
+        net = normalizeBridge(net);
+        if ((net !== 'mrc' && net !== 'irc') || !isLoggedIn()) {
             return Promise.resolve({ rooms: [], pending: false });
         }
-        return fetchJSON('./api/chat.ssjs?action=rooms&channel=mrc' + bridgeQuery()).then(function (response) {
+        return fetchJSON('./api/chat.ssjs?action=rooms&channel=' + net + bridgeQuery()).then(function (response) {
             if (!response || response.error) throw new Error(response && response.error ? String(response.error) : 'rooms');
             return {
                 rooms: Array.isArray(response.rooms) ? response.rooms : [],
@@ -2304,11 +2559,17 @@
                 if (_chatPageActive && normalizeUpper(_activeView.type) === 'CHANNEL' && normalizeUpper(_activeView.name) === normalizeUpper(payload.channel || _currentChannel)) {
                     _messages.push(payload);
                     if (_messages.length > MAX_MESSAGES) _messages.shift();
-                    _unreadChannels[normalizeUpper(payload.channel || _currentChannel)] = 0;
+                    if (document.hidden && !payload.isSelf) {
+                        // On screen but nobody looking: count it and tell the device.
+                        _unreadChannels[normalizeUpper(payload.channel || _currentChannel)] = (_unreadChannels[normalizeUpper(payload.channel || _currentChannel)] || 0) + 1;
+                        notifyChat(payload, true);
+                    } else {
+                        _unreadChannels[normalizeUpper(payload.channel || _currentChannel)] = 0;
+                    }
                     dispatchMessages();
                 } else {
                     _unreadChannels[normalizeUpper(payload.channel || _currentChannel)] = (_unreadChannels[normalizeUpper(payload.channel || _currentChannel)] || 0) + 1;
-                    if (!_chatPageActive) showToast(payload);
+                    notifyChat(payload, false);
                 }
 
                 dispatchRooms();
@@ -2365,7 +2626,7 @@
                     _unreadPrivate[threadKey] = _unreadPrivate[threadKey] || 0;
                 } else {
                     _unreadPrivate[threadKey] = (_unreadPrivate[threadKey] || 0) + 1;
-                    if (!_chatPageActive) showToast(payload);
+                    notifyChat(payload, false);
                 }
 
                 _lastPrivatePollAt = Math.max(_lastPrivatePollAt, payload.timestamp || 0);
@@ -2661,6 +2922,13 @@
         loadUsers(_currentChannel, false);
         if (!_eventSource) connectEvents(false); /* a page may have opened it already */
         startReconcileLoop();
+        // Back to a tab that was hidden on a room: what came in meanwhile is read now.
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden || !_chatPageActive || normalizeUpper(_activeView.type) !== 'CHANNEL') return;
+            _unreadChannels[normalizeUpper(_currentChannel)] = 0;
+            dispatchRooms();
+            loadActiveHistory(true);
+        });
     }
 
     window.ChatService = {
@@ -2693,7 +2961,7 @@
         leaveBridge: leaveBridge,
         isBridgeHeld: function (name) { return !!_bridgeHold[normalizeBridge(name)]; },
         setBridgeRoom: setBridgeRoom,
-        getBridgeRoom: function (name) { return normalizeBridge(name) === 'mrc' ? _bridgeRoom.mrc : ''; },
+        getBridgeRoom: function (name) { var net = normalizeBridge(name); return net === 'mrc' || net === 'irc' ? _bridgeRoom[net] : ''; },
         fetchBridgeRooms: fetchBridgeRooms,
         isGuestMode: function () { return _guestMode; },
         setChatPageActive: setChatPageActive,

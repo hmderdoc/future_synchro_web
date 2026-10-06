@@ -1755,7 +1755,7 @@ textarea.chat-web-input {
     var pickerSubmit = document.getElementById('chat-room-picker-submit');
     var pickerClose = document.getElementById('chat-room-picker-close');
     var pickerCancel = document.getElementById('chat-room-picker-cancel');
-    var pickerMode = ''; /* 'local' (join a room here) | 'mrc' (change MRC room) */
+    var pickerMode = ''; /* 'local' (join a room here) | 'mrc' / 'irc' (change that network's room) */
     var pickerRefreshTimer = 0;
     var motdActions = document.getElementById('chat-motd-actions');
     var noRoomsModal = document.getElementById('chat-norooms-modal');
@@ -1782,6 +1782,8 @@ textarea.chat-web-input {
     var forceMessageScrollToBottom = true;
     var messageBottomLocked = true;
     var pendingMessageScrollFrame = 0;
+    var readingAnchor = null;
+    var messageResizeObserver = null;
     var compactSidebarMedia = window.matchMedia ? window.matchMedia('(max-width: 980px)') : null;
     var wasCompactSidebarLayout = compactSidebarMedia ? compactSidebarMedia.matches : (window.innerWidth <= 980);
     var onCompactSidebarMediaChanged = null;
@@ -1898,6 +1900,71 @@ textarea.chat-web-input {
         messageBottomLocked = forceMessageScrollToBottom || isMessageListNearBottom();
         if (!messageBottomLocked && !forceMessageScrollToBottom) {
             cancelPendingMessageScroll();
+            readingAnchor = captureScrollAnchor();
+        }
+    }
+
+    // A reader scrolled up into history must not lose their place. The
+    // transcript is rebuilt wholesale and capped at 200 messages, so once a
+    // room is full every new message evicts the oldest and everything shifts
+    // up; embeds and avatars above the viewport also grow after the fact. A
+    // raw scrollTop can't survive that, so the first visible message is
+    // remembered by key and put back at the same offset afterwards.
+    function messageKey(message) {
+        return String(message.timestamp || 0) + '|' + String(message.sender || '') + '|' +
+            String(message.system || '') + '|' + String(message.text || '').slice(0, 64);
+    }
+
+    function captureScrollAnchor() {
+        if (!msgContainer) {
+            return null;
+        }
+        var top = msgContainer.getBoundingClientRect().top;
+        var nodes = msgContainer.querySelectorAll('[data-mkey]');
+        for (var i = 0; i < nodes.length; i++) {
+            var rect = nodes[i].getBoundingClientRect();
+            if (rect.bottom > top) {
+                return { key: nodes[i].getAttribute('data-mkey'), delta: rect.top - top };
+            }
+        }
+        return null;
+    }
+
+    function restoreScrollAnchor(anchor) {
+        if (!anchor || !msgContainer) {
+            return false;
+        }
+        var nodes = msgContainer.querySelectorAll('[data-mkey]');
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].getAttribute('data-mkey') !== anchor.key) continue;
+            var offset = nodes[i].getBoundingClientRect().top - msgContainer.getBoundingClientRect().top;
+            msgContainer.scrollTop += offset - anchor.delta;
+            return true;
+        }
+        return false;
+    }
+
+    // Content above the viewport can change height long after a render
+    // (link previews, images, avatars loading). Keep the reader's anchor
+    // put, or the bottom pinned, whichever they had.
+    function onMessageContentResized() {
+        if (!msgContainer) {
+            return;
+        }
+        if (messageBottomLocked) {
+            jumpMessagesToBottom();
+        } else if (readingAnchor) {
+            restoreScrollAnchor(readingAnchor);
+        }
+    }
+
+    function observeMessageContent() {
+        if (!messageResizeObserver || !msgContainer) {
+            return;
+        }
+        messageResizeObserver.disconnect();
+        for (var i = 0; i < msgContainer.children.length; i++) {
+            messageResizeObserver.observe(msgContainer.children[i]);
         }
     }
 
@@ -1947,6 +2014,7 @@ textarea.chat-web-input {
         var handed = takeHandoff('__pendingPrivateThread');
         if (handed && typeof handed === 'object' && handed.name) {
             return {
+                explicit: true,
                 channel: 'main',
                 privateName: sanitizeAlias(handed.name),
                 privateSystem: trimText(handed.system || ''),
@@ -1966,6 +2034,9 @@ textarea.chat-web-input {
         }
 
         return {
+            /* A link that names a room or thread (a toast, a notification)
+               moves there; a plain visit to chat keeps the current one. */
+            explicit: !!(params.get('channel') || params.get('private')),
             channel: sanitizeChannelName(params.get('channel') || 'main'),
             privateName: sanitizeAlias(params.get('private') || ''),
             privateSystem: trimText(params.get('system') || ''),
@@ -1975,11 +2046,11 @@ textarea.chat-web-input {
 
     function normalizeBridge(raw) {
         var key = String(raw || '').toLowerCase();
-        return key === 'mrc' || key === 'ddial' ? key : '';
+        return key === 'mrc' || key === 'ddial' || key === 'irc' ? key : '';
     }
 
     function bridgeLabel(net) {
-        return net === 'mrc' ? 'MRC' : (net === 'ddial' ? 'DDial' : '');
+        return net === 'mrc' ? 'MRC' : (net === 'ddial' ? 'DDial' : (net === 'irc' ? 'IRC' : ''));
     }
 
     function escapeHtml(str) {
@@ -2472,8 +2543,8 @@ textarea.chat-web-input {
        MRC room (the server's LIST reply, cached by the mux; it trickles in,
        so a pending answer is re-asked). */
     function renderPickerList(mode, result) {
-        var current = mode === 'mrc'
-            ? normalizeUpper(result.room || chatService.getBridgeRoom('mrc') || '')
+        var current = mode !== 'local'
+            ? normalizeUpper(result.room || chatService.getBridgeRoom(mode) || '')
             : normalizeUpper(getCurrentChannelName());
         var rooms = result.rooms || [];
         var html = '';
@@ -2481,8 +2552,8 @@ textarea.chat-web-input {
         if (!pickerList) return;
         if (!rooms.length) {
             html = '<div class="chat-web-nav-empty">' +
-                (mode === 'mrc'
-                    ? (result.pending ? 'Asking MRC for its room list...' : 'MRC did not list any rooms. Type one below.')
+                (mode !== 'local'
+                    ? (result.pending ? 'Asking ' + bridgeLabel(mode) + ' for its room list...' : bridgeLabel(mode) + ' did not list any rooms. Type one below.')
                     : 'No public rooms yet. Type a name below to create one.') + '</div>';
         } else {
             rooms.forEach(function (room) {
@@ -2520,16 +2591,16 @@ textarea.chat-web-input {
             renderPickerList('local', { rooms: local, pending: false });
             return;
         }
-        chatService.fetchBridgeRooms('mrc').then(function (result) {
-            if (!pickerModal || !pickerModal.classList.contains('is-open') || pickerMode !== 'mrc') return;
-            renderPickerList('mrc', result);
+        chatService.fetchBridgeRooms(mode).then(function (result) {
+            if (!pickerModal || !pickerModal.classList.contains('is-open') || pickerMode !== mode) return;
+            renderPickerList(mode, result);
             if (result.pending && retries > 0) {
-                pickerRefreshTimer = setTimeout(function () { loadPickerRooms('mrc', retries - 1); }, 2500);
+                pickerRefreshTimer = setTimeout(function () { loadPickerRooms(mode, retries - 1); }, 2500);
             }
         }).catch(function (error) {
             if (pickerList) {
                 pickerList.innerHTML = '<div class="chat-web-nav-empty">' +
-                    escapeHtml(error && error.message ? error.message : 'MRC is unavailable right now') + '</div>';
+                    escapeHtml(error && error.message ? error.message : bridgeLabel(mode) + ' is unavailable right now') + '</div>';
             }
         });
     }
@@ -2540,23 +2611,24 @@ textarea.chat-web-input {
 
     function openRoomPicker(mode) {
         if (!pickerModal) return;
-        pickerMode = mode === 'mrc' ? 'mrc' : 'local';
-        if (pickerTitle) pickerTitle.textContent = pickerMode === 'mrc' ? 'MRC Rooms' : 'Join a Room';
+        pickerMode = mode === 'mrc' || mode === 'irc' ? mode : 'local';
+        var netPicker = pickerMode !== 'local';
+        if (pickerTitle) pickerTitle.textContent = pickerMode === 'irc' ? 'IRC Channels' : netPicker ? 'MRC Rooms' : 'Join a Room';
         if (pickerText) {
-            pickerText.textContent = pickerMode === 'mrc'
-                ? 'Your MRC session moves to the room you pick.'
+            pickerText.textContent = netPicker
+                ? 'Your ' + bridgeLabel(pickerMode) + ' session moves to the ' + (pickerMode === 'irc' ? 'channel' : 'room') + ' you pick.'
                 : 'Pick a room, or type a new name (letters, numbers, _ or -) to create one.';
         }
         if (pickerInput) {
             pickerInput.value = '';
-            pickerInput.placeholder = pickerMode === 'mrc' ? '#room' : 'new-room';
-            pickerInput.maxLength = pickerMode === 'mrc' ? 30 : 32;
+            pickerInput.placeholder = netPicker ? '#room' : 'new-room';
+            pickerInput.maxLength = netPicker ? 30 : 32;
         }
-        if (pickerSubmit) pickerSubmit.textContent = pickerMode === 'mrc' ? 'Go' : 'Join';
+        if (pickerSubmit) pickerSubmit.textContent = netPicker ? 'Go' : 'Join';
         pickerModal.classList.add('is-open');
         pickerModal.setAttribute('aria-hidden', 'false');
-        if (pickerList && pickerMode === 'mrc') {
-            pickerList.innerHTML = '<div class="chat-web-nav-empty">Asking MRC for its room list...</div>';
+        if (pickerList && netPicker) {
+            pickerList.innerHTML = '<div class="chat-web-nav-empty">Asking ' + bridgeLabel(pickerMode) + ' for its room list...</div>';
         }
         loadPickerRooms(pickerMode, 2);
         if (pickerInput) pickerInput.focus();
@@ -2574,11 +2646,12 @@ textarea.chat-web-input {
     }
 
     function pickRoom(name) {
-        if (pickerMode === 'mrc') {
+        if (pickerMode === 'mrc' || pickerMode === 'irc') {
             var mrcName = String(name || '').replace(/^#/, '').replace(/[^A-Za-z0-9_.-]/g, '').substr(0, 30);
             if (!mrcName.length) return;
+            var pickedNet = pickerMode;
             closeRoomPicker();
-            chatService.setBridgeRoom('mrc', mrcName);
+            chatService.setBridgeRoom(pickedNet, mrcName);
             collapseMobileSidebarPanels();
             return;
         }
@@ -2631,6 +2704,7 @@ textarea.chat-web-input {
 
     function roomRowTitle(room) {
         if (room.bridge === 'mrc') return 'MRC' + (room.room ? ' #' + room.room : '');
+        if (room.bridge === 'irc') return 'IRC' + (room.room ? ' #' + room.room : '');
         if (room.bridge === 'ddial') return 'DDial';
         return '#' + room.name;
     }
@@ -2691,14 +2765,15 @@ textarea.chat-web-input {
                 html += '<span class="chat-web-badge is-unread">' + escapeHtml(String(room.unreadCount)) + '</span>';
             }
             html += '<span class="chat-web-nav-icons">';
-            if (room.bridge === 'mrc') {
-                html += '<button type="button" class="chat-web-nav-icon" data-room-switch="mrc" title="Change MRC room" aria-label="Change MRC room">&#8644;</button>';
+            if (room.bridge === 'mrc' || room.bridge === 'irc') {
+                var switchWhat = room.bridge === 'irc' ? 'Change IRC channel' : 'Change MRC room';
+                html += '<button type="button" class="chat-web-nav-icon" data-room-switch="' + room.bridge + '" title="' + switchWhat + '" aria-label="' + switchWhat + '">&#8644;</button>';
             }
             if (!room.bridge && !isMain) {
                 html += '<button type="button" class="chat-web-nav-icon is-leave" data-room-leave="' + escapeAttr(room.name) + '" title="Leave #' + escapeAttr(room.name) + '" aria-label="Leave #' + escapeAttr(room.name) + '">&times;</button>';
             }
-            if (room.bridge === 'mrc' && room.held) {
-                html += '<button type="button" class="chat-web-nav-icon is-leave" data-room-leave="mrc" title="Log off MRC" aria-label="Log off MRC">&times;</button>';
+            if ((room.bridge === 'mrc' || room.bridge === 'irc') && room.held) {
+                html += '<button type="button" class="chat-web-nav-icon is-leave" data-room-leave="' + room.bridge + '" title="Log off ' + bridgeLabel(room.bridge) + '" aria-label="Log off ' + bridgeLabel(room.bridge) + '">&times;</button>';
             }
             html += '</span>';
             html += '</div>';
@@ -3150,6 +3225,7 @@ textarea.chat-web-input {
         var groupWindow = 120000;
         var shouldStickToBottom = forceMessageScrollToBottom || isMessageListNearBottom();
         var previousScrollTop = msgContainer ? msgContainer.scrollTop : 0;
+        var scrollAnchor = shouldStickToBottom ? null : captureScrollAnchor();
 
         if (!isLoggedIn && getActiveView().type !== 'private') {
             // The server sends guests no message content (api/chat.ssjs
@@ -3197,7 +3273,7 @@ textarea.chat-web-input {
                 if (prevSender.length) {
                     html += '</div></div>';
                 }
-                html += '<div class="chat-system-msg">' + escapeHtml(message.text || '') + '</div>';
+                html += '<div class="chat-system-msg" data-mkey="' + escapeAttr(messageKey(message)) + '">' + escapeHtml(message.text || '') + '</div>';
                 prevSender = '';
                 prevTime = 0;
                 return;
@@ -3252,10 +3328,11 @@ textarea.chat-web-input {
                 html += '</div>';
             }
 
+            var keyAttr = ' data-mkey="' + escapeAttr(messageKey(message)) + '"';
             if (message.kind === 'bitmap' && message.bitmapKey) {
-                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble">' + renderBitmapBubble(message, !!nsfwBitmaps[message.bitmapKey] && !revealedBitmaps[message.bitmapKey]) + '</div>';
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble"' + keyAttr + '>' + renderBitmapBubble(message, !!nsfwBitmaps[message.bitmapKey] && !revealedBitmaps[message.bitmapKey]) + '</div>';
             } else {
-                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '">' + renderRichMessageHtml(message.text || '', message.textColors) + '</div>';
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '"' + keyAttr + '>' + renderRichMessageHtml(message.text || '', message.textColors) + '</div>';
             }
             prevSender = displaySender;
             prevTime = message.timestamp || 0;
@@ -3280,8 +3357,10 @@ textarea.chat-web-input {
             queueMessageScrollToBottom();
         } else {
             msgContainer.scrollTop = previousScrollTop;
+            restoreScrollAnchor(scrollAnchor); // falls back to the raw offset if the anchor was evicted
             syncMessageBottomLock();
         }
+        observeMessageContent();
         forceMessageScrollToBottom = false;
     }
 
@@ -3300,6 +3379,10 @@ textarea.chat-web-input {
     function syncRouteIntoService() {
         var route = parseRoute();
         var activeView = getActiveView();
+
+        if (!route.explicit) {
+            return false;
+        }
 
         if (route.privateName.length && isLoggedIn) {
             if (
@@ -3466,7 +3549,7 @@ textarea.chat-web-input {
 
             if (switchButton) {
                 event.stopPropagation();
-                openRoomPicker('mrc');
+                openRoomPicker(switchButton.getAttribute('data-room-switch') || 'mrc');
                 return;
             }
             if (leaveButton) {
@@ -3553,7 +3636,7 @@ textarea.chat-web-input {
         motdActions.addEventListener('click', function (event) {
             var target = event.target.closest('button');
             if (!target) return;
-            if (target.hasAttribute('data-motd-switch')) { openRoomPicker('mrc'); return; }
+            if (target.hasAttribute('data-motd-switch')) { openRoomPicker(target.getAttribute('data-motd-switch') || 'mrc'); return; }
             if (target.hasAttribute('data-motd-join')) { openRoomPicker('local'); return; }
             if (target.hasAttribute('data-motd-join-this')) { chatService.joinRoom(target.getAttribute('data-motd-join-this')); return; }
             if (target.hasAttribute('data-motd-leave')) { leaveLocalRoom(target.getAttribute('data-motd-leave')); }
@@ -3581,6 +3664,9 @@ textarea.chat-web-input {
 
     if (msgContainer) {
         msgContainer.addEventListener('scroll', syncMessageBottomLock, { passive: true });
+        if (window.ResizeObserver) {
+            messageResizeObserver = new ResizeObserver(onMessageContentResized);
+        }
         msgContainer.addEventListener('load', function (event) {
             if (!messageBottomLocked) {
                 return;
@@ -3909,7 +3995,7 @@ textarea.chat-web-input {
         if (view.type !== 'private') {
             room = getRooms().filter(function (r) { return normalizeUpper(r.name) === current; })[0] || null;
         }
-        var isMrc = !!(room && room.bridge === 'mrc');
+        var isMrc = !!(room && (room.bridge === 'mrc' || room.bridge === 'irc'));
         if (motdLabel) motdLabel.textContent = isMrc ? 'TOPIC' : 'MOTD';
         renderMotdActions(view, room);
         renderMotdBar(isMrc ? (room.topic || '') : jsonMotdText);
@@ -3923,8 +4009,9 @@ textarea.chat-web-input {
         var html = '';
         if (!motdActions) return;
         if (isLoggedIn && view.type === 'channel' && room) {
-            if (room.bridge === 'mrc') {
-                html = '<button type="button" class="chat-motd-action" data-motd-switch title="Change MRC room">Switch rooms</button>';
+            if (room.bridge === 'mrc' || room.bridge === 'irc') {
+                html = '<button type="button" class="chat-motd-action" data-motd-switch="' + room.bridge + '" title="' +
+                    (room.bridge === 'irc' ? 'Change IRC channel' : 'Change MRC room') + '">' + (room.bridge === 'irc' ? 'Switch channels' : 'Switch rooms') + '</button>';
             } else if (!room.bridge) {
                 if (room.joined) {
                     html = '<button type="button" class="chat-motd-action" data-motd-join title="Join another room">Join</button>' +
@@ -3954,8 +4041,12 @@ textarea.chat-web-input {
     var motdRefreshTimer = setInterval(loadMotd, 5 * 60 * 1000);
 
         chatService.setChatPageActive(true);
+    /* Read the route BEFORE the first render: renderAll() writes the active
+       view into the URL, and on arrival that is still the previous room, so
+       rendering first overwrote ?channel=ddial (a toast's link) with it. */
+    var routed = syncRouteIntoService();
     renderAll();
-    if (!syncRouteIntoService()) {
+    if (!routed) {
         chatService.loadHistory();
         chatService.getUsers();
     }
@@ -3993,6 +4084,7 @@ textarea.chat-web-input {
             window.removeEventListener('resize', onCompactSidebarWindowResize);
         }
         cancelPendingMessageScroll();
+        if (messageResizeObserver) messageResizeObserver.disconnect();
         if (motdRefreshTimer) clearInterval(motdRefreshTimer);
         chatService.setChatPageActive(false);
     }

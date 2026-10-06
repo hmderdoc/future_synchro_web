@@ -11,13 +11,13 @@
  *   POST ?action=leaveRoom&channel=name           - drop a room from the sidebar
  *   POST ?action=send                             - send a public room message
  *   GET  ?action=private[&since=timestamp]        - private thread summaries (auth required)
- *   GET  ?action=privateHistory&target=Alias[&bridge=mrc|ddial][&read=1]
+ *   GET  ?action=privateHistory&target=Alias[&bridge=mrc|ddial|irc][&read=1]
  *                                                 - private thread history (auth required)
- *   POST ?action=sendPrivate[&bridge=mrc|ddial]   - send a private message (auth required)
+ *   POST ?action=sendPrivate[&bridge=mrc|ddial|irc] - send a private message (auth required)
  *   POST ?action=threadState&target=..&read=1|dismiss=1
  *                                                 - mark a private thread read / dismiss it
- *   GET  ?action=rooms&channel=mrc                - MRC room list (bridge)
- *   POST ?action=leave&channel=mrc|ddial          - log the user off that network (bridge)
+ *   GET  ?action=rooms&channel=mrc|irc            - MRC / IRC room list (bridge)
+ *   POST ?action=leave&channel=mrc|ddial|irc      - log the user off that network (bridge)
  */
 
 var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
@@ -259,7 +259,7 @@ function styledSender(target, nick, sender) {
 
 function bridgeName(raw) {
     var key = String(raw || '').toLowerCase();
-    return key === 'mrc' || key === 'ddial' ? key : '';
+    return key === 'mrc' || key === 'ddial' || key === 'irc' ? key : '';
 }
 
 function isPrivateMessage(message) {
@@ -682,7 +682,7 @@ function summarizePrivateThreads(client, ownAlias, sinceTimestamp) {
                 name: peer.name,
                 system: peer.host || '',
                 bridge: peer.bridge || undefined,
-                avatar: peer.avatar || undefined,
+                avatar: AvatarProfiles.avatarData(peer.name, 0, peer.avatar || '') || undefined,
                 lastTimestamp: 0,
                 lastFromPeer: 0,
                 preview: '',
@@ -811,7 +811,7 @@ function loadPrivateHistory(client, ownAlias, targetName, targetSystem, targetBr
             name: selectedPeer.name,
             system: selectedPeer.host || '',
             bridge: selectedPeer.bridge || undefined,
-            avatar: liveAvatar || selectedPeer.avatar || undefined
+            avatar: liveAvatar || AvatarProfiles.avatarData(selectedPeer.name, 0, selectedPeer.avatar || '') || undefined
         } : null,
         messages: messages
     };
@@ -975,12 +975,16 @@ function lockedWho(client, channelName) {
    - ddial: each web user gets their OWN line under their own alias while
      they have the room open (so their name - and avatar - is the real one).
      A bare read (room counts, another page of the site) takes no line.
+   - irc:   each web user gets their own IRC connection under their alias
+     (the IRC connector, irc_web.ts), on the BBS's default network; it QUITs
+     a few minutes after their tab stops polling.
    - mrc:   each web user gets their own `Alias<FL>` identity, created when
      they open the room and logged off ~90s after their tab stops polling.
    ------------------------------------------------------------------------ */
 var BRIDGE_ROOMS = {
     ddial: { label: 'DDial', portKey: 'ddial_port', port: 5001 },
-    mrc: { label: 'MRC', portKey: 'mrc_port', port: 5000 }
+    mrc: { label: 'MRC', portKey: 'mrc_port', port: 5000 },
+    irc: { label: 'IRC', portKey: 'irc_port', port: 6698 }
 };
 var _bridgeConfig;
 
@@ -1070,6 +1074,7 @@ function bridgeColorRuns(runs, length, pad) {
 /* MRC BBS names often carry Mystic pipe colours (|09Some|15BBS): `plain` is
    the name for thread keys and comparisons; the page paints `pipe` when set. */
 function bridgeSiteName(room, ev) {
+    if (room === 'irc') { return { plain: 'IRC', pipe: '' }; }
     var raw = room === 'ddial' ? '' : String(ev.site || 'MRC').replace(/_/g, ' ').substr(0, 120);
     var plain = raw.replace(/\|\d\d/g, '').replace(/^\s+|\s+$/g, '') || (room === 'ddial' ? '' : 'MRC');
     return { plain: plain, pipe: raw !== plain && /\|\d\d/.test(raw) ? raw : '' };
@@ -1112,6 +1117,28 @@ function sliceColorRuns(runs, offset) {
     return out.length ? out : null;
 }
 
+/* A network handle as the site should key and show it: some BBSes pad it
+   (" Texas Tony" on DDial), which broke the placeholder initial and every
+   by-name lookup (sysop placeholders, links, ignores). Trimmed, with its
+   colour runs cut to match. -> { name, colors } */
+function bridgeHandle(raw, runs) {
+    var full = String(raw || '');
+    var name = full.replace(/^\s+|\s+$/g, '');
+    var lead = full.length - full.replace(/^\s+/, '').length;
+    var colors = bridgeColorRuns(runs, full.length, 0);
+    if (colors && lead) { colors = sliceColorRuns(colors, lead); }
+    if (colors) {
+        var kept = [], left = name.length;
+        for (var i = 0; i < colors.length && left > 0; i += 1) {
+            var n = Math.min(colors[i].n, left);
+            kept.push({ n: n, c: colors[i].c });
+            left -= n;
+        }
+        colors = kept.length ? kept : null;
+    }
+    return { name: name, colors: colors };
+}
+
 function bridgeMessages(room, response, ownAlias) {
     var out = [];
     var events = response && response.events ? response.events : [];
@@ -1127,7 +1154,8 @@ function bridgeMessages(room, response, ownAlias) {
         /* Private messages are threads in the sidebar (bridgePrivatePackets),
            not lines in the room. */
         if (ev.private) { continue; }
-        var sender = String(ev.sender || '');
+        var handle = bridgeHandle(ev.sender, ev.senderColors);
+        var sender = handle.name;
         /* `sender` of a web user is their account alias, so the local account
            (and its avatar) resolves. Everyone else on DDial is a free-form
            handle with no account here; the page resolves those through the
@@ -1145,7 +1173,7 @@ function bridgeMessages(room, response, ownAlias) {
         };
         /* DDial paints handles (and sometimes bodies) with ANSI; the mux hands
            those over as exact hex runs aligned to sender / text. */
-        var senderColors = bridgeColorRuns(ev.senderColors, sender.length, 0);
+        var senderColors = handle.colors;
         var textColors = bridgeColorRuns(ev.textColors, ev.text.length, 0);
         /* Relayed through a bridge: the person in the `<nick>` wrapper is the
            sender. The handle colours were the bridge's, so they are dropped;
@@ -1179,7 +1207,7 @@ function bridgePrivatePackets(room, response, ownAlias) {
     for (var i = 0; i < events.length; i += 1) {
         var ev = events[i];
         if (!ev || ev.kind !== 'chat' || !ev.private || typeof ev.text !== 'string') { continue; }
-        var sender = String(ev.sender || '');
+        var sender = bridgeHandle(ev.sender, null).name;
         if (!sender.length || bridgeIsSelf(room, ev, ownAlias, ownNick)) { continue; }
         var text = stripPrivateMarker(ev.text);
         if (!text.length) { continue; }
@@ -1221,11 +1249,67 @@ function heldBridges() {
     return out;
 }
 
+/* ?seen=mrc:123,ddial:456 - the newest network sequence number this browser
+   has shown the user, per network; unread counts are what came after it. */
+function seenBridgeSeqs() {
+    var out = {};
+    var parts = getRequestText('seen').split(',');
+    for (var i = 0; i < parts.length; i += 1) {
+        var pair = parts[i].split(':');
+        var name = bridgeName(pair[0]);
+        var seq = parseInt(pair[1], 10);
+        if (name && seq > 0) { out[name] = seq; }
+    }
+    return out;
+}
+
+/* Fill a network's room-list row from a poll this request made anyway: its
+   newest sequence number, how many room messages from other people came
+   after `seen`, and the latest of those (for a toast). `counted` tells the
+   page this row's count is real (a row without a poll says nothing). */
+function countBridgeUnread(row, room, response, seen, ownAlias) {
+    if (!response || response.ok === false) { return; }
+    row.counted = true;
+    row.seq = response.seq || 0;
+    row.newCount = 0;
+    if (!(seen > 0) || !response.events) { return; }
+    var ownNick = response.nick ? String(response.nick) : '';
+    for (var i = 0; i < response.events.length; i += 1) {
+        var ev = response.events[i];
+        if (!ev || ev.kind !== 'chat' || ev.private || !(ev.seq > seen)) { continue; }
+        if (typeof ev.text !== 'string' || !ev.text.length || bridgeIsSelf(room, ev, ownAlias, ownNick)) { continue; }
+        row.newCount += 1;
+        var relay = splitRelayedLine(ev.text);
+        var latestSender = relay ? relay.speaker : bridgeHandle(ev.sender, null).name;
+        var latestUser = bridgeLocalUserNumber(latestSender);
+        row.latest = {
+            sender: latestSender,
+            text: (relay ? relay.rest : ev.text).replace(/\|\d\d/g, '').substr(0, 200),
+            timestamp: ev.t || 0,
+            userNumber: latestUser,
+            /* Sysop placeholder / linked identity, so the toast has a face. */
+            avatar: AvatarProfiles.avatarData(latestSender, latestUser, '') || undefined
+        };
+    }
+}
+
 /* ?room=name - the MRC room the browser wants ('' = stay where the session is). */
 function requestedBridgeRoom() {
     return hasRequestParam('room')
         ? String(getRequestValue('room', '')).replace(/[^A-Za-z0-9_.-]/g, '').substr(0, 30)
         : '';
+}
+
+/* ?ircroom=name - the IRC channel (no '#') the browser wants ('' = keep it). */
+function requestedIrcRoom() {
+    return hasRequestParam('ircroom')
+        ? String(getRequestValue('ircroom', '')).replace(/[^A-Za-z0-9_-]/g, '').substr(0, 30)
+        : '';
+}
+
+/* The room a request to network `room` names: MRC and IRC have rooms. */
+function bridgeRoomParam(room) {
+    return room === 'mrc' ? requestedBridgeRoom() : room === 'irc' ? requestedIrcRoom() : '';
 }
 
 /* True when this request should hold the user's place on `room`: the chat
@@ -1237,7 +1321,7 @@ function bridgePresent(room) {
 function bridgePoll(room, ownAlias, present, client) {
     var response = bridgeRequest(room, {
         op: 'poll', user: ownAlias, since: 0, present: present,
-        room: room === 'mrc' ? requestedBridgeRoom() : ''
+        room: bridgeRoomParam(room)
     });
     mirrorBridgePrivate(client, room, response, ownAlias);
     return response;
@@ -1255,26 +1339,29 @@ function bridgeHistory(room, ownAlias, client) {
     var topic = String(response.topic || '').replace(/\|\d\d/g, '').replace(/^\s+|\s+$/g, '').substr(0, 200);
     return {
         channel: room, messages: bridgeMessages(room, response, ownAlias), bridge: room, topic: topic,
-        room: String(response.room || ''), nick: String(response.nick || ''), userCount: response.userCount || 0
+        room: String(response.room || ''), nick: String(response.nick || ''), userCount: response.userCount || 0,
+        seq: response.seq || 0
     };
 }
 
 function bridgeWho(room, ownAlias) {
-    var response = bridgeRequest(room, { op: 'who', user: ownAlias, room: room === 'mrc' ? requestedBridgeRoom() : '' });
+    var response = bridgeRequest(room, { op: 'who', user: ownAlias, room: bridgeRoomParam(room) });
     var users = [];
     var list = response && response.ok && response.users ? response.users : [];
     for (var i = 0; i < list.length; i += 1) {
         var entry = list[i];
-        var nick = typeof entry === 'string' ? entry : String(entry && entry.handle ? entry.handle : '');
+        var whoHandle = bridgeHandle(typeof entry === 'string' ? entry : (entry && entry.handle ? entry.handle : ''),
+            typeof entry === 'string' ? null : entry.colors);
+        var nick = whoHandle.name;
         if (!nick.length) { continue; }
         var person = AvatarProfiles.apply({
             nick: nick,
-            system: typeof entry === 'string' ? 'MRC' : String(entry.origin || 'DDial'),
+            system: typeof entry === 'string' ? BRIDGE_ROOMS[room].label : String(entry.origin || 'DDial'),
             userNumber: bridgeLocalUserNumber(nick)
         }, nick);
         person.bridge = room;
         /* The handle as its line last painted it on the net (DDial). */
-        var nickColors = typeof entry === 'string' ? null : bridgeColorRuns(entry.colors, nick.length, 0);
+        var nickColors = whoHandle.colors;
         if (nickColors && person.nick === nick) { person.nickColors = nickColors; }
         users.push(person);
     }
@@ -1290,7 +1377,7 @@ function bridgeWho(room, ownAlias) {
    tab and cleared by Leave); otherwise the session is left to expire.
    DDial reads take no line and announce nothing, so they are always fine. */
 function bridgePresenceAllowed(room) {
-    if (room !== 'mrc') { return true; }
+    if (room !== 'mrc' && room !== 'irc') { return true; }
     return bridgePresent(room);
 }
 
@@ -1305,6 +1392,9 @@ function bridgeSummaries(ownAlias) {
         newCount: 0
     });
     out.push({ name: 'mrc', label: 'MRC', bridge: 'mrc', userCount: 0, lastTimestamp: 0, newCount: 0 });
+    /* IRC, like MRC: a poll is a login, so its row is filled only from a poll
+       the user's presence already made. */
+    out.push({ name: 'irc', label: 'IRC', bridge: 'irc', userCount: 0, lastTimestamp: 0, newCount: 0 });
     return out;
 }
 
@@ -1403,6 +1493,17 @@ switch (action) {
            connection instead of one per sub-request. Each section can be turned
            off with <name>=0; `history` is opt-IN (pass history=1) since the client
            usually only needs it on the active channel. */
+        /* "Site is open" stamp for chat push (mods/load/chat_push.js): a
+           user whose tab synced in the last couple of minutes gets their chat
+           notifications from the page, not as a push. */
+        if (user.number > 0 && user.alias !== settings.guest) {
+            try {
+                var presentDir = system.data_dir + 'push/present/';
+                if (!file_isdir(presentDir)) mkpath(presentDir);
+                var presentFile = new File(presentDir + format('%04u', user.number));
+                if (presentFile.open('w')) presentFile.close();
+            } catch (_presentError) { /* push just won't know they're here */ }
+        }
         var syncChannel = getChannel();
         var syncSince = getRequestTimestamp('since');
         var syncWantChannels = flagDefaultsOn('channels');
@@ -1455,11 +1556,30 @@ switch (action) {
                 }
                 /* The room list's MRC row is never polled on its own (that is a
                    login); fill it from a poll this request made anyway. */
-                if (out.channels && polledBridges.mrc && polledBridges.mrc.ok !== false) {
+                if (out.channels) {
                     for (var mi = 0; mi < out.channels.length; mi += 1) {
-                        if (out.channels[mi].bridge === 'mrc') {
-                            out.channels[mi].userCount = polledBridges.mrc.userCount || 0;
-                            out.channels[mi].room = String(polledBridges.mrc.room || '');
+                        var roomPoll = polledBridges[out.channels[mi].bridge];
+                        if ((out.channels[mi].bridge === 'mrc' || out.channels[mi].bridge === 'irc') && roomPoll && roomPoll.ok !== false) {
+                            out.channels[mi].userCount = roomPoll.userCount || 0;
+                            out.channels[mi].room = String(roomPoll.room || '');
+                        }
+                    }
+                }
+                /* Unread counts for the networks the user is on (held), from
+                   those same polls. The open network's poll is its history
+                   (already shown, so nothing is unread): just its seq. */
+                if (out.channels) {
+                    var seenSeqs = seenBridgeSeqs();
+                    for (var ci = 0; ci < out.channels.length; ci += 1) {
+                        var bridgeRow = out.channels[ci];
+                        var polled = bridgeRow.bridge ? polledBridges[bridgeRow.bridge] : null;
+                        if (!polled) { continue; }
+                        if (polled.messages) {
+                            bridgeRow.counted = true;
+                            bridgeRow.seq = polled.seq || 0;
+                            bridgeRow.newCount = 0;
+                        } else {
+                            countBridgeUnread(bridgeRow, bridgeRow.bridge, polled, seenSeqs[bridgeRow.bridge] || 0, ownAlias);
                         }
                     }
                 }
@@ -1630,15 +1750,16 @@ switch (action) {
             reply = { error: 'authentication required' };
             break;
         }
-        if (bridgeRoomFor(getChannel()) !== 'mrc') {
+        var roomsNet = bridgeRoomFor(getChannel());
+        if (roomsNet !== 'mrc' && roomsNet !== 'irc') {
             reply = { error: 'not found' };
             break;
         }
-        var roomsReply = bridgeRequest('mrc', { op: 'rooms', user: user.alias, room: requestedBridgeRoom() });
+        var roomsReply = bridgeRequest(roomsNet, { op: 'rooms', user: user.alias, room: bridgeRoomParam(roomsNet) });
         reply = roomsReply && roomsReply.ok
             ? { rooms: Array.isArray(roomsReply.rooms) ? roomsReply.rooms : [], pending: !!roomsReply.pending,
                 room: String(roomsReply.room || ''), serverTime: Date.now() }
-            : { error: roomsReply && roomsReply.error ? roomsReply.error : 'MRC is unavailable right now' };
+            : { error: roomsReply && roomsReply.error ? roomsReply.error : BRIDGE_ROOMS[roomsNet].label + ' is unavailable right now' };
         break;
 
     case 'leave':
@@ -1852,7 +1973,7 @@ switch (action) {
             }
             var privateSent = bridgeRequest(privateBridge, {
                 op: 'send', user: user.alias, text: privateWire, to: privateTarget,
-                room: privateBridge === 'mrc' ? requestedBridgeRoom() : ''
+                room: bridgeRoomParam(privateBridge)
             });
             if (!privateSent || !privateSent.ok) {
                 reply = { error: privateSent && privateSent.error ? privateSent.error : 'That network is unavailable right now' };
