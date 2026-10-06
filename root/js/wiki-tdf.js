@@ -39,9 +39,15 @@
         var req = heads.map(function (h) {
             return { tag: h.tagName.toLowerCase(), text: h.textContent.trim(), color: headingColor(h) };
         });
-        var url = './api/tdf-heading.ssjs?h=' + encodeURIComponent(JSON.stringify(req));
-        if (fonts) url += '&fonts=' + encodeURIComponent(JSON.stringify(fonts));
-        fetch(url, { credentials: 'same-origin' })
+        /* POST: a long page's headings overflow sbbs's ~1KB request-line limit. */
+        var body = { h: req };
+        if (fonts) body.fonts = fonts;
+        fetch('./api/tdf-heading.ssjs', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
             .then(function (r) { return r.json(); })
             .then(function (data) { done(req, data); })
             .catch(function () { /* plain headings stay */ });

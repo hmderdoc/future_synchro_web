@@ -407,7 +407,8 @@
 .pp-tile:hover { border-color: var(--pp-accent); color: var(--pp-text); }
 .pp-tile-art { display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #000; position: relative; }
 .pp-tile-art img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
-.pp-tile-ansi .pp-tile-art img { image-rendering: pixelated; }
+/* Smooth: shrunk ~6x from full size, nearest-pixel would drop shade dithers. */
+.pp-tile-ansi .pp-tile-art img { image-rendering: auto; }
 .pp-tile-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: 11px; letter-spacing: .1em; }
 .pp-tile-caption { font-size: 10px; padding: 2px 4px; background: var(--pp-box); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-top: 1px solid var(--pp-border); }
 .pp-tile-more .pp-tile-art { display: flex; align-items: center; justify-content: center; color: var(--pp-accent); font-weight: bold; font-size: 13px; background: var(--pp-box); }
@@ -705,11 +706,13 @@
             <div class="pp-box-title">About <?xjs write(esc(summary.alias)); ?></div>
             <div class="pp-box-body pp-about">
 <?xjs
-    var page = Social.wikiPage(who);
+    var readerLevel = me ? user.security.level : 0;
+    var page = Social.wikiPage(who, readerLevel);
     if (page.exists && wikiCore) {
+        var wikiAccess = wikiCore.pageAccess(wikiCore.createStore({ dataDir: system.data_dir + 'wiki/' }).listPages(), readerLevel);
         var resolver = function (target) {
             var slug = wikiCore.slugify(target);
-            return { href: './?page=010-wiki.xjs#wiki/' + slug, cls: 'wiki-link' };
+            return { href: './?page=010-wiki.xjs#wiki/' + slug, cls: 'wiki-link', hidden: wikiAccess.isHidden(slug) };
         };
         var aboutHtml = '';
         try { aboutHtml = wikiCore.renderHtml(wikiCore.parse(page.body), resolver, embedRenderer); } catch (_renderError) { aboutHtml = ''; }
