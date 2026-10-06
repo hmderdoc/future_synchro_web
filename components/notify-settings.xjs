@@ -1,0 +1,356 @@
+<?xjs
+/* Notifications: which kinds pop up a toast on the site, and native push to
+   this device. One record per user shared by every part of the BBS
+   (mods/load/notify_lib.js prefs: `toast` and `push` maps of the same kinds).
+   Saves on each change. */
+    if (typeof Notify === 'undefined') load(system.mods_dir + 'load/notify_lib.js');
+    var _np = Notify.prefs(user.number);
+    /* Chat: how a message you aren't looking at is announced, per kind
+       (Notify prefs `chat`; js/chat.js delivers). */
+    var _npChatRows = [
+        ['chat_private', 'Private messages', 'on any chat network'],
+        ['chat_mention', 'Mentions', 'someone says your name in an Avatar Chat room'],
+        ['chat_local', 'Avatar Chat', 'new messages in rooms here'],
+        ['chat_mrc', 'MRC', 'your MRC room, while you’re on MRC'],
+        ['chat_ddial', 'DDial', 'while you’re on DDial'],
+        ['chat_irc', 'IRC', 'your IRC channel, while you’re on IRC']
+    ];
+    var _npModes = [['off', 'Off'], ['web', 'In site'], ['native', 'Desktop'], ['both', 'Both']];
+    /* Native push for when the site is closed (mods/push). */
+    var _npPushRows = [
+        ['forum', 'Forum replies', 'someone replies to your post, or posts to you'],
+        ['chat_private', 'Private chat messages', 'from this BBS’s chat'],
+        ['chat_mention', 'Avatar Chat mentions', 'someone says your name in an Avatar Chat room'],
+        ['chat_local', 'Avatar Chat activity', 'new messages in #main and rooms you joined'],
+        ['telegram', 'Telegrams', 'telegrams and system notices']
+    ];
+    /* How often Avatar Chat activity may push while you're away, per room. */
+    var _npEvery = [[0, 'every message'], [10, 'at most every 10 minutes'], [30, 'at most every 30 minutes'], [60, 'at most once an hour']];
+    function _npChatRow(row) {
+        var cur = (_np.chat && _np.chat[row[0]]) || 'web';
+        write('<div class="notify-chat-row"><span class="notify-chat-label"><span class="form-check-label">' + row[1] + '</span>'
+            + '<span class="notify-hint">' + row[2] + '</span></span>'
+            + '<select class="form-select form-select-sm" data-notify-chat="' + row[0] + '" aria-label="' + row[1] + '">');
+        _npModes.forEach(function (m) { write('<option value="' + m[0] + '"' + (m[0] === cur ? ' selected' : '') + '>' + m[1] + '</option>'); });
+        write('</select></div>');
+    }
+    function _npRow(delivery, row) {
+        write('<label class="form-check"><input class="form-check-input" type="checkbox" data-notify-delivery="' + delivery
+            + '" data-notify-kind="' + row[0] + '"' + (_np[delivery][row[0]] ? ' checked' : '') + '>'
+            + '<span class="form-check-label">' + row[1] + '</span><span class="notify-hint">' + row[2] + '</span></label>');
+        if (delivery === 'push' && row[0] === 'chat_local') {
+            write('<div class="notify-option"><select class="form-select form-select-sm" data-notify-option="chat_local_every" aria-label="How often Avatar Chat activity pushes">');
+            _npEvery.forEach(function (e) {
+                write('<option value="' + e[0] + '"' + (_np.options && _np.options.chat_local_every === e[0] ? ' selected' : '') + '>' + e[1] + '</option>');
+            });
+            write('</select><span class="notify-hint">per room; mentions always come through</span></div>');
+        }
+    }
+?>
+<style>
+.notify-settings .card-body { display: flex; flex-direction: column; gap: 8px; }
+.notify-settings .form-check { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.notify-settings .form-check-label { color: #fff; }
+.notify-settings .notify-hint { font-size: 12px; color: #aaa; }
+.notify-settings h6 { margin: 6px 0 0; color: #55ffff; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+.notify-push-device { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.notify-settings-status { min-height: 1.2em; font-size: 12px; color: #55ff55; }
+.notify-option { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 8px 1.75em; }
+.notify-option select { width: auto; background-color: #000; color: #fff; border-color: rgba(128, 128, 128, 0.5); }
+.notify-chat-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.notify-chat-label { display: flex; flex-direction: column; min-width: 0; }
+.notify-permission { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border: 1px solid #ffff55; border-radius: 4px; background: rgba(255, 255, 85, 0.08); }
+.notify-permission-text { color: #ffff55; font-size: 13px; flex: 1 1 16em; }
+.notify-chat-row select { width: auto; flex: none; background-color: #000; color: #fff; border-color: rgba(128, 128, 128, 0.5); }
+</style>
+<div class="card notify-settings" data-notify-settings>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><span class="bin-icon" data-icon="bell"></span>Notifications</span>
+    </div>
+    <div class="card-body">
+        <div class="notify-permission" data-perm-row hidden>
+            <span class="notify-permission-text" data-perm-text></span>
+            <button type="button" class="btn btn-sm btn-warning" data-perm-request hidden>Allow notifications on this device</button>
+        </div>
+        <h6>Chat</h6>
+        <div class="notify-hint">For messages in a room or conversation you aren’t looking at. Desktop uses your computer’s notifications; your browser will ask permission the first time.</div>
+<?xjs _npChatRows.forEach(_npChatRow); ?>
+        <div class="notify-hint" data-native-state></div>
+        <h6>When the site is closed</h6>
+        <div class="notify-hint">Avatar Chat pushes only go out while you don’t have the site open and aren’t on the BBS.</div>
+        <div class="notify-push-device">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-push-toggle disabled>Checking&hellip;</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-push-test hidden>Send a test</button>
+            <span class="notify-hint" data-push-state></span>
+        </div>
+        <div class="notify-push-device">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-icon-test>Test notification pictures</button>
+            <span class="notify-hint" data-icon-test-state></span>
+        </div>
+        <div class="notify-hint">Shows notifications even when the site is closed. Each phone or computer is turned on separately.</div>
+<?xjs _npPushRows.forEach(function (row) { _npRow('push', row); }); ?>
+        <div class="notify-settings-status" aria-live="polite"></div>
+    </div>
+</div>
+<script>
+(function () {
+    var root = document.querySelector('[data-notify-settings]');
+    if (!root || root.getAttribute('data-ready')) return;
+    root.setAttribute('data-ready', '1');
+    var status = root.querySelector('.notify-settings-status');
+    var toggle = root.querySelector('[data-push-toggle]');
+    var testBtn = root.querySelector('[data-push-test]');
+    var state = root.querySelector('[data-push-state]');
+
+    function post(url, data) {
+        return fetch(url, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'x-csrf-token': (window.sbbsConfig && sbbsConfig.csrfToken) || '' },
+            body: JSON.stringify(data || {})
+        }).then(function (r) { return r.json(); });
+    }
+
+    /* Say so when a Desktop choice can't work in this browser. */
+    var nativeNote = root.querySelector('[data-native-state]');
+    function nativeState() {
+        var wantsNative = Array.prototype.some.call(root.querySelectorAll('[data-notify-chat]'), function (s) {
+            return s.value === 'native' || s.value === 'both';
+        });
+        var msg = '';
+        if (wantsNative) {
+            if (!('Notification' in window)) msg = 'This browser can’t show desktop notifications; you’ll get in-site ones instead.';
+            else if (Notification.permission === 'denied') msg = 'Desktop notifications are blocked for this site in your browser settings; you’ll get in-site ones until you allow them.';
+        }
+        nativeNote.textContent = msg;
+    }
+    nativeState();
+
+    root.addEventListener('change', function (ev) {
+        var opt = ev.target.closest('[data-notify-option]');
+        if (opt) {
+            var prevOpt = opt.getAttribute('data-was') || (window.sbbsConfig && sbbsConfig.notifyPrefs && sbbsConfig.notifyPrefs.options
+                && String(sbbsConfig.notifyPrefs.options[opt.getAttribute('data-notify-option')])) || '10';
+            var po = { options: {} };
+            po.options[opt.getAttribute('data-notify-option')] = parseInt(opt.value, 10);
+            status.textContent = 'Saving…';
+            post('./api/notifications.ssjs?call=set-prefs', po).then(function (res) {
+                if (!res || !res.ok) throw new Error(res && res.error || 'failed');
+                if (window.sbbsConfig) sbbsConfig.notifyPrefs = res.prefs;
+                opt.setAttribute('data-was', opt.value);
+                status.textContent = 'Saved.';
+            }).catch(function () {
+                opt.value = prevOpt;
+                status.textContent = 'Couldn’t save that. Try again.';
+            });
+            return;
+        }
+        var sel = ev.target.closest('[data-notify-chat]');
+        if (sel) {
+            var was = sel.getAttribute('data-was') || (window.sbbsConfig && sbbsConfig.notifyPrefs && sbbsConfig.notifyPrefs.chat
+                && sbbsConfig.notifyPrefs.chat[sel.getAttribute('data-notify-chat')]) || 'web';
+            var p = { chat: {} };
+            p.chat[sel.getAttribute('data-notify-chat')] = sel.value;
+            status.textContent = 'Saving…';
+            if ((sel.value === 'native' || sel.value === 'both') && 'Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().then(function () { nativeState(); permState(); });
+            }
+            post('./api/notifications.ssjs?call=set-prefs', p).then(function (res) {
+                if (!res || !res.ok) throw new Error(res && res.error || 'failed');
+                // Chat reads these live; no reload needed.
+                if (window.sbbsConfig) sbbsConfig.notifyPrefs = res.prefs;
+                sel.setAttribute('data-was', sel.value);
+                status.textContent = 'Saved.';
+                nativeState();
+            }).catch(function () {
+                sel.value = was;
+                status.textContent = 'Couldn’t save that. Try again.';
+            });
+            return;
+        }
+        var box = ev.target.closest('[data-notify-kind]');
+        if (!box) return;
+        var delivery = box.getAttribute('data-notify-delivery');
+        var patch = {};
+        patch[delivery] = {};
+        patch[delivery][box.getAttribute('data-notify-kind')] = box.checked;
+        status.textContent = 'Saving…';
+        post('./api/notifications.ssjs?call=set-prefs', patch).then(function (res) {
+            if (!res || !res.ok) throw new Error(res && res.error || 'failed');
+            // Chat reads these live; no reload needed.
+            if (window.sbbsConfig) sbbsConfig.notifyPrefs = res.prefs;
+            status.textContent = 'Saved.';
+        }).catch(function () {
+            box.checked = !box.checked;
+            status.textContent = 'Couldn’t save that. Try again.';
+        });
+    });
+
+    /* ---- this device's push subscription ---- */
+    var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+    function urlKey(base64) {
+        var pad = '='.repeat((4 - base64.length % 4) % 4);
+        var raw = atob((base64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+        var out = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+        return out;
+    }
+
+    function show(enabled, note) {
+        toggle.disabled = false;
+        toggle.textContent = enabled ? 'Turn off on this device' : 'Turn on for this device';
+        toggle.setAttribute('data-on', enabled ? '1' : '');
+        testBtn.hidden = !enabled;
+        state.textContent = note || (enabled ? 'On for this device.' : '');
+    }
+
+    function current() {
+        return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); });
+    }
+
+    var BLOCKED = 'Notifications are blocked for this site. Click the icon at the left of the address bar, set Notifications to Allow (or reset the permission), then reload this page.';
+
+    /* Drop whatever subscription this browser already holds (it can outlive a
+       permission reset and be dead), then make a fresh one and file it. */
+    function subscribeFresh() {
+        return current().then(function (old) {
+            if (!old) return;
+            return post('./api/push.ssjs?call=unsubscribe', { endpoint: old.endpoint })
+                .catch(function () {})
+                .then(function () { return old.unsubscribe(); });
+        }).then(function () {
+            return fetch('./api/push.ssjs?call=key', { credentials: 'same-origin' }).then(function (r) { return r.json(); });
+        }).then(function (res) {
+            if (!res || !res.ok) throw new Error('no key');
+            return navigator.serviceWorker.ready.then(function (reg) {
+                return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(res.publicKey) });
+            });
+        }).then(function (sub) {
+            return post('./api/push.ssjs?call=subscribe', { subscription: sub.toJSON() });
+        }).then(function (res) {
+            if (!res || !res.ok) throw new Error('subscribe');
+            show(true);
+        });
+    }
+
+    /* Ask the browser for permission, then turn on push for this device. */
+    function enable() {
+        return Notification.requestPermission().then(function (perm) {
+            permState();
+            nativeState();
+            if (perm !== 'granted') {
+                if (supported) show(false, perm === 'denied' ? 'Blocked in your browser settings.' : 'Not allowed yet.');
+                return;
+            }
+            if (supported) return subscribeFresh();
+        }).catch(function () { if (supported) show(false, 'Couldn’t turn it on. Try again.'); });
+    }
+
+    /* Whether the browser itself will let this site notify; everything else
+       on this card depends on it. */
+    var permRow = root.querySelector('[data-perm-row]');
+    var permText = root.querySelector('[data-perm-text]');
+    var permBtn = root.querySelector('[data-perm-request]');
+    function permState() {
+        if (!('Notification' in window) || Notification.permission === 'granted') { permRow.hidden = true; return; }
+        permRow.hidden = false;
+        if (Notification.permission === 'denied') {
+            permText.textContent = BLOCKED;
+            permBtn.hidden = true;
+        } else {
+            permText.textContent = 'Your browser hasn’t given this site permission to show notifications, so Desktop and push notifications won’t appear on this device.';
+            permBtn.hidden = false;
+        }
+    }
+    permState();
+    permBtn.addEventListener('click', function () {
+        permBtn.disabled = true;
+        enable().then(function () { permBtn.disabled = false; });
+    });
+
+    function pushState() {
+        if (Notification.permission !== 'granted') {
+            // A subscription left over from before a permission reset doesn't count.
+            return show(false, Notification.permission === 'denied' ? 'Blocked in your browser settings.' : 'Not allowed in this browser yet.');
+        }
+        return current().then(function (sub) {
+            if (!sub) return show(false);
+            return fetch('./api/push.ssjs?call=status&endpoint=' + encodeURIComponent(sub.endpoint), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    // Subscribed in the browser but not on file (another account, or expired): re-register.
+                    if (res && res.ok && !res.enabled) return post('./api/push.ssjs?call=subscribe', { subscription: sub.toJSON() }).then(function () { show(true); });
+                    show(true);
+                });
+        }).catch(function () { show(false); });
+    }
+
+    if (!supported) {
+        toggle.textContent = 'Not available';
+        state.textContent = 'This browser can’t receive push notifications (on iPhone, add the site to your Home Screen first).';
+    } else {
+        pushState();
+    }
+
+    // Follow permission changes made in the browser while this page is open.
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'notifications' }).then(function (ps) {
+            ps.onchange = function () { permState(); nativeState(); if (supported) pushState(); };
+        }).catch(function () {});
+    }
+
+    toggle.addEventListener('click', function () {
+        toggle.disabled = true;
+        if (toggle.getAttribute('data-on')) {
+            current().then(function (sub) {
+                if (!sub) return;
+                return post('./api/push.ssjs?call=unsubscribe', { endpoint: sub.endpoint }).then(function () { return sub.unsubscribe(); });
+            }).then(function () { show(false, 'Off for this device.'); })
+              .catch(function () { show(true, 'Couldn’t turn it off. Try again.'); });
+            return;
+        }
+        enable();
+    });
+
+    /* Three notifications, each with a magenta "AV" placeholder as the
+       picture beside the app icon, loaded a different way: A is a page URL,
+       B is a data: URL drawn on a canvas, C is a page URL as both icon and
+       large image. Whichever shows the magenta square is how chat must send. */
+    var iconTestBtn = root.querySelector('[data-icon-test]');
+    var iconTestState = root.querySelector('[data-icon-test-state]');
+    iconTestBtn.addEventListener('click', function () {
+        var url = new URL('./images/notify-test-avatar.png', location.href).href;
+        function say(t) { iconTestState.textContent = t; }
+        if (!('Notification' in window) || Notification.permission !== 'granted') { say('Allow notifications on this device first.'); return; }
+        var img = new Image();
+        img.onerror = function () { say('Couldn’t load the test picture.'); };
+        img.onload = function () {
+            var c = document.createElement('canvas');
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            var dataURL = c.toDataURL('image/png');
+            navigator.serviceWorker.ready.then(function (reg) {
+                var badge = './images/icon-maskable-192.png';
+                return reg.showNotification('Test A: page URL', { body: 'Magenta AV square should be here.', tag: 'icontest-a', icon: url, badge: badge })
+                    .then(function () { return reg.showNotification('Test B: data URL', { body: 'Magenta AV square should be here.', tag: 'icontest-b', icon: dataURL, badge: badge }); })
+                    .then(function () { return reg.showNotification('Test C: icon + image', { body: 'Magenta AV square should be here.', tag: 'icontest-c', icon: url, image: url, badge: badge }); })
+                    .then(function () {
+                        /* D skips the service worker: shown straight from the page. */
+                        try { new Notification('Test D: from the page', { body: 'Magenta AV square should be here.', tag: 'icontest-d', icon: url }); } catch (e) {}
+                    });
+            }).then(function () {
+                var where = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) ? 'installed app' : 'browser tab';
+                say('Sent A–D from the ' + where + '. Which ones show the magenta square?');
+            })
+              .catch(function (e) { say('Failed: ' + (e && e.message || e)); });
+        };
+        img.src = url;
+    });
+
+    testBtn.addEventListener('click', function () {
+        post('./api/push.ssjs?call=test').then(function (res) {
+            state.textContent = res && res.ok ? 'Test sent; it should arrive in a few seconds.' : 'Couldn’t send a test.';
+        });
+    });
+})();
+</script>

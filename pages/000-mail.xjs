@@ -193,6 +193,43 @@
 </ul>
 <script type="text/javascript">
     (function () {
+        /* A notification lands here with ?n=N (that message, from the
+           Notifications page) or ?from=X (the sender's newest message, from a
+           "X sent you E-mail" push): open it and bring it into view. */
+        var from = '', wanted = 0;
+        try {
+            var q = new URLSearchParams(window.location.search);
+            from = q.get('from') || '';
+            wanted = parseInt(q.get('n'), 10) || 0;
+        } catch (_e) { }
+        from = from.replace(/^\s+|\s+$/g, '').toLowerCase();
+        if (!from && !wanted) return;
+        var best = null;
+        if (wanted) {
+            var exact = document.getElementById('li-' + wanted);
+            if (exact) best = { n: wanted, li: exact };
+        }
+        if (!best && from) document.querySelectorAll('#forum-list-container li.mail').forEach(function (li) {
+            var who = li.querySelector('strong');
+            if (!who || who.textContent.replace(/^\s+|\s+$/g, '').toLowerCase() !== from) return;
+            var n = parseInt(li.id.replace('li-', ''), 10);
+            if (!best || n > best.n) best = { n: n, li: li };
+        });
+        if (!best) return;
+        best.li.classList.add('current');
+        /* forum.js (getMailBody) may still be loading on an in-site visit. */
+        (function open(tries) {
+            if (typeof getMailBody === 'function') getMailBody(best.n);
+            else if (tries > 0) window.setTimeout(function () { open(tries - 1); }, 200);
+        })(15);
+        /* The SPA scrolls to the top once the page is in; come back to it. */
+        function reveal() { best.li.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        reveal();
+        [300, 900, 1800].forEach(function (ms) { window.setTimeout(reveal, ms); });
+    })();
+</script>
+<script type="text/javascript">
+    (function () {
         /* Person menu > Email / Netmail lands here with the recipient chosen
            (window.__pendingCompose = { to, subject }, set just before the
            SPA navigated): open the composer and fill it in. */

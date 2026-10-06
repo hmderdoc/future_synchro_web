@@ -236,4 +236,8 @@ var workerSource = [
     ''
 ].join('\n');
 
+/* Native push (js/sw-push.js): appended as-is so it stays a plain JS file. */
+var _swPush = new File(ROOT_DIR + 'js/sw-push.js');
+if (_swPush.open('r')) { workerSource += '\n' + _swPush.read(); _swPush.close(); }
+
 write(workerSource);

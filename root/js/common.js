@@ -297,6 +297,24 @@ document.addEventListener('DOMContentLoaded', function () {
             if (badge2) { badge2.textContent = text; }
         });
 
+        /* Unread notifications: a badge on the user menu and its
+           Notifications entry, pushed by lib/events/notify.js. The
+           notifications page calls this after marking entries read. */
+        function setNotificationBadge(count) {
+            var text = count > 0 ? String(count > 99 ? '99+' : count) : '';
+            ['badge-notifications', 'badge-notifications-inner'].forEach(function (id) {
+                var b = document.getElementById(id);
+                if (b) { b.textContent = text; b.style.display = text ? '' : 'none'; }
+            });
+        }
+        window.setNotificationBadge = setNotificationBadge;
+        registerEventListener('notify', function (e) {
+            var data = JSON.parse(e.data);
+            if (typeof data.count !== 'number') return;
+            setNotificationBadge(data.count);
+            window.dispatchEvent(new CustomEvent('fl:notifications', { detail: data }));
+        });
+
         /* Friend requests waiting: a badge on the user menu (and its My
            Profile entry, where the profile page's banner accepts them).
            Polled, and re-checked when a telegram arrives since a request
@@ -321,8 +339,26 @@ document.addEventListener('DOMContentLoaded', function () {
            right away so the badge clears without waiting for the poll. */
         window.refreshFriendRequestBadge = refreshFriendRequestBadge;
 
+        /* Opened from a telegram's push notification (?tgdone=<its first
+           line>): the user has read it, so don't pop it up again when the
+           site collects it. Only for a couple of minutes after arriving. */
+        var tgDone = '';
+        try { tgDone = new URLSearchParams(window.location.search).get('tgdone') || ''; } catch (_tgErr) { }
+        var tgDoneUntil = Date.now() + 120000;
+        function telegramAlreadySeen(raw) {
+            if (!tgDone || Date.now() > tgDoneUntil) return false;
+            var box = document.createElement('textarea');
+            box.innerHTML = raw;                       /* undo html_encode */
+            var plain = box.value.replace(/\x01./g, '').replace(/\s+/g, ' ').replace(/^\s+/, '');
+            var want = tgDone.replace(/\s+/g, ' ');
+            if (plain.substr(0, want.length) !== want) return false;
+            tgDone = '';                               /* once */
+            return true;
+        }
+
         registerEventListener('telegram', function (e) {
             refreshFriendRequestBadge();
+            if (telegramAlreadySeen(JSON.parse(e.data))) return;
             var tg = JSON.parse(e.data).replace(/\x01./g, '').replace(/\r?\n/g, '<br>');
             var titleEl = document.getElementById('popUpModalTitle');
             var bodyEl = document.getElementById('popUpModalBody');

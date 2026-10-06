@@ -1,0 +1,30 @@
+<!--HIDDEN:Notifications-->
+<?xjs
+    if (user.number < 1 || user.alias == settings.guest) exit();
+?>
+
+<div class="nf-page">
+    <div class="card mb-3">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="nf-title"><span class="bin-icon" data-icon="bell"></span>Notifications</span>
+            <div class="d-flex gap-2 align-items-center">
+                <div class="btn-group btn-group-sm" role="tablist" id="nf-tabs">
+                    <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+                    <button type="button" class="btn btn-outline-secondary" data-filter="unread">Unread</button>
+                    <button type="button" class="btn btn-outline-secondary" data-filter="read">History</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="nf-mark-all">Mark all read</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="nf-list" class="nf-feed" aria-live="polite">
+        <div class="nf-status">Loading...</div>
+    </div>
+    <div class="nf-more-wrap"><button type="button" class="btn btn-sm btn-outline-secondary" id="nf-more" hidden>Older</button></div>
+</div>
+
+<?xjs write('<script src="./js/notifications.js?_v=' + time() + '"></script>'); ?>
+<script>
+    if (typeof initNotifications === 'function') initNotifications();
+</script>

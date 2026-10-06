@@ -639,6 +639,22 @@ var _msgScrollLoading = false;
 var _msgScrollExhausted = false;
 var _msgScrollObserver = null;
 
+/* The message named by location.hash, loading further pages of the thread
+   until it turns up (or the thread runs out); null without a hash. */
+async function _loadHashMessage(sub, thread, count) {
+    var num = /^#(\d+)$/.exec(window.location.hash || '');
+    if (!num) return null;
+    var id = 'forum-message-' + num[1];
+    for (var pages = 0; pages < 50; pages++) {
+        var el = document.getElementById(id);
+        if (el || _msgScrollExhausted) return el;
+        var before = document.querySelectorAll('li[data-message]').length;
+        await listMessages(sub, thread, count, true);
+        if (document.querySelectorAll('li[data-message]').length === before) break;
+    }
+    return document.getElementById(id);
+}
+
 async function initMessageInfiniteScroll(sub, thread, count) {
     var sentinel = document.getElementById('forum-message-sentinel');
     if (!sentinel) return;
@@ -647,9 +663,18 @@ async function initMessageInfiniteScroll(sub, thread, count) {
     _msgScrollLoading = false;
     _highestReadMsg = 0;
     await listMessages(sub, thread, count);
+    // A #<number> link (a notification, say) names one message: load pages
+    // until it's in view and go there instead of the first unread.
+    var hashTarget = await _loadHashMessage(sub, thread, count);
     // Set up mark-as-read observer and scroll to first unread
     _observeMessagesForRead(sub);
-    setTimeout(_scrollToFirstUnread, 150);
+    if (hashTarget) {
+        document.querySelectorAll('#forum-list-container .current').forEach(function (el) { el.classList.remove('current'); });
+        hashTarget.classList.add('current');
+        setTimeout(function () { hashTarget.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 150);
+    } else {
+        setTimeout(_scrollToFirstUnread, 150);
+    }
     // Flush any pending read pointer on page unload
     window.addEventListener('beforeunload', _flushReadPtr);
     if (_msgScrollExhausted) return;
@@ -1318,7 +1343,10 @@ async function listSubs(group) {
         data.forEach(async e => await sbbs.forum.setSub(e));
     } else {
         // TO DO: add a TTL for this data instead of refreshing every time
-        v4_get(`./api/forum.ssjs?call=list-subs&group=${group}`).then(onSubList);
+        v4_get(`./api/forum.ssjs?call=list-subs&group=${group}`).then(fresh => {
+            fresh.forEach(e => sbbs.forum.setSub(e));
+            onSubList(fresh);
+        });
     }
     lm.stop();
     onSubList(data);

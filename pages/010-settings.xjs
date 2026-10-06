@@ -15,6 +15,7 @@
         </div>
     </div>
 
+    <? load(xjs_compile(settings.web_components + 'notify-settings.xjs')); ?>
     <? load(xjs_compile(settings.web_components + 'avatar-settings.xjs')); ?>
     <? load(xjs_compile(settings.web_components + 'chat-style-settings.xjs')); ?>
 </div>

@@ -236,7 +236,7 @@
        to the site-wide one. */
     var _seo_base = 'https://' + (system.inet_addr || system.name) + '/';
     var _seo_is_home = (page === '000-home.xjs');
-    var _seo_site_desc = 'Possibly the most customized Synchronet BBS around: original doors, live chat across four networks, DoveNet, fsxNet, tqwNet and home of CheeseNet.';
+    var _seo_site_desc = 'Possibly the most overbuilt BBS out there. Original games, a record label, an art gallery, news, chat across four networks, and resident AIs, all in a terminal. We should probably go outside.';
     var _seo_desc_by_page = {
         '001-chat.xjs': 'Live chat on ' + system.name + ', bridged to the BBS and other networks.',
         '002-forum.xjs': 'Message areas and networked forums on ' + system.name + '.',
@@ -314,7 +314,8 @@
         'futureland-gallery': 'art_gallery',
         newsflip: 'rssfeed',
         music_note: 'music_note',
-        myspace: 'smiley', account: 'account'
+        myspace: 'smiley', account: 'account',
+        bell: 'bell'
     };
     var _binIconData = {};
     for (var _bk in _binIconMap) {
@@ -476,9 +477,12 @@
                         }
                         write('</span>');
 ?>
-                        <span class="badge bg-danger" id="badge-unread-mail" style="display:none;"></span>
                         <span class="badge bg-warning text-dark" id="badge-friend-requests" style="display:none;" title="Friend requests waiting"></span>
-                        <div class="nav-avatar" data-avatar="<? write(user.number); ?>" aria-hidden="true"></div>
+                        <span class="nav-avatar-wrap">
+                            <div class="nav-avatar" data-avatar="<? write(user.number); ?>" aria-hidden="true"></div>
+                            <span class="badge-mail nav-avatar-badge is-left" id="badge-unread-mail" style="display:none;" title="Unread mail"></span>
+                            <span class="badge-notify nav-avatar-badge" id="badge-notifications" style="display:none;" title="Unread notifications"></span>
+                        </span>
                     </a>
                     <script>
                     /* Your avatar next to your name; redrawn by avatars.js when it changes. */
@@ -502,6 +506,10 @@
                     })();
                     </script>
                     <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="./?page=015-notifications.xjs">
+                            <span class="bin-icon" data-icon="bell"></span>Notifications
+                            <span class="badge badge-notify" id="badge-notifications-inner" style="display:none;"></span>
+                        </a></li>
                         <li><a class="dropdown-item" href="./?page=000-mail.xjs">
                             <span class="bin-icon" data-icon="mail"></span><? write(locale.strings.main.menu_item_mail); ?>
                             <span class="badge bg-danger" id="badge-unread-mail-inner"></span>
@@ -653,6 +661,8 @@
         isLoggedIn: <? write(user.alias !== settings.guest && user.number > 0); ?>,
         isSysop: <? write(user.is_sysop ? true : false); ?>,
         csrfToken: '<? write(getCsrfToken()); ?>',
+        /* Which notifications to show (mods/load/notify_lib.js prefs; Settings edits them). */
+        notifyPrefs: <? if (user.alias !== settings.guest && user.number > 0) { try { if (typeof Notify === 'undefined') load(system.mods_dir + 'load/notify_lib.js'); write(JSON.stringify(Notify.prefs(user.number))); } catch (_np) { write('null'); } } else write('null'); ?>,
         sidebarOff: <? write(_sidebarOff()); ?>,
         sidebarLeft: <? write(settings.layout_sidebar_left ? true : false); ?>,
         fullWidth: <? write(settings.layout_full_width ? true : false); ?>,
