@@ -51,6 +51,50 @@
 
     var client = null;
     var isConnected = false;
+
+    /* WebSocket readyState of fTelnet's current socket: 0 connecting,
+       1 open, 2 closing, 3 closed, -1 none. fTelnet's Connect() only
+       refuses while the socket is OPEN; a socket still CONNECTING is
+       silently replaced, and its handlers stay bound to the client, so
+       its events (connect, close) keep arriving for a session nobody is
+       looking at. Every reconnect here goes through these helpers. */
+    function socketState() {
+        try {
+            var c = client && client._Connection;
+            var ws = c && c._WebSocket;
+            if (ws && typeof ws.readyState === 'number') return ws.readyState;
+        } catch (_) { }
+        return -1;
+    }
+    function connectInFlight() { return socketState() === 0; }
+
+    /* Drop the current socket, open or still connecting, so none of its
+       later events reach the client. */
+    function teardownConnection() {
+        if (!client) return;
+        var st = socketState();
+        if (st === 1) {
+            try { client.Disconnect(false); } catch (_) { }
+            return;
+        }
+        if (st === 0 || st === 2) {
+            try {
+                var c = client._Connection;
+                ['onclose', 'onconnect', 'ondata', 'onioerror',
+                 'onlocalecho', 'onsecurityerror'].forEach(function (ev) {
+                    if (c[ev] && typeof c[ev].off === 'function') c[ev].off();
+                });
+                c.close();
+            } catch (_) { }
+            try { delete client._Connection; } catch (_) { }
+        }
+    }
+
+    function startConnect() {
+        if (!client) return;
+        if (socketState() === 1 || connectInFlight()) return;
+        try { client.Connect(); } catch (_) { }
+    }
     var currentColumns = 0;
     var currentRows = 0;
     var currentSize = null;
@@ -836,6 +880,12 @@
 
     function attachInputHandlers(container) {
         var wheelHandler = function (e) {
+            /* With mouse reporting on, the terminal core reports the wheel
+               as mouse buttons 64/65 (what SyncTERM sends) and Synchronet
+               turns those into up/down for the shell. Only fall back to
+               synthesised arrow keys when nobody is listening for mouse. */
+            var crt = client && client._Crt;
+            if (crt && crt._ReportMouse) return;
             if (e.deltaY > 0) sendArrowKey('down');
             else if (e.deltaY < 0) sendArrowKey('up');
         };
@@ -1132,7 +1182,10 @@
             };
         }
 
-        client.Connect();
+        /* The parent asks for no auto-connect when a door launch is
+           pending: the queued 'xtrn' command opens the session itself,
+           with the door's terminal type. */
+        if (cfg.autoConnect !== false) client.Connect();
         var container = document.getElementById('fTelnetContainer');
         if (container) attachInputHandlers(container);
         forceFontRecalc();
@@ -1173,10 +1226,13 @@
                 break;
 
             case 'connect':
-                if (client) {
-                    setNormalRLoginTerminalType(client);
-                    try { client.Connect(); } catch (ex) {}
-                }
+                if (!client) break;
+                /* A reconnect (door launch) may already be in flight;
+                   resetting the terminal type and connecting again would
+                   replace it with a plain login. */
+                if (isConnected || connectInFlight()) break;
+                setNormalRLoginTerminalType(client);
+                startConnect();
                 break;
 
             case 'disconnect':
@@ -1187,9 +1243,7 @@
 
             case 'rlogin':
                 if (!client || !client.Options) break;
-                if (isConnected) {
-                    try { client.Disconnect(); } catch (ex) {}
-                }
+                teardownConnection();
                 client.Options.ConnectionType = 'rlogin';
                 client.Options.RLoginClientUsername = msg.password;
                 client.Options.RLoginServerUsername = msg.username;
@@ -1204,25 +1258,21 @@
                     client.Options.WebSocketUrlPath =
                         '?Port=' + msg.rloginPort;
                 }
-                client.Connect();
+                startConnect();
                 break;
 
             case 'xtrn':
                 if (!client) break;
-                if (isConnected) {
-                    try { client.Disconnect(false); } catch (ex) {}
-                }
+                teardownConnection();
                 client._Options.RLoginTerminalType = 'xtrn=' + msg.code;
-                client.Connect();
+                startConnect();
                 break;
 
             case 'logout':
                 if (ansiMusicPlayer) ansiMusicPlayer.stop();
                 if (apcAudioPlayer) apcAudioPlayer.stop();
                 if (ansiMusicFilter) ansiMusicFilter.reset();
-                if (client && isConnected) {
-                    try { client.Disconnect(); } catch (ex) {}
-                }
+                teardownConnection();
                 if (client && client.Options) {
                     client.Options.ConnectionType = 'telnet';
                     if (msg.isSecure) {

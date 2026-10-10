@@ -313,6 +313,22 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 				reply.telegram = system.get_telegram(user.number);
 				break;
 
+			case 'node-busy':
+				/* Is this user still flagged in use on a node? The web
+				   terminal polls this between closing a session and opening a
+				   door login, because logon refuses a user who is already on
+				   another node (the same NODE_INUSE test as the terminal server). */
+				reply.busy = false;
+				if (user.alias === settings.guest || user.number < 1) break;
+				for (var nb = 0; nb < system.node_list.length; nb++) {
+					var nbNode = system.node_list[nb];
+					if (nbNode.status === NODE_INUSE && nbNode.useron === user.number) {
+						reply.busy = true;
+						break;
+					}
+				}
+				break;
+
 			case 'set-xtrn-intent':
 				if (user.alias === settings.guest) break;
 				if (typeof http_request.query.code === 'undefined') break;

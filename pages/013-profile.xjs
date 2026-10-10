@@ -350,6 +350,7 @@
 .pp-plays-title { font-weight: bold; color: var(--pp-emph); }
 .pp-plays { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .pp-play-row { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--pp-text); border: 1px solid var(--pp-border); padding: 3px 6px 3px 3px; background: var(--pp-box); }
+button.pp-play-row { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .pp-play-row:hover { border-color: var(--pp-accent); color: var(--pp-text); }
 .pp-play-rank { width: 1.4em; text-align: right; color: var(--pp-muted); font-size: 11px; }
 .pp-play-icon { width: 48px; height: 48px; flex-shrink: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
@@ -999,10 +1000,26 @@
             list.forEach(function (p, i) {
                 var value = by === 'count' ? p.count + ' launch' + (p.count === 1 ? '' : 'es')
                     : by === 'last' ? (p.last ? fmtDate(p.last) : '-') : fmtSeconds(p.seconds);
-                var row = document.createElement('a');
+                /* Logged-in viewers launch the game straight into the web
+                   terminal; guests get the games page as before. The terminal
+                   API is checked at click time: on a full page load this
+                   script runs before terminal.js has defined it. */
+                var code = String(p.code || '');
+                var row = document.createElement(me > 0 ? 'button' : 'a');
                 row.className = 'pp-play-row';
-                row.href = './?page=003-games.xjs';
-                row.title = p.name;
+                if (me > 0) {
+                    row.type = 'button';
+                    row.title = 'Play ' + p.name;
+                    row.addEventListener('click', function (ev) {
+                        ev.preventDefault();
+                        var term = window.sbbsTerminal;
+                        if (term && typeof term.launchXtrn === 'function') term.launchXtrn(code);
+                        else location.href = './?page=003-games.xjs';
+                    });
+                } else {
+                    row.href = './?page=003-games.xjs';
+                    row.title = p.name;
+                }
                 row.innerHTML = '<span class="pp-play-rank">' + (i + 1) + '</span><span class="pp-play-icon"></span>' +
                     '<span class="pp-play-name">' + esc(p.name) + '</span><span class="pp-play-count">' + esc(value) + '</span>';
                 host.appendChild(row);

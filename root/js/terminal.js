@@ -26,6 +26,13 @@
     var isSecure = location.protocol === 'https:';
     var resizeTimer = null;
     var restoreTimer = null;
+    var hideTimer = null;
+    /* A door launch is in progress: the session is being torn down and
+       reopened with the door's terminal type. While set, nothing else may
+       auto-connect, and the offline status from the teardown must not
+       close the panel. */
+    var launchPending = false;
+    var launchTimer = null;
 
     /* ============================================================
      *  Responsive screen size calculation
@@ -69,6 +76,11 @@
         if (!panel) return;
         panel.classList.toggle('is-hidden', hidden);
         panel.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+        /* The page scroll lock (body.terminal-open -> overflow:hidden) is
+           owned here, so it can never outlive the panel. It used to be
+           removed only inside the power-off animation callback; any path
+           that skipped that callback left every page unscrollable. */
+        document.body.classList.toggle('terminal-open', !hidden);
     }
 
     function focusTerminal() {
@@ -121,7 +133,8 @@
                         isLoggedIn: cfg.isLoggedIn,
                         userAlias: cfg.userAlias,
                         userPassword: cfg.userPassword,
-                        isSecure: isSecure
+                        isSecure: isSecure,
+                        autoConnect: !launchPending
                     }
                 }, location.origin);
                 break;
@@ -137,15 +150,18 @@
                 break;
 
             case 'status':
-                if (isConnected && !msg.connected && isVisible) {
-                    setTimeout(hidePanel, 1200);
+                clearTimeout(hideTimer);
+                if (msg.connected) {
+                    setLaunchPending(false);
+                } else if (isConnected && isVisible && !launchPending) {
+                    hideTimer = setTimeout(hidePanel, 1200);
                 }
                 isConnected = msg.connected;
                 updateStatus();
                 break;
 
             case 'click':
-                if (isVisible && !isConnected && initialized) {
+                if (isVisible && !isConnected && initialized && !launchPending) {
                     sendToIframe({ cmd: 'connect' });
                 }
                 break;
@@ -324,7 +340,7 @@
                 createIframe();
             } else {
                 restoreTerminalViewport();
-                if (!isConnected) {
+                if (!isConnected && !launchPending) {
                     sendToIframe({ cmd: 'connect' });
                 }
             }
@@ -338,7 +354,15 @@
     }
 
     function hidePanel() {
-        if (!panel || !isVisible || isAnimating) return;
+        if (!panel) return;
+        if (!isVisible) {
+            /* Self-heal: a stale scroll lock with the panel already hidden. */
+            if (panel.classList.contains('is-hidden')) {
+                document.body.classList.remove('terminal-open');
+            }
+            return;
+        }
+        if (isAnimating) return;
         isAnimating = true;
         clearTimeout(restoreTimer);
 
@@ -400,12 +424,54 @@
         updateStatus();
     });
 
+    function setLaunchPending(on) {
+        clearTimeout(launchTimer);
+        launchPending = on;
+        if (on) {
+            /* Safety valve: a launch whose connection never reports back
+               must not leave auto-connect disabled forever. */
+            launchTimer = setTimeout(function () { launchPending = false; }, 15000);
+        }
+    }
+
+    /* Wait (bounded) until the server has released the user's old node.
+       Synchronet refuses a login while the same user is still in use on
+       another node, and the node is only freed a moment after its socket
+       closes. Sysops are exempt, so this is for everyone else. */
+    function waitForNodeFree(maxMs) {
+        var deadline = Date.now() + maxMs;
+        return new Promise(function (resolve) {
+            (function poll() {
+                v4_get('./api/system.ssjs?call=node-busy').then(function (r) {
+                    if (!r || r.busy !== true || Date.now() >= deadline) {
+                        resolve();
+                        return;
+                    }
+                    setTimeout(poll, 250);
+                }, function () { resolve(); });
+            })();
+        });
+    }
+
     function launchXtrn(code) {
-        if (!code) return Promise.resolve();
+        if (!code || launchPending) return Promise.resolve();
+        setLaunchPending(true);
         return v4_get('./api/system.ssjs?call=set-xtrn-intent&code=' +
             encodeURIComponent(code)).then(function () {
+            var wasConnected = isConnected;
             showPanel(isVisible);
+            if (!wasConnected) return;
+            /* Close the live session first, then let the server free the
+               node before the door login goes out. */
+            sendToIframe({ cmd: 'disconnect', force: false });
+            isConnected = false;
+            updateStatus();
+            return waitForNodeFree(6000);
+        }).then(function () {
             sendToIframe({ cmd: 'xtrn', code: code });
+        }).catch(function (err) {
+            console.error('[terminal] launch failed:', err);
+            setLaunchPending(false);
         });
     }
 
