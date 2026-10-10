@@ -1,0 +1,23 @@
+######## FIREFOX x3
+SUMMARY firefox
+scenario                 fps  tick ms    max  >16ms  bc ms  strobe  eq fps  eq ms  tick range (ms)
+baseline                14.7    49.92    106     45      0    3.22     9.2   1.02  3.6-60.96  (no butterchurn)
+no-shadowblur             60     4.59     16      0      0    2.67    37.1   0.33  3.45-6.75  (no butterchurn)
+no-strobe                6.3        3      5      0      0       0     7.5   1.14  2.6-5.35  (no butterchurn)
+no-minieq                 11    82.16    148     48      0    4.63       0      0  45.37-82.32  (no butterchurn)
+lyrics-bouncing         12.9     69.2    162     45      0     7.2     8.9   0.93  66.78-82.87  (no butterchurn)
+no-filltext             11.8    23.27     43     44      0    3.26    10.1   1.05  1.96-75.87  (no butterchurn)
+no-shadow+strobe+eq     71.3     4.17     19      1      0       0       0      0  2.38-7.08  (no butterchurn)
+everything-off          51.2     6.58     12      0      0       0       0      0  2.64-6.84  (no butterchurn)
+######## CHROMIUM software-canvas x3
+SUMMARY chromium
+scenario                 fps  tick ms    max  >16ms  bc ms  strobe  eq fps  eq ms  tick range (ms)
+baseline                13.6    14.17   40.5     15   1.79   17.24       7   0.27  9.67-23.52
+no-shadowblur            4.6     7.93   18.7      1   3.55    3.87     2.3   0.31  5.13-11.33
+no-strobe                3.7     9.04   22.1      1   2.36       0       2   0.22  3.13-14.69
+no-minieq               12.4    14.01   65.6     13   3.22   16.63       0      0  9.18-31.12
+lyrics-bouncing         13.1    11.03   32.9      6   1.72   11.46     7.4   0.25  9.75-18.67
+no-filltext               14    11.13   27.3     14   1.55   14.03     7.2    0.2  9.11-11.48
+no-shadow+strobe+eq      7.8     4.08   15.8      0   4.05       0       0      0  3.76-10.14
+everything-off          81.3     1.38   13.4      0      0       0       0      0  1.28-3.58
+DONE

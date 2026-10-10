@@ -439,8 +439,12 @@
     function captureWireframeGrid() {
         // Downsample wireframe canvas to cols×rows for body/accessory coverage
         if (!wireCanvasRef || !bodyOffscreen || cols < 2 || rows < 2) return null;
-        bodyOffscreen.width  = cols;
-        bodyOffscreen.height = rows;
+        if (bodyOffscreen.width !== cols || bodyOffscreen.height !== rows) {
+            bodyOffscreen.width  = cols;   // resizing reallocates; only when the grid changes
+            bodyOffscreen.height = rows;
+        } else {
+            bodyOffCtx.clearRect(0, 0, cols, rows);
+        }
         bodyOffCtx.drawImage(wireCanvasRef, 0, 0, cols, rows);
         try { return bodyOffCtx.getImageData(0, 0, cols, rows); }
         catch (e) { return null; }

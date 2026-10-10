@@ -30,6 +30,8 @@
     var milkCanvas    = null;   // Butterchurn WebGL
     var wireCanvas    = null;   // Wireframe overlay (2D)
     var wireCtx       = null;
+    var wireGlow      = null;   // GlowLayer wrapping wireCanvas (one-pass bloom)
+    var karaokeGlow   = null;   // GlowLayer wrapping karaokeCanvas
 
     // Lyrics state
     var lrcLines      = [];     // [{time: seconds, text: ''}, ...]
@@ -2255,6 +2257,9 @@
         }
         bcViz = null;
 
+        if (wireGlow) { wireGlow.destroy(); wireGlow = null; }
+        if (karaokeGlow) { karaokeGlow.destroy(); karaokeGlow = null; }
+
         // Disconnect ResizeObserver to prevent leaks
         if (resizeObserver) {
             resizeObserver.disconnect();
@@ -2350,7 +2355,13 @@
             wireCanvas.className = 'viz-layer';
             box.appendChild(wireCanvas);
         }
-        wireCtx = wireCanvas.getContext('2d');
+        if (wireGlow) { wireGlow.destroy(); wireGlow = null; }
+        if (window.GlowLayer) {
+            wireGlow = window.GlowLayer.attach(wireCanvas, { scale: 0.25, radiusMul: 0.5, intensity: 1.0, passes: 1 });
+            wireCtx = wireGlow.ctx;
+        } else {
+            wireCtx = wireCanvas.getContext('2d');
+        }
 
         // Karaoke lyrics canvas (topmost layer)
         var oldKaraoke = box.querySelector('#viz-karaoke');
@@ -2359,7 +2370,13 @@
         karaokeCanvas.id = 'viz-karaoke';
         karaokeCanvas.className = 'viz-layer';
         box.appendChild(karaokeCanvas);
-        karaokeCtx = karaokeCanvas.getContext('2d');
+        if (karaokeGlow) { karaokeGlow.destroy(); karaokeGlow = null; }
+        if (window.GlowLayer) {
+            karaokeGlow = window.GlowLayer.attach(karaokeCanvas, { scale: 0.125, radiusMul: 0.5, intensity: 1.0, passes: 1 });
+            karaokeCtx = karaokeGlow.ctx;
+        } else {
+            karaokeCtx = karaokeCanvas.getContext('2d');
+        }
 
         // ASCII strobe overlay (between wireframe and karaoke)
         if (window.asciiStrobe && wireCanvas) {
@@ -2440,6 +2457,8 @@
             }
         });
 
+        if (wireGlow) wireGlow.resize(w, h);
+        if (karaokeGlow) karaokeGlow.resize(w, h);
         if (window.asciiStrobe) window.asciiStrobe.resize(w, h);
         if (bcViz) bcViz.setRendererSize(w, h);
     }
@@ -2490,7 +2509,7 @@
                     height: milkCanvas.height,
                     meshWidth: 32,
                     meshHeight: 24,
-                    pixelRatio: window.devicePixelRatio || 1
+                    pixelRatio: 1   // capped: DPR 2 quadrupled the per-preset fill cost for no visible gain
                 }
             );
 
@@ -2623,16 +2642,22 @@
         }
 
         drawHead(amp, bass, vocalPresence, getLyricMouthState(vizTime));
+        if (wireGlow) wireGlow.end();   // one bloom pass instead of per-stroke shadowBlur
 
         // ASCII strobe: beat-triggered ASCII 3D effect overlay
         if (window.asciiStrobe && window.asciiStrobe.isEnabled()) {
             window.asciiStrobe.tick(bass, amp, beatDetector, activeChar, headProjectionState, mouthOpen);
         }
 
-        if (lyricMode === LYRIC_MODE_SPITTING && !inlineEditorVisible) {
-            syncLyricsSpitting();
-        } else {
-            syncLyrics();
+        if (karaokeGlow) karaokeGlow.begin();
+        try {
+            if (lyricMode === LYRIC_MODE_SPITTING && !inlineEditorVisible) {
+                syncLyricsSpitting();
+            } else {
+                syncLyrics();
+            }
+        } finally {
+            if (karaokeGlow) karaokeGlow.end();   // bloom sample must run even if a lyric effect throws
         }
         syncLyricEditorUi(vizTime);
     }
@@ -2643,7 +2668,7 @@
     function drawHead(amp, bass, vocalPresence, lyricMouth) {
         if (!wireCtx || !wireCanvas) return;
         var W = wireCanvas.width, H = wireCanvas.height;
-        wireCtx.clearRect(0, 0, W, H);
+        if (wireGlow) wireGlow.begin(); else wireCtx.clearRect(0, 0, W, H);
 
         // --- Dark backdrop halo: dim the MilkDrop behind the character ---
         // Stronger when audio energy is high (busy background).
@@ -2656,12 +2681,13 @@
             // Base halo is subtle; ramps up with amplitude
             var energy = Math.min(1, (headAmp || 0) * 1.6 + (headBass || 0) * 0.5);
             var alpha = 0.12 + energy * 0.22;   // 0.12 idle → 0.34 peak
-            var grad = wireCtx.createRadialGradient(cx, cy, rMax * 0.05, cx, cy, rMax);
+            var hctx = wireGlow ? wireGlow.under : wireCtx;   // halo darkens, must not bloom
+            var grad = hctx.createRadialGradient(cx, cy, rMax * 0.05, cx, cy, rMax);
             grad.addColorStop(0, 'rgba(0,0,0,' + alpha.toFixed(3) + ')');
             grad.addColorStop(0.55, 'rgba(0,0,0,' + (alpha * 0.55).toFixed(3) + ')');
             grad.addColorStop(1, 'rgba(0,0,0,0)');
-            wireCtx.fillStyle = grad;
-            wireCtx.fillRect(0, 0, W, H);
+            hctx.fillStyle = grad;
+            hctx.fillRect(0, 0, W, H);
         })();
 
         // Constrain head rotation during lyrics so words come from the mouth;
@@ -6232,7 +6258,10 @@
         var mth = char.mouth;
 
         // Moustache sits between nose base and upper lip
-        var stacheY = (char.nose.base[0][1] + mth.y) * 0.5 + 0.01;
+        // Custom characters can have a moustache but no nose; fall back to a
+        // nose-base height above the mouth instead of throwing every frame.
+        var noseBaseY = (char.nose && char.nose.base && char.nose.base[0]) ? char.nose.base[0][1] : (mth.y + 0.16);
+        var stacheY = (noseBaseY + mth.y) * 0.5 + 0.01;
         var stacheZ = mth.z + 0.02;  // slightly in front of mouth
 
         // Center point (under nose)
@@ -9019,7 +9048,9 @@
         for (var i = 0; i < wordExplosions.length; i++) {
             var fragment = wordExplosions[i];
             var age = now - fragment.spawnTime;
-            if (age >= fragment.life) continue;
+            // age < 0 after a backward seek: (0.3 + t) would go negative and
+            // arc() throws, aborting the rest of the frame.
+            if (age < 0 || age >= fragment.life) continue;
 
             var t = age / fragment.life;
 
@@ -9371,7 +9402,25 @@
             if (!name) return null;   // pool not loaded yet for this tier
             particle.figFonts[tierIdx] = name;
         }
-        return window.tdfBrowser.renderWithFont(word, particle.figFonts[tierIdx]);
+        return _figLayoutCached(word, particle.figFonts[tierIdx]);
+    }
+
+    // Layout cache: renderWithFont re-walks every glyph cell and builds row
+    // strings; doing that per particle per frame was measurable. Keyed by
+    // font+word, bounded, null results are not cached (font may still load).
+    var _figLayoutCache = {};
+    var _figLayoutKeys  = [];
+    var _FIG_LAYOUT_CACHE_MAX = 256;
+    function _figLayoutCached(word, fontName) {
+        var key = fontName + '|' + word;
+        var hit = _figLayoutCache[key];
+        if (hit) return hit;
+        var data = window.tdfBrowser.renderWithFont(word, fontName);
+        if (!data) return null;
+        _figLayoutCache[key] = data;
+        _figLayoutKeys.push(key);
+        if (_figLayoutKeys.length > _FIG_LAYOUT_CACHE_MAX) delete _figLayoutCache[_figLayoutKeys.shift()];
+        return data;
     }
 
     function _figGet(word, tierIdx, particle) {
@@ -9388,61 +9437,75 @@
 
     // Draw a FIGlet grid on the karaoke canvas at (cx, cy) centered.
     // cellPx = pixel height per cell row (controls overall size).
-    function _figDraw(ctx, data, cx, cy, alpha, brightness, cellPx) {
-        if (!data || !data.rows || !data.rows.length) return { w: 0, h: 0 };
+    // The grid is rasterised once per (layout, cell size) into a sprite and
+    // then drawn with a single drawImage; previously every cell was a
+    // shadowBlur'd fillText per frame (hundreds per word in Firefox's
+    // software canvas). Bloom now comes from the karaoke GlowLayer pass.
+    var _figSpriteCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
+    var _figSpriteList  = [];           // [{data, cellH, canvas}] for bounded eviction
+    var _FIG_SPRITE_MAX = 48;
+    function _figSprite(data, cellH) {
+        var perData = _figSpriteCache ? _figSpriteCache.get(data) : null;
+        if (perData && perData[cellH]) return perData[cellH];
         var rows = data.rows;
         var height = rows.length;
-
-        var cellH = cellPx || 14;
-        var cellW = Math.round(cellH * 0.6);  // monospace aspect
-        // data.width from SSJS is UTF-8 byte count (wrong) — use browser char count
-        var totalW = rows[0].chars.length * cellW;
-        var totalH = height * cellH;
-
-        var ox = cx - totalW / 2;
-        var oy = cy - totalH / 2;
-
-        ctx.save();
-        ctx.font = cellH + 'px ' + _FIG_FONT_CSS;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.globalAlpha = alpha;
-
+        var cellW = Math.round(cellH * 0.6);
+        var totalW = Math.max(1, rows[0].chars.length * cellW);
+        var totalH = Math.max(1, height * cellH);
+        var c = document.createElement('canvas');
+        c.width = totalW; c.height = totalH;
+        var g = c.getContext('2d');
+        g.font = cellH + 'px ' + _FIG_FONT_CSS;
+        g.textAlign = 'left';
+        g.textBaseline = 'top';
         for (var r = 0; r < height; r++) {
             var row = rows[r];
-            var chars = row.chars;
-            var colors = row.colors;
+            var chars = row.chars, colors = row.colors;
             if (!chars || !colors) continue;
-
-            for (var c = 0; c < chars.length; c++) {
-                var ch = chars.charAt(c);
+            for (var ci = 0; ci < chars.length; ci++) {
+                var ch = chars.charAt(ci);
                 if (!ch || ch === ' ') continue;
-
-                var colorVal = (colors[c] !== undefined && colors[c] !== null) ? colors[c] : 7;
+                var colorVal = (colors[ci] !== undefined && colors[ci] !== null) ? colors[ci] : 7;
                 var cgaIdx = colorVal & 0x0F;
                 var bgIdx  = (colorVal >> 4) & 0x07;
                 if (cgaIdx === 0 && bgIdx === 0) continue;
-
-                var px = ox + c * cellW;
-                var py = oy + r * cellH;
-
+                var px = ci * cellW, py = r * cellH;
                 if (bgIdx > 0) {
-                    var bgHex = _CGA16[bgIdx] || '#000000';
-                    ctx.fillStyle = brightness < 1 ? _figDimColor(bgHex, brightness * 0.6) : bgHex;
-                    ctx.fillRect(px, py, cellW, cellH);
+                    g.fillStyle = _CGA16[bgIdx] || '#000000';
+                    g.fillRect(px, py, cellW, cellH);
                 }
-
-                var fgHex = _CGA16[cgaIdx] || '#FFFFFF';
-                var fgColor = brightness < 1 ? _figDimColor(fgHex, brightness) : fgHex;
-                ctx.fillStyle = fgColor;
-                ctx.shadowColor = fgColor;
-                ctx.shadowBlur = 3;
-                ctx.fillText(ch, px, py);
-                ctx.shadowBlur = 0;
+                g.fillStyle = _CGA16[cgaIdx] || '#FFFFFF';
+                g.fillText(ch, px, py);
             }
         }
+        var sprite = { canvas: c, w: totalW, h: totalH };
+        if (_figSpriteCache) {
+            if (!perData) { perData = {}; _figSpriteCache.set(data, perData); }
+            perData[cellH] = sprite;
+            _figSpriteList.push({ data: data, cellH: cellH });
+            if (_figSpriteList.length > _FIG_SPRITE_MAX) {
+                var old = _figSpriteList.shift();
+                var pd = _figSpriteCache.get(old.data);
+                if (pd) delete pd[old.cellH];
+            }
+        }
+        return sprite;
+    }
+
+    function _figDraw(ctx, data, cx, cy, alpha, brightness, cellPx) {
+        if (!data || !data.rows || !data.rows.length) return { w: 0, h: 0 };
+        var cellH = cellPx || 14;
+        var sprite = _figSprite(data, cellH);
+        var ox = cx - sprite.w / 2;
+        var oy = cy - sprite.h / 2;
+        ctx.save();
+        // brightness used to scale the colour toward black; over the dark
+        // visualizer background a matching alpha reads the same.
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha * (brightness < 1 ? brightness : 1)));
+        ctx.shadowBlur = 3;   // recorded by GlowLayer as bloom request; a no-op otherwise
+        ctx.drawImage(sprite.canvas, ox, oy);
         ctx.restore();
-        return { w: totalW, h: totalH };
+        return { w: sprite.w, h: sprite.h };
     }
 
     function _figDimColor(hex, brightness) {

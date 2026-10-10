@@ -1,0 +1,12 @@
+# After fixes (glow-layer + FIGlet sprite cache + strobe canvas reuse), 2026-10-09
+
+SUMMARY firefox
+scenario                 fps  tick ms    max  >16ms  bc ms  strobe  eq fps  eq ms  glow ms  tick range (ms)
+baseline                51.9     7.59     21      5      0    3.36    27.3   1.12  1.68/0.96 7.16-7.62  (no butterchurn)
+no-strobe               63.4      6.5     21      3      0       0    31.6   1.19  1.6/1.38 4.73-8.35  (no butterchurn)
+lyrics-bouncing         54.9     7.52     22      6      0    4.48    29.2   1.18  1.44/1.2 7.44-10.56  (no butterchurn)
+
+# no-ctx.filter fallback (NOFILTER=1)
+SUMMARY firefox
+scenario                 fps  tick ms    max  >16ms  bc ms  strobe  eq fps  eq ms  glow ms  tick range (ms)
+baseline                60.6      8.1     24     15      0    3.87    30.5   1.07  1.11/0.23 8.1-8.1  (no butterchurn)
