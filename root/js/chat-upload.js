@@ -6,11 +6,12 @@
  * comes from the server's `begin` reply and is a multiple of 3 bytes so the
  * base64 seams decode cleanly.
  *
- * Dropping a file IS the intent to post it, so the message goes out on its own
- * as soon as the upload (and, for video, the conversion) finishes. The compose
- * box is never blocked while that happens — normal typing and sending keep
- * working, which matters because a big video can take the better part of a
- * minute to convert.
+ * When the upload (and, for video, the conversion) finishes, the resulting URL
+ * is handed to the page's `send` callback, which puts it in the compose box so
+ * the user can add text around it before sending. The compose box is never
+ * blocked while the upload runs — normal typing and sending keep working,
+ * which matters because a big video can take the better part of a minute to
+ * convert.
  *
  * Only one video may be in flight per user: conversion is the expensive thing
  * this box does, and the server enforces the same rule for the second-tab case.
@@ -298,7 +299,7 @@
                 if (job.kind === 'video') _videoInFlight = false;
 
                 setChip(job, 'done', 100,
-                    result.transcoded ? convertedNote(result) : '<em>Posted.</em>');
+                    result.transcoded ? convertedNote(result) : '<em>Ready &mdash; add a message and press Enter.</em>');
                 removeChip(job, result.transcoded ? 9000 : 1200);
 
                 if (_options && typeof _options.send === 'function') {

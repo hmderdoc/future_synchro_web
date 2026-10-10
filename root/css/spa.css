@@ -156,6 +156,11 @@
 .terminal-panel.is-hidden {
     opacity: 0;
     pointer-events: none;
+    /* pointer-events:none is not honoured for iframes by every engine, and
+       a transparent full-screen iframe still catching wheel events hijacks
+       page scrolling. visibility:hidden takes it out of hit-testing
+       everywhere while keeping its layout, so font measurement still works. */
+    visibility: hidden;
 }
 
 /* fTelnet container fills remaining space - block layout so fTelnet can measure */
@@ -1105,16 +1110,45 @@ body.terminal-open {
 
 /* ============ Chat Toasts ============ */
 
+/* Bottom-right: the left edge is where message text and the sidebar sit,
+   so toasts there cover what the user is reading. */
 #chat-toasts {
     position: fixed;
     bottom: 20px;
-    left: 20px;
+    right: 20px;
     z-index: 1090;
     display: flex;
     flex-direction: column-reverse;
     gap: 8px;
     max-width: 360px;
     pointer-events: none;
+}
+
+/* With the two-column layout, keep toasts inside the sidebar column (330px,
+   see the #sidebar rule above) so they never cover the content area. The
+   padding is the inset from the column edges; the sidebar's own scrollbar
+   sits inside the right 16px or so. Whichever side the sidebar is on, the
+   strip follows it; with no sidebar the corner rule above still applies. */
+@media (min-width: 768px) {
+    body:has(.spa-container.container-fluid > .row > #content + #sidebar) #chat-toasts {
+        right: 0;
+        width: 330px;
+        max-width: 330px;
+        padding: 0 20px 0 12px;
+        box-sizing: border-box;
+    }
+    body:has(.spa-container.container-fluid > .row > #sidebar + #content) #chat-toasts {
+        left: 0;
+        right: auto;
+        width: 330px;
+        max-width: 330px;
+        padding: 0 12px 0 20px;
+        box-sizing: border-box;
+    }
+    body:has(.spa-container.container-fluid > .row > #sidebar + #content) .chat-toast-enter,
+    body:has(.spa-container.container-fluid > .row > #sidebar + #content) .chat-toast-exit {
+        transform: translateX(-30px);
+    }
 }
 
 .chat-toast {
@@ -1135,11 +1169,11 @@ body.terminal-open {
 
 .chat-toast-enter {
     opacity: 0;
-    transform: translateX(-30px);
+    transform: translateX(30px);
 }
 .chat-toast-exit {
     opacity: 0;
-    transform: translateX(-30px);
+    transform: translateX(30px);
 }
 
 .chat-toast-body {

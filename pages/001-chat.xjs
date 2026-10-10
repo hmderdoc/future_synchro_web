@@ -1904,6 +1904,29 @@ textarea.chat-web-input {
         }
     }
 
+    // The lock changes only on a real scroll. Reaching the bottom locks;
+    // scrolling UP away from it unlocks. A downward scroll that stops short
+    // of the bottom leaves the lock alone — the pane may have shrunk under a
+    // pinned reader (the composer growing, an upload chip, the keyboard),
+    // which opens a gap without any scroll event, and a reader nudging down
+    // through that gap has not asked to stop following the room.
+    var lastMessageScrollTop = 0;
+    function onMessageScroll() {
+        var top = msgContainer ? msgContainer.scrollTop : 0;
+        var scrolledUp = top < lastMessageScrollTop;
+        lastMessageScrollTop = top;
+        if (isMessageListNearBottom()) {
+            messageBottomLocked = true;
+            readingAnchor = null;
+        } else if (scrolledUp && messageBottomLocked) {
+            messageBottomLocked = false;
+            cancelPendingMessageScroll();
+            readingAnchor = captureScrollAnchor();
+        } else if (!messageBottomLocked) {
+            readingAnchor = captureScrollAnchor();
+        }
+    }
+
     // A reader scrolled up into history must not lose their place. The
     // transcript is rebuilt wholesale and capped at 200 messages, so once a
     // room is full every new message evicts the oldest and everything shifts
@@ -1963,6 +1986,9 @@ textarea.chat-web-input {
             return;
         }
         messageResizeObserver.disconnect();
+        // The pane itself too: when the composer grows or an upload chip
+        // appears it shrinks, and a pinned reader must stay pinned.
+        messageResizeObserver.observe(msgContainer);
         for (var i = 0; i < msgContainer.children.length; i++) {
             messageResizeObserver.observe(msgContainer.children[i]);
         }
@@ -3223,7 +3249,10 @@ textarea.chat-web-input {
         var prevSender = '';
         var prevTime = 0;
         var groupWindow = 120000;
-        var shouldStickToBottom = forceMessageScrollToBottom || isMessageListNearBottom();
+        // Trust the lock, not a fresh measurement: the pane can shrink under a
+        // pinned reader with no scroll event (see onMessageScroll), and a live
+        // gap check here would mistake that for having scrolled up.
+        var shouldStickToBottom = forceMessageScrollToBottom || messageBottomLocked;
         var previousScrollTop = msgContainer ? msgContainer.scrollTop : 0;
         var scrollAnchor = shouldStickToBottom ? null : captureScrollAnchor();
 
@@ -3663,7 +3692,7 @@ textarea.chat-web-input {
     }
 
     if (msgContainer) {
-        msgContainer.addEventListener('scroll', syncMessageBottomLock, { passive: true });
+        msgContainer.addEventListener('scroll', onMessageScroll, { passive: true });
         if (window.ResizeObserver) {
             messageResizeObserver = new ResizeObserver(onMessageContentResized);
         }
@@ -3843,19 +3872,33 @@ textarea.chat-web-input {
     }
 
     // ═══ Drag-and-drop uploads ═══
-    // Dropping a file is the intent to post it, so the URL is sent as its own
-    // message once the upload (and, for video, the conversion) is done. The
-    // compose box is deliberately left alone throughout — a video can take the
-    // better part of a minute and chat should stay usable while it runs.
+    // A finished upload drops its URL into the compose box at the cursor rather
+    // than posting on its own: the user adds whatever text goes with it (a
+    // caption, or a bot command that takes an image URL) and hits Enter like any
+    // other message. The box is never blocked while the upload runs — a video
+    // can take the better part of a minute and chat should stay usable.
     var uploadHost = document.getElementById('chat-upload-host');
-    if (window.ChatUpload && uploadHost && msgContainer) {
+    if (window.ChatUpload && uploadHost && msgContainer && chatText) {
         window.ChatUpload.init({
             dropTarget: msgContainer,
             pasteTarget: chatText,
             chipHost: uploadHost,
             send: function (url) {
-                forceMessageScrollToBottom = true;
-                return chatService.send(url);
+                var val = chatText.value;
+                var start = typeof chatText.selectionStart === 'number' ? chatText.selectionStart : val.length;
+                var end = typeof chatText.selectionEnd === 'number' ? chatText.selectionEnd : start;
+                var before = val.substring(0, start);
+                var after = val.substring(end);
+                // Pad with spaces so the URL never fuses with neighbouring text.
+                if (before.length && !/\s$/.test(before)) before += ' ';
+                if (!after.length || !/^\s/.test(after)) after = ' ' + after;
+                chatText.value = before + url + after;
+                var cursor = before.length + url.length + 1;
+                chatText.focus();
+                chatText.setSelectionRange(cursor, cursor);
+                // Let autoResize grow the box to fit the new line.
+                chatText.dispatchEvent(new Event('input', { bubbles: true }));
+                return true;
             }
         });
     }
