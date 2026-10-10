@@ -108,9 +108,8 @@
                     var upper = pid.toUpperCase();
                     var info = accessSet[upper];
                     if (!info) continue;
-                    seen[upper] = true;
-                    list.push(buildEntry(pid, info, st.count || 0, st.seconds || 0,
-                        st.lastTimestamp || 0, current));
+                    addEntry(list, seen, upper, buildEntry(pid, info, st.count || 0,
+                        st.seconds || 0, st.lastTimestamp || 0, current));
                 }
             }
         } else {
@@ -120,9 +119,8 @@
                 var upper = pid.toUpperCase();
                 var info = accessSet[upper];
                 if (!info) continue;
-                seen[upper] = true;
-                list.push(buildEntry(pid, info, p.count || 0, p.seconds || 0,
-                    p.lastTimestamp || 0, current));
+                addEntry(list, seen, upper, buildEntry(pid, info, p.count || 0,
+                    p.seconds || 0, p.lastTimestamp || 0, current));
             }
 
             data.programs.forEach(function (p) {
@@ -133,8 +131,27 @@
             });
         }
 
+        /* Programs without a 12x6 icon bin (text/icons/<CODE>.bin) stay
+           off the list. */
+        list = list.filter(function (entry) { return entry.hasIcon; });
         sortPrograms(list);
         return list;
+    }
+
+    /* The usage log records the same program under more than one spelling
+       of its code (nba_jam and NBA_JAM). Fold those into one row instead of
+       listing the game twice. */
+    function addEntry(list, seen, upper, entry) {
+        var existing = seen[upper];
+        if (existing && typeof existing === 'object') {
+            existing.count += entry.count;
+            existing.seconds += entry.seconds;
+            existing.lastTimestamp = Math.max(existing.lastTimestamp || 0, entry.lastTimestamp || 0);
+            existing.uniqueUsers = Math.max(existing.uniqueUsers, entry.uniqueUsers);
+            return;
+        }
+        seen[upper] = entry;
+        list.push(entry);
     }
 
     function buildEntry(pid, info, count, seconds, lastTimestamp, month) {
