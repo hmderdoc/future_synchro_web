@@ -4172,6 +4172,10 @@ body.viz-open .rl-list {
     padding: 0.75rem;
 }
 
+.avatar-settings-current-preview.is-disabled .avatar-settings-image {
+    opacity: 0.35;
+}
+
 .avatar-settings-image {
     display: block;
     image-rendering: pixelated;

@@ -404,6 +404,37 @@ if ((http_request.method === 'GET' || http_request.method === 'POST') && http_re
 				};
 				break;
 
+			case 'set-avatar-enabled':
+				/* Disable or re-enable the saved avatar without touching its
+				   art: the same [avatar] disabled key the door's /avatar off
+				   and the shell's chooser write. */
+				if (user.alias === settings.guest) {
+					reply = { success: false, error: 'Login required' };
+					break;
+				}
+				if (typeof http_request.query.enabled === 'undefined') {
+					reply = { success: false, error: 'No state supplied' };
+					break;
+				}
+				var avatar_lib = getAvatarLib();
+				var wantEnabled = String(http_request.query.enabled[0]) === '1';
+				var current = avatar_lib.read_localuser(user.number);
+				if (!current || !current.data) {
+					reply = { success: false, error: 'No avatar saved yet' };
+					break;
+				}
+				/* enable_localuser returns false when the state already
+				   matches; that still counts as success. */
+				if (!!current.disabled === !wantEnabled ||
+					avatar_lib.enable_localuser(user.number, wantEnabled)
+				) {
+					current = avatar_lib.read_localuser(user.number);
+					reply = { success: true, avatar: current || null };
+				} else {
+					reply = { success: false, error: 'Unable to save avatar state' };
+				}
+				break;
+
 			default:
 				break;
 

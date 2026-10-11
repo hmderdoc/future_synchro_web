@@ -190,6 +190,7 @@
             status: root.querySelector('[data-avatar-settings-status]'),
             library: root.querySelector('[data-avatar-settings-library]'),
             draw: root.querySelector('[data-avatar-settings-draw]'),
+            toggle: root.querySelector('[data-avatar-settings-toggle]'),
             input: root.querySelector('[data-avatar-settings-input]'),
             modal: root.querySelector('[data-avatar-settings-modal]'),
             modalClose: root.querySelectorAll('[data-avatar-settings-modal-close]'),
@@ -227,6 +228,22 @@
             refs.status.textContent = message || '';
         }
 
+        function isDisabled() {
+            var d = state.current ? state.current.disabled : false;
+            return d === true || d === 'true' || d === 1 || d === '1';
+        }
+
+        /* Disable / Enable shows only when there is a saved avatar. A
+           disabled avatar keeps its art: the preview dims and nobody sees it
+           in chat until it is enabled again. */
+        function renderToggle() {
+            var disabled = isDisabled();
+            if (refs.currentPreview) refs.currentPreview.classList.toggle('is-disabled', !!state.current && disabled);
+            if (!refs.toggle) return;
+            refs.toggle.hidden = !state.current;
+            refs.toggle.textContent = disabled ? 'Enable Avatar' : 'Disable Avatar';
+        }
+
         function setCurrentAvatar(avatar) {
             state.current = avatar && avatar.data ? avatar : null;
             if (refs.input) refs.input.value = state.current ? state.current.data : '';
@@ -238,6 +255,24 @@
             if (state.current && state.mode !== 'registration') {
                 updateAvatarTargets(avatarKeys(), state.current.data);
             }
+            renderToggle();
+        }
+
+        async function toggleAvatarEnabled() {
+            if (!state.current || !refs.toggle) return;
+            var enable = isDisabled();
+            refs.toggle.disabled = true;
+            var payload = await v4_post('./api/system.ssjs', {
+                call: 'set-avatar-enabled',
+                enabled: enable ? '1' : '0'
+            });
+            refs.toggle.disabled = false;
+            if (!payload || !payload.success || !payload.avatar) {
+                setStatus(payload && payload.error ? payload.error : 'Unable to save avatar state.', 'error');
+                return;
+            }
+            setCurrentAvatar(payload.avatar);
+            setStatus(enable ? 'Avatar enabled.' : 'Avatar disabled. Others see no avatar until you enable it.', enable ? 'success' : 'muted');
         }
 
         function renderCollectionMeta() {
@@ -507,6 +542,7 @@
         });
         refs.apply.addEventListener('click', saveSelectedCollectionAvatar);
         refs.draw.addEventListener('click', openEditor);
+        if (refs.toggle) refs.toggle.addEventListener('click', toggleAvatarEnabled);
         refs.library.addEventListener('click', openLibraryModal);
         refs.modalClose.forEach(function (node) {
             node.addEventListener('click', closeModal);

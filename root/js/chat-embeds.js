@@ -283,7 +283,10 @@
        mods/load/social_lib.js via sbbsConfig): generated pictures land in
        chat first, under the same file names, so they veil here too. */
     function isNsfwText(text) {
-        var words = (window.sbbsConfig && window.sbbsConfig.nsfwKeywords) || [];
+        /* No window under node (see the dual-environment note at the top):
+           no configured keywords there, so nothing is veiled. */
+        var cfg = typeof window !== 'undefined' ? window.sbbsConfig : null;
+        var words = (cfg && cfg.nsfwKeywords) || [];
         if (!words.length || !text) return false;
         var decoded = String(text);
         try { decoded = decodeURIComponent(decoded); } catch (_e) { /* keep as is */ }
