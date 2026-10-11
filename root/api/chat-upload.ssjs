@@ -31,6 +31,7 @@ var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
+load(settings.web_lib + 'chat-media-config.js');
 
 /* ------------------------------------------------------------- constants */
 
@@ -44,44 +45,24 @@ var LOCK_DIR = STAGE_DIR + 'locks/';
 var MEDIA_DIR = backslash(settings.web_root) + 'chatmedia/';
 var MEDIA_URL_PATH = '/chatmedia/';
 
+/* Sysop-tunable limits: [chatmedia] in ctrl/modopts.ini (lib/chat-media-config.js). */
+var MEDIA_CONFIG = chatMediaConfig();
+
 var ENCODE_SLOTS = 2;
 var ENCODE_SLOT_STALE_SEC = 900;      /* a slot held this long lost its owner */
 var STAGE_STALE_SEC = 3600;           /* abandoned part files */
-var MAX_OPEN_UPLOADS = 3;             /* unfinished uploads per user */
+var MAX_OPEN_UPLOADS = MEDIA_CONFIG.maxOpenUploads;   /* unfinished uploads per user */
 
-var VIDEO_MAX_SECONDS = 15;
-var VIDEO_MAX_HEIGHT = 720;
+var VIDEO_MAX_SECONDS = MEDIA_CONFIG.videoMaxSeconds;
+var VIDEO_MAX_HEIGHT = MEDIA_CONFIG.videoMaxHeight;
 var VIDEO_TARGET_BYTES = 20 * 1024 * 1024;
 
 /* Declared extension -> stored extension, kind, and the stream ffprobe must
-   find for the upload to count as real media of that kind. */
-var TYPES = {
-    png:  { ext: 'png',  kind: 'image', stream: 'video' },
-    jpg:  { ext: 'jpg',  kind: 'image', stream: 'video' },
-    jpeg: { ext: 'jpg',  kind: 'image', stream: 'video' },
-    gif:  { ext: 'gif',  kind: 'image', stream: 'video' },
-    webp: { ext: 'webp', kind: 'image', stream: 'video' },
-    mp3:  { ext: 'mp3',  kind: 'audio', stream: 'audio' },
-    m4a:  { ext: 'm4a',  kind: 'audio', stream: 'audio' },
-    ogg:  { ext: 'ogg',  kind: 'audio', stream: 'audio' },
-    oga:  { ext: 'ogg',  kind: 'audio', stream: 'audio' },
-    wav:  { ext: 'wav',  kind: 'audio', stream: 'audio' },
-    flac: { ext: 'flac', kind: 'audio', stream: 'audio' },
-    mp4:  { ext: 'mp4',  kind: 'video', stream: 'video' },
-    m4v:  { ext: 'mp4',  kind: 'video', stream: 'video' },
-    mov:  { ext: 'mp4',  kind: 'video', stream: 'video' },
-    webm: { ext: 'mp4',  kind: 'video', stream: 'video' },
-    ans:  { ext: 'ans',  kind: 'ansi',  stream: null },
-    asc:  { ext: 'asc',  kind: 'ansi',  stream: null },
-    nfo:  { ext: 'asc',  kind: 'ansi',  stream: null }
-};
+   find for the upload to count as real media of that kind (the full table is
+   CHAT_MEDIA_TYPES; allowed_types narrows it). */
+var TYPES = MEDIA_CONFIG.types;
 
-var MAX_BYTES = {
-    image: 20 * 1024 * 1024,
-    audio: 20 * 1024 * 1024,
-    video: 100 * 1024 * 1024,
-    ansi:  1 * 1024 * 1024
-};
+var MAX_BYTES = MEDIA_CONFIG.maxBytes;
 
 /* ------------------------------------------------------------ small utils */
 
@@ -363,6 +344,9 @@ case 'begin':
         var id;
         var f;
 
+        if (!MEDIA_CONFIG.enabled) {
+            fail('Chat attachments are turned off on this board.');
+        }
         if (!type) {
             fail('That file type cannot be posted to chat.');
         }
@@ -564,7 +548,7 @@ case 'finish':
             transcoded: transcoded,
             reason: reason,
             encodeMs: encodeMs,
-            expiresDays: 7
+            expiresDays: MEDIA_CONFIG.retentionDays
         });
     }());
     break;

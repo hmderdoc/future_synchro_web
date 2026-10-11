@@ -104,12 +104,19 @@
         if (msg.bridge === 'mrc') return 'chat_mrc';
         if (msg.bridge === 'ddial') return 'chat_ddial';
         if (msg.bridge === 'irc') return 'chat_irc';
-        var me = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
-        var said = String(getMessageText(msg) || msg.previewText || '');
-        if (me && new RegExp('(^|[^a-z0-9])@?' + me.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)', 'i').test(said)) {
+        if (mentionsMe(getMessageText(msg) || msg.previewText || '')) {
             return 'chat_mention';
         }
         return 'chat_local';
+    }
+
+    /* True when text says the signed-in user's alias as a whole word (an
+       optional leading @, any case). One rule for toasts and the transcript
+       highlight on the chat page. */
+    function mentionsMe(text) {
+        var me = (window.sbbsConfig && window.sbbsConfig.userAlias) || '';
+        if (!me) return false;
+        return new RegExp('(^|[^a-z0-9])@?' + me.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)', 'i').test(String(text || ''));
     }
 
     /* How the user wants that kind announced: 'off', 'web' (toast),
@@ -2933,6 +2940,7 @@
 
     window.ChatService = {
         send: send,
+        mentionsMe: mentionsMe,
         createRoom: joinRoom,
         joinRoom: joinRoom,
         leaveRoom: leaveRoom,

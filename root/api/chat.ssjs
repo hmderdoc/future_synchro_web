@@ -24,6 +24,7 @@ var settings = load('modopts.js', 'web') || { web_directory: '../webv4' };
 load(settings.web_directory + '/lib/init.js');
 load(settings.web_lib + 'auth.js');
 load(settings.web_lib + 'avatar-profiles.js');
+load(settings.web_lib + 'chat-limits.js');
 var request = require({}, settings.web_lib + 'request.js', 'request');
 /* Members' chat handle styles (per-letter colours + tag): the record the
    terminal shell and the web Settings page both edit. */
@@ -1887,7 +1888,7 @@ switch (action) {
             break;
         }
 
-        var maxMessageLen = (messageText.indexOf('[BITMAP|') === 0) ? 32000 : 1000;
+        var maxMessageLen = (messageText.indexOf('[BITMAP|') === 0) ? CHAT_MAX_BITMAP_LEN : CHAT_MAX_MESSAGE_LEN;
         if (messageText.length > maxMessageLen) {
             messageText = messageText.substr(0, maxMessageLen);
         }
@@ -1992,7 +1993,7 @@ switch (action) {
             break;
         }
 
-        var maxPrivateLen = (privateMessageText.indexOf('[BITMAP|') === 0) ? 32000 : 1000;
+        var maxPrivateLen = (privateMessageText.indexOf('[BITMAP|') === 0) ? CHAT_MAX_BITMAP_LEN : CHAT_MAX_MESSAGE_LEN;
         if (privateMessageText.length > maxPrivateLen) {
             privateMessageText = privateMessageText.substr(0, maxPrivateLen);
         }

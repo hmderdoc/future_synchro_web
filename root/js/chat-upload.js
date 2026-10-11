@@ -24,7 +24,9 @@
 
     /* Mirrors the server's TYPES table. Checked here only so an obviously wrong
        drop fails instantly instead of after a 100 MB upload; the server's copy
-       is the one that actually decides. */
+       is the one that actually decides. The page passes the board's
+       [chatmedia] values to init() as options.kinds / options.maxBytes; these
+       are the defaults when it does not. */
     var KINDS = {
         png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image',
         mp3: 'audio', m4a: 'audio', ogg: 'audio', oga: 'audio', wav: 'audio', flac: 'audio',
@@ -445,6 +447,8 @@
 
     function init(options) {
         _options = options || {};
+        if (_options.kinds) KINDS = _options.kinds;
+        if (_options.maxBytes) MAX_BYTES = _options.maxBytes;
         if (_options.dropTarget) bindDropZone(_options.dropTarget);
         if (_options.pasteTarget) {
             _options.pasteTarget.addEventListener('paste', function (event) {

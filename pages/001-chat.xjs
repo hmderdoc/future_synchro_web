@@ -1,4 +1,5 @@
 <!--Chat-->
+<?xjs load(settings.web_lib + 'chat-limits.js'); load(settings.web_lib + 'chat-media-config.js'); ?>
 <script type="text/javascript" src="./js/ansi-editor.js"></script>
 <script type="text/javascript" src="./js/ansi-editor-modal.js"></script>
 <script type="text/javascript" src="./js/chat-embeds.js"></script>
@@ -929,6 +930,12 @@ textarea.chat-web-input {
     color: #AAAAAA;
     background: transparent;
 }
+/* Mentions of you: yellow border and a dim yellow wash */
+.chat-web-page .chat-bubble-other.chat-bubble-mention {
+    border-color: #FFFF55;
+    border-left-width: 3px;
+    background: rgba(170, 85, 0, 0.18);
+}
 .chat-web-page .chat-bubble-self a {
     color: #55FFFF;
 }
@@ -1670,7 +1677,7 @@ textarea.chat-web-input {
                     <div id="chat-ansi-wrap" class="chat-ansi-wrap"></div>
                     <div id="chat-upload-host" class="chat-upload-host"></div>
                     <form id="chat-input" class="chat-input-area chat-web-form" autocomplete="off">
-                        <textarea id="chat-text" class="chat-web-input" maxlength="2000" rows="1" placeholder="Type a message..."></textarea>
+                        <textarea id="chat-text" class="chat-web-input" maxlength="<?xjs write(CHAT_MAX_MESSAGE_LEN); ?>" rows="1" placeholder="Type a message..."></textarea>
                         <button type="button" id="chat-ansi-toggle" class="chat-ansi-toggle">ANSI</button>
                         <button class="chat-web-send" type="submit">Send</button>
                     </form>
@@ -3276,6 +3283,7 @@ textarea.chat-web-input {
 
         var hiddenBySender = 0;
         var nsfwBitmaps = nsfwBitmapKeys(msgs);
+        var inPrivateView = getActiveView().type === 'private';
         msgs.forEach(function (message) {
             // The ignore list is shared with the terminal shell (person menu > Ignore).
             if (!message.isSelf && message.sender && window.PersonMenu && PersonMenu.isIgnored(message.sender, message.bridge || 'local')) { hiddenBySender++; return; }
@@ -3361,7 +3369,10 @@ textarea.chat-web-input {
             if (message.kind === 'bitmap' && message.bitmapKey) {
                 html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + ' chat-bitmap-bubble"' + keyAttr + '>' + renderBitmapBubble(message, !!nsfwBitmaps[message.bitmapKey] && !revealedBitmaps[message.bitmapKey]) + '</div>';
             } else {
-                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + '"' + keyAttr + '>' + renderRichMessageHtml(message.text || '', message.textColors) + '</div>';
+                // Someone else saying your name in a room. A private thread is
+                // all addressed to you already, so it gets no highlight.
+                var isMention = !isSelf && !inPrivateView && chatService && chatService.mentionsMe && chatService.mentionsMe(message.text);
+                html += '<div class="chat-bubble ' + (isSelf ? 'chat-bubble-self' : 'chat-bubble-other') + (isMention ? ' chat-bubble-mention' : '') + '"' + keyAttr + '>' + renderRichMessageHtml(message.text || '', message.textColors) + '</div>';
             }
             prevSender = displaySender;
             prevTime = message.timestamp || 0;
@@ -3878,8 +3889,12 @@ textarea.chat-web-input {
     // other message. The box is never blocked while the upload runs — a video
     // can take the better part of a minute and chat should stay usable.
     var uploadHost = document.getElementById('chat-upload-host');
-    if (window.ChatUpload && uploadHost && msgContainer && chatText) {
+    // [chatmedia] in ctrl/modopts.ini (lib/chat-media-config.js).
+    var chatMedia = <?xjs write(JSON.stringify(chatMediaClientConfig(chatMediaConfig()))); ?>;
+    if (window.ChatUpload && uploadHost && msgContainer && chatText && chatMedia.enabled) {
         window.ChatUpload.init({
+            kinds: chatMedia.kinds,
+            maxBytes: chatMedia.maxBytes,
             dropTarget: msgContainer,
             pasteTarget: chatText,
             chipHost: uploadHost,
