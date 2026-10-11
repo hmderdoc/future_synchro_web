@@ -251,6 +251,23 @@
         ? system.name + ' - Synchronet BBS'
         : page_ctrl.title + ': ' + system.name;
     var _seo_desc = _seo_desc_by_page[page] || _seo_site_desc;
+    var _seo_type = 'website';
+    var _seo_image = _seo_base + 'images/icon-512.png';
+    /* A records link naming one track (?track=Name.mp3) announces the track
+       itself: og:audio points at the same anonymous stream the records page
+       plays, so chat clients that read OpenGraph (the avatar chat door, link
+       previews) can play the song from a plain link. */
+    var _seo_audio = '';
+    if (page === '011-futureland-records.xjs'
+        && http_request.query.track !== undefined
+        && /^[^\/\\]+\.mp3$/i.test(String(http_request.query.track[0]))) {
+        var _seo_track = String(http_request.query.track[0]);
+        var _seo_track_q = 'dir=originalcontent_mp3s&file=' + encodeURIComponent(_seo_track);
+        _seo_type = 'music.song';
+        _seo_title = _seo_track.replace(/\.mp3$/i, '').replace(/_/g, ' ') + ': Vektrax Records';
+        _seo_audio = _seo_base + 'api/files.ssjs?call=stream-file&' + _seo_track_q;
+        _seo_image = _seo_base + 'api/files.ssjs?call=track-art&' + _seo_track_q;
+    }
     function _seoAttr(s) {
         return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
@@ -261,11 +278,15 @@
     <link rel="canonical" href="<? write(_seoAttr(_seo_base)); ?>">
     <meta property="og:url" content="<? write(_seoAttr(_seo_base)); ?>">
 <? } ?>
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="<? write(_seoAttr(_seo_type)); ?>">
     <meta property="og:site_name" content="<? write(_seoAttr(system.name)); ?>">
     <meta property="og:title" content="<? write(_seoAttr(_seo_title)); ?>">
     <meta property="og:description" content="<? write(_seoAttr(_seo_desc)); ?>">
-    <meta property="og:image" content="<? write(_seoAttr(_seo_base + 'images/icon-512.png')); ?>">
+    <meta property="og:image" content="<? write(_seoAttr(_seo_image)); ?>">
+<? if (_seo_audio) { ?>
+    <meta property="og:audio" content="<? write(_seoAttr(_seo_audio)); ?>">
+    <meta property="og:audio:type" content="audio/mpeg">
+<? } ?>
     <meta name="twitter:card" content="summary">
     <link rel="icon" href="./images/favicon.ico">
     <link rel="manifest" href="./manifest.json">
